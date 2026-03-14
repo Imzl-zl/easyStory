@@ -439,9 +439,545 @@ nodes:
 
 ---
 
-## 7. 配置资源管理
+## 7. 小说分析功能
 
-### 7.1 Skills/Agents/Hooks 的存储
+### 7.1 设计目标
+
+**用户上传小说,通过自然语言提问进行分析**
+
+用户可以上传已有小说,系统分析其文风、剧情、人物等特征,并支持用户用自然语言提问。
+
+### 7.2 核心挑战
+
+**长文本处理问题:**
+- 一本小说可能有几十万到上百万字
+- LLM 上下文窗口有限(Claude 200K tokens ≈ 30-40 万字)
+- 需要在保持分析质量的同时控制 token 消耗
+
+### 7.3 MVP 方案
+
+**采用方案:用户选择章节 + 智能采样**
+
+#### 功能流程
+
+```
+1. 用户上传小说(TXT/EPUB 等格式)
+   ↓
+2. 系统自动按章节切分
+   ↓
+3. 显示章节列表,用户选择:
+   - 选项 A: 选择具体章节范围(如 1-10 章)
+   - 选项 B: 智能采样(系统自动选择代表性章节)
+   ↓
+4. 系统分析选中章节
+   - 生成文风分析报告
+   - 存储分析结果
+   ↓
+5. 用户用自然语言提问
+   - "分析文风" → 返回文风特征
+   - "总结剧情" → 返回剧情摘要
+   - "分析人物" → 返回人物分析
+```
+
+#### 智能采样规则
+
+```yaml
+采样策略:
+  触发条件: 章节数 > 30
+  采样规则:
+    - 开头: 前 5 章(建立基调)
+    - 中间: 均匀采样 10 章(发展过程)
+    - 结尾: 后 5 章(高潮结局)
+    - 总计: 约 20 章
+
+  采样算法:
+    - 中间采样: 将剩余章节分成 10 段,每段取中间章节
+    - 确保覆盖整个故事发展过程
+```
+
+### 7.4 分析维度
+
+**系统生成的分析报告包含:**
+
+| 维度 | 说明 | 示例 |
+|-----|------|------|
+| 文风特征 | 用词风格、句式特点、节奏感 | "用词华丽,多用四字成语;长短句结合,节奏明快" |
+| 叙事视角 | 第一人称/第三人称,全知/限知 | "第三人称限知视角,主要跟随主角视角" |
+| 情感基调 | 整体情感倾向 | "轻松幽默,偶有紧张刺激" |
+| 剧情结构 | 故事发展脉络 | "开端-发展-高潮-结局,双线叙事" |
+| 人物特征 | 主要人物性格和关系 | "主角:坚韧不拔;配角:忠诚可靠" |
+
+### 7.5 存储设计
+
+**数据模型:**
+
+```python
+class NovelAnalysis(Base):
+    id: int
+    project_id: int
+    novel_title: str
+    total_chapters: int
+    analyzed_chapters: list[int]  # 分析的章节编号
+    analysis_result: dict  # JSON 格式的分析结果
+    created_at: datetime
+```
+
+**分析结果格式:**
+
+```json
+{
+  "writing_style": {
+    "vocabulary": "华丽,多用成语",
+    "sentence_structure": "长短句结合",
+    "rhythm": "节奏明快"
+  },
+  "narrative_perspective": "第三人称限知",
+  "emotional_tone": "轻松幽默",
+  "plot_structure": "双线叙事",
+  "characters": [
+    {"name": "主角", "traits": "坚韧不拔"}
+  ]
+}
+```
+
+### 7.6 用户交互
+
+**上传后的操作流程:**
+
+```
+用户上传小说
+  ↓
+系统显示章节列表(共 50 章)
+  ↓
+用户选择:
+  - [选择章节范围] 1-10 章
+  - [智能采样] 系统自动选择 20 章
+  ↓
+系统分析中...
+  ↓
+生成分析报告
+  ↓
+用户提问:
+  - "这本书的文风是什么样的?"
+  - "主角的性格特点是什么?"
+  - "适合什么类型的读者?"
+```
+
+### 7.7 技术实现要点
+
+**章节切分:**
+- 支持 TXT 格式(按"第X章"等标记切分)
+- 支持 EPUB 格式(按 HTML 结构切分)
+- 智能识别章节标题
+
+**分析流程:**
+```python
+async def analyze_novel(chapters: list[str]) -> dict:
+    # 1. 对每章生成简短摘要
+    summaries = []
+    for chapter in chapters:
+        summary = await llm.summarize(chapter)
+        summaries.append(summary)
+
+    # 2. 基于摘要生成整体分析
+    analysis = await llm.analyze(
+        prompt=f"基于以下章节摘要,分析整体文风:\n{summaries}"
+    )
+
+    return analysis
+```
+
+**问答系统:**
+```python
+async def answer_question(question: str, analysis: dict) -> str:
+    # 基于分析结果回答用户问题
+    response = await llm.chat(
+        context=f"小说分析结果:\n{analysis}",
+        question=question
+    )
+    return response
+```
+
+### 7.8 后续扩展
+
+**第二阶段可以加入:**
+- ⬜ RAG 检索增强(向量化存储章节)
+- ⬜ 更细粒度的分析(段落级、句子级)
+- ⬜ 对比分析(与其他小说对比)
+- ⬜ 风格迁移(学习某本小说的文风)
+
+### 7.9 分析自动生成 Skill (MVP 功能)
+
+**功能描述:**
+
+基于小说分析结果,自动生成模仿该文风的 Skill,形成"分析-学习-创作"的完整闭环。
+
+**实现流程:**
+
+```
+用户上传小说 → 分析文风
+  ↓
+提取文风特征(用词、句式、节奏)
+  ↓
+自动生成 Skill 配置文件
+  ↓
+用户可以直接使用生成的 Skill 创作新小说
+```
+
+**生成的 Skill 示例:**
+
+```yaml
+skill:
+  id: "skill.style.金庸风格"
+  name: "金庸武侠风格"
+  category: "chapter"
+  prompt: |
+    你是一位武侠小说作家,模仿金庸的写作风格。
+
+    【文风特征】
+    - 用词风格: {{ analysis.vocabulary }}
+    - 句式特点: {{ analysis.sentence_structure }}
+    - 节奏感: {{ analysis.rhythm }}
+
+    请按照以上风格创作内容:
+    {{ user_input }}
+```
+
+**技术实现:**
+
+```python
+async def generate_skill_from_analysis(
+    analysis: dict,
+    novel_title: str
+) -> SkillConfig:
+    """基于分析结果生成 Skill"""
+    prompt_template = f"""
+你是一位小说作家,模仿《{novel_title}》的写作风格。
+
+【文风特征】
+- 用词风格: {analysis['vocabulary']}
+- 句式特点: {analysis['sentence_structure']}
+- 节奏感: {analysis['rhythm']}
+
+请按照以上风格创作内容:
+{{{{ user_input }}}}
+"""
+
+    skill = SkillConfig(
+        id=f"skill.style.{novel_title}",
+        name=f"{novel_title}风格",
+        category="chapter",
+        prompt=prompt_template
+    )
+
+    # 保存到配置目录
+    save_skill_config(skill)
+
+    return skill
+```
+
+**用户交互:**
+
+```
+分析完成后,系统提示:
+"已生成《金庸武侠》风格的 Skill,是否保存?"
+  ↓
+用户确认保存
+  ↓
+Skill 自动添加到配置库
+  ↓
+用户在创建节点时可以选择使用该 Skill
+```
+
+---
+
+## 8. 快速开始模板 (MVP 功能)
+
+### 8.1 设计目标
+
+**降低新手门槛,提供预设的创作模板**
+
+新手用户可能不知道如何配置工作流,提供预设模板可以让他们快速开始创作。
+
+### 8.2 模板内容
+
+**MVP 提供 2-3 个基础模板:**
+
+1. **玄幻小说模板**
+   - 预配置的 Workflow(大纲 → 章节 → 审核)
+   - 预设的 Skills(玄幻大纲生成、玄幻章节生成)
+   - 预设的 Agents(逻辑审核、文风审核)
+
+2. **都市小说模板**
+   - 预配置的 Workflow
+   - 预设的 Skills(都市大纲生成、都市章节生成)
+   - 预设的 Agents
+
+### 8.3 用户交互
+
+```
+创建新项目时,用户选择:
+  ├─ 自由对话(高级用户)
+  └─ 快速开始(新手友好)
+      ├─ 玄幻小说模板
+      ├─ 都市小说模板
+      └─ 空白项目
+```
+
+**选择模板后:**
+
+```
+1. 系统加载预配置的 Workflow
+2. 引导用户填写基础信息:
+   - 小说题材
+   - 主角设定
+   - 世界观
+3. 自动生成初始设定
+4. 用户可以直接开始创作
+```
+
+### 8.4 模板配置示例
+
+**玄幻小说模板配置:**
+
+```yaml
+template:
+  id: "template.xuanhuan"
+  name: "玄幻小说模板"
+  description: "适合创作玄幻、修仙类小说"
+
+  workflow:
+    id: "workflow.xuanhuan_manual"
+    nodes:
+      - id: "outline"
+        name: "生成大纲"
+        type: "generate"
+        skill: "skill.outline.xuanhuan"
+
+      - id: "chapter_1"
+        name: "生成第1章"
+        type: "generate"
+        skill: "skill.chapter.xuanhuan"
+
+  guided_questions:
+    - question: "主角是什么身份?"
+      variable: "protagonist"
+    - question: "故事发生在什么世界?"
+      variable: "world_setting"
+    - question: "主要冲突是什么?"
+      variable: "conflict"
+```
+
+---
+
+## 9. 工作流可视化 (MVP 简化版)
+
+### 9.1 设计目标
+
+**让用户直观看到工作流执行进度**
+
+用户需要知道当前执行到哪个节点,每个节点的状态如何。
+
+### 9.2 MVP 范围
+
+**简化版:列表视图(不是图形化)**
+
+```
+工作流执行监控:
+  ├─ [大纲] ✅ 已完成 (2分钟前)
+  ├─ [第1章] 🔄 执行中 (生成内容...)
+  ├─ [第2章] ⏸️ 等待中
+  └─ [第3章] ⏸️ 等待中
+```
+
+**实时信息显示:**
+- 节点状态(已完成/执行中/等待中/失败)
+- 执行时间
+- Token 消耗
+- 审核结果(如果有)
+
+### 9.3 技术实现
+
+**使用 WebSocket 实时推送状态:**
+
+```typescript
+// 前端订阅工作流状态
+const ws = new WebSocket(`ws://localhost:8000/ws/${projectId}`)
+
+ws.onmessage = (event) => {
+  const update = JSON.parse(event.data)
+  // 更新 UI 显示
+  updateNodeStatus(update.nodeId, update.status)
+}
+```
+
+**后端推送状态更新:**
+
+```python
+async def execute_node(node_id: str):
+    # 推送状态:开始执行
+    await websocket.send_json({
+        "nodeId": node_id,
+        "status": "running",
+        "message": "生成内容..."
+    })
+
+    # 执行节点
+    result = await workflow_engine.execute_node(node_id)
+
+    # 推送状态:完成
+    await websocket.send_json({
+        "nodeId": node_id,
+        "status": "completed",
+        "output": result
+    })
+```
+
+### 9.4 不做的功能(留到第二阶段)
+
+- ⬜ 拖拽式图形化编排
+- ⬜ 复杂的流程图展示
+- ⬜ 节点连线和依赖可视化
+
+---
+
+## 10. 内容管理 (MVP 核心功能)
+
+### 10.1 设计目标
+
+**组织和管理创作素材**
+
+用户需要管理大纲、章节、人物设定、世界观等创作素材。
+
+### 10.2 内容组织结构
+
+```
+项目内容库:
+  ├─ 基础设定
+  │   ├─ 题材
+  │   ├─ 主角设定
+  │   └─ 世界观
+  ├─ 大纲
+  ├─ 章节内容
+  │   ├─ 第1章
+  │   ├─ 第2章
+  │   └─ ...
+  ├─ 人物设定
+  │   ├─ 主角
+  │   ├─ 配角
+  │   └─ 反派
+  └─ 世界观设定
+```
+
+### 10.3 内容版本管理
+
+**每次修改都创建新版本:**
+
+```
+第1章:
+  ├─ 版本1 (初稿) - 2024-03-14 10:00
+  ├─ 版本2 (精修) - 2024-03-14 11:30
+  └─ 版本3 (当前) - 2024-03-14 14:20
+```
+
+**版本操作:**
+- 查看历史版本
+- 回滚到指定版本
+- 对比两个版本(简单的文本 diff)
+
+### 10.4 数据模型
+
+**已在 Task 2 中定义:**
+
+```python
+class Content(Base):
+    id: int
+    project_id: int
+    content_type: str  # "outline", "chapter", "character", "world_setting"
+    title: str
+
+class ContentVersion(Base):
+    id: int
+    content_id: int
+    version: int
+    content_text: str
+    created_by: str
+    is_current: bool
+```
+
+### 10.5 不做的功能(留到第二阶段)
+
+- ⬜ 复杂的搜索功能
+- ⬜ 跨项目复用素材
+- ⬜ 高级的版本对比(可视化 diff)
+- ⬜ 标签和分类系统
+
+---
+
+## 11. 后续扩展功能
+
+以下功能不在 MVP 范围内,作为后续扩展:
+
+### 11.1 第二阶段扩展
+
+1. **批量操作功能**
+   - 批量生成章节
+   - 批量审核
+   - 批量导出
+
+2. **错误处理和重试机制**
+   - 智能重试(指数退避)
+   - 错误分类处理
+   - 失败通知
+
+3. **版本对比和回滚**
+   - 可视化 diff 对比
+   - 一键回滚
+   - 版本分支
+
+4. **导出功能增强**
+   - 支持 EPUB/PDF 格式
+   - 自定义模板和样式
+   - 批量导出
+
+5. **成本控制**
+   - 成本估算
+   - 预算管理
+   - 成本报告
+
+### 11.2 第三阶段扩展
+
+6. **智能推荐系统**
+   - 推荐合适的 Skill/Workflow
+   - 基于使用习惯学习
+   - 社区热门配置推荐
+
+7. **A/B 测试功能**
+   - 同一章节多版本生成
+   - 对比选择最佳版本
+   - 学习用户偏好
+
+8. **协作功能**
+   - 多人同时编辑
+   - 评论和批注
+   - 任务分配
+   - 权限管理
+
+9. **性能优化**
+   - 缓存机制
+   - 增量生成(流式输出)
+   - 并行优化
+
+10. **安全性增强**
+    - 内容审核(敏感词过滤)
+    - 数据加密
+    - 访问控制
+
+---
+
+## 12. 配置资源管理
+
+### 8.1 Skills/Agents/Hooks 的存储
 
 **决策：本地配置文件 + 导入导出**
 
@@ -477,9 +1013,9 @@ nodes:
 
 ---
 
-## 8. 技术实现要点
+## 13. 技术实现要点
 
-### 8.1 实现难度评估
+### 13.1 实现难度评估
 
 | 功能模块 | 实现难度 | 说明 |
 |---------|---------|------|
@@ -490,7 +1026,7 @@ nodes:
 | 双工作模式 | 中等 | 状态管理 + 模式切换 |
 | 混合 UI | 中等偏高 | 表单 ↔ YAML 双向同步 |
 
-### 8.2 关键技术选型
+### 13.2 关键技术选型
 
 | 技术点 | 推荐方案 | 理由 |
 |-------|---------|------|
@@ -500,7 +1036,7 @@ nodes:
 | 配置格式 | YAML | 可读性好，支持多行字符串 |
 | 前端框架 | Next.js + React | 现代化，生态完善 |
 
-### 8.3 实现优先级
+### 13.3 实现优先级
 
 **第一阶段（MVP）：**
 1. ✅ 节点系统基础架构
@@ -523,7 +1059,7 @@ nodes:
 
 ---
 
-## 9. 总结
+## 14. 总结
 
 本设计文档定义了 easyStory 核心创作流程的五个关键模块：
 

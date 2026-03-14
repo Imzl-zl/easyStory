@@ -9,7 +9,12 @@
       "Bash('C:/sudy/github/easyStory/docs/技术/配置格式规范.md':*)",
       "Bash('C:/sudy/github/easyStory/docs/plans/2026-03-14-core-workflow-design.md':*)",
       "Bash('C:/sudy/github/easyStory/docs/plans/2026-03-14-core-creation-workflow-design.md':*)",
-      "Bash(\"C:\\\\sudy\\\\github\\\\easyStory\\\\docs\\\\plans\\\\2026-03-14-core-creation-workflow-implementation.md\":*)"
+      "Bash(\"C:\\\\sudy\\\\github\\\\easyStory\\\\docs\\\\plans\\\\2026-03-14-core-creation-workflow-implementation.md\":*)",
+      "Bash(grep:*)",
+      "Bash(docs/README.md:*)",
+      "Bash(wc:*)",
+      "Read(//c/sudy/github/easyStory/**)",
+      "Bash(done)"
     ]
   }
 }

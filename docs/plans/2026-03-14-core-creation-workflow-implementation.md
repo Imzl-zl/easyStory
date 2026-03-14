@@ -83,8 +83,9 @@ def test_content_versioning():
 
 创建 `base.py`:
 ```python
+import uuid
 from datetime import datetime
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, Uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -94,24 +95,26 @@ class Base(DeclarativeBase):
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class UUIDMixin:
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
 ```
 
 创建 `project.py`:
 ```python
-from sqlalchemy import String, Text, Enum as SQLEnum
+from sqlalchemy import String, Text, Enum as SQLEnum, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from enum import Enum
-from .base import Base, TimestampMixin
+from .base import Base, TimestampMixin, UUIDMixin
 
 class ProjectStatus(str, Enum):
     ACTIVE = "active"
     ARCHIVED = "archived"
     DELETED = "deleted"
 
-class Project(Base, TimestampMixin):
+class Project(Base, TimestampMixin, UUIDMixin):
     __tablename__ = "projects"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)
     status: Mapped[ProjectStatus] = mapped_column(SQLEnum(ProjectStatus), default=ProjectStatus.ACTIVE)
@@ -122,10 +125,10 @@ class Project(Base, TimestampMixin):
 
 创建 `workflow.py`:
 ```python
-from sqlalchemy import String, Integer, Text, ForeignKey, JSON, Enum as SQLEnum
+from sqlalchemy import String, Integer, Text, ForeignKey, JSON, Enum as SQLEnum, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from enum import Enum
-from .base import Base, TimestampMixin
+from .base import Base, TimestampMixin, UUIDMixin
 
 class ExecutionStatus(str, Enum):
     PENDING = "pending"
@@ -134,11 +137,10 @@ class ExecutionStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
-class WorkflowExecution(Base, TimestampMixin):
+class WorkflowExecution(Base, TimestampMixin, UUIDMixin):
     __tablename__ = "workflow_executions"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"))
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("projects.id"))
     workflow_id: Mapped[str] = mapped_column(String(200))
     status: Mapped[ExecutionStatus] = mapped_column(SQLEnum(ExecutionStatus), default=ExecutionStatus.PENDING)
     current_node_index: Mapped[int] = mapped_column(Integer, default=0)
@@ -148,11 +150,10 @@ class WorkflowExecution(Base, TimestampMixin):
     project: Mapped["Project"] = relationship(back_populates="workflow_executions")
     node_executions: Mapped[list["NodeExecution"]] = relationship(back_populates="workflow_execution", cascade="all, delete-orphan")
 
-class NodeExecution(Base, TimestampMixin):
+class NodeExecution(Base, TimestampMixin, UUIDMixin):
     __tablename__ = "node_executions"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    workflow_execution_id: Mapped[int] = mapped_column(ForeignKey("workflow_executions.id"))
+    workflow_execution_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("workflow_executions.id"))
     node_id: Mapped[str] = mapped_column(String(200))
     node_type: Mapped[str] = mapped_column(String(50))
     sequence: Mapped[int] = mapped_column(Integer)
@@ -167,26 +168,24 @@ class NodeExecution(Base, TimestampMixin):
 
 创建 `content.py`:
 ```python
-from sqlalchemy import String, Integer, Text, ForeignKey, Boolean
+from sqlalchemy import String, Integer, Text, ForeignKey, Boolean, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from .base import Base, TimestampMixin
+from .base import Base, TimestampMixin, UUIDMixin
 
-class Content(Base, TimestampMixin):
+class Content(Base, TimestampMixin, UUIDMixin):
     __tablename__ = "contents"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"))
+    project_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("projects.id"))
     content_type: Mapped[str] = mapped_column(String(50))
     title: Mapped[str] = mapped_column(String(500))
 
     project: Mapped["Project"] = relationship(back_populates="contents")
     versions: Mapped[list["ContentVersion"]] = relationship(back_populates="content", cascade="all, delete-orphan")
 
-class ContentVersion(Base, TimestampMixin):
+class ContentVersion(Base, TimestampMixin, UUIDMixin):
     __tablename__ = "content_versions"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    content_id: Mapped[int] = mapped_column(ForeignKey("contents.id"))
+    content_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("contents.id"))
     version: Mapped[int] = mapped_column(Integer)
     content_text: Mapped[str] = mapped_column(Text)
     created_by: Mapped[str] = mapped_column(String(100))
@@ -220,6 +219,16 @@ def test_load_skill(config_loader):
     skill = config_loader.load_skill("skill.outline.xuanhuan")
     assert skill.id == "skill.outline.xuanhuan"
     assert "玄幻" in skill.prompt
+
+def test_load_agent(config_loader):
+    agent = config_loader.load_agent("agent.style_checker")
+    assert agent.id == "agent.style_checker"
+    assert agent.agent_type == "reviewer"
+
+def test_load_hook(config_loader):
+    hook = config_loader.load_hook("hook.auto_save")
+    assert hook.id == "hook.auto_save"
+    assert len(hook.triggers) > 0
 
 def test_load_workflow(config_loader):
     workflow = config_loader.load_workflow("workflow.xuanhuan_manual")
@@ -256,17 +265,38 @@ class SkillConfig(BaseModel):
     prompt: str
     variables: dict[str, SkillVariable] = Field(default_factory=dict)
 
+class AgentConfig(BaseModel):
+    id: str
+    name: str
+    agent_type: Literal["writer", "reviewer", "checker"]
+    skills: list[str] = Field(default_factory=list)
+    system_prompt: str | None = None
+
+class HookTrigger(BaseModel):
+    event: Literal["before_generate", "after_generate", "before_review", "after_review"]
+    action_type: Literal["script", "webhook", "agent"]
+    action_config: dict = Field(default_factory=dict)
+
+class HookConfig(BaseModel):
+    id: str
+    name: str
+    triggers: list[HookTrigger] = Field(default_factory=list)
+
 class NodeConfig(BaseModel):
     id: str
     name: str
     type: Literal["generate", "review", "export"]
     skill: str | None = None
+    hooks: dict[str, list[str]] = Field(default_factory=dict)
+    reviewers: list[str] = Field(default_factory=list)
     auto_proceed: bool = False
     auto_review: bool = False
+    auto_fix: bool = False
 
 class WorkflowConfig(BaseModel):
     id: str
     name: str
+    mode: Literal["manual", "auto"] = "manual"
     nodes: list[NodeConfig]
 ```
 
@@ -275,12 +305,14 @@ class WorkflowConfig(BaseModel):
 ```python
 import yaml
 from pathlib import Path
-from app.schemas.config_schemas import SkillConfig, WorkflowConfig
+from app.schemas.config_schemas import SkillConfig, WorkflowConfig, AgentConfig, HookConfig
 
 class ConfigLoader:
     def __init__(self, config_root: Path):
         self.config_root = config_root
         self.skills_cache: dict[str, SkillConfig] = {}
+        self.agents_cache: dict[str, AgentConfig] = {}
+        self.hooks_cache: dict[str, HookConfig] = {}
         self.workflows_cache: dict[str, WorkflowConfig] = {}
         self._load_all_configs()
 
@@ -292,6 +324,22 @@ class ConfigLoader:
                     data = yaml.safe_load(f)
                     skill = SkillConfig(**data['skill'])
                     self.skills_cache[skill.id] = skill
+
+        agents_dir = self.config_root / "agents"
+        if agents_dir.exists():
+            for yaml_file in agents_dir.rglob("*.yaml"):
+                with open(yaml_file, 'r', encoding='utf-8') as f:
+                    data = yaml.safe_load(f)
+                    agent = AgentConfig(**data['agent'])
+                    self.agents_cache[agent.id] = agent
+
+        hooks_dir = self.config_root / "hooks"
+        if hooks_dir.exists():
+            for yaml_file in hooks_dir.rglob("*.yaml"):
+                with open(yaml_file, 'r', encoding='utf-8') as f:
+                    data = yaml.safe_load(f)
+                    hook = HookConfig(**data['hook'])
+                    self.hooks_cache[hook.id] = hook
 
         workflows_dir = self.config_root / "workflows"
         if workflows_dir.exists():
@@ -305,6 +353,16 @@ class ConfigLoader:
         if skill_id not in self.skills_cache:
             raise ValueError(f"Skill not found: {skill_id}")
         return self.skills_cache[skill_id]
+
+    def load_agent(self, agent_id: str) -> AgentConfig:
+        if agent_id not in self.agents_cache:
+            raise ValueError(f"Agent not found: {agent_id}")
+        return self.agents_cache[agent_id]
+
+    def load_hook(self, hook_id: str) -> HookConfig:
+        if hook_id not in self.hooks_cache:
+            raise ValueError(f"Hook not found: {hook_id}")
+        return self.hooks_cache[hook_id]
 
     def load_workflow(self, workflow_id: str) -> WorkflowConfig:
         if workflow_id not in self.workflows_cache:
@@ -481,7 +539,7 @@ class WorkflowEngine:
 
 ```python
 import pytest
-from app.services.context_builder import ContextBuilder
+from app.services.context_builder import ContextBuilder, ContextInjectionRule
 
 @pytest.mark.asyncio
 async def test_build_context():
@@ -495,6 +553,63 @@ async def test_build_context():
     )
     assert "outline" in context
     assert "previous_chapters" in context
+
+@pytest.mark.asyncio
+async def test_three_layer_priority():
+    builder = ContextBuilder()
+    
+    global_rules = [
+        {"type": "outline"},
+        {"type": "previous_chapters", "count": 2}
+    ]
+    
+    pattern_rules = [
+        {
+            "node_pattern": "chapter_*",
+            "inject": [
+                {"type": "previous_chapters", "count": 3},
+                {"type": "character_profile"}
+            ]
+        }
+    ]
+    
+    node_rules = [
+        {"type": "previous_chapters", "count": 5}
+    ]
+    
+    merged = builder.merge_rules(
+        global_rules=global_rules,
+        pattern_rules=pattern_rules,
+        node_id="chapter_10",
+        node_rules=node_rules
+    )
+    
+    assert merged["previous_chapters"]["count"] == 5
+    assert "outline" in merged
+    assert "character_profile" in merged
+
+@pytest.mark.asyncio
+async def test_pattern_matching():
+    builder = ContextBuilder()
+    
+    pattern_rules = [
+        {
+            "node_pattern": "chapter_*",
+            "inject": [{"type": "previous_chapters", "count": 3}]
+        },
+        {
+            "node_pattern": "outline",
+            "inject": [{"type": "world_setting"}]
+        }
+    ]
+    
+    matched = builder.match_patterns(pattern_rules, "chapter_5")
+    assert len(matched) == 1
+    assert matched[0]["type"] == "previous_chapters"
+    
+    matched = builder.match_patterns(pattern_rules, "outline")
+    assert len(matched) == 1
+    assert matched[0]["type"] == "world_setting"
 ```
 
 **Run:** `pytest tests/unit/test_context_builder.py -v`
@@ -503,32 +618,85 @@ async def test_build_context():
 **Implementation:** `backend/app/services/context_builder.py`
 
 ```python
+import fnmatch
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.content import Content, ContentVersion
 
 class ContextBuilder:
-    async def build_context(self, project_id: int, injection_rules: list[dict], db: AsyncSession = None) -> dict:
-        """构建上下文"""
+    async def build_context(
+        self,
+        project_id: str,
+        injection_rules: list[dict],
+        db: AsyncSession = None
+    ) -> dict:
         context = {}
 
         for rule in injection_rules:
-            if rule["type"] == "outline":
+            rule_type = rule["type"]
+            
+            if rule_type == "outline":
                 context["outline"] = await self._load_outline(project_id, db)
-            elif rule["type"] == "previous_chapters":
+            elif rule_type == "chapter_list":
+                context["chapter_list"] = await self._load_chapter_list(project_id, db)
+            elif rule_type == "previous_chapters":
                 count = rule.get("count", 1)
                 context["previous_chapters"] = await self._load_previous_chapters(project_id, count, db)
+            elif rule_type == "character_profile":
+                context["character_profile"] = await self._load_character_profile(project_id, db)
+            elif rule_type == "world_setting":
+                context["world_setting"] = await self._load_world_setting(project_id, db)
+            elif rule_type == "custom":
+                context[rule.get("key", "custom")] = await self._load_custom(rule, db)
 
         return context
 
-    async def _load_outline(self, project_id: int, db: AsyncSession) -> str:
-        """加载大纲"""
-        # TODO: 从数据库查询
-        return "大纲内容"
+    def merge_rules(
+        self,
+        global_rules: list[dict],
+        pattern_rules: list[dict],
+        node_id: str,
+        node_rules: list[dict] | None = None
+    ) -> dict:
+        merged = {}
+        
+        for rule in global_rules:
+            merged[rule["type"]] = rule.copy()
+        
+        matched = self.match_patterns(pattern_rules, node_id)
+        for rule in matched:
+            merged[rule["type"]] = rule.copy()
+        
+        if node_rules:
+            for rule in node_rules:
+                merged[rule["type"]] = rule.copy()
+        
+        return merged
 
-    async def _load_previous_chapters(self, project_id: int, count: int, db: AsyncSession) -> list[str]:
-        """加载前 N 章"""
-        # TODO: 从数据库查询
-        return ["第1章内容", "第2章内容"][:count]
+    def match_patterns(self, pattern_rules: list[dict], node_id: str) -> list[dict]:
+        matched = []
+        for rule in pattern_rules:
+            pattern = rule.get("node_pattern", "")
+            if fnmatch.fnmatch(node_id, pattern):
+                matched.extend(rule.get("inject", []))
+        return matched
+
+    async def _load_outline(self, project_id: str, db: AsyncSession) -> str:
+        pass
+
+    async def _load_chapter_list(self, project_id: str, db: AsyncSession) -> list[dict]:
+        pass
+
+    async def _load_previous_chapters(self, project_id: str, count: int, db: AsyncSession) -> list[str]:
+        pass
+
+    async def _load_character_profile(self, project_id: str, db: AsyncSession) -> dict:
+        pass
+
+    async def _load_world_setting(self, project_id: str, db: AsyncSession) -> str:
+        pass
+
+    async def _load_custom(self, rule: dict, db: AsyncSession) -> str:
+        pass
 ```
 
 **Run:** `pytest tests/unit/test_context_builder.py -v`
