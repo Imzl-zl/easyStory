@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__serena__list_dir",
+      "mcp__serena__activate_project",
+      "mcp__serena__read_memory",
+      "mcp__serena__search_for_pattern",
+      "mcp__exa__web_search_exa",
+      "Bash('C:/sudy/github/easyStory/docs/技术/配置格式规范.md':*)",
+      "Bash('C:/sudy/github/easyStory/docs/plans/2026-03-14-core-workflow-design.md':*)",
+      "Bash('C:/sudy/github/easyStory/docs/plans/2026-03-14-core-creation-workflow-design.md':*)",
+      "Bash(\"C:\\\\sudy\\\\github\\\\easyStory\\\\docs\\\\plans\\\\2026-03-14-core-creation-workflow-implementation.md\":*)"
+    ]
+  }
+}

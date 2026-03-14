@@ -1,0 +1,1 @@
+当前仓库暂无可执行代码，因此没有构建、运行、测试、格式化命令。常用查看命令：`rg --files docs` 列出文档；`Get-Content docs\需求调研报告.md`、`Get-Content docs\技术栈调研报告.md`、`Get-Content docs\技术栈确定.md` 查看文档内容。若后续加入代码，需要重新记录 run/test/lint/format 命令。
