@@ -5,7 +5,7 @@
 | 文档类型 | 技术设计 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-14 |
-| 更新时间 | 2026-03-14 |
+| 更新时间 | 2026-03-17 |
 | 关联文档 | [系统架构设计](./architecture.md) |
 
 ---
@@ -143,14 +143,38 @@ Agent (智能体)
 | template_id | UUID | 模板 ID |
 | status | VARCHAR(50) | 状态：created/running/paused/completed/failed/cancelled |
 | current_node | INTEGER | 当前节点序号 |
-| pause_reason | VARCHAR(50) | 暂停原因：user_request/budget_exceeded/review_failed/error |
+| pause_reason | VARCHAR(50) | 暂停原因：user_request/user_interrupted/budget_exceeded/review_failed/error |
 | resume_from_node | VARCHAR(200) | 恢复时从哪个节点继续 |
-| snapshot | JSONB | 暂停时的状态快照 |
+| snapshot | JSONB | 暂停时的运行时快照（最小 Schema 见下） |
 | workflow_snapshot | JSONB | 启动时工作流配置快照（不可变） |
 | skills_snapshot | JSONB | 启动时 Skills 配置快照（不可变） |
 | agents_snapshot | JSONB | 启动时 Agents 配置快照（不可变） |
 | started_at | TIMESTAMP | 开始时间 |
 | completed_at | TIMESTAMP | 完成时间 |
+
+> `snapshot` 存放在 `workflow_executions.snapshot` 字段中，用于恢复执行；它是运行时快照，不同于启动时不可变的 `workflow_snapshot / skills_snapshot / agents_snapshot`。
+>
+> 最小建议 Schema：
+> ```json
+> {
+>   "current_node_id": "chapter_gen",
+>   "current_node_execution_id": "uuid",
+>   "current_sequence": 7,
+>   "resume_context": {
+>     "chapter_task_id": "uuid",
+>     "chapter_number": 7
+>   },
+>   "completed_nodes": [
+>     {"node_id": "outline", "sequence": 0, "status": "completed"}
+>   ],
+>   "pending_actions": [
+>     {"type": "user_decision", "source": "interrupted_generation"}
+>   ],
+>   "partial_artifacts": [
+>     {"content_version_id": "uuid", "created_by": "ai_partial"}
+>   ]
+> }
+> ```
 
 **NodeExecution（节点执行）**
 
@@ -159,10 +183,10 @@ Agent (智能体)
 | id | UUID | 主键 |
 | workflow_execution_id | UUID | 工作流执行 ID |
 | node_id | VARCHAR(200) | 节点 ID（来自 workflow 配置） |
-| sequence | INTEGER | 迭代序号（循环节点）/0（非循环） |
+| sequence | INTEGER | 同一 `workflow_execution_id + node_id` 下的执行序号 |
 | node_order | INTEGER | 节点顺序（用于 UI 列表排序，可冗余） |
 | node_type | VARCHAR(50) | 类型：generate/review/export |
-| status | VARCHAR(50) | 状态：pending/running/reviewing/fixing/completed/failed/skipped |
+| status | VARCHAR(50) | 状态：pending/running/running_stream/reviewing/fixing/interrupted/completed/failed/skipped |
 | input | JSONB | 输入数据 |
 | output | JSONB | 输出数据 |
 | retry_count | INTEGER | 重试次数（默认 0） |
@@ -172,6 +196,8 @@ Agent (智能体)
 | completed_at | TIMESTAMP | 完成时间 |
 
 > 约束：同一 `workflow_execution_id` 下，`(node_id, sequence)` 必须唯一，用于防重复生成与 `resume_workflow` 幂等（详见 `docs/design/17-cross-module-contracts.md`）。
+>
+> `sequence` 是物理执行序号，不等同于业务上的 `chapter_number`。章节循环的逻辑身份由 `chapter_tasks.chapter_number` 与 `node_executions.input.chapter_task_id / chapter_number` 共同标识；同一章节的重试或手动重跑会创建新的 `NodeExecution` 并分配新的 `sequence`。
 
 **Artifact（产物）**
 
@@ -441,10 +467,12 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | brief | TEXT | 章节摘要/任务描述 |
 | key_characters | JSONB | 关键角色列表 |
 | key_events | JSONB | 关键事件列表 |
-| status | VARCHAR(50) | 状态：pending/generating/completed/failed/skipped |
+| status | VARCHAR(50) | 状态：pending/generating/interrupted/completed/failed/skipped |
 | content_id | UUID | 关联生成的内容 ID（可选，FK → content.id） |
 | created_at | TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | 更新时间 |
+
+> 约束：唯一约束为 `UNIQUE (workflow_execution_id, chapter_number)`。`interrupted` 为非终态，表示用户在生成过程中主动停止，等待后续恢复或改写决策。
 
 ### story_facts（Story Bible 事实库）
 
@@ -460,9 +488,13 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | subject | VARCHAR(255) | 主题（如人物名、地点名） |
 | content | TEXT | 事实内容 |
 | is_active | BOOLEAN | 是否有效，默认 true |
+| conflict_status | VARCHAR(20) | 冲突状态：none/potential/confirmed |
+| conflict_with_fact_id | UUID | 冲突指向的事实 ID（可选，自关联） |
 | superseded_by | UUID | 被哪条新事实替代（可选） |
 | created_at | TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | 更新时间 |
+
+> 新事实写入前需和当前 active facts 做冲突检查。`potential` 表示检测到疑似矛盾但暂未确认，`confirmed` 表示已确认冲突，默认不自动注入到上下文中。
 
 ### 其他补充表（简要说明）
 

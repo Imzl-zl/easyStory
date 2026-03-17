@@ -93,7 +93,9 @@
 - [ ] 创建项目时自动关联到当前用户
 - [ ] 工作流执行时记录 token 消耗
 - [ ] 超过预算时自动暂停并通知用户
+- [ ] 项目级和用户级日预算可同时生效，防止通过多项目绕过预算
 - [ ] LLM 调用失败时自动重试（最多 3 次）
+- [ ] 模型降级前会按 Skill/Agent/Node 的 `required_capabilities` 过滤不兼容模型
 - [ ] 工作流可以暂停/恢复/取消
 - [ ] 每次执行保存配置快照
 - [ ] 可以查看历史执行的配置版本
@@ -146,12 +148,17 @@
 - [ ] 运行中停止当前生成时，当前节点标记 interrupted，工作流进入 paused
 - [ ] 动态章节模式支持三种终止方式
 - [ ] 大纲完成后由章节拆分 Skill 自动生成 ChapterTask 列表
+- [ ] `chapter_split` 失败时禁止留下半套 ChapterTask，且不允许 skip
 - [ ] ChapterTask 绑定 workflow_execution_id，恢复时只读取当前执行的章节计划
+- [ ] WorkflowExecution.snapshot 有最小恢复 schema，能支撑 interrupted/pause 场景恢复
 - [ ] 设定修改后检测影响范围并提示用户
+- [ ] 设定修改影响结果分为自动替换 / 人工复核 / stale，并支持范围批量处理
 - [ ] 首次启动工作流前执行设定完整度检查，阻止缺少关键信息的批量生成
 - [ ] 小说上传支持 UTF-8 / GBK 编码自动检测
+- [ ] StoryFact 新旧事实冲突时会标记 potential/confirmed conflict，而不是静默覆盖
 - [ ] 章节检测失败时回退到固定长度切分
 - [ ] `best` 导出策略依赖显式标记的最佳版本
+- [ ] 回滚到旧版本时，StoryFact 同步回到对应版本视角
 - [ ] `writing_preferences` 和 `foreshadowing_reminder` 受独立 token 上限约束
 - [ ] 导出前预检章节状态，异常章节让用户选择处理方式
 - [ ] 循环节点中 skipped 迭代算完成，不阻塞 export

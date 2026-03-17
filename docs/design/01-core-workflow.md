@@ -195,6 +195,31 @@ class WorkflowExecution:
 
 暂停时保存：当前节点执行进度、已完成节点输出、上下文缓存、用户临时修改。
 
+**`snapshot` 最小建议 Schema：**
+
+```json
+{
+  "current_node_id": "chapter_gen",
+  "current_node_execution_id": "uuid",
+  "current_sequence": 7,
+  "resume_context": {
+    "chapter_task_id": "uuid",
+    "chapter_number": 7
+  },
+  "completed_nodes": [
+    {"node_id": "outline", "sequence": 0, "status": "completed"}
+  ],
+  "pending_actions": [
+    {"type": "user_decision", "source": "interrupted_generation"}
+  ],
+  "partial_artifacts": [
+    {"content_version_id": "uuid", "created_by": "ai_partial"}
+  ]
+}
+```
+
+> `snapshot` 存放在 `WorkflowExecution.snapshot` 字段中，用于恢复执行；它是**运行时快照**，不同于启动时不可变的 `workflow_snapshot/skills_snapshot/agents_snapshot`。
+
 ---
 
 ## 5. 并发控制

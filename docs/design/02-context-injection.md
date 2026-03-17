@@ -136,10 +136,33 @@ class StoryFact(Base, TimestampMixin, UUIDMixin):
     subject: Mapped[str]
     content: Mapped[str]
     is_active: Mapped[bool] = True
+    conflict_status: Mapped[str] = "none"         # none / potential / confirmed
+    conflict_with_fact_id: Mapped[uuid.UUID | None]
     superseded_by: Mapped[uuid.UUID | None]
 ```
 
-### 4.4 注入优化效果
+### 4.4 事实冲突检测
+
+同一项目下，新的事实抽取结果在写入前必须与**当前 active facts** 做冲突检查：
+
+- 主键维度：`(fact_type, subject)`
+- 对比对象：同 `project_id` 下 `is_active=true` 且 `superseded_by is null` 的事实
+- 允许直接替代的场景：
+  - 来自同一内容版本的重复抽取
+  - 明确时间推进的 `timeline`
+  - 用户手动确认“旧事实已被新事实覆盖”
+
+**冲突处理：**
+- 明显兼容 → 正常写入或 supersede 旧事实
+- 可能矛盾 → 新旧事实都保留，标记 `conflict_status="potential"`，在 UI 和上下文报告中提示
+- 用户确认矛盾成立 → 标记 `conflict_status="confirmed"`，默认不自动注入冲突项
+
+示例：
+- 旧事实：`character_state / 萧炎 / 16 岁，斗者三段`
+- 新事实：`character_state / 萧炎 / 18 岁，斗灵`
+- 若缺少时间推进依据 → 标记为 `potential conflict`
+
+### 4.5 注入优化效果
 
 | 方案 | 50 章 token 消耗 | 一致性 |
 |------|-----------------|--------|

@@ -147,6 +147,9 @@ skill:
   model:                              # 可选，模型配置（不含凭证）
     provider: "anthropic"             # 可选：openai/anthropic/deepseek/...
     name: "claude-sonnet-4-20250514"  # 可选：具体模型名（可被 workflow/node 覆盖）
+    required_capabilities:            # 可选：运行该 Skill 所需能力
+      - "streaming"
+      - "long_context"
     temperature: 0.8                  # 温度（0-2）
     max_tokens: 4000                  # 最大 token 数
     top_p: 0.9                        # Top-p 采样
@@ -170,7 +173,7 @@ skill:
 | `variables` | object | ❌ | 简单模式：模板变量定义（与 `inputs`/`outputs` **互斥**） |
 | `inputs` | object | ❌ | 增强模式：输入 Schema（严格校验，与 `variables` **互斥**，见下） |
 | `outputs` | object | ❌ | 增强模式：输出 Schema（与 `variables` **互斥**，见下） |
-| `model` | object | ❌ | 模型配置（不含凭证，含 provider/name + 参数） |
+| `model` | object | ❌ | 模型配置（不含凭证，含 provider/name、参数，以及可选 `required_capabilities`） |
 
 > **`variables` vs `inputs`/`outputs`**：两者是互斥的配置模式。`variables` 是简单模式，只定义类型和默认值；`inputs`/`outputs` 是增强模式，支持 enum、min/max、min_length 等约束校验。同一个 Skill 中不可同时使用两种模式，编译时校验会报错。
 
@@ -262,6 +265,8 @@ agent:
   model:                              # 可选，模型配置（不含凭证）
     provider: "openai"
     name: "gpt-4o"
+    required_capabilities:
+      - "json_schema_output"
     temperature: 0.3                  # 审核用低温度
     max_tokens: 1000
 
@@ -279,7 +284,7 @@ agent:
 | `type` | string | ✅ | 类型：writer/reviewer/checker |
 | `system_prompt` | string | ✅ | 系统提示词 |
 | `skills` | array | ❌ | 关联的技能 ID 列表 |
-| `model` | object | ❌ | 模型配置（不含凭证，含 provider/name + 参数） |
+| `model` | object | ❌ | 模型配置（不含凭证，含 provider/name、参数，以及可选 `required_capabilities`） |
 | `output_schema` | object | ❌ | 输出格式定义（JSON Schema）。仅 writer/checker 可用；reviewer 固定为 ReviewResult |
 
 **类型说明**：
@@ -400,6 +405,7 @@ workflow:
     max_tokens_per_node: 50000        # 单节点最大 token
     max_tokens_per_workflow: 500000   # 单次工作流最大 token
     max_tokens_per_day: 2000000       # 每日最大 token（项目级）
+    max_tokens_per_day_per_user: 3000000  # 每日最大 token（用户级，可选）
     warning_threshold: 0.8            # 80% 时告警
     on_exceed: "pause"                # 超预算策略: pause / skip / fail
 
@@ -421,6 +427,7 @@ workflow:
       - "claude-sonnet-4-20250514"
       - "gpt-4o"
       - "deepseek-v3"
+    on_all_fail: "pause"              # 全部失败后的动作：pause / fail / skip
   
   context_injection:                  # 可选，上下文注入规则
     enabled: true
@@ -528,6 +535,8 @@ workflow:
 | `context_injection` | object | ❌ | 上下文注入规则 |
 | `nodes` | array | ✅ | 节点列表 |
 
+> 运行时执行 `model_fallback` 前，系统会先按当前 Skill / Agent / Node 的 `model.required_capabilities` 过滤不兼容的备选模型。
+
 **节点类型说明**：
 
 | 类型 | 说明 | 必填字段 |
@@ -565,10 +574,21 @@ workflow:
 model:
   provider: "anthropic"             # openai/anthropic/deepseek/...
   name: "claude-sonnet-4-20250514"  # 具体模型名
+  required_capabilities:            # 可选，能力要求
+    - "streaming"
+    - "json_schema_output"
   temperature: 0.7
   max_tokens: 4000
   top_p: 0.9
 ```
+
+推荐能力标签：
+- `json_schema_output`：稳定输出结构化 JSON / Schema
+- `long_context`：支持大上下文
+- `streaming`：支持流式输出
+- `tool_calling`：支持工具调用
+
+> 当工作流配置了 `model_fallback.chain` 时，运行时会先过滤不满足 `required_capabilities` 的模型，再按降级链顺序尝试。
 
 ### 7.2 选择优先级（高 → 低）
 

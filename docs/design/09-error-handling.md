@@ -106,9 +106,31 @@ workflow:
 
 1. 按 `chain` 列表顺序尝试下一个模型
 2. 每个降级模型仍然遵循重试策略（拥有独立的重试计数）
-3. 如果所有模型均失败，执行 `on_all_fail` 策略
+3. 降级前必须做能力兼容性检查
+4. 如果所有兼容模型均失败，执行 `on_all_fail` 策略
 
-### 4.4 `on_all_fail` 策略
+### 4.4 模型能力兼容性检查
+
+并非所有备选模型都能安全替代当前模型。降级时必须校验当前 Skill / Agent / Node 对模型能力的要求。
+
+建议的能力标签：
+
+- `json_schema_output`：稳定输出结构化 JSON / Schema
+- `long_context`：支持大上下文
+- `streaming`：支持流式输出
+- `tool_calling`：支持工具调用
+
+示例：
+- reviewer Agent 默认要求 `json_schema_output`
+- 长章节生成可能要求 `long_context`
+- Studio 流式生成要求 `streaming`
+
+**规则：**
+- 若备选模型不满足必需能力，不能进入降级链尝试
+- 若当前节点存在能力要求但所有备选模型都不满足，则直接执行 `on_all_fail`
+- 禁止为了“降级成功”而静默放宽结构化输出要求
+
+### 4.5 `on_all_fail` 策略
 
 | 策略 | 行为 |
 |------|------|
@@ -116,7 +138,7 @@ workflow:
 | `fail` | 终止工作流，标记为失败 |
 | `skip` | 跳过当前节点，继续执行后续节点 |
 
-### 4.5 注意事项
+### 4.6 注意事项
 
 - 降级时需要确认备选模型有可用的凭证（参见 10-user-and-credentials.md）
 - 不同模型的 token 计价不同，降级后费用可能变化（参见 08-cost-and-safety.md）

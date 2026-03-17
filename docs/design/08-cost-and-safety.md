@@ -31,7 +31,8 @@ workflow:
   budget:
     max_tokens_per_node: 50000       # 单节点最大 token
     max_tokens_per_workflow: 500000  # 单次工作流最大 token
-    max_tokens_per_day: 2000000     # 每日最大 token（项目级）
+    max_tokens_per_day: 2000000      # 每日最大 token（项目级）
+    max_tokens_per_day_per_user: 3000000  # 每日最大 token（用户级，可选）
     warning_threshold: 0.8           # 80% 时告警
     on_exceed: "pause"               # 超预算策略: pause / skip / fail
 ```
@@ -48,7 +49,8 @@ workflow:
 
 - **节点级** (`max_tokens_per_node`): 防止单个节点异常消耗
 - **工作流级** (`max_tokens_per_workflow`): 限制单次执行总量
-- **日级** (`max_tokens_per_day`): 项目维度的每日总量控制
+- **日级（项目）** (`max_tokens_per_day`): 限制单项目每日总量
+- **日级（用户）** (`max_tokens_per_day_per_user`): 限制单用户跨项目总量，防止通过多项目绕过预算
 
 当消耗达到 `warning_threshold`（默认 80%）时触发告警通知。
 
@@ -206,6 +208,19 @@ async def estimate_workflow_cost(
 | 生成 token | Skill 历史数据 / 默认值 | 有历史数据时更准确 |
 | 审核 token | 固定估算 | 审核 prompt 较短且稳定 |
 | 精修 token | 概率加权 | 基于历史精修触发率 |
+
+### 5.4 Dry-run 精度模式
+
+`estimate_context_tokens()` 必须支持两种模式：
+
+| 模式 | 行为 | 代价 | 适用场景 |
+|------|------|------|---------|
+| `fast` | 不完整拼接全文，只读取元数据、历史均值和必要摘要做估算 | 快 | 启动按钮前默认预估 |
+| `accurate` | 在内存中真实构建上下文并计数，但**不调用 LLM** | 慢但准 | 用户主动查看详细预算时 |
+
+**说明：**
+- Dry-run 关注的是 token / 费用预估，不把数据库读取和字符串拼接耗时计入 token 成本
+- 但 UI 应提示 `accurate` 模式可能较慢，因为它会真实读取内容和拼接上下文
 
 ---
 

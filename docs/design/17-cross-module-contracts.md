@@ -25,7 +25,7 @@
 | `pause_workflow` | 是 | 已在 paused 则忽略 |
 | `interrupt_generation` | 是 | 当前节点不在流式生成中则忽略 |
 | `cancel_workflow` | 是 | 已在 cancelled/completed 则忽略；running 时先尽力中断当前节点 |
-| `retry_node` | 否 | 创建新 NodeExecution |
+| `retry_node` | 否 | 创建新的 NodeExecution，并分配新的 `sequence` |
 
 ### 2.2 防重复生成
 
@@ -53,6 +53,11 @@ ALTER TABLE chapter_tasks
 ADD CONSTRAINT uq_chapter_task_plan
 UNIQUE (workflow_execution_id, chapter_number);
 ```
+
+**`sequence` 语义：**
+- `sequence` 是**同一 `workflow_execution_id + node_id` 下的执行序号**
+- 它用于区分首次执行、重试、手动重跑和循环迭代，不等同于业务上的 `chapter_number`
+- 章节循环的逻辑身份由 `ChapterTask.chapter_number` 和 `NodeExecution.input_data.chapter_task_id/chapter_number` 共同标识
 
 ### 2.4 状态机
 

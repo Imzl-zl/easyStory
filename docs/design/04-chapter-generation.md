@@ -93,6 +93,28 @@ skill:
 - 所有新写入的 ChapterTask 初始 status 为 `pending`
 - 若同一 `workflow_execution_id` 下已有 ChapterTask 记录，先清除旧记录再写入（幂等）
 
+### 3.5 chapter_split 失败处理
+
+`chapter_split` 是章节生成链路的硬前置依赖，因此失败时**不允许 skip**：
+
+```yaml
+- id: "chapter_split"
+  on_fail: "pause"   # pause / fail
+```
+
+| 策略 | 行为 |
+|------|------|
+| `pause` | 工作流暂停，等待用户修大纲、重试拆分或手动录入章节计划（默认） |
+| `fail` | 直接终止本次工作流 |
+
+**约束：**
+- `chapter_split` 输出校验失败时，必须整体回滚 `chapter_tasks` 写入，禁止留下半套章节计划
+- downstream 的 `chapter_gen` 在 `chapter_split` 成功前不得启动
+- 用户恢复时可选：
+  - 重试 `chapter_split`
+  - 修改大纲后重新执行 `outline -> chapter_split`
+  - 手动导入/录入 ChapterTask 列表
+
 ---
 
 ## 4. ChapterTask 数据模型
@@ -115,6 +137,9 @@ class ChapterTask(Base, TimestampMixin, UUIDMixin):
 - 唯一约束：`UNIQUE (workflow_execution_id, chapter_number)`
 - 查询“当前执行的章节计划”时，必须显式按 `workflow_execution_id` 过滤
 - `interrupted` 是非终态，只表示用户在生成过程中主动喊停，等待后续决策
+- `NodeExecution.sequence` 是**同一 node 在当前 workflow_execution 下的执行序号**，不是 `chapter_number`
+- 对章节循环来说，逻辑章节身份由 `ChapterTask.chapter_number` 和 `NodeExecution.input_data.chapter_task_id/chapter_number` 标识
+- 同一章节的重试或“修改提示后重新生成”会创建新的 `NodeExecution`，但仍指向同一个 `chapter_task`
 
 ---
 
