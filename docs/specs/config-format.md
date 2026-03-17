@@ -39,9 +39,6 @@
 │
 ├── workflows/                     # Workflows 配置
 │   └── *.yaml
-│
-└── model-profiles/                # 模型档案配置
-    └── *.yaml
 ```
 
 **选择理由**：
@@ -82,8 +79,10 @@ skill:
     - 世界观：{{ world_setting }}
     - 大纲：{{ outline }}
 
-  # 模型参数
+  # 模型配置（不含凭证）
   model:
+    provider: "anthropic"
+    name: "claude-sonnet-4-20250514"
     temperature: 0.8
     max_tokens: 4000
 ```
@@ -92,7 +91,7 @@ skill:
 
 ## 3. Skill 配置格式
 
-**用途**：定义 AI 技能包，包含提示词模板和模型参数。
+**用途**：定义 AI 技能包，包含提示词模板和模型配置。
 
 **完整格式**：
 ```yaml
@@ -145,7 +144,9 @@ skill:
       required: false
       default: 3000
   
-  model:                              # 可选，模型参数
+  model:                              # 可选，模型配置（不含凭证）
+    provider: "anthropic"             # 可选：openai/anthropic/deepseek/...
+    name: "claude-sonnet-4-20250514"  # 可选：具体模型名（可被 workflow/node 覆盖）
     temperature: 0.8                  # 温度（0-2）
     max_tokens: 4000                  # 最大 token 数
     top_p: 0.9                        # Top-p 采样
@@ -166,8 +167,57 @@ skill:
 | `author` | string | ❌ | 作者 |
 | `tags` | array | ❌ | 标签列表 |
 | `prompt` | string | ✅ | 提示词模板，支持 Jinja2 语法 |
-| `variables` | object | ❌ | 模板变量定义 |
-| `model` | object | ❌ | 模型参数 |
+| `variables` | object | ❌ | 简单模式：模板变量定义（与 `inputs`/`outputs` **互斥**） |
+| `inputs` | object | ❌ | 增强模式：输入 Schema（严格校验，与 `variables` **互斥**，见下） |
+| `outputs` | object | ❌ | 增强模式：输出 Schema（与 `variables` **互斥**，见下） |
+| `model` | object | ❌ | 模型配置（不含凭证，含 provider/name + 参数） |
+
+> **`variables` vs `inputs`/`outputs`**：两者是互斥的配置模式。`variables` 是简单模式，只定义类型和默认值；`inputs`/`outputs` 是增强模式，支持 enum、min/max、min_length 等约束校验。同一个 Skill 中不可同时使用两种模式，编译时校验会报错。
+
+### Skill 输入输出 Schema（增强版）
+
+当需要更严格的校验时，可以用 `inputs`/`outputs` 替代简单的 `variables`：
+
+```yaml
+skill:
+  id: "skill.outline.xuanhuan"
+  inputs:
+    genre:
+      type: "string"
+      required: true
+      description: "小说题材"
+      enum: ["玄幻", "都市", "科幻", "言情"]
+    protagonist:
+      type: "string"
+      required: true
+      min_length: 2
+      max_length: 500
+    target_chapters:
+      type: "integer"
+      required: false
+      default: 50
+      min: 10
+      max: 500
+
+  outputs:
+    outline_text:
+      type: "string"
+      required: true
+      min_length: 100
+    chapter_count:
+      type: "integer"
+      required: true
+    chapter_list:
+      type: "array"
+      items:
+        type: "object"
+        properties:
+          number: { type: "integer" }
+          title: { type: "string" }
+          brief: { type: "string" }
+```
+
+工作流启动前会对 Skill 的 inputs/outputs 进行编译校验，详见 [跨模块契约](../design/17-cross-module-contracts.md)。
 
 **分类说明**：
 
@@ -209,44 +259,28 @@ agent:
   skills:                             # 可选，关联的技能
     - "skill.review.style"
   
-  model:                              # 可选，模型参数
+  model:                              # 可选，模型配置（不含凭证）
+    provider: "openai"
+    name: "gpt-4o"
     temperature: 0.3                  # 审核用低温度
     max_tokens: 1000
-  
-  output_schema:                      # 可选，输出格式定义
-    type: "object"
-    properties:
-      score:
-        type: "number"
-        description: "评分 0-1"
-      issues:
-        type: "array"
-        items:
-          type: "object"
-          properties:
-            type: { type: "string" }
-            location: { type: "string" }
-            description: { type: "string" }
-            suggestion: { type: "string" }
-      suggestions:
-        type: "string"
-        description: "整体修改建议"
-    required: ["score", "issues"]
+
+  # reviewer 类型输出固定为 ReviewResult（不允许自定义 output_schema，见 docs/design/03-review-and-fix.md）
 ```
 
 **字段说明**：
 
 | 字段 | 类型 | 必填 | 说明 |
 |-----|------|------|------|
-| `id` | string | ✅ | 唯一标识，格式：`agent.{type}.{name}` |
+| `id` | string | ✅ | 唯一标识，格式：`agent.{name}`（如 `agent.style_checker`） |
 | `name` | string | ✅ | 显示名称 |
 | `version` | string | ❌ | 版本号 |
 | `description` | string | ❌ | 描述 |
 | `type` | string | ✅ | 类型：writer/reviewer/checker |
 | `system_prompt` | string | ✅ | 系统提示词 |
 | `skills` | array | ❌ | 关联的技能 ID 列表 |
-| `model` | object | ❌ | 模型参数 |
-| `output_schema` | object | ❌ | 输出格式定义（JSON Schema） |
+| `model` | object | ❌ | 模型配置（不含凭证，含 provider/name + 参数） |
+| `output_schema` | object | ❌ | 输出格式定义（JSON Schema）。仅 writer/checker 可用；reviewer 固定为 ReviewResult |
 
 **类型说明**：
 
@@ -352,12 +386,41 @@ workflow:
   description: "全自动玄幻小说创作流程" # 可选，描述
   author: "user"                      # 可选，作者
   tags: ["玄幻", "全自动"]            # 可选，标签
-  
+
+  mode: "auto"                        # 必填，工作模式：manual / auto
+
   settings:                           # 可选，全局设置
     auto_proceed: true                # 审核通过后自动进入下一步
     max_retry: 3                      # 最大重试次数
     save_on_step: true                # 每步自动保存
     timeout: 300                      # 单节点超时（秒）
+    default_pass_rule: "no_critical"  # 默认审核聚合规则
+
+  budget:                             # 可选，Token 预算配置
+    max_tokens_per_node: 50000        # 单节点最大 token
+    max_tokens_per_workflow: 500000   # 单次工作流最大 token
+    max_tokens_per_day: 2000000       # 每日最大 token（项目级）
+    warning_threshold: 0.8            # 80% 时告警
+    on_exceed: "pause"                # 超预算策略: pause / skip / fail
+
+  safety:                             # 可选，执行安全阀
+    max_retry_per_node: 3             # 单节点最大重试
+    max_fix_attempts: 3               # 最大精修次数
+    max_total_retries: 10             # 整个工作流最大重试总数
+    execution_timeout: 3600           # 工作流超时（秒）
+    node_timeout: 300                 # 单节点超时（秒）
+
+  retry:                              # 可选，重试策略
+    backoff: "exponential"            # 退避策略: fixed / exponential
+    base_delay: 5                     # 基础延迟（秒）
+    max_delay: 60                     # 最大延迟（秒）
+
+  model_fallback:                     # 可选，模型降级策略
+    enabled: false                    # 默认关闭
+    chain:                            # 降级链
+      - "claude-sonnet-4-20250514"
+      - "gpt-4o"
+      - "deepseek-v3"
   
   context_injection:                  # 可选，上下文注入规则
     enabled: true
@@ -379,36 +442,46 @@ workflow:
       name: "生成大纲"                 # 节点名称
       type: "generate"                # 节点类型
       skill: "skill.outline.xuanhuan" # 使用的技能
-      
+
       hooks:                          # 节点级钩子
         before:
           - "hook.validate_input"
         after:
           - "hook.auto_save"
-      
+
       auto_review: true               # 是否自动审核
+      review_mode: "parallel"         # 审核模式：parallel / serial
       reviewers:                      # 审核 agents
         - "agent.consistency_checker"
+      review_config:                  # 审核配置
+        pass_rule: "no_critical"      # 聚合规则: all_pass / majority_pass / no_critical
+        re_review_scope: "all"        # 精修后重审范围: all / failed_only
+
       auto_fix: true                  # 是否自动精修
       max_fix_attempts: 3             # 最大精修次数
+      fix_skill: "skill.fix.xuanhuan" # 精修 Skill（可选，无则用内置默认）
+      fix_strategy:                   # 精修策略
+        mode: "targeted"              # targeted（局部）/ full_rewrite（整篇）
+        targeted_threshold: 3         # 问题 ≤ 3 → 局部修改
+        rewrite_threshold: 6          # 问题 > 6 → 整篇重写
       on_fix_fail: "pause"            # 精修失败后动作：pause/skip/fail
-    
+
     - id: "chapter_plan"
       name: "规划章节"
       type: "generate"
       skill: "skill.chapter_plan"
       depends_on: ["outline"]         # 依赖的节点
-      
+
       auto_review: true
       reviewers:
         - "agent.consistency_checker"
-    
+
     - id: "chapter_gen"
       name: "生成章节"
       type: "generate"
       skill: "skill.chapter.xuanhuan"
       depends_on: ["chapter_plan"]
-      
+
       loop:                           # 循环配置
         enabled: true
         count_from: "chapter_plan"    # 从章节规划获取数量
@@ -446,7 +519,12 @@ workflow:
 |-----|------|------|------|
 | `id` | string | ✅ | 唯一标识，格式：`workflow.{name}` |
 | `name` | string | ✅ | 显示名称 |
+| `mode` | string | ✅ | 工作模式：`manual`（手动）/ `auto`（自动） |
 | `settings` | object | ❌ | 全局设置 |
+| `budget` | object | ❌ | Token 预算配置（详见 [08-cost-and-safety](../design/08-cost-and-safety.md)） |
+| `safety` | object | ❌ | 执行安全阀配置（详见 [08-cost-and-safety](../design/08-cost-and-safety.md)） |
+| `retry` | object | ❌ | 重试策略 |
+| `model_fallback` | object | ❌ | 模型降级策略 |
 | `context_injection` | object | ❌ | 上下文注入规则 |
 | `nodes` | array | ✅ | 节点列表 |
 
@@ -457,68 +535,48 @@ workflow:
 | `generate` | 生成内容 | `skill` |
 | `review` | 审核内容 | `reviewers` |
 | `export` | 导出文件 | `formats` |
-| `custom` | 自定义节点 | `action` |
+| `custom` | 自定义节点（**MVP 延期，v0.2 实现**） | `action` |
 
 **上下文注入类型**：
 
 | 类型 | 说明 | 参数 |
 |-----|------|------|
+| `project_setting` | 项目设定（结构化设定文档） | - |
 | `outline` | 大纲 | - |
 | `chapter_list` | 章节目录 | - |
+| `chapter_task` | 当前章节任务（来自 ChapterTask） | - |
 | `previous_chapters` | 前 N 章 | `count` |
 | `character_profile` | 人物设定 | - |
 | `world_setting` | 世界观设定 | - |
-| `custom` | 自定义 | `source`, `query` |
+| `story_bible` | Story Bible 事实库 | `include`, `max_tokens` |
+| `chapter_summary` | 章节摘要（代替原文堆叠） | `count`, `max_tokens_per_summary` |
+| `style_reference` | 小说分析结果（文风参考） | `analysis_id`, `inject_fields` |
+| `custom` | 自定义 | `key`, `source`, `query` |
 
 ---
 
-## 7. Model Profile 配置格式
+## 7. 模型配置与凭证（约束）
 
-**用途**：定义模型档案，包含 API 配置和模型参数。
+**决策**：任何 API Key/凭证不允许出现在 YAML（包括 `${ENV}` 引用）。凭证统一存于数据库 `model_credentials`（AES-256-GCM 加密），通过 Web UI 管理，详见 `docs/design/10-user-and-credentials.md`。
 
-**完整格式**：
+### 7.1 model 对象（在 Skill/Agent/Workflow/Node 中复用）
+
 ```yaml
-model_profile:
-  id: "openai-gpt4"                   # 必填，唯一标识
-  name: "OpenAI GPT-4"                # 必填，显示名称
-  version: "1.0.0"                    # 可选，版本号
-  description: "OpenAI GPT-4 模型"     # 可选，描述
-  
-  provider: "openai"                  # 必填，提供商
-  model_name: "gpt-4-turbo-preview"   # 必填，模型名称
-  
-  api_key: "${OPENAI_API_KEY}"        # 可选，API Key（支持环境变量）
-  base_url: "https://api.openai.com/v1"  # 可选，自定义 API 地址
-  
-  default_params:                     # 可选，默认参数
-    temperature: 0.7
-    max_tokens: 4000
-    top_p: 1.0
-  
-  rate_limit:                         # 可选，速率限制
-    requests_per_minute: 60
-    tokens_per_minute: 90000
-  
-  retry:                              # 可选，重试配置
-    max_attempts: 3
-    delay: 1
-  
-  is_default: false                   # 可选，是否默认
+model:
+  provider: "anthropic"             # openai/anthropic/deepseek/...
+  name: "claude-sonnet-4-20250514"  # 具体模型名
+  temperature: 0.7
+  max_tokens: 4000
+  top_p: 0.9
 ```
 
-**字段说明**：
+### 7.2 选择优先级（高 → 低）
 
-| 字段 | 类型 | 必填 | 说明 |
-|-----|------|------|------|
-| `id` | string | ✅ | 唯一标识 |
-| `name` | string | ✅ | 显示名称 |
-| `provider` | string | ✅ | 提供商：openai/anthropic/google/custom |
-| `model_name` | string | ✅ | 模型名称 |
-| `api_key` | string | ❌ | API Key（支持环境变量 `${VAR}`） |
-| `base_url` | string | ❌ | 自定义 API 地址 |
-| `default_params` | object | ❌ | 默认参数 |
-| `rate_limit` | object | ❌ | 速率限制 |
-| `is_default` | boolean | ❌ | 是否默认 |
+```
+节点级 model > Skill 级 model > 工作流级 model > 项目级默认 model > 全局默认 model
+```
+
+> `provider` 用于选择凭证（项目级 > 用户级 > 系统级），`name` 用于选择具体模型。
 
 ---
 
@@ -556,4 +614,4 @@ model_profile:
 
 *文档版本: 1.0.0*  
 *创建日期: 2026-03-14*  
-*更新日期: 2026-03-14*
+*更新日期: 2026-03-17*

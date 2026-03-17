@@ -1,0 +1,40 @@
+workflow:
+  id: "workflow.xuanhuan_manual"
+  name: "玄幻小说手动创作"
+  version: "1.0.0"
+  description: "手动模式玄幻小说创作流程"
+
+  settings:
+    auto_proceed: false
+    max_retry: 3
+    save_on_step: true
+
+  context_injection:
+    enabled: true
+    rules:
+      - node_pattern: "chapter_*"
+        inject:
+          - type: "outline"
+            required: true
+          - type: "previous_chapters"
+            count: 2
+            required: true
+
+  nodes:
+    - id: "outline"
+      name: "生成大纲"
+      type: "generate"
+      skill: "skill.outline.xuanhuan"
+      auto_review: false
+      auto_proceed: false
+
+    - id: "chapter_1"
+      name: "生成第一章"
+      type: "generate"
+      skill: "skill.chapter.xuanhuan"
+      depends_on: ["outline"]
+      auto_review: true
+      reviewers:
+        - "agent.style_checker"
+      auto_fix: false
+      auto_proceed: false

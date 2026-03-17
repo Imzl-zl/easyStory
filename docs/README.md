@@ -4,106 +4,104 @@
 
 ---
 
-## 📚 文档导航
+## 文档导航
 
-### 核心设计文档
+### 技术规范（specs/）
 
-1. **[核心创作流程设计](./plans/2026-03-14-core-creation-workflow-design.md)** ⭐
-   - 状态: 已确认
-   - 内容: 完整的核心创作流程设计,包括节点系统、上下文注入、审核流程、小说分析、快速开始模板、工作流可视化、内容管理等
-   - 最新更新: 2026-03-14
+| 文档 | 状态 | 说明 |
+|------|------|------|
+| [技术栈确定](./specs/tech-stack.md) | 生效 | 最终技术选型决策 |
+| [系统架构设计](./specs/architecture.md) | 生效 | 分层架构 + MCP 预留 |
+| [数据库设计](./specs/database-design.md) | 生效 | 数据模型和表结构 |
+| [配置格式规范](./specs/config-format.md) | 生效 | Skills/Agents/Hooks/Workflows YAML 格式 |
 
-2. **[实施计划](./plans/2026-03-14-core-creation-workflow-implementation.md)**
-   - 状态: 待更新
-   - 内容: MVP 阶段的详细实施计划
-   - 说明: 需要更新以包含新增的 MVP 功能
+### 功能设计（design/）
 
-### 技术规范文档
+| 编号 | 文档 | 优先级 | 内容 |
+|------|------|--------|------|
+| 00 | [设计索引](./design/00-index.md) | - | 模块总览 + 验收标准（83 项） |
+| 01 | [核心工作流](./design/01-core-workflow.md) | 🔴 | 节点系统 + 双模式 + 状态机 |
+| 02 | [上下文注入](./design/02-context-injection.md) | 🔴 | 三层优先级 + Story Bible + 裁剪 |
+| 03 | [审核精修](./design/03-review-and-fix.md) | 🔴 | ReviewResult Schema + 聚合 + 精修 |
+| 04 | [章节生成](./design/04-chapter-generation.md) | 🔴 | 循环 + 拆分 + 动态终止 |
+| 05 | [内容编辑](./design/05-content-editor.md) | 🔴 | 编辑器 + 版本 + 下游影响 |
+| 06 | [创作设定](./design/06-creative-setup.md) | 🔴 | 对话设定 + 结构化输出 + 模板 |
+| 07 | [小说分析](./design/07-novel-analysis.md) | 🟡 | 上传 + 分析 + Skill 生成 |
+| 08 | [成本控制](./design/08-cost-and-safety.md) | 🔴 | 预算 + 安全阀 + Dry-run |
+| 09 | [错误处理](./design/09-error-handling.md) | 🔴 | 分类 + 重试 + 模型降级 |
+| 10 | [用户认证](./design/10-user-and-credentials.md) | 🔴 | User 模型 + 凭证管理 |
+| 11 | [导出](./design/11-export.md) | 🟡 | 格式 + 范围 + 版本选择 |
+| 12 | [流式输出](./design/12-streaming-and-interrupt.md) | 🟡 | SSE + 中途打断 |
+| 13 | [AI 偏好学习](./design/13-ai-preference-learning.md) | 🟡 | 记忆系统 + 编辑分析 |
+| 14 | [伏笔追踪](./design/14-foreshadowing-tracking.md) | 🟡 | 生命周期 + 自动检测 |
+| 15 | [写作面板](./design/15-writing-dashboard.md) | 🟡 | 指标 + 趋势 |
+| 16 | [MCP 预留](./design/16-mcp-architecture.md) | 🔴 | 三方向 + 架构约束 |
+| 17 | [跨模块契约](./design/17-cross-module-contracts.md) | 🔴 | 并发幂等 + 安全 + 级联 |
+| 18 | [数据备份](./design/18-data-backup.md) | 🟡 | 软删除 + 回收站 + 日志 |
 
-3. **[系统架构设计](./specs/architecture.md)**
-   - 状态: 生效
-   - 内容: 系统整体架构设计
+### UI 交互设计（ui/）
 
-4. **[技术栈确定](./specs/tech-stack.md)**
-   - 状态: 生效
-   - 内容: 最终技术选型决策(Python 3.12、FastAPI、LangGraph、LiteLLM 等)
+| 文档 | 说明 |
+|------|------|
+| [UI 设计规范](./ui/ui-design.md) | 视觉规格白皮书 |
+| [UI 交互补充](./ui/ui-interaction-supplement.md) | 缺失页面 + 交互缺口 |
 
-5. **[数据库设计](./specs/database-design.md)**
-   - 状态: 生效
-   - 内容: 数据库模型和表结构设计
+### 实施计划（plans/）
 
-6. **[配置格式规范](./specs/config-format.md)**
-   - 状态: 生效
-   - 内容: Skills/Agents/Hooks/Workflows 的 YAML 配置格式
+| 文档 | 说明 |
+|------|------|
+| [实施计划](./plans/implementation-plan.md) | MVP 阶段详细实施计划 |
 
 ---
 
-## 📖 文档阅读顺序
+## 文档阅读顺序
 
 ### 新成员入门
 
-1. **核心创作流程设计** - 理解项目核心功能和设计理念
-2. **系统架构设计** - 了解技术架构
-3. **技术栈确定** - 了解技术选型
-4. **实施计划** - 了解开发计划
+1. **核心工作流** → 理解核心功能和设计理念
+2. **系统架构设计** → 了解技术架构
+3. **技术栈确定** → 了解技术选型
+4. **设计索引** → 了解全部模块和验收标准
 
 ### 开发人员
 
-1. **核心创作流程设计** - 理解业务逻辑
-2. **数据库设计** - 了解数据模型
-3. **配置格式规范** - 了解配置系统
-4. **实施计划** - 开始开发
-
-**注意：** API 文档由 FastAPI 自动生成，启动后端服务后访问 `/docs` 查看 Swagger UI
-
----
-
-## 🎯 当前 MVP 范围
-
-**第一版(方案 B)包含:**
-
-**核心功能:**
-1. ✅ 节点系统基础架构
-2. ✅ 手动模式
-3. ✅ 基础上下文注入
-4. ✅ 串行审核
-5. ✅ 小说分析功能
-
-**新增 MVP 功能:**
-6. ✅ 分析自动生成 Skill (独特卖点)
-7. ✅ 快速开始模板 (2-3 个基础模板)
-8. ✅ 工作流可视化 (简化版列表视图)
-9. ✅ 内容管理 (基础版本管理)
-
-**预计工作量:** 10-13 天
+1. **设计索引** → 了解模块全貌和验收标准
+2. **核心工作流** → 理解业务逻辑
+3. **数据库设计** → 了解数据模型
+4. **配置格式规范** → 了解配置系统
+5. 按开发任务查阅对应的 design/ 文件
 
 ---
 
-## 📝 文档维护规范
+## 优先级说明
 
-- 所有设计文档都应该包含文档状态和更新时间
-- 重要的设计决策应该记录在相应的文档中
-- 避免文档重复,保持单一信息源
-- 定期清理过时或废弃的文档
-- API 文档由代码自动生成,不单独维护
+- 🔴 MVP 必须实现（后期改造成本高）
+- 🟡 MVP 建议简化实现（提升可用性）
+- 🟢 第二阶段扩展
 
 ---
 
-## 📂 当前文档列表
+## 文档目录结构
 
 ```
 docs/
-├── README.md (本文件)
-├── plans/
-│   ├── 2026-03-14-core-creation-workflow-design.md (核心设计)
-│   └── 2026-03-14-core-creation-workflow-implementation.md (实施计划)
-└── specs/
-    ├── architecture.md (系统架构设计)
-    ├── tech-stack.md (技术栈确定)
-    ├── database-design.md (数据库设计)
-    └── config-format.md (配置格式规范)
+├── README.md                    # 本文件
+├── specs/                       # 技术规范
+│   ├── tech-stack.md
+│   ├── architecture.md
+│   ├── database-design.md
+│   └── config-format.md
+├── design/                      # 功能设计（18 个模块）
+│   ├── 00-index.md             # 索引 + 验收标准
+│   ├── 01-core-workflow.md     # ~ 18-data-backup.md
+│   └── ...
+├── ui/                          # UI 交互设计
+│   ├── ui-design.md
+│   └── ui-interaction-supplement.md
+└── plans/                       # 实施计划
+    └── implementation-plan.md
 ```
 
 ---
 
-*最后更新: 2026-03-14*
+*最后更新: 2026-03-16*

@@ -1,0 +1,194 @@
+# 内容编辑器设计
+
+| 字段 | 内容 |
+|---|---|
+| 文档类型 | 功能设计 |
+| 优先级 | 🔴 MVP 必须 |
+| 关联文档 | [上下文注入](./02-context-injection.md)、[审核精修](./03-review-and-fix.md) |
+
+---
+
+## 1. 概述
+
+内容编辑器是用户使用频率最高的功能，涵盖：编辑器形态、AI 辅助编辑、版本管理、Story Bible 版本绑定、编辑旧章节的下游影响处理。
+
+> **决策**：Content 和 ContentVersion 使用分离表，而非单表。
+
+---
+
+## 2. 内容组织结构
+
+```
+项目内容库:
+  ├─ 基础设定（题材、主角、世界观）
+  ├─ 大纲
+  ├─ 章节内容（第1章、第2章、...）
+  ├─ 人物设定（主角、配角、反派）
+  └─ 世界观设定
+```
+
+---
+
+## 3. 编辑器形态
+
+MVP 采用 **Markdown 编辑器 + AI 对话侧边栏**：
+
+```
+┌──────────────────────────────────────────────────┐
+│  章节标题: 第3章 - 初入宗门                         │
+├────────────────────────┬─────────────────────────┤
+│                        │  AI 对话助手             │
+│  Markdown 编辑区域     │                         │
+│                        │  用户: 把战斗场面写得     │
+│  萧炎站在宗门大殿前，  │  更激烈一些               │
+│  心中涌起一股复杂的    │                         │
+│  情绪...               │  AI: 修改如下：          │
+│                        │  [差异预览]              │
+│                        │  ✅ 应用  ❌ 放弃        │
+├────────────────────────┼─────────────────────────┤
+│  字数: 3,200 | 版本: 3 │  模型: claude-sonnet     │
+└────────────────────────┴─────────────────────────┘
+```
+
+---
+
+## 4. AI 辅助编辑模式
+
+| 模式 | 操作 | 说明 |
+|-----|------|------|
+| 整章对话 | 侧边栏输入修改意见 | "把整章的语气改得更紧张" |
+| 选中修改 | 选中文本 → 右键 → AI 修改 | 只修改选中部分 |
+| 续写补充 | 光标定位 → 触发续写 | 从光标位置继续生成 |
+| 审核修订 | 基于 ReviewIssue 列表逐项处理 | 支持跳转、标记已处理、忽略后重审 |
+
+---
+
+## 5. 版本管理
+
+### 5.1 版本处理流程
+
+```
+用户编辑 → 自动保存草稿（每 30 秒）
+  ↓ 用户点击"确认保存"
+  ↓ 创建新版本（ContentVersion）
+  ↓ 记录变更来源: "user_edit" / "ai_assist" / "auto_fix"
+  ↓ 继续工作流
+```
+
+### 5.2 数据模型
+
+```python
+class Content(Base, TimestampMixin, UUIDMixin):
+    project_id: Mapped[uuid.UUID]
+    parent_id: Mapped[uuid.UUID | None]
+    content_type: Mapped[str]        # outline/chapter/character/world_setting
+    title: Mapped[str]
+    chapter_number: Mapped[int | None]
+    order_index: Mapped[int]
+
+class ContentVersion(Base, TimestampMixin, UUIDMixin):
+    content_id: Mapped[uuid.UUID]
+    version: Mapped[int]
+    content_text: Mapped[str]
+    created_by: Mapped[str]          # "system" / "user" / "ai_assist" / "auto_fix" / "ai_partial"
+    change_source: Mapped[str | None]
+    word_count: Mapped[int]
+    is_current: Mapped[bool]
+    is_best: Mapped[bool] = False
+    context_snapshot_hash: Mapped[str | None]  # SHA256 用于检测上下文变化
+    ai_conversation_id: Mapped[uuid.UUID | None]
+```
+
+### 5.3 版本操作
+
+- 查看历史版本
+- 回滚到指定版本
+- 对比两个版本（简单文本 diff）
+- 标记/取消“最佳版本”
+
+### 5.4 最佳版本规则
+
+- `is_best` 是**显式用户选择**，不是系统自动推断
+- 同一 `Content` 最多只允许一个 `is_best=true`
+- 导出策略 `best` 只读取被明确标记的版本，缺失时由导出预检提示用户处理
+
+---
+
+## 6. Story Bible 版本绑定
+
+### 6.1 绑定规则
+
+StoryFact 绑定到具体 ContentVersion：
+
+```python
+class StoryFact:
+    source_content_version_id: Mapped[uuid.UUID]  # 绑定版本
+```
+
+### 6.2 版本变更时的事实处理
+
+```
+章节版本变更时:
+1. 用户确认保存新版本 (v2)
+2. 旧版本 (v1) 的所有 StoryFact → is_active=False
+3. 基于新版本 (v2) 重新抽取事实
+4. 旧事实.superseded_by = 新事实.id（旧 → 新单向链，可追溯）
+5. 后续注入只查 is_active=True
+```
+
+### 6.3 触发时机
+
+```
+事实抽取 ONLY 触发于:
+  ✅ 章节版本标记为 is_current=True（用户确认保存）
+  ✅ 工作流自动生成的章节通过审核
+  ❌ 草稿自动保存 → 不触发
+  ❌ 编辑过程中 → 不触发
+```
+
+---
+
+## 7. 编辑旧章节的下游处理
+
+**策略：标记 + 提示，不自动重新生成。**
+
+### 7.1 处理流程
+
+```
+用户保存第 5 章新版本 (v2)
+  ↓ 重新抽取 StoryFact
+  ↓ 扫描下游章节 (chapter_number > 5)
+  ↓ 对每个下游章节：对比 context_snapshot_hash
+  ↓ hash 不同 → 标记为 "stale"
+
+UI 展示:
+  第6章 ✅ v2
+  第7章 ⚠️ v1 (上下文已变更)
+  第8章 ⚠️ v1 (上下文已变更)
+```
+
+### 7.2 用户选择
+
+```
+- [ 忽略 ] — 不处理，继续创作
+- [ 重新生成第7-10章 ] — 重新执行工作流
+- [ 逐章确认 ] — 打开每章手动决定
+```
+
+**关键原则：**
+- 不自动重新生成（代价太高，可能毁掉用户已编辑的内容）
+- 必须标记并提示
+- 用户决定处理方式
+
+---
+
+## 8. 不做的功能（第二阶段）
+
+- ⬜ 复杂的搜索功能
+- ⬜ 跨项目复用素材
+- ⬜ 高级版本对比（可视化 diff）
+- ⬜ 标签和分类系统
+
+---
+
+*最后更新: 2026-03-17*

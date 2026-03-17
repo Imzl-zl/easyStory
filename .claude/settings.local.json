@@ -14,7 +14,11 @@
       "Bash(docs/README.md:*)",
       "Bash(wc:*)",
       "Read(//c/sudy/github/easyStory/**)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(cd:*)",
+      "WebSearch",
+      "Bash(where python:*)",
+      "Bash(python:*)"
     ]
   }
 }
