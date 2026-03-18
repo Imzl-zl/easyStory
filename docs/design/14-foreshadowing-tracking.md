@@ -26,28 +26,9 @@
 
 ## 3. 数据模型
 
-```python
-class Foreshadowing(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "foreshadowings"
-    project_id: Mapped[uuid.UUID]
-    title: Mapped[str]                    # "云岚宗的秘密"
-    description: Mapped[str]
-    status: Mapped[str]                   # planted / developed / revealed / forgotten / abandoned
-    importance: Mapped[str]               # major / minor / hint
-    planted_chapter: Mapped[int]
-    planted_quote: Mapped[str | None]
-    target_reveal_chapter: Mapped[int | None]
-    actual_reveal_chapter: Mapped[int | None]
-    source: Mapped[str]                   # ai_detected / user_created / outline
+Foreshadowing 记录伏笔的完整生命周期（标题、描述、状态、重要性、埋设/揭示章节、来源）。ForeshadowingEvent 记录伏笔在各章节中的发展事件（提及/发展/揭示）。
 
-class ForeshadowingEvent(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "foreshadowing_events"
-    foreshadowing_id: Mapped[uuid.UUID]
-    chapter_number: Mapped[int]
-    event_type: Mapped[str]               # mention / develop / reveal
-    description: Mapped[str]
-    quote: Mapped[str | None]
-```
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § foreshadowings / foreshadowing_events
 
 ---
 

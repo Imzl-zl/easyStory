@@ -34,16 +34,9 @@ backup:
 
 ## 3. 软删除机制
 
-所有删除操作都是软删除（标记 deleted），不是物理删除：
+所有删除操作都是软删除（标记 `deleted_at`），不是物理删除。查询时自动过滤 `deleted_at IS NULL`。
 
-```python
-class Project(Base):
-    status: Mapped[ProjectStatus]
-    deleted_at: Mapped[datetime | None]
-
-# 查询时自动过滤
-query = select(Project).where(Project.deleted_at.is_(None))
-```
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § Project
 
 ---
 
@@ -60,17 +53,11 @@ query = select(Project).where(Project.deleted_at.is_(None))
 
 ---
 
-## 5. 执行日志模型
+## 5. 执行日志
 
-```python
-class ExecutionLog(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "execution_logs"
-    workflow_execution_id: Mapped[uuid.UUID]
-    node_execution_id: Mapped[uuid.UUID | None]
-    level: Mapped[str]           # INFO / WARNING / ERROR
-    message: Mapped[str]
-    details: Mapped[dict | None] # 错误堆栈等
-```
+执行日志记录工作流和节点执行过程中的关键事件，包含级别（INFO/WARNING/ERROR）、消息和扩展详情。
+
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § execution_logs
 
 ---
 
@@ -97,17 +84,9 @@ GET /api/v1/workflows/{execution_id}/logs?level=ERROR&limit=50
 
 ## 8. Prompt/响应回放（可开关）
 
-```python
-class PromptReplay(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "prompt_replays"
-    node_execution_id: Mapped[uuid.UUID]
-    replay_type: Mapped[str]         # generate / review / fix
-    model_name: Mapped[str]
-    prompt_text: Mapped[str]
-    response_text: Mapped[str]
-    input_tokens: Mapped[int]
-    output_tokens: Mapped[int]
-```
+回放记录保存每次 LLM 调用的完整 Prompt 和响应，用于调试和审计。记录类型包括 generate/review/fix，同时存储 token 消耗数据。
+
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § prompt_replays
 
 配置：
 ```yaml

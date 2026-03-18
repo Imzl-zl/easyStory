@@ -65,31 +65,13 @@
 
 ## 4. 后端实现
 
-```python
-async def generate_streaming(node_execution_id, prompt):
-    buffer = []
-    interrupted = False
+流式生成的核心行为：
 
-    async for chunk in litellm.acompletion_stream(prompt):
-        if await check_cancelled(node_execution_id):
-            interrupted = True
-            break
-        buffer.append(chunk.content)
-        yield SSEEvent(event="chunk", data=chunk.content)
-
-    partial_content = "".join(buffer)
-    if interrupted:
-        yield SSEEvent(
-            event="stopped",
-            data={"content": partial_content, "status": "interrupted"},
-        )
-        yield SSEEvent(
-            event="partial",
-            data={"content": partial_content, "tokens": count_tokens(partial_content)},
-        )
-    else:
-        yield SSEEvent(event="completed", data={"content": partial_content})
-```
+1. 通过 LiteLLM 发起流式 LLM 调用
+2. 每收到一个 chunk，通过 SSE 推送给前端（event: `chunk`）
+3. 每个 chunk 前检查是否被用户中断（查询 NodeExecution 状态）
+4. 若被中断：停止接收后续 chunk，将已收到的部分内容拼接保存，推送 `stopped` 和 `partial` 事件
+5. 若正常完成：推送 `completed` 事件，包含完整内容
 
 ---
 

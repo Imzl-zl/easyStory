@@ -24,26 +24,15 @@
 
 ### 2.1 User 模型
 
-```python
-class User(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "users"
+User 表包含基本字段：username（唯一）、email（可选）、hashed_password（bcrypt）、is_active。
 
-    username: Mapped[str] = mapped_column(String(100), unique=True)
-    email: Mapped[str | None] = mapped_column(String(200))
-    hashed_password: Mapped[str] = mapped_column(String(200))
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-
-    projects: Mapped[list["Project"]] = relationship(back_populates="owner")
-```
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § users
 
 ### 2.2 Project 增加 owner 关联
 
-```python
-class Project(Base, TimestampMixin, UUIDMixin):
-    # 新增字段
-    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    owner: Mapped["User"] = relationship(back_populates="projects")
-```
+Project 新增 `owner_id`（FK → users.id），与 User 为多对一关系。
+
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § projects
 
 ### 2.3 设计要点
 
@@ -87,27 +76,9 @@ class Project(Base, TimestampMixin, UUIDMixin):
 
 ### 4.1 ModelCredential 存储模型
 
-```python
-class ModelCredential(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "model_credentials"
+凭证表记录 API Key 的加密存储，支持三级作用域（system/user/project）、供应商标识、自定义 endpoint 和连通性验证时间。
 
-    owner_type: Mapped[str] = mapped_column(String(20))
-    # "system" / "user" / "project"
-    owner_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
-    # user_id 或 project_id
-    provider: Mapped[str] = mapped_column(String(50))
-    # "anthropic" / "openai" / "deepseek"
-    display_name: Mapped[str] = mapped_column(String(100))
-    # 如 "我的 Claude Key"
-    encrypted_key: Mapped[str] = mapped_column(Text)
-    # AES-256 加密后的 API Key
-    base_url: Mapped[str | None] = mapped_column(String(500))
-    # 自定义 endpoint
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    last_verified_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
-```
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § model_credentials
 
 ### 4.2 字段说明
 

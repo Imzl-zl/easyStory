@@ -39,6 +39,7 @@ class ContentVersion(Base, TimestampMixin, UUIDMixin):
     change_summary: Mapped[str | None] = mapped_column(Text)
     change_source: Mapped[str] = mapped_column(String(50), default="system")
     is_current: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_best: Mapped[bool] = mapped_column(Boolean, default=False)
     context_snapshot_hash: Mapped[str | None] = mapped_column(String(64))
     ai_conversation_id: Mapped[uuid.UUID | None] = mapped_column()
 

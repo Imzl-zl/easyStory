@@ -43,7 +43,7 @@
 
 ### 2.3 技术实现
 
-使用 Python `asyncio` + `Semaphore` 控制并发数，异步任务而非线程。
+使用异步并发 + 信号量控制并发数，异步任务而非线程。
 
 ---
 
@@ -51,43 +51,49 @@
 
 **所有 Reviewer Agent 的输出必须遵循此 Schema。**
 
-```python
-class ReviewIssue(BaseModel):
-    category: Literal[
-        "plot_inconsistency", "character_inconsistency", "style_deviation",
-        "banned_words", "ai_flavor", "logic_error", "quality_low", "other"
-    ]
-    severity: Literal["critical", "major", "minor", "suggestion"]
-    location: ReviewLocation | None
-    description: str
-    suggested_fix: str | None
-    evidence: str | None
+### ReviewIssue（单条审核问题）
 
-class ReviewLocation(BaseModel):
-    paragraph_index: int | None
-    start_offset: int | None
-    end_offset: int | None
-    quoted_text: str | None
+| 字段 | 类型 | 必填 | 说明 |
+|-----|------|------|------|
+| category | 枚举 | 是 | plot_inconsistency / character_inconsistency / style_deviation / banned_words / ai_flavor / logic_error / quality_low / other |
+| severity | 枚举 | 是 | critical / major / minor / suggestion |
+| location | ReviewLocation | 否 | 问题定位（段落索引、偏移量、原文引用） |
+| description | string | 是 | 问题描述 |
+| suggested_fix | string | 否 | 建议修改方案 |
+| evidence | string | 否 | 佐证文本 |
 
-class ReviewResult(BaseModel):
-    reviewer_id: str
-    reviewer_name: str
-    status: Literal["passed", "failed", "warning"]
-    score: float | None          # 0-100
-    issues: list[ReviewIssue]
-    summary: str
-    execution_time_ms: int
-    tokens_used: int
+### ReviewLocation（问题定位）
 
-class AggregatedReviewResult(BaseModel):
-    overall_status: Literal["passed", "failed"]
-    results: list[ReviewResult]
-    total_issues: int
-    critical_count: int
-    major_count: int
-    minor_count: int
-    pass_rule: Literal["all_pass", "majority_pass", "no_critical"]
-```
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| paragraph_index | int | 段落索引 |
+| start_offset / end_offset | int | 偏移量 |
+| quoted_text | string | 问题原文引用 |
+
+### ReviewResult（单个 Reviewer 的审核结果）
+
+| 字段 | 类型 | 必填 | 说明 |
+|-----|------|------|------|
+| reviewer_id | string | 是 | 审核 Agent ID |
+| reviewer_name | string | 是 | 显示名称 |
+| status | 枚举 | 是 | passed / failed / warning |
+| score | float | 否 | 0-100 评分 |
+| issues | ReviewIssue[] | 是 | 问题列表 |
+| summary | string | 是 | 审核摘要 |
+| execution_time_ms | int | 是 | 执行耗时（毫秒） |
+| tokens_used | int | 是 | 消耗 token 数 |
+
+### AggregatedReviewResult（聚合审核结果）
+
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| overall_status | 枚举 | passed / failed |
+| results | ReviewResult[] | 各 Reviewer 结果列表 |
+| total_issues | int | 问题总数 |
+| critical_count | int | critical 级别问题数 |
+| major_count | int | major 级别问题数 |
+| minor_count | int | minor 级别问题数 |
+| pass_rule | 枚举 | 使用的聚合规则 |
 
 **使用约束：**
 - Reviewer 的 system prompt 中必须要求结构化输出

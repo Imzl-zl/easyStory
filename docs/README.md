@@ -50,7 +50,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [实施计划](./plans/implementation-plan.md) | MVP 阶段详细实施计划 |
+| [后端核心实施计划（V2）](./plans/2026-03-17-backend-core-v2.md) | 后端核心实现路线（以设计文档为准） |
 
 ---
 
@@ -99,9 +99,9 @@ docs/
 │   ├── ui-design.md
 │   └── ui-interaction-supplement.md
 └── plans/                       # 实施计划
-    └── implementation-plan.md
+    └── 2026-03-17-backend-core-v2.md
 ```
 
 ---
 
-*最后更新: 2026-03-16*
+*最后更新: 2026-03-18*

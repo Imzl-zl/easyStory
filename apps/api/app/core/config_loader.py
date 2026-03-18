@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 
 import yaml
@@ -9,9 +8,6 @@ from app.schemas.config_schemas import (
     SkillConfig,
     WorkflowConfig,
 )
-
-logger = logging.getLogger(__name__)
-
 
 class ConfigLoader:
     def __init__(self, config_root: Path):
@@ -39,16 +35,17 @@ class ConfigLoader:
         if not target.exists():
             return
         for yaml_file in target.rglob("*.yaml"):
+            with open(yaml_file, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            if not data:
+                raise ValueError(f"Invalid YAML: {yaml_file} is empty")
+            if root_key not in data:
+                raise ValueError(f"Invalid YAML: {yaml_file} missing '{root_key}' root key")
             try:
-                with open(yaml_file, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
-                if not data or root_key not in data:
-                    logger.warning("Skipping %s: missing '%s' key", yaml_file, root_key)
-                    continue
                 config = model_cls(**data[root_key])
-                cache[config.id] = config
-            except Exception:
-                logger.exception("Failed to load config from %s", yaml_file)
+            except Exception as exc:
+                raise ValueError(f"Invalid {root_key} config in {yaml_file}: {exc}") from exc
+            cache[config.id] = config
 
     def load_skill(self, skill_id: str) -> SkillConfig:
         if skill_id not in self._skills:

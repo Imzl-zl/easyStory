@@ -14,34 +14,34 @@
 
 ## 概览
 
-### Phase 1: 数据模型层 (Task 1-4)
+### Phase 1: 数据模型层 (Task 1-4, 4.5)
 
 搭建项目骨架，实现所有数据库模型。这是最关键的基础——模型字段错了，上层全部要改。
 
-### Phase 2: 配置与基础设施 (Task 5-8)
+### Phase 2: 配置与基础设施 (Task 5-8, 8.5)
 
 完善 Pydantic Schema、ConfigLoader、模板渲染器、TokenCounter。
 
-### Phase 3: 引擎核心 (Task 9-14)
+### Phase 3: 引擎核心 (Task 9-14, 14.5)
 
 WorkflowStateMachine、ContextBuilder、ReviewExecutor、FixExecutor、LLM Service、WorkflowEngine。
 
-### Phase 4: 服务层 (Task 15-18)
+### Phase 4: 服务层 (Task 15-18, 18.5)
 
 ProjectService、ContentService、WorkflowService、CredentialService。
 
-### Phase 5: API 层 (Task 19-23)
+### Phase 5: API 层 (Task 19-23, 23.5)
 
 FastAPI 入口、Auth、REST endpoints、SSE。
 
 ### 任务依赖图
 
 ```
-Phase 1: [T1] → [T2] → [T3] → [T4]
-Phase 2: [T5] → [T6] → [T7], [T8]
-Phase 3: [T9], [T10] → [T11] → [T12], [T13] → [T14]
-Phase 4: [T15] → [T16] → [T17], [T18]
-Phase 5: [T19] → [T20] → [T21], [T22], [T23]
+Phase 1: [T1] → [T2] → [T3] → [T4] → [T4.5 测试]
+Phase 2: [T5] → [T6] → [T7], [T8] → [T8.5 测试]
+Phase 3: [T9], [T8] → [T10] → [T11] → [T12], [T13] → [T14] → [T14.5 测试]
+Phase 4: [T15] → [T16] → [T17], [T18] → [T18.5 测试]
+Phase 5: [T19] → [T20] → [T21], [T22], [T23] → [T23.5 测试]
 ```
 
 ---
@@ -170,23 +170,31 @@ class User(Base, TimestampMixin, UUIDMixin):
 ```python
 # apps/api/tests/conftest.py
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+import pytest_asyncio
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from app.models.base import Base
 
 
-@pytest.fixture
-def engine():
-    eng = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(eng)
+@pytest_asyncio.fixture
+async def engine():
+    eng = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        poolclass=StaticPool,
+    )
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield eng
-    Base.metadata.drop_all(eng)
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await eng.dispose()
 
 
-@pytest.fixture
-def db(engine):
-    with Session(engine) as session:
+@pytest_asyncio.fixture
+async def db(engine) -> AsyncSession:
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_factory() as session:
         yield session
 ```
 
@@ -197,11 +205,11 @@ def db(engine):
 from app.models.user import User
 
 
-def test_user_creation(db):
+async def test_user_creation(db):
     user = User(username="testuser", hashed_password="hashed123")
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
     assert user.username == "testuser"
     assert user.id is not None
     assert user.is_active is True
@@ -228,7 +236,7 @@ def test_user_creation(db):
 - Project 有 `owner_id` FK → users（10-user-and-credentials §2.2）
 - Project 有 `deleted_at` 软删除（18-data-backup）
 - Content 有 `parent_id` 自引用（database-design）
-- ContentVersion 有 `change_source`、`context_snapshot_hash`、`is_current`（05-content-editor）
+- ContentVersion 有 `change_source`、`context_snapshot_hash`、`is_current`、`is_best`（05-content-editor；同一 Content 最多一个 best）
 
 **Implementation: project.py**
 
@@ -290,7 +298,7 @@ class Content(Base, TimestampMixin, UUIDMixin):
     content: Mapped[str | None] = mapped_column(Text)
     word_count: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(50), default="draft")
-    metadata_: Mapped[dict | None] = mapped_column("metadata", JSON)
+    metadata_: Mapped[dict | None] = mapped_column("metadata", JSON)  # 避免与 SQLAlchemy metadata 概念混淆
     last_edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     project: Mapped["Project"] = relationship(back_populates="contents")
@@ -309,6 +317,7 @@ class ContentVersion(Base, TimestampMixin, UUIDMixin):
     change_summary: Mapped[str | None] = mapped_column(Text)
     change_source: Mapped[str] = mapped_column(String(50), default="system")
     is_current: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_best: Mapped[bool] = mapped_column(Boolean, default=False)
     context_snapshot_hash: Mapped[str | None] = mapped_column(String(64))
     ai_conversation_id: Mapped[uuid.UUID | None] = mapped_column()
 
@@ -427,8 +436,8 @@ class NodeExecution(Base, TimestampMixin, UUIDMixin):
     node_order: Mapped[int] = mapped_column(Integer, default=0)
     node_type: Mapped[str] = mapped_column(String(50))
     status: Mapped[str] = mapped_column(String(50), default="pending")
-    input_data: Mapped[dict | None] = mapped_column(JSON)
-    output_data: Mapped[dict | None] = mapped_column(JSON)
+    input_data: Mapped[dict | None] = mapped_column("input", JSON)
+    output_data: Mapped[dict | None] = mapped_column("output", JSON)
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(Text)
     execution_time_ms: Mapped[int | None] = mapped_column(Integer)
@@ -561,16 +570,23 @@ def test_review_action_with_issues(db):
 # apps/api/app/models/chapter_task.py
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import JSON
 
 from .base import Base, TimestampMixin, UUIDMixin
 
 
 class ChapterTask(Base, TimestampMixin, UUIDMixin):
     __tablename__ = "chapter_tasks"
+    __table_args__ = (
+        UniqueConstraint("workflow_execution_id", "chapter_number"),
+    )
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
+    workflow_execution_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workflow_executions.id")
+    )
     chapter_number: Mapped[int] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(String(255))
     brief: Mapped[str] = mapped_column(Text)
@@ -604,7 +620,11 @@ class StoryFact(Base, TimestampMixin, UUIDMixin):
     subject: Mapped[str] = mapped_column(String(255))
     content: Mapped[str] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    superseded_by: Mapped[uuid.UUID | None] = mapped_column()
+    conflict_status: Mapped[str] = mapped_column(String(20), default="none")
+    conflict_with_fact_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("story_facts.id")
+    )
+    superseded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("story_facts.id"))
 ```
 
 **Implementation: token_usage.py**
@@ -749,6 +769,27 @@ from .export import Export
 **Run:** `pytest tests/ -v`
 **Commit:** `feat: implement all supporting models (ChapterTask, StoryFact, TokenUsage, etc.)`
 
+### Task 4.5: Phase 1 集成测试
+
+**目标：** 验证数据模型层所有产出的集成正确性
+
+**测试范围：**
+- 所有 Model 的 CRUD 操作（创建、读取、更新、删除）
+- 外键关系和级联行为（Project → Content → ContentVersion 等）
+- 唯一约束验证（node_executions 的 workflow_execution_id + node_id + sequence）
+- 软删除行为（Project.deleted_at）
+- JSONB 字段的序列化/反序列化
+
+**通过标准：**
+- 所有测试用例通过
+- 无未处理的 TODO/FIXME
+- 覆盖率 ≥ 80%（Model 层）
+
+**依赖：** Task 4
+
+**Run:** `pytest tests/models/ -v`
+**Commit:** `test: add Phase 1 data model integration tests`
+
 ---
 
 ## Phase 2: 配置与基础设施
@@ -758,10 +799,12 @@ from .export import Export
 **目标：** Pydantic Schema 完全对齐 config-format.md + 各设计文档中的配置项。
 
 **关键新增（相比 V1）：**
-- NodeConfig: `review_mode`, `review_config`, `fix_skill`, `fix_strategy`, `loop`
-- WorkflowConfig: `mode`, `budget`, `safety`, `retry`, `model_fallback`
+- NodeConfig: `auto_proceed/auto_review/auto_fix`、`reviewers`、`review_mode`、`review_config`、`max_fix_attempts`、`on_fix_fail`、`fix_skill`、`fix_strategy`、`loop`
+- WorkflowConfig: `mode`、`settings`（工作流级默认 + 节点级覆盖）、`budget`, `safety`, `retry`, `model_fallback`
 - ReviewResult/ReviewIssue/AggregatedReviewResult（03-review-and-fix §3）
 - SkillConfig: `inputs`/`outputs` 增强 Schema（config-format §3）
+- AgentConfig: 新增 `mcp_servers: list[str] = []`（MVP 为空列表，MCP 预留字段）
+- HookConfig: `action.type` 字段说明改为可扩展（通过 PluginRegistry 分发）
 
 **Files:**
 - Rewrite: `apps/api/app/schemas/config_schemas.py`
@@ -772,10 +815,16 @@ from .export import Export
 
 ```python
 # 新增到 NodeConfig
+# 用于实现“自动 + 每 N 章人工检查”等混合体验；不是 workflow.mode 的第三种枚举
+class LoopPauseConfig(BaseModel):
+    strategy: Literal["none", "every", "every_n"] = "none"
+    every_n: int | None = None
+
 class LoopConfig(BaseModel):
     enabled: bool = False
     count_from: str | None = None
     item_var: str = "chapter_index"
+    pause: LoopPauseConfig | None = None  # None 时由 workflow.mode 推导默认值（manual=every，auto=none）
 
 class ReviewConfig(BaseModel):
     pass_rule: Literal["all_pass", "majority_pass", "no_critical"] = "no_critical"
@@ -787,11 +836,28 @@ class FixStrategy(BaseModel):
     targeted_threshold: int = 3
     rewrite_threshold: int = 6
 
+class WorkflowSettings(BaseModel):
+    # 工作流级默认；节点级 `auto_*` 字段为 None 时继承此处
+    # 运行时默认值由 workflow.mode 决定（manual=false；auto=true），在 ConfigLoader 中做补全
+    auto_proceed: bool | None = None
+    auto_review: bool | None = None
+    auto_fix: bool | None = None
+    save_on_step: bool = True
+    default_pass_rule: Literal["all_pass", "majority_pass", "no_critical"] = "no_critical"
+
 class NodeConfig(BaseModel):
     # ... 现有字段 ...
+    auto_proceed: bool | None = None
+    auto_review: bool | None = None
+    auto_fix: bool | None = None
+
+    reviewers: list[str] = Field(default_factory=list)
     review_mode: Literal["parallel", "serial"] = "serial"
     max_concurrent_reviewers: int = 3
     review_config: ReviewConfig = Field(default_factory=ReviewConfig)
+
+    max_fix_attempts: int | None = None
+    on_fix_fail: Literal["pause", "skip", "fail"] = "pause"
     fix_skill: str | None = None
     fix_strategy: FixStrategy = Field(default_factory=FixStrategy)
     loop: LoopConfig = Field(default_factory=LoopConfig)
@@ -801,6 +867,7 @@ class BudgetConfig(BaseModel):
     max_tokens_per_node: int = 50000
     max_tokens_per_workflow: int = 500000
     max_tokens_per_day: int = 2000000
+    max_tokens_per_day_per_user: int | None = None
     warning_threshold: float = 0.8
     on_exceed: Literal["pause", "skip", "fail"] = "pause"
 
@@ -816,15 +883,22 @@ class RetryConfig(BaseModel):
     initial_delay: float = 1.0
     max_delay: float = 30.0
     max_attempts: int = 3
+    retryable_errors: list[str] = Field(
+        default_factory=lambda: ["timeout", "rate_limit", "server_error"]
+    )
+
+class ModelFallbackItem(BaseModel):
+    model: str
 
 class ModelFallbackConfig(BaseModel):
     enabled: bool = False
-    chain: list[ModelConfig] = Field(default_factory=list)
+    chain: list[ModelFallbackItem] = Field(default_factory=list)
     on_all_fail: Literal["pause", "fail", "skip"] = "pause"
 
 class WorkflowConfig(BaseModel):
     # ... 现有字段 ...
     mode: Literal["manual", "auto"] = "manual"
+    settings: WorkflowSettings = Field(default_factory=WorkflowSettings)
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     safety: SafetyConfig = Field(default_factory=SafetyConfig)
     retry: RetryConfig = Field(default_factory=RetryConfig)
@@ -989,6 +1063,7 @@ def test_validate_finds_missing_vars():
 > 来源: 08-cost-and-safety §6, §7; 17-cross-module-contracts §3
 
 **Files:**
+- Create: `apps/api/app/core/errors.py`
 - Create: `apps/api/app/core/token_counter.py`
 - Create: `config/model_pricing.yaml`
 - Create: `apps/api/tests/unit/test_token_counter.py`
@@ -996,10 +1071,31 @@ def test_validate_finds_missing_vars():
 **Implementation:**
 
 ```python
+# apps/api/app/core/errors.py
+class EasyStoryError(Exception):
+    pass
+
+
+class ConfigurationError(EasyStoryError):
+    pass
+
+
+class UnknownModelError(ConfigurationError):
+    def __init__(self, model: str):
+        super().__init__(f"Unknown model: {model}")
+        self.model = model
+
+
+class BudgetExceededError(EasyStoryError):
+    pass
+
+
 # apps/api/app/core/token_counter.py
 import yaml
 from pathlib import Path
 from dataclasses import dataclass
+
+from .errors import UnknownModelError
 
 MODEL_TOKEN_RATIOS: dict[str, float] = {
     "default": 1.5,  # 中文约 1.5 字/token
@@ -1016,6 +1112,7 @@ class ModelPrice:
 class TokenCounter:
     def count(self, text: str, model: str = "default") -> int:
         """精确计数（有 tokenizer 时使用，否则退化为 estimate）"""
+        # TODO: 接入 tokenizer（例如 tiktoken 或供应商返回值）后，此方法应提供真实计数
         return self.estimate(text, model)
 
     def estimate(self, text: str, model: str = "default") -> int:
@@ -1041,7 +1138,7 @@ class ModelPricing:
     ) -> float:
         price = self._prices.get(model)
         if not price:
-            return 0.0
+            raise UnknownModelError(model)
         return (
             input_tokens * price.input_per_1k / 1000
             + output_tokens * price.output_per_1k / 1000
@@ -1049,10 +1146,32 @@ class ModelPricing:
 
     def get_context_window(self, model: str) -> int:
         price = self._prices.get(model)
-        return price.context_window if price else 128000
+        if not price:
+            raise UnknownModelError(model)
+        return price.context_window
 ```
 
 **Commit:** `feat: implement TokenCounter and ModelPricing`
+
+### Task 8.5: Phase 2 集成测试
+
+**目标：** 验证配置与基础设施层所有产出的集成正确性
+
+**测试范围：**
+- ConfigLoader：加载合法 YAML、拒绝非法 YAML、引用完整性校验、ID 唯一性校验
+- Pydantic Schema：Skill/Agent/Hook/Workflow 配置的序列化/反序列化/校验
+- SkillTemplateRenderer：沙箱安全性（禁止 macro/import）、StrictUndefined 行为、白名单 filter
+- TokenCounter：精确计数 vs 快速估算、不同模型的字符比
+- ModelPricing：费用计算、热更新、未知模型处理
+
+**通过标准：**
+- 所有测试用例通过
+- 模板渲染安全测试覆盖所有禁止项
+
+**依赖：** Task 8
+
+**Run:** `pytest tests/core/ tests/schemas/ -v`
+**Commit:** `test: add Phase 2 config and infrastructure integration tests`
 
 ---
 
@@ -1082,7 +1201,7 @@ class InvalidTransitionError(Exception):
 class WorkflowStateMachine:
     VALID_TRANSITIONS: dict[str, list[str]] = {
         "created":   ["running"],
-        "running":   ["paused", "completed", "failed"],
+        "running":   ["paused", "completed", "failed", "cancelled"],
         "paused":    ["running", "cancelled"],
         "failed":    ["running"],
         "completed": [],
@@ -1106,7 +1225,13 @@ class WorkflowStateMachine:
         return status in cls.TERMINAL_STATES
 ```
 
-**Tests:** 覆盖所有合法/非法转换组合。
+**Tests:** 覆盖所有合法/非法转换组合，包含重试路径。
+
+```python
+# apps/api/tests/unit/test_state_machine.py (伪代码)
+def test_failed_can_retry_to_running():
+    WorkflowStateMachine.validate_transition("failed", "running")
+```
 
 **Commit:** `feat: implement workflow state machine`
 
@@ -1128,6 +1253,15 @@ class WorkflowStateMachine:
 - `build_context(project_id, injection_rules, db)` → variables dict + context_report
 - `truncate_context(sections, budget)` → 裁剪后的 sections
 
+**Tests:** 覆盖 token 裁剪边界（刚好不超/刚好超/必须 drop）。
+
+```python
+# apps/api/tests/unit/test_context_builder.py (伪代码)
+def test_truncate_keeps_priority_1_sections():
+    # priority=1 section 永不裁剪；超预算时从低优先级开始裁剪
+    pass
+```
+
 **Commit:** `feat: implement context builder with three-layer priority and truncation`
 
 ---
@@ -1148,6 +1282,15 @@ class WorkflowStateMachine:
 - `_execute_serial(content, reviewers)` → list[ReviewResult]
 - `aggregate(results, pass_rule)` → AggregatedReviewResult
 
+**Tests:** 并行模式下 reviewer 超时/失败的聚合行为必须可预测。
+
+```python
+# apps/api/tests/unit/test_review_executor.py (伪代码)
+async def test_parallel_review_partial_timeout():
+    # 一个 reviewer 超时 -> 结果标记 failed/timeout；聚合规则按 pass_rule 判定
+    pass
+```
+
 **Commit:** `feat: implement review executor with parallel/serial modes`
 
 ---
@@ -1164,25 +1307,37 @@ class WorkflowStateMachine:
 - `determine_strategy(aggregated_result, config)` → "targeted" | "full_rewrite"
 - `execute_fix(original, feedback, strategy, fix_skill)` → fixed_content
 
+**Tests:** 问题数量阈值触发策略切换；targeted/full_rewrite 两条路径都要覆盖。
+
 **Commit:** `feat: implement fix executor with auto strategy selection`
 
 ---
 
-### Task 13: LLM 服务
+### Task 13: LLM 服务 + MCP 预留抽象
 
-> 来源: 09-error-handling; tech-stack（LiteLLM）
+> 来源: 09-error-handling; tech-stack（LiteLLM）; 16-mcp-architecture
 
 **Files:**
-- Create: `apps/api/app/engine/llm_service.py`
+- Create: `apps/api/app/engine/llm_service.py` — ToolProvider 接口 + LLMToolProvider（MVP 实现）
+- Create: `apps/api/app/engine/plugin_registry.py` — PluginRegistry（MVP 内置 script/webhook/agent 三种 provider）
 - Create: `apps/api/tests/unit/test_llm_service.py`
 
-**核心方法：**
+**MCP 预留说明：**
+- `llm_service.py` 中定义 `ToolProvider` 抽象接口（execute/list_tools），`LLMToolProvider` 是 MVP 的唯一实现
+- `plugin_registry.py` 中定义 `PluginRegistry`（register/execute），MVP 注册 ScriptProvider/WebhookProvider/AgentProvider
+- Agent 调 LLM 通过 ToolProvider，Hook 执行通过 PluginRegistry — 满足 MCP 预留架构约束
+- 第二阶段增加 `MCPToolProvider` 和 `MCPPluginProvider` 时，上层代码无需修改
+
+**核心方法（LLMToolProvider）：**
 - `call(prompt, model_config, credential)` → LLMResponse
 - `call_stream(prompt, model_config, credential)` → AsyncGenerator[str]
 - `_retry_with_backoff(fn, config)` → result
 - `_fallback(fn, fallback_chain)` → result
 
-**Commit:** `feat: implement LLM service with retry and model fallback`
+**错误与异常：**
+- 统一抛业务异常（如超时/限流/配置错误/预算超限），禁止”吞错并返回空结果”。
+
+**Commit:** `feat: implement LLM service with ToolProvider/PluginRegistry MCP abstractions`
 
 ---
 
@@ -1207,6 +1362,28 @@ class WorkflowStateMachine:
 - start 前检查同项目无 running/paused 工作流
 
 **Commit:** `feat: implement complete workflow engine with state machine and chapter loop`
+
+### Task 14.5: Phase 3 集成测试
+
+**目标：** 验证引擎核心所有产出的集成正确性
+
+**测试范围：**
+- WorkflowStateMachine：所有合法状态转换、拒绝非法转换、幂等性（resume 已 running 的工作流）
+- ContextBuilder：上下文注入（三层优先级）、裁剪算法（超预算时按优先级裁剪）、第 1 章特殊处理
+- ReviewExecutor：并行/串行审核、ReviewResult Schema 校验、聚合规则（all_pass/majority_pass/no_critical）
+- FixExecutor：精修策略选择（targeted/full_rewrite）、max_fix_attempts 计数、on_fix_fail 行为
+- LLM Service：通过 LiteLLM 调用（mock）、重试策略、模型降级链
+- WorkflowEngine：完整工作流执行（mock LLM）、章节循环、暂停/恢复、中断语义
+
+**通过标准：**
+- 所有测试用例通过
+- 状态机转换 100% 覆盖
+- 工作流端到端流程可跑通（使用 mock LLM）
+
+**依赖：** Task 14
+
+**Run:** `pytest tests/engine/ -v`
+**Commit:** `test: add Phase 3 engine core integration tests`
 
 ---
 
@@ -1237,6 +1414,26 @@ class WorkflowStateMachine:
 - 优先级解析（project > user > system）
 - 连通性测试
 - Commit: `feat: implement credential service with encryption`
+
+### Task 18.5: Phase 4 集成测试
+
+**目标：** 验证服务层所有产出的集成正确性
+
+**测试范围：**
+- ProjectService：CRUD、owner_id 过滤、软删除/恢复、设定完整度检查
+- ContentService：内容创建/编辑、版本管理、stale 标记传播、最佳版本标记
+- WorkflowService：启动（并发检查）、暂停/恢复/取消、配置快照保存
+- CredentialService：AES-256-GCM 加解密、优先级解析（project > user > system）、连通性测试（mock）
+- Service 层 DTO 入参/返回（不依赖 HTTP Request/Response）
+
+**通过标准：**
+- 所有测试用例通过
+- Service 层无 HTTP 依赖（import 检查）
+
+**依赖：** Task 18
+
+**Run:** `pytest tests/services/ -v`
+**Commit:** `test: add Phase 4 service layer integration tests`
 
 ---
 
@@ -1272,6 +1469,29 @@ class WorkflowStateMachine:
 - `GET /api/v1/config/skills|agents|hooks|workflows`
 - `PUT /api/v1/config/skills/{id}` (编辑后写回 YAML)
 - Commit: `feat: implement config management API`
+
+### Task 23.5: Phase 5 端到端测试
+
+**目标：** 验证 API 层和完整请求链的正确性
+
+**测试范围：**
+- Auth：注册/登录/JWT 验证/过期处理
+- Project API：CRUD + 权限隔离（用户只能访问自己的项目）
+- Content API：内容管理 + 版本操作
+- Workflow API：启动/暂停/恢复/取消 + SSE 流式推送
+- Config API：配置读取/编辑/写回 YAML
+- 错误处理：401/403/404/422 响应格式
+- CORS 配置验证
+
+**通过标准：**
+- 所有测试用例通过
+- API 文档（/docs）可正常访问
+- 完整创作流程可跑通（注册 → 创建项目 → 启动工作流 → 生成 → 导出）
+
+**依赖：** Task 23
+
+**Run:** `pytest tests/api/ -v`
+**Commit:** `test: add Phase 5 API end-to-end tests`
 
 ---
 
@@ -1319,5 +1539,5 @@ open http://localhost:8000/docs
 
 *计划版本: 2.0.0*
 *创建日期: 2026-03-17*
-*基于: 19 个设计文档全面审查*
+*基于: 18 个设计文档全面审查*
 *预计任务数: 23 个*

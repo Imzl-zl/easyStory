@@ -3,11 +3,14 @@ workflow:
   name: "玄幻小说手动创作"
   version: "1.0.0"
   description: "手动模式玄幻小说创作流程"
+  mode: "manual"
 
   settings:
     auto_proceed: false
-    max_retry: 3
+    auto_review: false
+    auto_fix: false
     save_on_step: true
+    default_pass_rule: "no_critical"
 
   context_injection:
     enabled: true

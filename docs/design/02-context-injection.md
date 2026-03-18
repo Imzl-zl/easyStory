@@ -79,18 +79,9 @@ context_injection:
 
 ```
 ContextBuilder.build_context()
-  ↓
-返回 dict: {
-  "outline": "大纲全文...",
-  "previous_content": "第48章...\n\n第49章...",
-  "character_profile": "萧炎：16岁，斗者三段...",
-  "story_bible": "【人物状态】...\n【未解伏笔】...",
-  ...
-}
-  ↓
-SkillTemplateRenderer.render(template, variables)
-  ↓
-最终 Prompt 文本
+  → 返回变量字典（如 outline、previous_content、character_profile、story_bible 等）
+  → SkillTemplateRenderer.render(template, variables)
+  → 最终 Prompt 文本
 ```
 
 > `variables` 会在渲染前由统一的 VariableResolver 合并默认值/循环变量/映射结果，并在 `StrictUndefined` 下做缺失校验，详见 [跨模块契约](./17-cross-module-contracts.md)。
@@ -126,20 +117,7 @@ SkillTemplateRenderer.render(template, variables)
 
 ### 4.3 数据模型
 
-```python
-class StoryFact(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "story_facts"
-    project_id: Mapped[uuid.UUID]
-    chapter_number: Mapped[int]
-    source_content_version_id: Mapped[uuid.UUID]  # 绑定到具体版本
-    fact_type: Mapped[str]
-    subject: Mapped[str]
-    content: Mapped[str]
-    is_active: Mapped[bool] = True
-    conflict_status: Mapped[str] = "none"         # none / potential / confirmed
-    conflict_with_fact_id: Mapped[uuid.UUID | None]
-    superseded_by: Mapped[uuid.UUID | None]
-```
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § story_facts
 
 ### 4.4 事实冲突检测
 
@@ -175,19 +153,17 @@ class StoryFact(Base, TimestampMixin, UUIDMixin):
 
 ### 5.1 Section 优先级配置
 
-```python
-SECTION_CONFIG = {
-    "project_setting":         {"priority": 1, "min_tokens": 0,   "truncation": "none"},
-    "chapter_task":            {"priority": 1, "min_tokens": 0,   "truncation": "none"},
-    "story_bible":             {"priority": 2, "min_tokens": 500, "truncation": "drop_oldest_facts"},
-    "writing_preferences":     {"priority": 3, "min_tokens": 80,  "truncation": "keep_high_confidence_only"},
-    "foreshadowing_reminder":  {"priority": 4, "min_tokens": 80,  "truncation": "keep_major_only"},
-    "chapter_summaries":       {"priority": 5, "min_tokens": 200, "truncation": "drop_oldest_chapters"},
-    "previous_chapters":       {"priority": 6, "min_tokens": 500, "truncation": "tail_truncation"},
-    "style_reference":         {"priority": 7, "min_tokens": 0,   "truncation": "selected_fields_only"},
-    "outline":                 {"priority": 8, "min_tokens": 200, "truncation": "tail_truncation"},
-}
-```
+| Section | 优先级 | 最低 token | 裁剪策略 |
+|---------|--------|-----------|---------|
+| project_setting | 1（最高） | 0 | 永不裁剪 |
+| chapter_task | 1 | 0 | 永不裁剪 |
+| story_bible | 2 | 500 | 丢弃最早的事实 |
+| writing_preferences | 3 | 80 | 只保留高置信度偏好 |
+| foreshadowing_reminder | 4 | 80 | 只保留 major 伏笔 |
+| chapter_summaries | 5 | 200 | 丢弃最早的章节摘要 |
+| previous_chapters | 6 | 500 | 尾部截断 |
+| style_reference | 7 | 0 | 只保留选中字段 |
+| outline | 8（最低） | 200 | 尾部截断 |
 
 ### 5.2 裁剪流程
 

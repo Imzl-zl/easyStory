@@ -71,27 +71,9 @@
 
 ## 5. 数据模型
 
-```python
-class WritingPreference(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "writing_preferences"
-    project_id: Mapped[uuid.UUID]
-    user_id: Mapped[uuid.UUID]
-    category: Mapped[str]        # "style" / "narrative" / "forbidden" / "character_voice"
-    content: Mapped[str]
-    confidence: Mapped[float]    # 0-1
-    source_edits_count: Mapped[int]
-    is_pinned: Mapped[bool] = False
-    is_active: Mapped[bool] = True
+WritingPreference 记录用户的写作偏好（类别、内容、置信度、来源编辑次数、是否置顶/激活）。EditPattern 记录用户的编辑模式（模式类型、原文、修改后文本、AI 分析结果）。
 
-class EditPattern(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "edit_patterns"
-    project_id: Mapped[uuid.UUID]
-    content_version_id: Mapped[uuid.UUID]
-    pattern_type: Mapped[str]    # "deletion" / "replacement" / "addition"
-    original_text: Mapped[str]
-    edited_text: Mapped[str]
-    ai_analysis: Mapped[str | None]
-```
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § writing_preferences / edit_patterns
 
 ---
 

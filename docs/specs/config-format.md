@@ -271,6 +271,8 @@ agent:
     max_tokens: 1000
 
   # reviewer 类型输出固定为 ReviewResult（不允许自定义 output_schema，见 docs/design/03-review-and-fix.md）
+
+  mcp_servers: []                     # 可选，MCP Server 列表（MVP 为空，第二阶段启用）
 ```
 
 **字段说明**：
@@ -286,6 +288,7 @@ agent:
 | `skills` | array | ❌ | 关联的技能 ID 列表 |
 | `model` | object | ❌ | 模型配置（不含凭证，含 provider/name、参数，以及可选 `required_capabilities`） |
 | `output_schema` | object | ❌ | 输出格式定义（JSON Schema）。仅 writer/checker 可用；reviewer 固定为 ReviewResult |
+| `mcp_servers` | array | ❌ | MCP Server 列表（MVP 为空，第二阶段启用，见 [MCP 预留](../design/16-mcp-architecture.md)） |
 
 **类型说明**：
 
@@ -323,7 +326,7 @@ hook:
     value: "completed"                # 值
   
   action:                             # 必填，执行动作
-    type: "script"                    # 类型：script/webhook/agent
+    type: "script"                    # MVP 内置：script/webhook/agent（通过 PluginRegistry 可扩展，二期增加 mcp）
     config:
       module: "app.hooks.builtin"     # 模块路径（script 类型）
       function: "auto_save_content"   # 函数名
@@ -332,7 +335,7 @@ hook:
   
   priority: 10                        # 可选，优先级，数字越小越先执行
   timeout: 30                         # 可选，超时时间（秒）
-  retry:                              # 可选，重试配置
+  retry:                              # 可选，重试配置（仅对当前 hook 的 action 生效，不等同 workflow.retry）
     max_attempts: 3
     delay: 1                          # 重试间隔（秒）
 ```
@@ -346,7 +349,7 @@ hook:
 | `trigger.event` | string | ✅ | 触发事件 |
 | `trigger.node_types` | array | ❌ | 适用的节点类型 |
 | `condition` | object | ❌ | 额外触发条件 |
-| `action.type` | string | ✅ | 动作类型：script/webhook/agent |
+| `action.type` | string | ✅ | 动作类型（通过 PluginRegistry 分发，可扩展）。MVP 内置：script/webhook/agent；第二阶段增加 mcp |
 | `action.config` | object | ✅ | 动作配置 |
 | `priority` | integer | ❌ | 优先级，默认 10 |
 | `enabled` | boolean | ❌ | 是否启用，默认 true |
@@ -376,6 +379,8 @@ hook:
 | `webhook` | 调用 HTTP 接口 | `url`, `method`, `headers`, `body` |
 | `agent` | 调用 Agent | `agent_id`, `input_mapping` |
 
+> `action.type` 通过 PluginRegistry 分发，支持扩展新类型。MVP 内置 script/webhook/agent 三种；第二阶段增加 `mcp` 类型（见 [MCP 预留](../design/16-mcp-architecture.md)）。
+
 ---
 
 ## 6. Workflow 配置格式
@@ -392,13 +397,13 @@ workflow:
   author: "user"                      # 可选，作者
   tags: ["玄幻", "全自动"]            # 可选，标签
 
-  mode: "auto"                        # 必填，工作模式：manual / auto
+  mode: "auto"                        # 必填，工作模式：manual / auto（不引入 hybrid；混合体验用节点级覆盖 + loop.pause 表达）
 
   settings:                           # 可选，全局设置
     auto_proceed: true                # 审核通过后自动进入下一步
-    max_retry: 3                      # 最大重试次数
+    auto_review: true                 # 默认是否自动审核（节点级可覆盖）
+    auto_fix: true                    # 默认审核失败是否自动精修（节点级可覆盖）
     save_on_step: true                # 每步自动保存
-    timeout: 300                      # 单节点超时（秒）
     default_pass_rule: "no_critical"  # 默认审核聚合规则
 
   budget:                             # 可选，Token 预算配置
@@ -417,16 +422,24 @@ workflow:
     node_timeout: 300                 # 单节点超时（秒）
 
   retry:                              # 可选，重试策略
-    backoff: "exponential"            # 退避策略: fixed / exponential
-    base_delay: 5                     # 基础延迟（秒）
-    max_delay: 60                     # 最大延迟（秒）
+    strategy: "exponential_backoff"   # 退避策略: exponential_backoff / fixed / none
+    initial_delay: 1                  # 初始延迟（秒）
+    max_delay: 30                     # 最大延迟（秒）
+    max_attempts: 3                   # 最大重试次数
+    retryable_errors:                 # 可重试错误白名单（仅这些会触发重试）
+      - "timeout"
+      - "rate_limit"
+      - "server_error"
+
+  # 说明：`workflow.retry` 只负责 LLM 调用层的瞬时错误重试（如 timeout/429/5xx），不影响节点级 `on_fail` 行为。
+  # 节点执行级的“重跑次数”由 `workflow.safety.max_retry_per_node` 控制；精修轮次上限由 `workflow.safety.max_fix_attempts` / `nodes[].max_fix_attempts` 控制。
 
   model_fallback:                     # 可选，模型降级策略
     enabled: false                    # 默认关闭
     chain:                            # 降级链
-      - "claude-sonnet-4-20250514"
-      - "gpt-4o"
-      - "deepseek-v3"
+      - model: "claude-sonnet-4-20250514"
+      - model: "gpt-4o"
+      - model: "deepseek-v3"
     on_all_fail: "pause"              # 全部失败后的动作：pause / fail / skip
   
   context_injection:                  # 可选，上下文注入规则
@@ -449,6 +462,7 @@ workflow:
       name: "生成大纲"                 # 节点名称
       type: "generate"                # 节点类型
       skill: "skill.outline.xuanhuan" # 使用的技能
+      auto_proceed: false             # 节点级覆盖：强制人工确认
 
       hooks:                          # 节点级钩子
         before:
@@ -493,7 +507,11 @@ workflow:
         enabled: true
         count_from: "chapter_plan"    # 从章节规划获取数量
         item_var: "chapter_index"     # 循环变量名
-      
+        pause:                        # 可选：循环内暂停策略（用于“自动 + 每 N 章人工检查”等混合体验）
+          strategy: "every_n"         # none / every / every_n
+          every_n: 10                 # strategy=every_n 时必填；每 10 章暂停一次
+          # 未配置 pause 时：manual 模式默认 every；auto 模式默认 none
+
       hooks:
         before:
           - "hook.inject_context"
@@ -626,9 +644,9 @@ model:
 - 引用完整性检查（如 skill 引用的 agent 是否存在）
 
 **错误处理**：
-- 配置错误：记录日志，跳过该配置
-- 引用缺失：记录警告，延迟加载
-- 格式错误：返回详细错误信息
+- 配置错误：记录详细错误（日志 + Web UI），拒绝加载该配置（不进入注册表）
+- 引用缺失：视为配置错误（引用完整性不满足时禁止加载）
+- 格式错误：返回详细错误信息并拒绝加载
 
 ---
 

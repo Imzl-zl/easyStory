@@ -18,4 +18,8 @@ class StoryFact(Base, TimestampMixin, UUIDMixin):
     subject: Mapped[str] = mapped_column(String(255))
     content: Mapped[str] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    superseded_by: Mapped[uuid.UUID | None] = mapped_column()
+    conflict_status: Mapped[str] = mapped_column(String(20), default="none")
+    conflict_with_fact_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("story_facts.id")
+    )
+    superseded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("story_facts.id"))

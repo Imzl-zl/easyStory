@@ -99,6 +99,26 @@ workflow:
 
 用户操作：生成 → 查看/编辑/对话修改 → 手动审核（可选） → 确认 → 下一节点
 
+**手动模式交互细节：**
+
+| 阶段 | 用户可执行的操作 | 说明 |
+|------|----------------|------|
+| 生成完成后 | 查看生成内容 | 内容以草稿状态展示在编辑器中 |
+| | 编辑内容 | 直接在编辑器中修改，自动保存草稿（每 30 秒） |
+| | AI 对话修改 | 通过侧边栏对话让 AI 修改特定部分 |
+| | 手动触发审核 | 可选操作，点击"审核"按钮运行配置的 Reviewer |
+| | 查看审核结果 | 查看各 Reviewer 的评分和问题列表 |
+| 确认操作 | 点击"确认并继续" | 创建正式版本（ContentVersion）、触发事实抽取、推进到下一节点 |
+
+**确认动作的前置条件：**
+- 内容不为空
+- 无正在进行的 AI 修改操作
+
+**离开与恢复：**
+- 用户可随时离开页面，状态保持为 `paused`
+- 无超时限制，下次回来时从上次位置继续
+- 草稿自动保存，不会丢失编辑内容
+
 ### 3.3 自动模式
 
 ```yaml
@@ -108,21 +128,29 @@ workflow:
     auto_proceed: true
     auto_review: true
     auto_fix: true
-    max_retry: 3
+  safety:
+    max_fix_attempts: 3
 ```
 
-流程：生成 → 自动审核 → 通过则自动下一步 / 失败则自动精修（最多 3 次） → 仍失败则暂停等人工
+流程：生成 → 自动审核 → 通过则自动下一步 / 失败则自动精修（最多 `max_fix_attempts` 次） → 仍失败则暂停等人工
 
 ### 3.4 节点级覆盖
 
 ```yaml
 workflow:
   mode: "auto"  # 默认自动模式
-nodes:
-  - id: "outline"
-    auto_proceed: false  # 大纲节点强制人工确认
-  - id: "chapter_10"
-    auto_proceed: false  # 第10章需要人工检查
+
+  nodes:
+    - id: "outline"
+      auto_proceed: false  # 大纲节点强制人工确认
+
+    # 章节生成通常是一个循环节点（而不是每章一个节点）
+    # “混合体验”（例如每 10 章暂停一次）用 loop.pause 表达，而不是增加 mode=hybrid
+    - id: "chapter_gen"
+      loop:
+        pause:
+          strategy: "every_n"
+          every_n: 10
 ```
 
 ### 3.5 运行时切换
@@ -156,18 +184,16 @@ failed    --retry()--------------------> running
 
 **合法状态转换：**
 
-```python
-VALID_TRANSITIONS = {
-    "created":   ["running"],
-    "running":   ["paused", "completed", "failed", "cancelled"],
-    "paused":    ["running", "cancelled"],
-    "failed":    ["running"],          # retry
-    "completed": [],                    # 终态
-    "cancelled": [],                    # 终态
-}
-```
+| 当前状态 | 可转换到 | 触发方式 |
+|---------|---------|---------|
+| created | running | start() |
+| running | paused, completed, failed, cancelled | pause()/完成/错误/cancel() |
+| paused | running, cancelled | resume()/cancel() |
+| failed | running | retry()（受安全阀约束） |
+| completed | —（终态） | — |
+| cancelled | —（终态） | — |
 
-> `max_retry` 达到后，`failed` 视为终态：不再允许从 `failed` 进入 `running`（由安全阀控制，见 [成本控制](./08-cost-and-safety.md)）。
+> `failed → running`（retry）在业务上允许，但必须通过安全阀校验（如 `workflow.safety.max_total_retries`），否则会被拒绝并要求人工介入（见 [成本控制](./08-cost-and-safety.md)）。
 
 ### 4.2 用户动作语义
 
@@ -180,45 +206,42 @@ VALID_TRANSITIONS = {
 | 取消工作流 | 工作流级终止 | 允许从 `running` 或 `paused` 发起；`running` 时先尽力中断当前节点，再进入 `cancelled`，之后不可恢复 |
 
 **设计原则：**
-- “停止当前生成”不是“取消工作流”，它只是把当前节点拉回人工决策点
+- “停止当前生成”不是”取消工作流”，它只是把当前节点拉回人工决策点
 - “暂停工作流”用于暂时中止自动推进，后续允许恢复
 - “取消工作流”是放弃本次执行，不保留继续执行语义
 
-### 4.3 暂停/恢复机制
+### 4.3 paused 状态的统一语义
 
-```python
-class WorkflowExecution:
-    pause_reason: str | None       # "user_request" / "user_interrupted" / "budget_exceeded" / "review_failed" / "error"
-    resume_from_node: str | None   # 恢复时从哪个节点继续
-    snapshot: dict | None          # 暂停时的状态快照
-```
+`paused` 是**工作流执行层面的唯一暂停态**，覆盖以下所有场景：
 
-暂停时保存：当前节点执行进度、已完成节点输出、上下文缓存、用户临时修改。
+| pause_reason | 触发方式 | 说明 |
+|-------------|---------|------|
+| `user_request` | 用户点击”暂停” | 用户主动暂停自动推进 |
+| `user_interrupted` | 用户点击”停止当前生成” | 中断流式生成后进入暂停 |
+| `budget_exceeded` | 预算超限 | 系统自动暂停 |
+| `review_failed` | 精修达上限 | on_fix_fail=pause 时触发 |
+| `error` | 不可恢复错误 | 需人工介入 |
+| `loop_pause` | loop.pause 策略触发 | 每 N 章暂停检查 |
+| （无，手动模式节点间）| 节点完成等待确认 | 手动模式每步都经历”运行→暂停→确认→运行” |
 
-**`snapshot` 最小建议 Schema：**
+**关键约束：** 同一项目存在 `running` 或 `paused` 状态的工作流时，禁止启动新工作流。这意味着手动模式下用户离开页面（工作流处于 `paused`）后，必须先 resume 当前工作流或 cancel 它，才能启动新的。这是预期行为，不是限制。
 
-```json
-{
-  "current_node_id": "chapter_gen",
-  "current_node_execution_id": "uuid",
-  "current_sequence": 7,
-  "resume_context": {
-    "chapter_task_id": "uuid",
-    "chapter_number": 7
-  },
-  "completed_nodes": [
-    {"node_id": "outline", "sequence": 0, "status": "completed"}
-  ],
-  "pending_actions": [
-    {"type": "user_decision", "source": "interrupted_generation"}
-  ],
-  "partial_artifacts": [
-    {"content_version_id": "uuid", "created_by": "ai_partial"}
-  ]
-}
-```
+### 4.4 暂停/恢复机制
 
-> `snapshot` 存放在 `WorkflowExecution.snapshot` 字段中，用于恢复执行；它是**运行时快照**，不同于启动时不可变的 `workflow_snapshot/skills_snapshot/agents_snapshot`。
+暂停时保存运行时快照到 `WorkflowExecution.snapshot`，包含以下信息：
+
+| 快照内容 | 说明 |
+|---------|------|
+| 当前节点 ID 与执行 ID | 恢复时知道从哪继续 |
+| 当前执行序号 | 章节循环的进度 |
+| 恢复上下文 | 如章节任务 ID、章节号 |
+| 已完成节点列表 | 各节点完成状态 |
+| 待处理动作 | 如用户决策请求 |
+| 部分产物 | 中断时已生成的部分内容 |
+
+> `snapshot` 是**运行时快照**，用于恢复执行；不同于启动时不可变的 `workflow_snapshot/skills_snapshot/agents_snapshot`。
+>
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § WorkflowExecution
 
 ---
 
@@ -232,12 +255,9 @@ class WorkflowExecution:
 
 **原则：工作流读取上下文时做快照，不受后续编辑影响。**
 
-```python
-async def prepare_context_for_node(node_id, project_id):
-    context_data = await context_builder.build_context(project_id, injection_rules)
-    context_hash = hashlib.sha256(json.dumps(context_data).encode()).hexdigest()
-    node_execution.input_data = {"context": context_data, "context_hash": context_hash}
-```
+节点执行前，系统构建当前上下文并计算 SHA-256 哈希值，作为该节点的输入快照。后续用户编辑不影响正在执行的节点。
+
+> → 上下文构建详见 [上下文注入](./02-context-injection.md)
 
 - 用户可以随时编辑任何章节
 - 工作流使用的是快照，不受影响
@@ -261,14 +281,7 @@ async def prepare_context_for_node(node_id, project_id):
 
 ### 6.2 实时推送（SSE）
 
-**使用 SSE（Server-Sent Events）实时推送状态：**
-
-```python
-async def execute_node(node_id: str):
-    yield SSEEvent(event="status", data={"nodeId": node_id, "status": "running"})
-    result = await workflow_engine.execute_node(node_id)
-    yield SSEEvent(event="status", data={"nodeId": node_id, "status": "completed"})
-```
+使用 SSE（Server-Sent Events）实时推送节点状态变更，包括节点启动、完成、错误等事件。
 
 > **决策**：使用 SSE 而非 WebSocket，与 tech-stack 决策一致。
 

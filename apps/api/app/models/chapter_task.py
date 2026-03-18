@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
@@ -9,8 +9,12 @@ from .base import Base, TimestampMixin, UUIDMixin
 
 class ChapterTask(Base, TimestampMixin, UUIDMixin):
     __tablename__ = "chapter_tasks"
+    __table_args__ = (UniqueConstraint("workflow_execution_id", "chapter_number"),)
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
+    workflow_execution_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workflow_executions.id")
+    )
     chapter_number: Mapped[int] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(String(255))
     brief: Mapped[str] = mapped_column(Text)

@@ -29,18 +29,10 @@
 
 ### 2.2 防重复生成
 
-```python
-async def resume_workflow(execution_id):
-    async with db.begin():
-        execution = await db.execute(
-            select(WorkflowExecution)
-            .where(WorkflowExecution.id == execution_id)
-            .with_for_update()  # 悲观锁
-        )
-        if execution.status == "running": return  # 幂等
-        if execution.status != "paused": raise InvalidStateError()
-        execution.status = "running"
-```
+`resume_workflow` 必须使用悲观锁（`FOR UPDATE`）获取 WorkflowExecution 记录：
+- 若已在 `running` 状态 → 忽略（幂等）
+- 若不在 `paused` 状态 → 抛出状态错误
+- 否则 → 将状态更新为 `running`
 
 ### 2.3 唯一约束
 
@@ -61,31 +53,15 @@ UNIQUE (workflow_execution_id, chapter_number);
 
 ### 2.4 状态机
 
-```python
-class WorkflowStateMachine:
-    VALID_TRANSITIONS = {
-        "created":   ["running"],
-        "running":   ["paused", "completed", "failed", "cancelled"],
-        "paused":    ["running", "cancelled"],
-        "failed":    ["running"],
-        "completed": [],
-        "cancelled": [],
-    }
-```
+> → 合法状态转换详见 [核心工作流](./01-core-workflow.md) §4.1
 
 ### 2.5 中断语义
 
-```python
-async def interrupt_generation(node_execution_id):
-    node_execution = await lock_node_execution(node_execution_id)
-    if node_execution.status != "running_stream":
-        return  # 幂等
-
-    node_execution.status = "interrupted"
-    workflow = await lock_workflow_execution(node_execution.workflow_execution_id)
-    workflow.status = "paused"
-    workflow.pause_reason = "user_interrupted"
-```
+`interrupt_generation` 的行为：
+1. 使用悲观锁获取 NodeExecution 记录
+2. 若当前节点不在 `running_stream` 状态 → 忽略（幂等）
+3. 将节点状态改为 `interrupted`
+4. 将工作流状态改为 `paused`，`pause_reason` 设为 `user_interrupted`
 
 **约束：**
 - `interrupt_generation` 只负责把当前节点拉回人工决策点，不得直接把工作流标记为 `cancelled`
@@ -96,16 +72,16 @@ async def interrupt_generation(node_execution_id):
 
 ## 3. Token 计数统一来源
 
-```python
-class TokenCounter:
-    """统一 Token 计数器，所有需要计数的地方必须调用此类"""
-    def count(self, text, model) -> int:     # 精确（有 tokenizer 时）
-    def estimate(self, text, model) -> int:  # 快速估算
+> → TokenCounter 和 ModelPricing 的接口契约详见 [成本控制](./08-cost-and-safety.md) §6、§7
 
-class ModelPricing:
-    """统一价格表，禁止 hardcode 价格"""
-    def calculate_cost(self, model, input_tokens, output_tokens) -> float: ...
-```
+**使用约束：**
+
+| 调用方 | 使用方法 | 场景 |
+|--------|---------|------|
+| BudgetGuard | count()（MVP 为估算） | 预算检查 |
+| Dry-run | estimate()（快速） | 启动前预估 |
+| ContextBuilder | count()（MVP 为估算） | 报告 token 占用 |
+| TokenUsage 记录 | LLM API 返回值 | 最权威来源 |
 
 价格配置：
 ```yaml
@@ -117,29 +93,13 @@ models:
   deepseek-v3:                { input_per_1k: 0.001, output_per_1k: 0.002, context_window: 128000 }
 ```
 
-**使用约束：**
-- BudgetGuard 调 `count()` 做精确检查
-- Dry-run 调 `estimate()` 做快速预估
-- ContextBuilder 调 `count()` 报告占用
-- TokenUsage 的数值来自 LLM API 返回值（最权威）
-- ModelPricing 需要能热更新
-
 ---
 
 ## 4. Prompt 模板渲染安全
 
 ### 4.1 使用 Jinja2 SandboxedEnvironment
 
-```python
-class SkillTemplateRenderer:
-    def __init__(self):
-        self.env = SandboxedEnvironment(undefined=StrictUndefined)
-        self.env.filters = {
-            "truncate": self._safe_truncate,
-            "upper": str.upper, "lower": str.lower,
-            "trim": str.strip, "default": self._safe_default,
-        }
-```
+Skill 模板渲染必须在沙箱环境中执行，使用 `StrictUndefined`（引用到的变量缺失必须抛错），只允许白名单 filter。
 
 ### 4.2 允许与禁止
 
@@ -208,12 +168,13 @@ data_retention:
 
 ### 5.3 统一删除服务
 
-```python
-class ProjectDeletionService:
-    async def soft_delete(self, project_id): ...     # 只标记 deleted_at
-    async def restore(self, project_id): ...          # 清除 deleted_at
-    async def physical_delete(self, project_id): ...  # 按依赖顺序级联
-```
+ProjectDeletionService 提供三个操作：
+
+| 操作 | 行为 |
+|------|------|
+| soft_delete | 只标记 `deleted_at`，关联数据不动 |
+| restore | 清除 `deleted_at`，从回收站恢复 |
+| physical_delete | 按依赖顺序级联物理删除所有关联数据 |
 
 ---
 
@@ -221,14 +182,9 @@ class ProjectDeletionService:
 
 ### 6.1 配置快照
 
-每次执行工作流时保存完整配置：
+每次执行工作流时保存完整配置快照到 WorkflowExecution 中，包括 workflow_snapshot、skills_snapshot、agents_snapshot 三个不可变快照字段。
 
-```python
-class WorkflowExecution:
-    workflow_snapshot: Mapped[dict]   # 完整配置快照
-    skills_snapshot: Mapped[dict]     # 所有 Skills 快照
-    agents_snapshot: Mapped[dict]     # 所有 Agents 快照
-```
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § WorkflowExecution
 
 ### 6.2 配置文件版本化
 

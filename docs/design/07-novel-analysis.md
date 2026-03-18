@@ -107,16 +107,9 @@
 
 ## 7. 存储设计
 
-```python
-class NovelAnalysis(Base):
-    id: uuid.UUID
-    project_id: uuid.UUID
-    novel_title: str
-    total_chapters: int
-    analyzed_chapters: list[int]
-    analysis_result: dict         # JSON 格式分析结果
-    created_at: datetime
-```
+分析结果存储在 Analysis 表中，包含小说标题、分析章节范围、结构化分析结果和改进建议。
+
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § Analysis
 
 ---
 

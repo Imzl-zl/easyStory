@@ -90,22 +90,9 @@ workflow:
 
 ### 4.1 TokenUsage 模型
 
-```python
-class TokenUsage(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "token_usages"
+每次 LLM 调用后记录 token 消耗，关联到项目、节点执行和凭证，用于预算检查和费用追踪。
 
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
-    node_execution_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("node_executions.id")
-    )
-    credential_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("model_credentials.id")
-    )
-    model_name: Mapped[str] = mapped_column(String(100))
-    input_tokens: Mapped[int] = mapped_column(Integer)
-    output_tokens: Mapped[int] = mapped_column(Integer)
-    estimated_cost: Mapped[float] = mapped_column(Float)  # 估算费用（美元）
-```
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § token_usages
 
 ### 4.2 字段说明
 
@@ -150,55 +137,16 @@ class TokenUsage(Base, TimestampMixin, UUIDMixin):
 
 ### 5.2 预估算法
 
-```python
-async def estimate_workflow_cost(
-    workflow_config: WorkflowConfig,
-    project_id: uuid.UUID,
-) -> CostEstimate:
-    """预估工作流成本（不调 LLM）"""
-    total_min = 0
-    total_max = 0
-    node_estimates = []
+预估流程（不调用 LLM）：
 
-    for node in workflow_config.resolved_nodes:
-        # 预估上下文注入 token
-        context_tokens = await estimate_context_tokens(node, project_id)
-
-        # 预估生成 token（基于 Skill 的历史数据或默认值）
-        gen_min, gen_max = estimate_generation_tokens(node)
-
-        # 预估审核 token
-        review_tokens = (
-            estimate_review_tokens(node) if node.auto_review else 0
-        )
-
-        # 预估精修 token（按概率）
-        fix_tokens = estimate_fix_tokens(node) if node.auto_fix else 0
-
-        node_est = NodeEstimate(
-            node_id=node.id,
-            context_tokens=context_tokens,
-            generation_tokens=(gen_min, gen_max),
-            review_tokens=review_tokens,
-            fix_tokens=fix_tokens,
-        )
-        node_estimates.append(node_est)
-
-        total_min += context_tokens + gen_min + review_tokens
-        total_max += context_tokens + gen_max + review_tokens + fix_tokens
-
-    return CostEstimate(
-        total_tokens=(total_min, total_max),
-        estimated_cost=(
-            calculate_cost(total_min),
-            calculate_cost(total_max),
-        ),
-        node_estimates=node_estimates,
-        budget_warnings=check_budget_warnings(
-            total_min, total_max, project_budget
-        ),
-    )
-```
+1. 遍历工作流的所有解析后节点
+2. 对每个节点分别预估：
+   - **上下文注入 token** — 根据节点依赖的数据量估算
+   - **生成 token（区间）** — 基于 Skill 的历史数据或默认值
+   - **审核 token** — 审核 prompt 较短且稳定，固定估算
+   - **精修 token（概率加权）** — 基于历史精修触发率
+3. 汇总所有节点，输出 token 区间和费用区间
+4. 对比预算配置，输出告警信息（如"预计在第 35-40 章触发告警"）
 
 ### 5.3 预估数据来源
 
@@ -230,70 +178,48 @@ async def estimate_workflow_cost(
 
 Dry-run 预估、上下文报告、执行记录、预算守卫等多处需要 token 计数。如果各自估算，容易出现"预估不超、实际超了"的不一致。因此定义 `TokenCounter` 作为单一事实来源。
 
-### 6.2 TokenCounter 类
+### 6.2 TokenCounter 接口契约
 
-```python
-class TokenCounter:
-    """
-    统一 Token 计数器（单一事实来源）。
-    所有需要计数 token 的地方必须调用此类，禁止自行估算。
-    """
+TokenCounter 提供两个方法：
 
-    def __init__(self):
-        self._tokenizers: dict[str, Tokenizer] = {}
+| 方法 | 说明 | 使用场景 |
+|-----|------|---------|
+| `count(text, model)` | 精确计数（有 tokenizer 时） | BudgetGuard 预算检查、ContextBuilder 报告 |
+| `estimate(text, model)` | 快速估算（按字符比，中文约 1.5 字/token，英文约 4 字符/token） | Dry-run 成本预估 |
 
-    def count(self, text: str, model: str) -> int:
-        """精确计数（有 tokenizer 时）"""
-        tokenizer = self._get_tokenizer(model)
-        return tokenizer.encode(text).length
+**MVP 降级说明：**
+- MVP 阶段暂不引入外部 tokenizer 依赖（如 tiktoken），`count()` 内部退化为调用 `estimate()`
+- 这意味着 MVP 阶段所有调用方（BudgetGuard、ContextBuilder 等）使用的都是字符比估算值，精度约 ±15%
+- LLM API 返回的实际 token 数（记录在 TokenUsage 中）是最权威来源，用于事后校准估算精度
+- 接入 tokenizer 后，`count()` 将切换为精确计数，调用方代码无需修改（接口不变）
+- **预算守卫应留出安全余量**：考虑到估算偏差，建议 `warning_threshold` 实际生效值在用户配置基础上向下偏移 5%（如用户配置 80%，实际在 75% 时触发）
 
-    def estimate(self, text: str, model: str) -> int:
-        """快速估算（无 tokenizer 时，按字符比估算）"""
-        # 中文约 1.5 字/token，英文约 4 字符/token
-        # 此比例集中配置，不允许各模块自定义
-        ratio = MODEL_TOKEN_RATIOS.get(model, 1.5)
-        return int(len(text) / ratio)
-
-    def _get_tokenizer(self, model: str) -> Tokenizer:
-        if model not in self._tokenizers:
-            self._tokenizers[model] = load_tokenizer(model)
-        return self._tokenizers[model]
-```
+**约束：**
+- 所有需要计数 token 的地方必须调用 TokenCounter，禁止自行估算
+- 字符比估算系数集中配置，不允许各模块自定义
 
 ### 6.3 调用约束
 
 | 调用方 | 使用方法 | 场景 |
 |--------|---------|------|
-| BudgetGuard（预算守卫） | `TokenCounter.count()` | 精确检查，阻断超预算 |
+| BudgetGuard（预算守卫） | `TokenCounter.count()` | 预算检查（MVP 为估算值，接入 tokenizer 后为精确值） |
 | Dry-run（成本预估） | `TokenCounter.estimate()` | 快速预估，启动前展示 |
-| ContextBuilder（上下文构建） | `TokenCounter.count()` | 报告实际 token 占用 |
+| ContextBuilder（上下文构建） | `TokenCounter.count()` | 报告 token 占用（MVP 为估算值） |
 | TokenUsage 记录 | LLM API 返回值 | 最权威来源，用于事后校准 |
 
 ---
 
 ## 7. 费用计算统一来源
 
-### 7.1 ModelPricing 类
+### 7.1 ModelPricing 接口契约
 
-```python
-class ModelPricing:
-    """
-    统一价格表（可配置、可版本化）。
-    所有费用计算必须通过此类，禁止 hardcode 价格。
-    """
+ModelPricing 提供统一的费用计算方法 `calculate_cost(model, input_tokens, output_tokens) → float`。
 
-    def __init__(self, config_path: str):
-        self._prices = self._load_prices(config_path)
-
-    def calculate_cost(
-        self, model: str, input_tokens: int, output_tokens: int
-    ) -> float:
-        price = self._prices[model]
-        return (
-            input_tokens * price.input_per_1k / 1000
-            + output_tokens * price.output_per_1k / 1000
-        )
-```
+**约束：**
+- 所有费用计算必须通过 ModelPricing，禁止硬编码价格
+- 价格数据来自可配置文件（支持热更新）
+- 价格版本化，便于追溯历史费用计算依据
+- 新增模型只需在配置文件中添加条目，无需改代码
 
 ### 7.2 价格配置文件
 

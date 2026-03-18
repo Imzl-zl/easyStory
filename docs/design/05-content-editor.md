@@ -77,27 +77,9 @@ MVP 采用 **Markdown 编辑器 + AI 对话侧边栏**：
 
 ### 5.2 数据模型
 
-```python
-class Content(Base, TimestampMixin, UUIDMixin):
-    project_id: Mapped[uuid.UUID]
-    parent_id: Mapped[uuid.UUID | None]
-    content_type: Mapped[str]        # outline/chapter/character/world_setting
-    title: Mapped[str]
-    chapter_number: Mapped[int | None]
-    order_index: Mapped[int]
+**Content** 记录内容元信息（项目、类型、标题、章节号、排序），**ContentVersion** 记录内容的每个版本快照（全文、变更来源、字数、上下文哈希、是否当前/最佳版本）。
 
-class ContentVersion(Base, TimestampMixin, UUIDMixin):
-    content_id: Mapped[uuid.UUID]
-    version: Mapped[int]
-    content_text: Mapped[str]
-    created_by: Mapped[str]          # "system" / "user" / "ai_assist" / "auto_fix" / "ai_partial"
-    change_source: Mapped[str | None]
-    word_count: Mapped[int]
-    is_current: Mapped[bool]
-    is_best: Mapped[bool] = False
-    context_snapshot_hash: Mapped[str | None]  # SHA256 用于检测上下文变化
-    ai_conversation_id: Mapped[uuid.UUID | None]
-```
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § Content 和 content_versions
 
 ### 5.3 版本操作
 
@@ -118,12 +100,9 @@ class ContentVersion(Base, TimestampMixin, UUIDMixin):
 
 ### 6.1 绑定规则
 
-StoryFact 绑定到具体 ContentVersion：
+StoryFact 绑定到具体 ContentVersion（通过 `source_content_version_id` 字段）。
 
-```python
-class StoryFact:
-    source_content_version_id: Mapped[uuid.UUID]  # 绑定版本
-```
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § story_facts
 
 ### 6.2 版本变更时的事实处理
 

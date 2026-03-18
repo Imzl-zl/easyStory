@@ -119,17 +119,9 @@ skill:
 
 ## 4. ChapterTask 数据模型
 
-```python
-class ChapterTask(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "chapter_tasks"
-    project_id: Mapped[uuid.UUID]
-    workflow_execution_id: Mapped[uuid.UUID]
-    chapter_number: Mapped[int]
-    title: Mapped[str]
-    brief: Mapped[str]                    # 章节摘要/任务描述
-    status: Mapped[str]                   # pending / generating / interrupted / completed / failed / skipped
-    content_id: Mapped[uuid.UUID | None]  # 关联生成的内容
-```
+ChapterTask 记录每个章节的任务信息，包括章节号、标题、摘要/任务描述（brief）、关键角色和事件列表、状态和关联的生成内容。
+
+> → 数据模型详见 [数据库设计](../specs/database-design.md) § chapter_tasks
 
 ### 4.1 约束
 
@@ -161,22 +153,12 @@ chapter_generation:
       enabled: true              # 用户随时可停
 ```
 
-循环逻辑：
-
-```python
-async def execute_chapter_loop(workflow_execution, config):
-    chapter_num = 1
-    while chapter_num <= config.max_chapters:
-        result = await generate_chapter(chapter_num)
-        if marker in result.output:
-            result.output = result.output.replace(marker, "").strip()
-            await save_and_finish(result)
-            break
-        if await check_outline_covered(project_id, chapter_num):
-            break
-        chapter_num += 1
-    if chapter_num > config.max_chapters:
-        await pause_workflow("max_chapters_reached")
+**循环行为：**
+1. 从第 1 章开始，逐章生成
+2. 每章生成后检查三种终止信号：LLM 输出标记 → 大纲覆盖度 → 用户手动停止
+3. 检测到 `[STORY_COMPLETE]` 标记时，移除标记、保存内容、结束循环
+4. 大纲所有结局要素都已覆盖时，结束循环
+5. 超过 `max_chapters` 硬上限时，暂停工作流（`pause_reason: max_chapters_reached`）
 ```
 
 ---
@@ -191,7 +173,10 @@ chapter_generation:
     mark_for_retry: true
 ```
 
-> `retry` 不是 `on_fail` 的职责——重试由安全阀 `max_retry` 控制（见 [08-cost-and-safety](./08-cost-and-safety.md)）。`on_fail` 仅定义"重试耗尽后怎么办"。
+> `retry` 不是 `on_fail` 的职责：
+> - **LLM 调用层** 的瞬时错误重试由 `workflow.retry` 控制（见 [09-error-handling](./09-error-handling.md)）。
+> - **节点执行级** 的重跑由安全阀 `workflow.safety.max_retry_per_node` / `max_total_retries` 控制（见 [08-cost-and-safety](./08-cost-and-safety.md)）。
+> `on_fail` 只定义“重试/重跑耗尽后怎么办”。
 
 | 策略 | 行为 |
 |------|------|
@@ -199,7 +184,54 @@ chapter_generation:
 | `skip` | 标记当前章节为 skipped，继续下一章 |
 | `fail` | 立即终止整个工作流 |
 
+### 6.1 循环内暂停策略（用于“混合体验”）
+
+章节生成通常以一个循环节点（如 `chapter_gen`）实现：节点数量固定，但内部可迭代生成任意多章。
+
+**需求**：既支持全手动逐章确认，也支持全自动批量生成，还支持“每 N 章暂停一次让用户检查”的混合体验。
+
+**结论**：不新增 `workflow.mode: hybrid`。混合体验由循环节点的 `loop.pause` 表达。
+
+**配置位置（示例）**：
+
+```yaml
+workflow:
+  mode: "auto"  # manual / auto
+  nodes:
+    - id: "chapter_gen"
+      loop:
+        enabled: true
+        pause:
+          strategy: "every_n"  # none / every / every_n
+          every_n: 10          # 每 10 章暂停一次
+```
+
+**默认行为**：
+- 若 `loop.pause` 未配置：`manual` 模式默认 `every`；`auto` 模式默认 `none`
+- `every`：每章生成完成后暂停，等待用户确认再继续
+- `every_n`：每批 N 章暂停一次（批次内仍可自动审核/精修）
+
 恢复时：检查**当前 `workflow_execution_id` 下**的 `chapter_tasks` → 找到第一个 `status` 不在 `("completed", "skipped")` 的章节（如 pending/interrupted/failed）→ 从该章节继续。
+
+### 6.2 暂停后用户可执行的操作
+
+工作流暂停后（无论是用户主动暂停、loop.pause 触发、还是错误导致），用户可以执行以下操作：
+
+| 操作 | 说明 |
+|------|------|
+| 查看/编辑已生成章节 | 打开任意已完成章节进行编辑，保存新版本 |
+| 修改 ChapterTask | 调整后续章节的任务描述（brief）、关键角色、关键事件 |
+| 调整 Workflow 配置 | 切换审核 Agent、修改精修策略、调整预算等 |
+| 跳过某些章节 | 将指定章节标记为 `skipped`，恢复后跳过这些章节 |
+| 从某章重新开始 | 选择一个章节号，恢复后从该章重新生成（之后的章节重置为 pending） |
+| 切换工作模式 | 从自动切换为手动，或反之 |
+| 取消工作流 | 放弃本次执行，进入 `cancelled` 终态 |
+| 恢复工作流 | 从暂停点继续执行 |
+
+**约束：**
+- 编辑已完成章节会触发下游 stale 标记（详见 [内容编辑](./05-content-editor.md) §7）
+- 修改 ChapterTask 不影响已完成的章节，只影响后续待生成的章节
+- 调整 Workflow 配置后恢复时，使用新配置继续执行（但启动时的配置快照不变）
 
 ---
 

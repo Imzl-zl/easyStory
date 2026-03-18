@@ -64,8 +64,6 @@ Agent (智能体)
 | title | VARCHAR(255) | 标题 |
 | chapter_number | INTEGER | 章节号（章节类型时有效） |
 | order_index | INTEGER | 排序索引（用于章节顺序） |
-| content | TEXT | 内容正文 |
-| word_count | INTEGER | 字数 |
 | status | VARCHAR(50) | 状态：draft/approved/stale/archived |
 | metadata | JSONB | 元数据（标签、备注等） |
 | created_at | TIMESTAMP | 创建时间 |
@@ -79,15 +77,23 @@ Agent (智能体)
 | id | UUID | 主键 |
 | content_id | UUID | 内容 ID |
 | version_number | INTEGER | 版本号（递增） |
-| content | TEXT | 内容快照（全量存储） |
+| content_text | TEXT | 内容快照（全量存储） |
 | change_summary | TEXT | 变更摘要 |
+| created_by | VARCHAR(50) | 创建者：system/user/ai_assist/auto_fix/ai_partial |
 | change_source | VARCHAR(50) | 变更来源：user_edit/ai_generate/ai_fix/import |
 | word_count | INTEGER | 该版本字数 |
 | context_snapshot_hash | VARCHAR(64) | 生成时上下文快照的 SHA-256（用于溯源） |
 | ai_conversation_id | UUID | AI 生成/精修时的会话 ID（可选） |
+| is_current | BOOLEAN | 是否当前版本（默认 true；创建新版本时旧版本置 false） |
+| is_best | BOOLEAN | 是否用户选择的最佳版本（同一 Content 最多一条 true） |
 | created_at | TIMESTAMP | 创建时间 |
+| updated_at | TIMESTAMP | 更新时间 |
 
 > v0.1 采用全量快照，v0.2 可按需迁移为增量差异存储。
+>
+> 字段说明：
+> - `created_by`：记录"谁做的"操作者身份（system/user/ai_assist/auto_fix/ai_partial）
+> - `change_source`：记录"变更动因"（user_edit/ai_generate/ai_fix/import），两个字段职责互补，不冗余
 
 **Analysis（分析结果）**
 
@@ -143,7 +149,7 @@ Agent (智能体)
 | template_id | UUID | 模板 ID |
 | status | VARCHAR(50) | 状态：created/running/paused/completed/failed/cancelled |
 | current_node | INTEGER | 当前节点序号 |
-| pause_reason | VARCHAR(50) | 暂停原因：user_request/user_interrupted/budget_exceeded/review_failed/error |
+| pause_reason | VARCHAR(50) | 暂停原因：user_request/user_interrupted/budget_exceeded/review_failed/error/loop_pause |
 | resume_from_node | VARCHAR(200) | 恢复时从哪个节点继续 |
 | snapshot | JSONB | 暂停时的运行时快照（最小 Schema 见下） |
 | workflow_snapshot | JSONB | 启动时工作流配置快照（不可变） |
@@ -250,7 +256,7 @@ Agent (智能体)
 | id | UUID | 主键 |
 | hook_id | VARCHAR(100) | 钩子唯一标识（来自 YAML） |
 | trigger | VARCHAR(50) | 触发时机 |
-| action_type | VARCHAR(50) | 动作类型：script/webhook/agent |
+| action_type | VARCHAR(50) | 动作类型（MVP 内置：script/webhook/agent，通过 PluginRegistry 可扩展） |
 | action_config | JSONB | 动作配置 |
 | file_path | VARCHAR(255) | 对应 YAML 文件路径 |
 
@@ -348,6 +354,8 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 
 **review_type 为自由字符串**：`ReviewAction.review_type` 不使用枚举，保持与用户自定义 Agent 配置的一致性。
 
+**内容正文与元信息分离**：`Content` 表只记录元信息（类型、标题、章节号、状态等），正文内容全部存储在 `content_versions` 表中。查询当前正文时通过 `content_versions.is_current=true` 获取。这保证了版本管理的单一职责，避免了 Content 和 ContentVersion 正文不一致的风险。
+
 **全量版本快照**：v0.1 `content_versions` 表存全量内容，实现简单，后续视存储压力决定是否迁移为增量差异。
 
 **内容层级关系**：`Content.parent_id` 支持内容的层级关系，例如章节可以属于某个卷或部分。
@@ -364,7 +372,6 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 
 以下功能在 v0.2 或更高版本中考虑添加：
 
-- **用户系统**：User 表，支持多用户和权限管理
 - **审计日志**：AuditLog 表，记录用户操作历史
 - **协作功能**：支持多人实时协同编辑
 - **增量版本存储**：content_versions 表迁移为增量差异存储
