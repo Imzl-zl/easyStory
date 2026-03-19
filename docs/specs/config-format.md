@@ -166,7 +166,7 @@ skill:
 | `name` | string | ✅ | 显示名称 |
 | `version` | string | ❌ | 版本号，默认 `1.0.0` |
 | `description` | string | ❌ | 描述 |
-| `category` | string | ✅ | 分类：outline/chapter/character/world_setting/review |
+| `category` | string | ✅ | 分类：outline/opening_plan/chapter/character/world_setting/review |
 | `author` | string | ❌ | 作者 |
 | `tags` | array | ❌ | 标签列表 |
 | `prompt` | string | ✅ | 提示词模板，支持 Jinja2 语法 |
@@ -257,7 +257,7 @@ agent:
     3. 是否有重复的表达
     4. 是否有不当的用词
     
-    请给出评分（0-1）和具体建议。
+    请给出评分（0-100）和具体建议。
   
   skills:                             # 可选，关联的技能
     - "skill.review.style"
@@ -405,13 +405,14 @@ workflow:
     auto_fix: true                    # 默认审核失败是否自动精修（节点级可覆盖）
     save_on_step: true                # 每步自动保存
     default_pass_rule: "no_critical"  # 默认审核聚合规则
+    default_fix_skill: null           # 可选，工作流级默认精修 Skill（节点未配 fix_skill 时回退到此）
 
   budget:                             # 可选，Token 预算配置
     max_tokens_per_node: 50000        # 单节点最大 token
     max_tokens_per_workflow: 500000   # 单次工作流最大 token
     max_tokens_per_day: 2000000       # 每日最大 token（项目级）
     max_tokens_per_day_per_user: 3000000  # 每日最大 token（用户级，可选）
-    warning_threshold: 0.8            # 80% 时告警
+    warning_threshold: 0.8            # 80% 时告警；展示值和生效值一致，不静默偏移
     on_exceed: "pause"                # 超预算策略: pause / skip / fail
 
   safety:                             # 可选，执行安全阀
@@ -480,9 +481,9 @@ workflow:
 
       auto_fix: true                  # 是否自动精修
       max_fix_attempts: 3             # 最大精修次数
-      fix_skill: "skill.fix.xuanhuan" # 精修 Skill（可选，无则用内置默认）
+      fix_skill: "skill.fix.xuanhuan" # 精修 Skill（回退链：节点 fix_skill → workflow.settings.default_fix_skill → 内置默认 Prompt）
       fix_strategy:                   # 精修策略
-        mode: "targeted"              # targeted（局部）/ full_rewrite（整篇）
+        selection_rule: "auto"        # auto / targeted / full_rewrite
         targeted_threshold: 3         # 问题 ≤ 3 → 局部修改
         rewrite_threshold: 6          # 问题 > 6 → 整篇重写
       on_fix_fail: "pause"            # 精修失败后动作：pause/skip/fail

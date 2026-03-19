@@ -34,7 +34,14 @@ backup:
 
 ## 3. 软删除机制
 
-所有删除操作都是软删除（标记 `deleted_at`），不是物理删除。查询时自动过滤 `deleted_at IS NULL`。
+MVP 只对 **Project aggregate** 提供软删除（标记 `deleted_at`）和回收站恢复能力。
+
+这意味着：
+
+- 用户删除项目时，只标记 `projects.deleted_at`
+- 项目下的内容、执行、导出、事实等关联数据不做各自独立的软删除，而是跟随项目一起保留
+- 查询默认过滤 `projects.deleted_at IS NULL`
+- 真正清理关联数据由统一的物理删除流程负责
 
 > → 数据模型详见 [数据库设计](../specs/database-design.md) § Project
 
@@ -58,6 +65,15 @@ backup:
 执行日志记录工作流和节点执行过程中的关键事件，包含级别（INFO/WARNING/ERROR）、消息和扩展详情。
 
 > → 数据模型详见 [数据库设计](../specs/database-design.md) § execution_logs
+
+### 5.1 审计日志边界
+
+`ExecutionLog` 和 `AuditLog` 不是一回事：
+
+- `ExecutionLog`：记录工作流、节点、LLM 调用等运行事件
+- `AuditLog`：记录凭证变更、项目删除/恢复等安全或关键管理事件
+
+MVP 只要求审计安全/关键管理事件，不追求“所有用户动作全量留痕”
 
 ---
 
@@ -100,4 +116,4 @@ prompt_replay:
 
 ---
 
-*最后更新: 2026-03-16*
+*最后更新: 2026-03-19*

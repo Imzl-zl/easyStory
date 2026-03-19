@@ -4,7 +4,9 @@
 |---|---|
 | 文档类型 | 功能设计 |
 | 优先级 | 🔴 MVP 必须 |
-| 关联文档 | [核心工作流](./01-core-workflow.md)、[成本控制](./08-cost-and-safety.md) |
+| 关联文档 | [核心工作流](./01-core-workflow.md)、[成本控制](./08-cost-and-safety.md)、[前置创作资产](./19-pre-writing-assets.md) |
+
+> **优先级说明**：本模块整体为 🔴，但"上下文可观测性报告"和"体验型上下文（writing_preferences/foreshadowing_reminder）"为 🟡 建议简化。
 
 ---
 
@@ -59,17 +61,34 @@ context_injection:
 |-----|-------------------|------|
 | `project_setting` | `{{ project_setting }}` | 项目设定（结构化设定文档，可全文或摘要注入） |
 | `outline` | `{{ outline }}` | 大纲 |
+| `opening_plan` | `{{ opening_plan }}` | 开篇设计（前 1-3 章的阶段约束） |
 | `chapter_list` | `{{ chapter_list }}` | 章节目录 |
 | `chapter_task` | `{{ chapter_task }}` | 当前章节任务（来自 ChapterTask：title/brief/关键角色等） |
 | `previous_chapters` | `{{ previous_content }}` | 前 N 章，用 `\n\n---\n\n` 分隔 |
-| `character_profile` | `{{ character_profile }}` | 人物设定 |
-| `world_setting` | `{{ world_setting }}` | 世界观设定 |
+| `character_profile` | `{{ character_profile }}` | 人物设定（从 `ProjectSetting` 投影） |
+| `world_setting` | `{{ world_setting }}` | 世界观设定（从 `ProjectSetting` 投影） |
 | `story_bible` | `{{ story_bible }}` | 事实库，按 fact_type 分组 |
 | `chapter_summary` | `{{ chapter_summaries }}` | 各章摘要 |
 | `style_reference` | `{{ style_reference }}` | 小说分析结果（选字段注入，用于文风参考） |
 | `writing_preferences` | `{{ writing_preferences }}` | 用户编辑学习出的高置信偏好摘要 |
 | `foreshadowing_reminder` | `{{ pending_foreshadowings }}` / `{{ overdue_foreshadowings }}` | 伏笔推进和遗忘提醒 |
 | `custom` | `{{ custom_<key> }}` | 用户自定义 |
+
+### 前置创作资产的分层注入
+
+最佳实践不是把所有素材平铺进 Prompt，而是分层注入：
+
+| 层级 | 默认资产 | 目的 |
+|------|---------|------|
+| 长期约束 | `project_setting` / `character_profile` / `world_setting` / `outline` / `story_bible` | 保持世界、人物、主线稳定 |
+| 阶段约束 | `opening_plan` / 当前阶段目标 / 近期伏笔 | 保持当前阶段节奏和体验稳定 |
+| 当前执行 | `chapter_task` / `previous_chapters` / `chapter_summary` | 保持本章真正落地 |
+
+规则：
+
+- `opening_plan` 默认只在第 1-3 章高优先级注入
+- 第 4 章以后，`opening_plan` 降为按需引用，不应长期挤占上下文预算
+- `chapter_task` 仍是当前章节的最高优先级执行指令
 
 ---
 
@@ -175,6 +194,20 @@ ContextBuilder.build_context()
    - 重新计算，仍超则裁下一个
 4. priority=1 的 section（project_setting）**永不裁剪**
 
+### 5.2.1 硬边界：必需上下文仍超模型窗口
+
+“永不裁剪”的含义是**不能被静默丢弃**，不是“无论多大都强行塞进模型”。
+
+- 若裁掉所有非必需 section 后，`project_setting`、`chapter_task` 或其他 `required` 上下文仍然超过所选模型的 `context_window`
+- 当前节点**不得启动**
+- 系统必须显式返回 `context_overflow` 类错误，并在上下文报告中标明超限来源和缺口
+- 用户可选动作应是：压缩设定 / 调整大纲 / 更换更大上下文模型 / 手动关闭部分非必需注入
+
+禁止行为：
+- 为了“跑起来”静默裁掉 `required` 上下文
+- 未告知用户就自动改用更大模型
+- 把超限伪装成普通生成失败
+
 ### 5.3 裁剪策略可配置
 
 ```yaml
@@ -257,12 +290,17 @@ Skill 模板用 Jinja2 条件处理：
 {{ previous_content }}
 {% endif %}
 
+{% if opening_plan %}
+【开篇设计】
+{{ opening_plan }}
+{% endif %}
+
 {% if not previous_content and not story_bible %}
 【创作提示】
-这是故事的第一章，请着重建立世界观、引入主角、设定基调。
+这是故事的第一章，请优先遵循开篇设计，建立世界观、引入主角、设定基调。
 {% endif %}
 ```
 
 ---
 
-*最后更新: 2026-03-17*
+*最后更新: 2026-03-19*

@@ -176,6 +176,11 @@ ProjectDeletionService 提供三个操作：
 | restore | 清除 `deleted_at`，从回收站恢复 |
 | physical_delete | 按依赖顺序级联物理删除所有关联数据 |
 
+**MVP 边界：**
+- 软删除 / 恢复只作用于 **Project aggregate**
+- `Content`、`WorkflowExecution`、`Export`、`StoryFact` 等关联数据在项目进入回收站时继续保留，但不提供各自独立的“软删除/恢复”能力
+- 只有 `physical_delete` 才按依赖顺序级联清理关联数据
+
 ---
 
 ## 6. 配置版本管理
@@ -186,7 +191,29 @@ ProjectDeletionService 提供三个操作：
 
 > → 数据模型详见 [数据库设计](../specs/database-design.md) § WorkflowExecution
 
-### 6.2 配置文件版本化
+### 6.2 运行中配置边界
+
+同一次 `WorkflowExecution` 的执行边界必须固定：
+
+- `start_workflow` 时绑定启动快照（`workflow_snapshot / skills_snapshot / agents_snapshot`）
+- `resume_workflow` 只能按该快照恢复，**不得**读取用户暂停后改动的配置文件
+- 用户在暂停期间修改 Workflow / Skill / Agent 配置，只影响**下一次新执行**
+- 若用户希望“从第 N 章开始按新配置重跑”，系统应创建新的 `WorkflowExecution`，而不是在旧执行上热切换配置
+
+### 6.2.1 配置快照 vs 上下文快照
+
+这里必须区分两类“快照”，避免混淆：
+
+- **配置快照（执行级）**：`workflow_snapshot / skills_snapshot / agents_snapshot`，在 `start_workflow` 时冻结，整个 `WorkflowExecution` 生命周期内不变
+- **上下文快照（节点级）**：节点真正调用 LLM 前构建的输入上下文，按当时的项目数据生成，并记录到该节点/版本的溯源信息中
+
+因此：
+
+- 暂停后修改配置文件，不影响当前执行的 `resume`
+- 节点一旦开始执行，其输入上下文不再受后续编辑影响
+- 尚未开始的后续节点，会读取**当时最新的项目内容/设定数据**来生成自己的节点级上下文快照
+
+### 6.3 配置文件版本化
 
 ```yaml
 workflow:
@@ -198,7 +225,7 @@ workflow:
       changes: "增加自动精修功能"
 ```
 
-### 6.3 配置对比
+### 6.4 配置对比
 
 ```
 GET /api/v1/workflows/{id}/diff?from=1.1.0&to=1.2.0
@@ -207,4 +234,30 @@ GET /api/v1/workflows/{id}/diff?from=1.1.0&to=1.2.0
 
 ---
 
-*最后更新: 2026-03-17*
+## 7. 导出状态口径
+
+### 7.1 单一业务状态
+
+导出预检、导出列表和下载能力**不直接暴露** `Content`、`NodeExecution`、`ChapterTask` 的原始状态，而是通过统一的 `ExportChapterStateResolver` 归一化为以下业务状态：
+
+- `completed`
+- `draft`
+- `failed`
+- `skipped`
+- `generating`
+
+### 7.2 映射原则
+
+- 当前章节存在活跃生成（如 `chapter_task.status=generating` 或节点仍在 `running/running_stream`）→ `generating`
+- 当前章节被显式跳过 → `skipped`
+- 存在可导出的当前内容，且内容状态为 `approved` 或 `stale` → `completed`
+- 只有草稿/partial 内容，尚未形成可导出的正式版本 → `draft`
+- 当前章节无可导出内容，且最近一次生成已失败 → `failed`
+
+**约束：**
+- `stale` 不是单独的导出状态；它属于 `completed`，但导出预检必须给出 warning
+- UI 不得自行拼接多表状态判断，统一走同一套 Resolver 逻辑
+
+---
+
+*最后更新: 2026-03-19*

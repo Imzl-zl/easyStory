@@ -4,13 +4,17 @@
 |---|---|
 | 文档类型 | 功能设计 |
 | 优先级 | 🔴 MVP 必须 |
-| 关联文档 | [核心工作流](./01-core-workflow.md)、[上下文注入](./02-context-injection.md) |
+| 关联文档 | [核心工作流](./01-core-workflow.md)、[上下文注入](./02-context-injection.md)、[前置创作资产](./19-pre-writing-assets.md) |
+
+> **优先级说明**：本模块整体为 🔴，但"设定修改影响结果分级（自动替换/人工复核/stale）+ 范围批量处理"为 🟡 建议简化。
 
 ---
 
 ## 1. 概述
 
 创作起点定义了用户如何建立创作方向，包括：自由对话式设定、结构化设定输出、设定→Skill 变量映射、快速开始模板、设定修改影响传播。
+
+> 本文聚焦“如何建立和维护 `ProjectSetting`”。关于 `ProjectSetting -> Outline -> OpeningPlan -> ChapterTask -> Chapter` 的前置资产链路，见 [前置创作资产](./19-pre-writing-assets.md)。
 
 ---
 
@@ -60,6 +64,8 @@
 }
 ```
 
+> `world_setting`、`protagonist` 等结构都是 `ProjectSetting` 的组成部分；世界观设定和角色设定不再单独维护第二套真值源。
+
 ---
 
 ## 4. 设定→Skill 变量映射
@@ -98,7 +104,7 @@ setting_to_skill_mapping:
 
 ### 5.2 启动前完整度检查
 
-**项目可以先创建，但第一次启动 `outline` / `chapter` 工作流前必须做设定完整度检查。**
+**项目可以先创建，但第一次启动 `outline` / `opening_plan` / `chapter` 工作流前必须做设定完整度检查。**
 
 | 字段 | 等级 | 规则 |
 |------|------|------|
@@ -135,6 +141,7 @@ setting_to_skill_mapping:
 **处理规则：**
 - 简单字段替换（名称、地点名）→ 支持全局文本替换
 - 复杂字段变更（性格、能力、世界观规则）→ 只更新设定，标记下游为 stale
+- 对已有正文执行“全局替换/批量替换”时，必须按内容编辑规则**逐章创建新的 `ContentVersion`**，不得原地覆盖历史版本
 
 ### 6.1 影响分级
 
@@ -196,9 +203,18 @@ template:
       - id: "outline"
         name: "生成大纲"
         skill: "skill.outline.xuanhuan"
-      - id: "chapter_1"
-        name: "生成第1章"
+      - id: "opening_plan"
+        name: "生成开篇设计"
+        skill: "skill.opening_plan.xuanhuan"
+        depends_on: ["outline"]
+      - id: "chapter_split"
+        name: "拆分章节任务"
+        skill: "skill.chapter_split"
+        depends_on: ["opening_plan"]
+      - id: "chapter_gen"
+        name: "生成章节"
         skill: "skill.chapter.xuanhuan"
+        depends_on: ["chapter_split"]
   guided_questions:
     - question: "主角是什么身份?"
       variable: "protagonist"

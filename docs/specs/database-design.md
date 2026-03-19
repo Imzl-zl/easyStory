@@ -5,7 +5,7 @@
 | 文档类型 | 技术设计 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-14 |
-| 更新时间 | 2026-03-17 |
+| 更新时间 | 2026-03-19 |
 | 关联文档 | [系统架构设计](./architecture.md) |
 
 ---
@@ -60,7 +60,7 @@ Agent (智能体)
 | id | UUID | 主键 |
 | project_id | UUID | 项目 ID |
 | parent_id | UUID | 父内容 ID（支持内容层级关系，可为 NULL） |
-| content_type | VARCHAR(50) | 类型：outline/chapter/character/world_setting |
+| content_type | VARCHAR(50) | 类型：outline/opening_plan/chapter |
 | title | VARCHAR(255) | 标题 |
 | chapter_number | INTEGER | 章节号（章节类型时有效） |
 | order_index | INTEGER | 排序索引（用于章节顺序） |
@@ -69,6 +69,8 @@ Agent (智能体)
 | created_at | TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | 更新时间 |
 | last_edited_at | TIMESTAMP | 最后编辑时间 |
+
+> `character_profile` 与 `world_setting` 在 MVP 中作为 `ProjectSetting` 的结构化投影参与上下文注入，不作为独立 `Content` 主类型存储。
 
 **content_versions（版本快照）**
 
@@ -149,7 +151,7 @@ Agent (智能体)
 | template_id | UUID | 模板 ID |
 | status | VARCHAR(50) | 状态：created/running/paused/completed/failed/cancelled |
 | current_node | INTEGER | 当前节点序号 |
-| pause_reason | VARCHAR(50) | 暂停原因：user_request/user_interrupted/budget_exceeded/review_failed/error/loop_pause |
+| pause_reason | VARCHAR(50) | 暂停原因：user_request/user_interrupted/budget_exceeded/review_failed/error/loop_pause/max_chapters_reached |
 | resume_from_node | VARCHAR(200) | 恢复时从哪个节点继续 |
 | snapshot | JSONB | 暂停时的运行时快照（最小 Schema 见下） |
 | workflow_snapshot | JSONB | 启动时工作流配置快照（不可变） |
@@ -211,7 +213,7 @@ Agent (智能体)
 |-----|------|----- |
 | id | UUID | 主键 |
 | node_execution_id | UUID | 节点执行 ID |
-| artifact_type | VARCHAR(50) | 类型：outline/chapter/character 等 |
+| artifact_type | VARCHAR(50) | 类型：outline/opening_plan/chapter/review_report 等 |
 | content | TEXT | 内容 |
 | word_count | INTEGER | 字数 |
 | created_at | TIMESTAMP | 创建时间 |
@@ -281,10 +283,11 @@ Agent (智能体)
 |-----|------|----- |
 | id | UUID | 主键 |
 | project_id | UUID | 项目 ID |
-| format | VARCHAR(20) | 格式：markdown/docx/pdf |
+| format | VARCHAR(20) | 格式：txt/markdown/docx/pdf |
 | filename | VARCHAR(255) | 文件名 |
 | file_path | VARCHAR(500) | 文件路径（相对于导出目录） |
 | file_size | INTEGER | 文件大小（字节） |
+| config_snapshot | JSONB | 导出配置快照 |
 | created_at | TIMESTAMP | 创建时间 |
 
 > 导出文件存储在文件系统，数据库只存路径和元数据。
@@ -372,7 +375,6 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 
 以下功能在 v0.2 或更高版本中考虑添加：
 
-- **审计日志**：AuditLog 表，记录用户操作历史
 - **协作功能**：支持多人实时协同编辑
 - **增量版本存储**：content_versions 表迁移为增量差异存储
 
@@ -442,6 +444,20 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | level | VARCHAR(20) | 日志级别：INFO/WARNING/ERROR |
 | message | TEXT | 日志消息 |
 | details | JSONB | 扩展详情（错误堆栈等） |
+| created_at | TIMESTAMP | 创建时间 |
+
+### audit_logs（安全审计日志）
+
+> 详见 [10-user-and-credentials](../design/10-user-and-credentials.md) 与 [18-data-backup](../design/18-data-backup.md)
+
+| 字段 | 类型 | 说明 |
+|-----|------|----- |
+| id | UUID | 主键 |
+| actor_user_id | UUID | 操作用户 ID（可选，system 事件时可为 NULL） |
+| event_type | VARCHAR(50) | 事件类型：credential_create / credential_update / credential_delete / credential_verify / credential_enable / credential_disable / project_delete / project_restore |
+| entity_type | VARCHAR(50) | 实体类型：model_credential / project |
+| entity_id | UUID | 实体 ID |
+| details | JSONB | 扩展详情（provider、owner_type、验证结果等） |
 | created_at | TIMESTAMP | 创建时间 |
 
 ### prompt_replays（Prompt/响应回放）
@@ -521,4 +537,4 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 
 ---
 
-*最后更新: 2026-03-17*
+*最后更新: 2026-03-19*

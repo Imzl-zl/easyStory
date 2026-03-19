@@ -150,13 +150,16 @@ fix_context:
 
 ```yaml
 fix_strategy:
-  mode: "targeted"             # targeted（局部）/ full_rewrite（整篇）
-  selection_rule: "auto"
-  auto_rules:
-    targeted_threshold: 3      # 问题 ≤ 3 → 局部修改
-    rewrite_threshold: 6       # 问题 > 6 → 整篇重写
-    # 3-6 个之间 → 自动模式下局部精修，手动模式下询问用户
+  selection_rule: "auto"       # auto / targeted / full_rewrite
+  targeted_threshold: 3        # 问题 ≤ 3 → 局部修改
+  rewrite_threshold: 6         # 问题 > 6 → 整篇重写
+  # 3-6 个之间 → 自动模式下局部精修，手动模式下询问用户
 ```
+
+**规则：**
+- `selection_rule=targeted` → 强制局部精修
+- `selection_rule=full_rewrite` → 强制整篇重写
+- `selection_rule=auto` → 按阈值自动判断
 
 ### 5.3 精修 Prompt 来源
 
@@ -167,7 +170,7 @@ fix_strategy:
 - id: "chapter_1"
   fix_skill: "skill.fix.xuanhuan"     # 专用
 
-  # 没有 → workflow.default_fix_skill
+  # 没有 → workflow.settings.default_fix_skill
   # 也没有 → 内置 "请根据审核反馈修改内容：{feedback}"
 ```
 

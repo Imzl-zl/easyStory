@@ -4,7 +4,7 @@
 |---|---|
 | 文档类型 | 设计规格 |
 | 所属领域 | 导出功能、格式支持、排版 |
-| 优先级 | MVP 建议简化实现 |
+| 优先级 | 🔴 TXT/Markdown 基础导出为 MVP 必须；🟡 DOCX/EPUB/高级排版为建议简化 |
 | 来源 | design-review-supplement §6, §16, §24.12 |
 
 ---
@@ -142,7 +142,9 @@ export:
 | `specific` | 按 `chapter_versions` 指定 | 精细控制各章版本 |
 | `best` | 取用户标记为"最佳"的版本 | 多版本迭代后选优导出 |
 
-### 5.3 `best` 策略约束
+### 5.3 `best` 策略约束（🟡 建议简化）
+
+> MVP 只需实现 `latest` 策略；`specific` 和 `best` 为 🟡 建议简化实现。
 
 - `best` 依赖 [内容编辑](./05-content-editor.md) 中 `ContentVersion.is_best`
 - “最佳版本”必须由用户显式标记，不做自动推断
@@ -190,6 +192,21 @@ export:
 
 ## 7. 不完整内容处理
 
+### 7.0 导出状态单一口径
+
+导出能力对外只使用一套统一的业务状态：`completed / draft / failed / skipped / generating`。
+
+系统内部可能同时存在 `Content.status`、`ChapterTask.status`、`NodeExecution.status` 等多套状态，但导出预检和导出 UI **不得直接暴露原始状态列**，必须先做归一化。
+
+**映射原则：**
+- `generating`：当前章节存在活跃生成（如 `running` / `running_stream` / `chapter_task=generating`）
+- `skipped`：当前章节被显式跳过
+- `completed`：存在可导出的当前内容，且内容状态为 `approved` 或 `stale`
+- `draft`：只有草稿或 partial 内容，尚未形成可导出的正式版本
+- `failed`：当前章节无可导出内容，且最近一次生成已失败
+
+> `stale` 不是单独的导出状态；它按 `completed` 处理，但预检必须显示 warning。
+
 ### 7.1 导出前预检流程
 
 ```
@@ -197,7 +214,7 @@ export:
 
 1. 扫描导出范围内的所有章节
 2. 按状态分类:
-   - completed:  正常导出
+   - completed:  正常导出（`stale` 章节额外给 warning）
    - draft:      提示 "第X章为草稿状态"
    - failed:     提示 "第X章生成失败"
    - skipped:    提示 "第X章被跳过"
@@ -240,6 +257,7 @@ export:
 
 - `generating` 状态始终阻止导出，避免导出不完整的中间结果
 - "包含当前内容"选项对 failed 章节尝试导出最后可用版本；如果没有任何版本则等同于"跳过"
+- `stale` 内容允许导出，但必须在预检中明确提示“内容基于旧上下文，可能已过期”
 - 预检结果应在 UI 中清晰展示，让用户知情决策
 
 ---

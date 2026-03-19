@@ -47,7 +47,7 @@ Project 新增 `owner_id`（FK → users.id），与 User 为多对一关系。
 ### 3.1 技术选型
 
 - 使用 JWT token 认证（FastAPI + python-jose）
-- MVP 只需要注册 / 登录 / 登出三个端点
+- MVP 后端只需注册 / 登录两个端点；登出在前端处理（删除本地 token）
 
 ### 3.2 API 认证流程
 
@@ -58,11 +58,17 @@ Project 新增 `owner_id`（FK → users.id），与 User 为多对一关系。
 登录: POST /api/auth/login
   -> 校验密码, 返回 JWT
 
+登出: 前端删除本地 JWT token
+  -> MVP 不做服务端 token 黑名单
+  -> 第二阶段可引入 refresh token + 服务端吊销机制
+
 业务请求: GET /api/projects
   -> Header: Authorization: Bearer <token>
   -> 中间件解析 token, 注入 current_user
   -> 查询自动过滤 owner_id = current_user.id
 ```
+
+> **MVP 登出决策**：JWT 是无状态 token，登出在前端删除即可。不维护服务端黑名单（避免引入 Redis 等额外依赖）。token 过期时间设为 24 小时，过期后自然失效。
 
 ### 3.3 实现要点
 
@@ -125,15 +131,20 @@ credential_security:
   key_derivation: "PBKDF2"          # 从环境变量中的 master key 派生
   storage: "database"                # 加密后存库，明文永不落盘
   api_response: "masked"             # API 返回时掩码: "sk-...xxxx"
-  audit_log: true                    # 凭证的增删改查都记审计日志
+  audit_scope: "security_events"     # MVP 只审计安全事件，不做全量行为回放
 ```
 
 ### 6.2 安全原则
 
 - **存储**: API Key 使用 AES-256-GCM 加密后存入数据库，master key 从环境变量获取
 - **传输**: API 返回凭证信息时，Key 始终掩码显示（如 `sk-...xxxx`）
-- **审计**: 凭证的创建、修改、删除、使用均记录审计日志
+- **审计**: MVP 记录凭证的 create / update / delete / verify / enable / disable 等安全事件
 - **派生**: 加密密钥通过 PBKDF2 从 master key 派生，非直接使用
+
+**MVP 边界：**
+- 费用归属和调用统计通过 `TokenUsage` 追踪
+- 完整的“谁查看过凭证列表”“每次使用都落独立审计事件”不作为 MVP 阻塞项
+- 审计日志与执行日志分离：凭证安全事件进入 `AuditLog`，工作流运行细节进入 `ExecutionLog`
 
 ---
 
@@ -161,6 +172,7 @@ credential_security:
 - 测试结果记录到 `last_verified_at`，用户可在 UI 查看凭证状态
 - 支持手动重新测试（"重新验证"按钮）
 - 凭证长时间未验证时，UI 可提示用户重新验证
+- 验证成功/失败都应记录为安全审计事件
 
 ### 7.3 费用归属
 

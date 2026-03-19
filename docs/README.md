@@ -19,7 +19,7 @@
 
 | 编号 | 文档 | 优先级 | 内容 |
 |------|------|--------|------|
-| 00 | [设计索引](./design/00-index.md) | - | 模块总览 + 验收标准（83 项） |
+| 00 | [设计索引](./design/00-index.md) | - | 模块总览 + 验收标准 |
 | 01 | [核心工作流](./design/01-core-workflow.md) | 🔴 | 节点系统 + 双模式 + 状态机 |
 | 02 | [上下文注入](./design/02-context-injection.md) | 🔴 | 三层优先级 + Story Bible + 裁剪 |
 | 03 | [审核精修](./design/03-review-and-fix.md) | 🔴 | ReviewResult Schema + 聚合 + 精修 |
@@ -30,7 +30,7 @@
 | 08 | [成本控制](./design/08-cost-and-safety.md) | 🔴 | 预算 + 安全阀 + Dry-run |
 | 09 | [错误处理](./design/09-error-handling.md) | 🔴 | 分类 + 重试 + 模型降级 |
 | 10 | [用户认证](./design/10-user-and-credentials.md) | 🔴 | User 模型 + 凭证管理 |
-| 11 | [导出](./design/11-export.md) | 🟡 | 格式 + 范围 + 版本选择 |
+| 11 | [导出](./design/11-export.md) | 🔴/🟡 | 🔴 TXT/Markdown；🟡 DOCX/EPUB/高级排版 |
 | 12 | [流式输出](./design/12-streaming-and-interrupt.md) | 🟡 | SSE + 中途打断 |
 | 13 | [AI 偏好学习](./design/13-ai-preference-learning.md) | 🟡 | 记忆系统 + 编辑分析 |
 | 14 | [伏笔追踪](./design/14-foreshadowing-tracking.md) | 🟡 | 生命周期 + 自动检测 |
@@ -38,6 +38,7 @@
 | 16 | [MCP 预留](./design/16-mcp-architecture.md) | 🔴 | 三方向 + 架构约束 |
 | 17 | [跨模块契约](./design/17-cross-module-contracts.md) | 🔴 | 并发幂等 + 安全 + 级联 |
 | 18 | [数据备份](./design/18-data-backup.md) | 🟡 | 软删除 + 回收站 + 日志 |
+| 19 | [前置创作资产](./design/19-pre-writing-assets.md) | 🔴 | 设定/大纲/开篇/章节衔接链路 |
 
 ### UI 交互设计（ui/）
 
@@ -51,6 +52,9 @@
 | 文档 | 说明 |
 |------|------|
 | [后端核心实施计划（V2）](./plans/2026-03-17-backend-core-v2.md) | 后端核心实现路线（以设计文档为准） |
+| [前置创作资产实施计划](./plans/2026-03-19-pre-writing-assets.md) | 设定/大纲/开篇设计/章节衔接补充计划 |
+
+> 当前计划覆盖后端核心与前置创作资产补充设计。前端实施计划将在后端核心稳定后单独编写。
 
 ---
 
@@ -104,4 +108,4 @@ docs/
 
 ---
 
-*最后更新: 2026-03-18*
+*最后更新: 2026-03-19*

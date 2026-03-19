@@ -1,4 +1,4 @@
-# easyStory 后端核心实施计划 V2
+# easyStory 后端核心实施计划 V2.1.1
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
@@ -8,7 +8,21 @@
 
 **Tech Stack:** Python 3.12+, FastAPI 0.115+, SQLAlchemy 2.0 (async), Pydantic 2.x, LangGraph 0.2.70+, LiteLLM 1.82+, Jinja2 (Sandboxed), PyYAML, aiosqlite (dev) / asyncpg (prod)
 
-**Source of Truth:** `docs/specs/` 和 `docs/design/` 目录下的设计文档。与本计划有冲突时，以设计文档为准。
+**Source of Truth:** `docs/specs/` 和 `docs/design/` 目录下的设计文档。与本计划有冲突时，以设计文档为准。本版已吸收 2026-03-19 的设计边界对齐决策。
+
+> 与“前置创作资产”直接相关的实现细节，请同时对照 [前置创作资产实施计划](./2026-03-19-pre-writing-assets.md)。执行 Task 2 / 10 / 16 / 17 / 21 / 22 时必须一并核对。
+
+## 设计边界前置决策
+
+以下边界在进入实现前视为已定稿，计划与实现都不得再摇摆：
+
+1. 同一次 `WorkflowExecution` 绑定启动快照；`resume` 不读取暂停后修改的新配置。若要“从第 N 章按新配置重跑”，创建新的执行。
+2. 导出预检使用统一的 `ExportChapterStateResolver`，对外只暴露 `completed/draft/failed/skipped/generating`；`stale` 归入 `completed + warning`。
+3. 上下文裁剪后若必需上下文仍超模型 `context_window`，阻止当前节点启动并显式报 `context_overflow`，不静默裁剪。
+4. 凭证审计的 MVP 范围是安全事件：create/update/delete/verify/enable/disable；费用归属和调用统计通过 `TokenUsage`。
+5. 软删除的 MVP 作用域只覆盖 `Project aggregate`；关联数据跟随项目保留与恢复，不做各自独立软删除。
+6. `warning_threshold` 的展示值和生效值一致，不做静默安全余量偏移。
+7. 创作主链路统一为 `ProjectSetting -> Outline -> OpeningPlan -> ChapterTask -> Chapter`；世界观/角色设定归 `ProjectSetting`，不再作为独立主数据源。
 
 ---
 
@@ -30,9 +44,9 @@ WorkflowStateMachine、ContextBuilder、ReviewExecutor、FixExecutor、LLM Servi
 
 ProjectService、ContentService、WorkflowService、CredentialService。
 
-### Phase 5: API 层 (Task 19-23, 23.5)
+### Phase 5: API 层 (Task 19-24, 23.5)
 
-FastAPI 入口、Auth、REST endpoints、SSE。
+FastAPI 入口、Auth、REST endpoints、SSE、Export。
 
 ### 任务依赖图
 
@@ -41,7 +55,7 @@ Phase 1: [T1] → [T2] → [T3] → [T4] → [T4.5 测试]
 Phase 2: [T5] → [T6] → [T7], [T8] → [T8.5 测试]
 Phase 3: [T9], [T8] → [T10] → [T11] → [T12], [T13] → [T14] → [T14.5 测试]
 Phase 4: [T15] → [T16] → [T17], [T18] → [T18.5 测试]
-Phase 5: [T19] → [T20] → [T21], [T22], [T23] → [T23.5 测试]
+Phase 5: [T19] → [T20] → [T21], [T22], [T23], [T24] → [T23.5 测试]
 ```
 
 ---
@@ -237,6 +251,8 @@ async def test_user_creation(db):
 - Project 有 `deleted_at` 软删除（18-data-backup）
 - Content 有 `parent_id` 自引用（database-design）
 - ContentVersion 有 `change_source`、`context_snapshot_hash`、`is_current`、`is_best`（05-content-editor；同一 Content 最多一个 best）
+- MVP 的 `Content.content_type` 以 `outline/opening_plan/chapter` 为主；`character_profile/world_setting` 作为 `ProjectSetting` 投影参与上下文，不再落独立主数据
+- `Outline` 与 `OpeningPlan` 复用 `Content + ContentVersion` 版本体系，不新增独立主表
 
 **Implementation: project.py**
 
@@ -295,8 +311,6 @@ class Content(Base, TimestampMixin, UUIDMixin):
     title: Mapped[str] = mapped_column(String(255))
     chapter_number: Mapped[int | None] = mapped_column(Integer)
     order_index: Mapped[int | None] = mapped_column(Integer)
-    content: Mapped[str | None] = mapped_column(Text)
-    word_count: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(50), default="draft")
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSON)  # 避免与 SQLAlchemy metadata 概念混淆
     last_edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -312,10 +326,11 @@ class ContentVersion(Base, TimestampMixin, UUIDMixin):
 
     content_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("contents.id"))
     version_number: Mapped[int] = mapped_column(Integer)
-    content: Mapped[str] = mapped_column(Text)
+    content_text: Mapped[str] = mapped_column(Text)
     word_count: Mapped[int | None] = mapped_column(Integer)
     change_summary: Mapped[str | None] = mapped_column(Text)
-    change_source: Mapped[str] = mapped_column(String(50), default="system")
+    created_by: Mapped[str] = mapped_column(String(50), default="system")
+    change_source: Mapped[str] = mapped_column(String(50), default="ai_generate")
     is_current: Mapped[bool] = mapped_column(Boolean, default=True)
     is_best: Mapped[bool] = mapped_column(Boolean, default=False)
     context_snapshot_hash: Mapped[str | None] = mapped_column(String(64))
@@ -350,12 +365,12 @@ def test_content_version_with_change_source(db):
     db.add(content)
     db.commit()
     v1 = ContentVersion(
-        content_id=content.id, version_number=1, content="初版内容",
-        change_source="system", is_current=True,
+        content_id=content.id, version_number=1, content_text="初版内容",
+        change_source="ai_generate", is_current=True,
     )
     db.add(v1)
     db.commit()
-    assert v1.change_source == "system"
+    assert v1.change_source == "ai_generate"
     assert v1.is_current is True
 ```
 
@@ -543,7 +558,7 @@ def test_review_action_with_issues(db):
 
 ---
 
-### Task 4: 支撑模型 — ChapterTask, StoryFact, TokenUsage, ModelCredential, ExecutionLog, Export
+### Task 4: 支撑模型 — ChapterTask, StoryFact, TokenUsage, ModelCredential, ExecutionLog, AuditLog, Export
 
 **目标：** 实现所有剩余模型，覆盖设计文档中的全部数据表。
 
@@ -553,6 +568,7 @@ def test_review_action_with_issues(db):
 - TokenUsage: 08-cost-and-safety §4
 - ModelCredential: 10-user-and-credentials §4.1
 - ExecutionLog: 18-data-backup
+- AuditLog: 10-user-and-credentials §6 + 18-data-backup §5.1
 - Export: 11-export + database-design
 
 **Files:**
@@ -561,8 +577,13 @@ def test_review_action_with_issues(db):
 - Create: `apps/api/app/models/token_usage.py`
 - Create: `apps/api/app/models/credential.py`
 - Create: `apps/api/app/models/execution_log.py`
+- Create: `apps/api/app/models/audit_log.py`
 - Create: `apps/api/app/models/export.py`
 - Update: `apps/api/app/models/__init__.py`
+
+**补充要求：**
+- `audit_logs` 用于记录 credential 安全事件和 project delete/restore 事件
+- `exports.format` 必须包含 `txt`
 
 **Implementation: chapter_task.py**
 
@@ -743,7 +764,7 @@ class Export(Base, TimestampMixin, UUIDMixin):
     filename: Mapped[str] = mapped_column(String(255))
     file_path: Mapped[str] = mapped_column(String(500))
     file_size: Mapped[int | None] = mapped_column(Integer)
-    config: Mapped[dict | None] = mapped_column(JSON)
+    config_snapshot: Mapped[dict | None] = mapped_column(JSON)
 ```
 
 **Update: `__init__.py` 导出所有模型**
@@ -844,6 +865,7 @@ class WorkflowSettings(BaseModel):
     auto_fix: bool | None = None
     save_on_step: bool = True
     default_pass_rule: Literal["all_pass", "majority_pass", "no_critical"] = "no_critical"
+    default_fix_skill: str | None = None  # 工作流级默认精修 Skill（回退链：节点 fix_skill → 此字段 → 内置默认）
 
 class NodeConfig(BaseModel):
     # ... 现有字段 ...
@@ -1161,7 +1183,7 @@ class ModelPricing:
 - ConfigLoader：加载合法 YAML、拒绝非法 YAML、引用完整性校验、ID 唯一性校验
 - Pydantic Schema：Skill/Agent/Hook/Workflow 配置的序列化/反序列化/校验
 - SkillTemplateRenderer：沙箱安全性（禁止 macro/import）、StrictUndefined 行为、白名单 filter
-- TokenCounter：精确计数 vs 快速估算、不同模型的字符比
+- TokenCounter：estimate() 字符比估算精度、count() MVP 退化行为验证、不同模型的字符比
 - ModelPricing：费用计算、热更新、未知模型处理
 
 **通过标准：**
@@ -1241,7 +1263,7 @@ def test_failed_can_retry_to_running():
 
 > 来源: 02-context-injection; 17-cross-module-contracts §4.4
 
-**目标：** 三层优先级合并 + 模式匹配 + Token 裁剪 + 构建报告
+**目标：** 三层优先级合并 + 模式匹配 + Token 裁剪 + 构建报告，并在必需上下文仍超模型窗口时硬失败；支持 `opening_plan` 作为前 1-3 章的阶段约束注入
 
 **Files:**
 - Create: `apps/api/app/engine/context_builder.py`
@@ -1252,8 +1274,9 @@ def test_failed_can_retry_to_running():
 - `match_patterns(pattern_rules, node_id)` → 匹配的 inject 项
 - `build_context(project_id, injection_rules, db)` → variables dict + context_report
 - `truncate_context(sections, budget)` → 裁剪后的 sections
+- `ensure_model_window(model, sections)` → 必需上下文仍超窗时抛 `ContextOverflowError`
 
-**Tests:** 覆盖 token 裁剪边界（刚好不超/刚好超/必须 drop）。
+**Tests:** 覆盖 token 裁剪边界（刚好不超/刚好超/必须 drop）、required context 超窗硬失败、`opening_plan` 在第 1-3 章高优先级注入以及第 4 章后的降级行为。
 
 ```python
 # apps/api/tests/unit/test_context_builder.py (伪代码)
@@ -1369,7 +1392,7 @@ async def test_parallel_review_partial_timeout():
 
 **测试范围：**
 - WorkflowStateMachine：所有合法状态转换、拒绝非法转换、幂等性（resume 已 running 的工作流）
-- ContextBuilder：上下文注入（三层优先级）、裁剪算法（超预算时按优先级裁剪）、第 1 章特殊处理
+- ContextBuilder：上下文注入（三层优先级）、裁剪算法（超预算时按优先级裁剪）、`opening_plan` 阶段注入、第 1 章特殊处理
 - ReviewExecutor：并行/串行审核、ReviewResult Schema 校验、聚合规则（all_pass/majority_pass/no_critical）
 - FixExecutor：精修策略选择（targeted/full_rewrite）、max_fix_attempts 计数、on_fix_fail 行为
 - LLM Service：通过 LiteLLM 调用（mock）、重试策略、模型降级链
@@ -1397,15 +1420,20 @@ async def test_parallel_review_partial_timeout():
 
 ### Task 16: ProjectService + ContentService
 
-- `ProjectService`: create, get, list, update, soft_delete, restore, physical_delete
+- `ProjectService`: create, get, list, update, soft_delete, restore, physical_delete（仅 `Project aggregate` 支持软删除）
+- `ProjectService`: 提供 `ProjectSetting` 完整度检查，作为启动 `outline/opening_plan/chapter` 工作流前置校验
 - `ContentService`: create, get, list, update_content, create_version, get_versions, rollback
+- `ContentService`: 统一管理 `outline/opening_plan/chapter` 三类内容的创建、确认与版本操作
 - 入参/返回用 Pydantic DTO，不依赖 HTTP
 - Commit: `feat: implement project and content services`
 
 ### Task 17: WorkflowService
 
 - 编排层：调用 WorkflowEngine + ContentService + ContextBuilder
-- 保存配置快照、创建 NodeExecution 记录、记录 TokenUsage
+- 保存启动配置快照、创建 NodeExecution 记录、记录 TokenUsage
+- 从零开始的新项目在启动正文生成前，校验已确认 `Outline` 与 `OpeningPlan`；若不满足则阻止进入 `chapter_split/chapter_gen`
+- `resume` 严格使用当前执行的快照；暂停后编辑配置只影响下一次新执行
+- 若用户要“从指定章节按新配置重跑”，由 WorkflowService 创建新的 `WorkflowExecution`
 - Commit: `feat: implement workflow orchestration service`
 
 ### Task 18: CredentialService
@@ -1413,6 +1441,7 @@ async def test_parallel_review_partial_timeout():
 - CRUD + AES-256-GCM 加解密
 - 优先级解析（project > user > system）
 - 连通性测试
+- 记录 credential 安全审计事件（create/update/delete/verify/enable/disable）
 - Commit: `feat: implement credential service with encryption`
 
 ### Task 18.5: Phase 4 集成测试
@@ -1422,8 +1451,8 @@ async def test_parallel_review_partial_timeout():
 **测试范围：**
 - ProjectService：CRUD、owner_id 过滤、软删除/恢复、设定完整度检查
 - ContentService：内容创建/编辑、版本管理、stale 标记传播、最佳版本标记
-- WorkflowService：启动（并发检查）、暂停/恢复/取消、配置快照保存
-- CredentialService：AES-256-GCM 加解密、优先级解析（project > user > system）、连通性测试（mock）
+- WorkflowService：启动（并发检查）、暂停/恢复/取消、配置快照保存、按新配置重跑时新建执行
+- CredentialService：AES-256-GCM 加解密、优先级解析（project > user > system）、连通性测试（mock）、安全审计事件
 - Service 层 DTO 入参/返回（不依赖 HTTP Request/Response）
 
 **通过标准：**
@@ -1454,7 +1483,11 @@ async def test_parallel_review_partial_timeout():
 ### Task 21: Project + Content API
 
 - `GET/POST /api/v1/projects`, `GET/PUT/DELETE /api/v1/projects/{id}`
-- `GET/POST /api/v1/projects/{id}/contents`, version endpoints
+- `GET/POST /api/v1/projects/{id}/contents`, version endpoints（覆盖 `outline/opening_plan/chapter`）
+- `POST /api/v1/projects/{id}/setting/complete-check`
+- `POST /api/v1/projects/{id}/outline/generate|approve`
+- `POST /api/v1/projects/{id}/opening-plan/generate|approve`
+- `POST /api/v1/projects/{id}/chapter-tasks/regenerate`
 - Commit: `feat: implement project and content API endpoints`
 
 ### Task 22: Workflow API + SSE
@@ -1462,6 +1495,7 @@ async def test_parallel_review_partial_timeout():
 - `POST /api/v1/projects/{id}/workflows/start`
 - `POST /api/v1/workflows/{id}/resume|pause|cancel`
 - `GET /api/v1/workflows/{id}/stream` (SSE)
+- 启动工作流时必须校验前置创作资产关口；对导入的中后期项目可通过显式 skip reason 放行
 - Commit: `feat: implement workflow API with SSE streaming`
 
 ### Task 23: Config API
@@ -1470,6 +1504,26 @@ async def test_parallel_review_partial_timeout():
 - `PUT /api/v1/config/skills/{id}` (编辑后写回 YAML)
 - Commit: `feat: implement config management API`
 
+### Task 24: Export Service + API
+
+> 来源: 11-export
+
+**Files:**
+- Create: `apps/api/app/services/export_service.py`
+- Create: `apps/api/app/api/v1/export.py`
+
+**实现范围（MVP）：**
+- ExportService: 导出前预检（通过 `ExportChapterStateResolver` 统一章节状态）、版本策略（MVP 只实现 `latest`）、内容拼装
+- ExportRenderer: TXT + Markdown 两种格式渲染（Jinja2 模板）
+- API: `POST /api/v1/projects/{id}/export`（触发导出）、`GET /api/v1/exports/{id}/download`（下载文件）
+- 导出文件写入文件系统 `exports/{project_id}/`，数据库记录元数据
+- `stale` 内容按可导出处理，但预检必须给 warning
+- DOCX/EPUB 延后（🟡）
+
+**依赖：** Task 21（Content API）
+
+**Commit:** `feat: implement export service with TXT and Markdown support`
+
 ### Task 23.5: Phase 5 端到端测试
 
 **目标：** 验证 API 层和完整请求链的正确性
@@ -1477,18 +1531,19 @@ async def test_parallel_review_partial_timeout():
 **测试范围：**
 - Auth：注册/登录/JWT 验证/过期处理
 - Project API：CRUD + 权限隔离（用户只能访问自己的项目）
-- Content API：内容管理 + 版本操作
-- Workflow API：启动/暂停/恢复/取消 + SSE 流式推送
+- Content API：`outline/opening_plan/chapter` 内容管理 + 版本操作 + 前置资产确认接口
+- Workflow API：启动/暂停/恢复/取消 + SSE 流式推送 + 前置创作资产关口校验
 - Config API：配置读取/编辑/写回 YAML
+- Export API：导出触发/下载、统一状态预检、`latest` 版本策略、`stale` warning
 - 错误处理：401/403/404/422 响应格式
 - CORS 配置验证
 
 **通过标准：**
 - 所有测试用例通过
 - API 文档（/docs）可正常访问
-- 完整创作流程可跑通（注册 → 创建项目 → 启动工作流 → 生成 → 导出）
+- 完整创作流程可跑通（注册 → 创建项目 → 设定完整度检查 → 生成/确认 Outline → 生成/确认 OpeningPlan → 启动工作流 → 生成 → 导出）
 
-**依赖：** Task 23
+**依赖：** Task 24
 
 **Run:** `pytest tests/api/ -v`
 **Commit:** `test: add Phase 5 API end-to-end tests`
@@ -1530,6 +1585,7 @@ open http://localhost:8000/docs
 - `docs/design/03-review-and-fix.md` §3 ReviewResult Schema
 - `docs/design/04-chapter-generation.md` §4 ChapterTask 模型
 - `docs/design/05-content-editor.md` ContentVersion 扩展字段
+- `docs/design/19-pre-writing-assets.md` 前置创作资产链路与 `OpeningPlan` 约束
 - `docs/design/08-cost-and-safety.md` §4 TokenUsage 模型
 - `docs/design/10-user-and-credentials.md` §2 User + §4 ModelCredential
 - `docs/design/17-cross-module-contracts.md` 全部约束
@@ -1537,7 +1593,7 @@ open http://localhost:8000/docs
 
 ---
 
-*计划版本: 2.0.0*
+*计划版本: 2.1.1*
 *创建日期: 2026-03-17*
-*基于: 18 个设计文档全面审查*
-*预计任务数: 23 个*
+*基于: 19 个设计文档全面审查 + 2026-03-19 边界与前置创作资产对齐修订*
+*预计任务数: 24 个*

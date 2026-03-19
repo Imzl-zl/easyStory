@@ -10,12 +10,13 @@
 
 ## 文档阅读指南
 
-本目录包含 easyStory 的完整功能设计文档，按模块拆分为 18 个独立文件。
+本目录包含 easyStory 的完整功能设计文档，按模块拆分为 19 个独立文件。
 
 **建议阅读顺序：**
 1. 先读 `01-core-workflow` 理解核心架构
-2. 再读 `02-context-injection` 和 `03-review-and-fix` 理解生成质量保障
-3. 其余按需查阅
+2. 再读 `06-creative-setup` 和 `19-pre-writing-assets` 理解创作准备链路
+3. 再读 `02-context-injection` 和 `03-review-and-fix` 理解生成质量保障
+4. 其余按需查阅
 
 ---
 
@@ -33,7 +34,7 @@
 | 08 | 成本控制 | [08-cost-and-safety](./08-cost-and-safety.md) | 🔴 | 预算 + 安全阀 + Dry-run + Token 统一 |
 | 09 | 错误处理 | [09-error-handling](./09-error-handling.md) | 🔴 | 分类 + 重试 + 模型降级 |
 | 10 | 用户认证 | [10-user-and-credentials](./10-user-and-credentials.md) | 🔴 | User 模型 + 凭证管理 + 权限 |
-| 11 | 导出 | [11-export](./11-export.md) | 🟡 | 格式 + 范围 + 最佳版本选择 |
+| 11 | 导出 | [11-export](./11-export.md) | 🔴/🟡 | 🔴 TXT/Markdown 基础导出；🟡 DOCX/EPUB/高级排版 |
 | 12 | 流式输出 | [12-streaming-and-interrupt](./12-streaming-and-interrupt.md) | 🟡 | SSE + 中途打断 + 停止/暂停语义 |
 | 13 | AI 偏好学习 | [13-ai-preference-learning](./13-ai-preference-learning.md) | 🟡 | 记忆系统 + 编辑模式分析 + 注入治理 |
 | 14 | 伏笔追踪 | [14-foreshadowing-tracking](./14-foreshadowing-tracking.md) | 🟡 | 生命周期 + 自动检测 + 提醒注入预算 |
@@ -41,14 +42,15 @@
 | 16 | MCP 预留 | [16-mcp-architecture](./16-mcp-architecture.md) | 🔴 | 三方向 + 抽象层 + 架构约束 |
 | 17 | 跨模块契约 | [17-cross-module-contracts](./17-cross-module-contracts.md) | 🔴 | 并发幂等 + 模板安全 + 级联删除 |
 | 18 | 数据备份 | [18-data-backup](./18-data-backup.md) | 🟡 | 软删除 + 回收站 + 执行日志 |
+| 19 | 前置创作资产 | [19-pre-writing-assets](./19-pre-writing-assets.md) | 🔴 | 设定/大纲/开篇/章节的标准衔接链路 |
 
 ---
 
 ## 实施优先级总结
 
-### MVP 必须实现（🔴）— 共 30 项
+### MVP 必须实现（🔴）— 共 31 项
 
-**功能模块（11 项）：**
+**功能模块（12 项）：**
 
 1. 成本控制与安全阀 — 防止 token 失控
 2. 错误处理与容错 — 保证稳定性
@@ -58,9 +60,10 @@
 6. 内容编辑器 — 用户使用频率最高的功能
 7. 精修机制详细设计 — 定义精修输入/策略/Skill 来源
 8. 对话式设定输出定义 — 结构化输出 + 变量映射
-9. 章节循环生成机制 — 大纲拆分 + 中断恢复 + 跳过
-10. Skill/Workflow Schema 静态校验 — 启动前编译校验
-11. 模型供应商凭证管理 — Key 加密存储 + 作用域
+9. 前置创作资产链路 — 设定/大纲/开篇/章节衔接
+10. 章节循环生成机制 — 大纲拆分 + 中断恢复 + 跳过
+11. Skill/Workflow Schema 静态校验 — 启动前编译校验
+12. 模型供应商凭证管理 — Key 加密存储 + 作用域
 
 **跨模块契约（6 项）：**
 
@@ -73,17 +76,17 @@
 
 **功能逻辑规格：**
 
-重点包括：上下文→Skill 变量映射、编辑旧章节下游处理、审核聚合规则、精修重新审核范围、运行中停止语义、ChapterTask 执行绑定、设定完整度检查、动态章节终止、上下文裁剪算法、导出最佳版本策略、体验型上下文预算等。
+重点包括：上下文→Skill 变量映射、编辑旧章节下游处理、审核聚合规则、精修重新审核范围、运行中停止语义、ChapterTask 执行绑定、设定完整度检查、前置创作资产链路、动态章节终止、上下文裁剪算法、体验型上下文预算、恢复执行与配置快照边界、导出状态统一口径等。
 
 ### MVP 建议简化实现（🟡）— 12 项
 
 > **Story Bible 说明**：🔴 的"Story Bible 版本绑定"指数据模型层的结构预留（`source_content_version_id` 字段和冲突标记机制），这是上线阻塞项。🟡 的"Story Bible"指完整的事实自动抽取和注入能力，MVP 可简化为手动录入或基础规则抽取。
 
-31–42. 内容导出、数据备份、执行日志、小说分析优化、Story Bible 完整能力、上下文可观测性、Dry-run预估、Prompt回放、流式输出+打断、AI偏好学习、伏笔追踪、写作数据面板
+32–43. 高级导出（DOCX/EPUB/排版模板）、数据备份、执行日志、小说分析优化、Story Bible 完整能力、上下文可观测性、Dry-run预估、Prompt回放、流式输出+打断、AI偏好学习、伏笔追踪、写作数据面板
 
 ### 第二阶段（🟢）
 
-43–45. 批量操作/A/B测试/协作/审核、MCP Client、MCP Server
+44–46. 批量操作/A/B测试/协作/审核、MCP Client、MCP Server
 
 ---
 
@@ -112,7 +115,8 @@
 - [ ] 不同节点可以配置不同模型
 - [ ] 工作流启动前 Schema 静态校验
 - [ ] 模型 API Key 加密存储，支持三级作用域
-- [ ] 添加 Key 后自动测试连通性
+- [ ] 添加 Key 后自动测试连通性，并记录 create/update/delete/verify/enable_disable 安全事件
+- [ ] 可以导出 TXT 和 Markdown 格式
 
 ### 🔴 MVP 上线阻塞 — 契约验收
 
@@ -134,15 +138,19 @@
 - [ ] ContextBuilder 输出变量 dict，通过 Jinja2 填充到 Skill 模板
 - [ ] 未被 Skill 引用的注入类型不进入 Prompt，但在上下文报告中标记为 unused
 - [ ] 第 1 章生成时，无数据的注入类型跳过并在上下文报告中标记 not_applicable
-- [ ] 上下文超预算时按优先级裁剪，project_setting 永不裁剪
+- [ ] 上下文超预算时按优先级裁剪；若必需上下文裁剪后仍超模型窗口，则阻止执行并显式报错
 - [ ] 编辑旧章节后，下游章节标记为 stale
 - [ ] 用户可选择忽略/重生成/逐章确认 stale 章节
 - [ ] 审核聚合规则（pass_rule）可在节点级配置
 - [ ] 精修后默认全部 reviewer 重跑
-- [ ] 工作流执行时上下文使用快照，不受后续编辑影响
+- [ ] 工作流配置使用启动快照；每个节点执行前生成输入上下文快照，节点执行期间不受后续编辑影响
 - [ ] 同一项目不允许同时运行两个工作流
 - [ ] 运行中停止当前生成时，当前节点标记 interrupted，工作流进入 paused
-- [ ] 大纲完成后由章节拆分 Skill 自动生成 ChapterTask 列表
+- [ ] 世界观设定和角色设定归属 `ProjectSetting`，不存在第二套真值源
+- [ ] 标准创作链路为 `ProjectSetting -> Outline -> OpeningPlan -> ChapterTask -> Chapter`
+- [ ] 新建项目从零开始生成正文前，需先确认 `Outline` 与 `OpeningPlan`
+- [ ] `opening_plan` 默认只在第 1-3 章作为高优先级阶段约束注入
+- [ ] 大纲与开篇设计确认后由章节拆分 Skill 自动生成 ChapterTask 列表
 - [ ] `chapter_split` 失败时禁止留下半套 ChapterTask，且不允许 skip
 - [ ] ChapterTask 绑定 workflow_execution_id，恢复时只读取当前执行的章节计划
 - [ ] WorkflowExecution.snapshot 有最小恢复 schema，能支撑 interrupted/pause 场景恢复
@@ -170,8 +178,7 @@
 
 ### 🟡 MVP 建议简化 — 不阻塞上线
 
-- [ ] 可以导出 TXT 和 Markdown 格式
-- [ ] 删除项目后进入回收站（30 天内可恢复）
+- [ ] 删除项目后进入回收站（30 天内可恢复；MVP 仅 Project aggregate 支持软删除）
 - [ ] 可以查看工作流执行日志
 - [ ] 可以查看历史执行的配置版本
 - [ ] Story Bible 事实库自动提取人物/地点/时间线
@@ -217,6 +224,7 @@
   → 点击"开始创作"
   → 设定完整度检查（ready/warning/blocked）
   → 生成大纲 → 人工确认大纲
+  → 生成开篇设计 → 人工确认开篇设计
   → 自动拆分章节任务列表
   → 逐章生成（手动模式：每章生成后查看/编辑/确认）
   → 全部完成后导出 Markdown
@@ -227,14 +235,16 @@
 ```
 注册/登录
   → 创建空项目 → 对话式设定 或 手动填写结构化设定
-  → 导入参考小说 → 分析文风 → 生成风格 Skill
   → 自定义 Workflow（YAML 编辑模式）
+  → 生成并调整大纲 / 开篇设计
   → 配置多个审核 Agent（文风/违禁词/AI味/剧情一致性）
   → 自动模式批量生成，每 10 章暂停检查（loop.pause.every_n）
   → 暂停时编辑不满意的章节、调整后续章节任务
   → 恢复工作流继续生成
-  → 导出 DOCX
+  → 导出 Markdown
 ```
+
+> 扩展路径（🟡）：导入参考小说 → 分析文风 → 生成风格 Skill；导出 DOCX。
 
 ### 场景 3：中断与恢复
 

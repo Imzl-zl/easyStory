@@ -4,13 +4,15 @@
 |---|---|
 | 文档类型 | 功能设计 |
 | 优先级 | 🔴 MVP 必须 |
-| 关联文档 | [核心工作流](./01-core-workflow.md)、[上下文注入](./02-context-injection.md) |
+| 关联文档 | [核心工作流](./01-core-workflow.md)、[上下文注入](./02-context-injection.md)、[前置创作资产](./19-pre-writing-assets.md) |
+
+> **优先级说明**：本模块整体为 🔴，但"动态章节三种终止方式"为 🟡 建议简化。
 
 ---
 
 ## 1. 概述
 
-定义章节循环生成的完整机制：章节数量来源、大纲自动拆分、ChapterTask 数据模型、动态章节终止条件、中断恢复、循环节点完成语义。
+定义章节循环生成的完整机制：章节数量来源、前置资产驱动的章节拆分、ChapterTask 数据模型、动态章节终止条件、中断恢复、循环节点完成语义。
 
 ---
 
@@ -27,7 +29,7 @@ chapter_generation:
 
 ---
 
-## 3. 大纲自动拆分章节任务
+## 3. 前置资产驱动的章节任务拆分
 
 ### 3.1 工作流中的位置
 
@@ -37,10 +39,15 @@ nodes:
     name: "生成大纲"
     skill: "skill.outline.xuanhuan"
 
+  - id: "opening_plan"
+    name: "生成开篇设计"
+    skill: "skill.opening_plan.xuanhuan"
+    depends_on: ["outline"]
+
   - id: "chapter_split"          # 章节拆分节点
     name: "拆分章节任务"
     skill: "skill.chapter_split"
-    depends_on: ["outline"]
+    depends_on: ["outline", "opening_plan"]
 
   - id: "chapter_gen"
     name: "生成章节"
@@ -51,6 +58,8 @@ nodes:
       count_from: "chapter_split"
       item_var: "chapter_index"
 ```
+
+> 标准创作链路为 `ProjectSetting -> Outline -> OpeningPlan -> ChapterTask -> Chapter`。`chapter_split` 默认消费已确认的 `Outline` 和 `OpeningPlan`，而不是只吃一份大纲。
 
 ### 3.2 拆分 Skill 输出 Schema
 
@@ -74,11 +83,14 @@ skill:
 
 循环生成时，系统从 `ChapterTask` 表读取对应章节的 `brief`，填充到 Skill 模板的 `{{ chapter_task }}`。
 
+对于前 1-3 章，`chapter_gen` 还应额外读取 `OpeningPlan` 作为阶段约束；但 `chapter_task` 仍是当前章节的直接执行输入。
+
 ### 3.4 chapter_split → ChapterTask 写入机制
 
 `chapter_split` 节点执行后，**引擎内置后处理**自动将 Skill 输出的 chapters 数组写入 `chapter_tasks` 表：
 
 - **写入时机**: `chapter_split` 节点 status 变为 `completed` 时，由引擎自动触发（非 Hook，不可绕过）
+- **输入前提**: 必须基于已确认的 `Outline` 与 `OpeningPlan` 执行拆分
 - **字段映射**:
 
 | Skill 输出字段 | chapter_tasks 表字段 |
@@ -112,7 +124,7 @@ skill:
 - downstream 的 `chapter_gen` 在 `chapter_split` 成功前不得启动
 - 用户恢复时可选：
   - 重试 `chapter_split`
-  - 修改大纲后重新执行 `outline -> chapter_split`
+  - 修改大纲或开篇设计后重新执行 `outline -> opening_plan -> chapter_split`
   - 手动导入/录入 ChapterTask 列表
 
 ---
@@ -223,7 +235,7 @@ workflow:
 | 修改 ChapterTask | 调整后续章节的任务描述（brief）、关键角色、关键事件 |
 | 调整 Workflow 配置 | 切换审核 Agent、修改精修策略、调整预算等 |
 | 跳过某些章节 | 将指定章节标记为 `skipped`，恢复后跳过这些章节 |
-| 从某章重新开始 | 选择一个章节号，恢复后从该章重新生成（之后的章节重置为 pending） |
+| 从某章重新开始 | 在**当前执行快照不变**的前提下，选择一个章节号，恢复后从该章重新生成（之后的章节重置为 pending） |
 | 切换工作模式 | 从自动切换为手动，或反之 |
 | 取消工作流 | 放弃本次执行，进入 `cancelled` 终态 |
 | 恢复工作流 | 从暂停点继续执行 |
@@ -231,7 +243,8 @@ workflow:
 **约束：**
 - 编辑已完成章节会触发下游 stale 标记（详见 [内容编辑](./05-content-editor.md) §7）
 - 修改 ChapterTask 不影响已完成的章节，只影响后续待生成的章节
-- 调整 Workflow 配置后恢复时，使用新配置继续执行（但启动时的配置快照不变）
+- 调整 Workflow / Skill / Agent 配置后，不影响当前 `WorkflowExecution` 的恢复；`resume` 仍使用启动快照
+- 若用户希望“从某章开始按新配置重跑”，应创建新的 `WorkflowExecution`
 
 ---
 
@@ -280,4 +293,4 @@ on_fail 策略影响：
 
 ---
 
-*最后更新: 2026-03-17*
+*最后更新: 2026-03-19*

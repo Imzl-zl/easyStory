@@ -222,6 +222,7 @@ failed    --retry()--------------------> running
 | `review_failed` | 精修达上限 | on_fix_fail=pause 时触发 |
 | `error` | 不可恢复错误 | 需人工介入 |
 | `loop_pause` | loop.pause 策略触发 | 每 N 章暂停检查 |
+| `max_chapters_reached` | 动态章节超硬上限 | source=dynamic 时达到 max_chapters |
 | （无，手动模式节点间）| 节点完成等待确认 | 手动模式每步都经历”运行→暂停→确认→运行” |
 
 **关键约束：** 同一项目存在 `running` 或 `paused` 状态的工作流时，禁止启动新工作流。这意味着手动模式下用户离开页面（工作流处于 `paused`）后，必须先 resume 当前工作流或 cancel 它，才能启动新的。这是预期行为，不是限制。
@@ -243,6 +244,11 @@ failed    --retry()--------------------> running
 >
 > → 数据模型详见 [数据库设计](../specs/database-design.md) § WorkflowExecution
 
+**恢复边界：**
+- `resume` 恢复当前执行时，继续使用启动时冻结的 `workflow_snapshot/skills_snapshot/agents_snapshot`
+- 用户在暂停期间修改配置文件，不影响当前执行的 `resume`
+- 若希望按新配置继续后续章节，应新建一次 `WorkflowExecution`
+
 ---
 
 ## 5. 并发控制
@@ -256,6 +262,8 @@ failed    --retry()--------------------> running
 **原则：工作流读取上下文时做快照，不受后续编辑影响。**
 
 节点执行前，系统构建当前上下文并计算 SHA-256 哈希值，作为该节点的输入快照。后续用户编辑不影响正在执行的节点。
+
+> 注意：这里的“上下文快照”是**节点级输入快照**，不同于 `workflow_snapshot/skills_snapshot/agents_snapshot` 这类**执行级配置快照**。配置在执行开始时冻结；内容/设定数据在节点启动时读取。
 
 > → 上下文构建详见 [上下文注入](./02-context-injection.md)
 
@@ -318,4 +326,4 @@ failed    --retry()--------------------> running
 
 ---
 
-*最后更新: 2026-03-17*
+*最后更新: 2026-03-19*
