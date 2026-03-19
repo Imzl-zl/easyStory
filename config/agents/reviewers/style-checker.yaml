@@ -4,6 +4,8 @@ agent:
   version: "1.0.0"
   description: "检查内容文风是否符合设定"
   type: "reviewer"
+  tags: ["审核", "文风"]
+  mcp_servers: []
 
   system_prompt: |
     你是一位专业的小说文风审核专家。
@@ -19,5 +21,7 @@ agent:
   model:
     provider: "openai"
     name: "gpt-4o"
+    required_capabilities:
+      - "json_schema_output"
     temperature: 0.3
     max_tokens: 1000

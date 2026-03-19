@@ -1,0 +1,28 @@
+skill:
+  id: "skill.review.style"
+  name: "文风审核"
+  version: "1.0.0"
+  description: "为 reviewer 提供文风审核维度"
+  category: "review"
+  tags: ["审核", "文风"]
+
+  prompt: |
+    你需要检查以下内容的文风一致性、表达重复和突兀跳转。
+
+    【内容】
+    {{ content }}
+
+    输出结构化审核结论。
+
+  variables:
+    content:
+      type: "string"
+      required: true
+
+  model:
+    provider: "openai"
+    name: "gpt-4o"
+    required_capabilities:
+      - "json_schema_output"
+    temperature: 0.2
+    max_tokens: 1200

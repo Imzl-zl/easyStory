@@ -108,13 +108,17 @@ def test_content_version_tracking(db):
     db.commit()
     v1 = ContentVersion(
         content_id=content.id, version_number=1,
-        content="初版大纲内容", change_source="system", is_current=True,
+        content_text="初版大纲内容",
+        created_by="system",
+        change_source="ai_generate",
+        is_current=True,
     )
     db.add(v1)
     db.commit()
     db.refresh(v1)
     assert v1.version_number == 1
-    assert v1.change_source == "system"
+    assert v1.created_by == "system"
+    assert v1.change_source == "ai_generate"
     assert v1.is_current is True
     assert v1.context_snapshot_hash is None
 
@@ -127,13 +131,27 @@ def test_content_version_change_sources(db):
     project = Project(name="编辑测试", owner_id=user.id)
     db.add(project)
     db.commit()
-    content = Content(project_id=project.id, content_type="chapter", title="章节")
+    content = Content(
+        project_id=project.id,
+        content_type="chapter",
+        title="章节",
+        chapter_number=1,
+    )
     db.add(content)
     db.commit()
-    for i, source in enumerate(["system", "user", "ai_assist", "auto_fix"], start=1):
+    change_cases = [
+        ("system", "ai_generate"),
+        ("user", "user_edit"),
+        ("ai_assist", "ai_generate"),
+        ("auto_fix", "ai_fix"),
+    ]
+    for i, (created_by, source) in enumerate(change_cases, start=1):
         v = ContentVersion(
             content_id=content.id, version_number=i,
-            content=f"版本{i}", change_source=source,
+            content_text=f"版本{i}",
+            created_by=created_by,
+            change_source=source,
+            is_current=i == len(change_cases),
         )
         db.add(v)
     db.commit()
@@ -191,7 +209,7 @@ def test_workflow_execution_defaults(db):
     wf = _make_workflow(db)
     db.refresh(wf)
     assert wf.status == "created"
-    assert wf.current_node == 0
+    assert wf.current_node_id is None
     assert wf.pause_reason is None
     assert wf.workflow_snapshot is None
 
@@ -323,9 +341,11 @@ from app.models.export import Export
 
 
 def test_chapter_task(db):
-    project = _make_project(db)
+    wf = _make_workflow(db)
     ct = ChapterTask(
-        project_id=project.id, chapter_number=1,
+        project_id=wf.project_id,
+        workflow_execution_id=wf.id,
+        chapter_number=1,
         title="第一章 废柴崛起", brief="主角觉醒天赋",
         key_characters=["萧炎", "萧薰儿"],
         key_events=["斗气觉醒"],
@@ -340,11 +360,20 @@ def test_chapter_task(db):
 
 def test_story_fact(db):
     project = _make_project(db)
-    content = Content(project_id=project.id, content_type="chapter", title="ch1")
+    content = Content(
+        project_id=project.id,
+        content_type="chapter",
+        title="ch1",
+        chapter_number=1,
+    )
     db.add(content)
     db.commit()
     version = ContentVersion(
-        content_id=content.id, version_number=1, content="内容",
+        content_id=content.id,
+        version_number=1,
+        content_text="内容",
+        created_by="system",
+        change_source="ai_generate",
     )
     db.add(version)
     db.commit()
@@ -434,8 +463,8 @@ def test_export(db):
     project = _make_project(db)
     exp = Export(
         project_id=project.id, format="markdown",
-        filename="novel.md", file_path="/exports/novel.md",
-        file_size=50000, config={"template": "default"},
+        filename="novel.md", file_path="novel.md",
+        file_size=50000,
     )
     db.add(exp)
     db.commit()

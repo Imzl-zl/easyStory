@@ -2,21 +2,32 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    DateTime, ForeignKey, Integer, String, Text, UniqueConstraint,
+    DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from .base import Base, TimestampMixin, UUIDMixin
 
+ACTIVE_WORKFLOW_FILTER = "status IN ('created', 'running', 'paused')"
+
 
 class WorkflowExecution(Base, TimestampMixin, UUIDMixin):
     __tablename__ = "workflow_executions"
+    __table_args__ = (
+        Index(
+            "uq_workflow_execution_active_project",
+            "project_id",
+            unique=True,
+            sqlite_where=text(ACTIVE_WORKFLOW_FILTER),
+            postgresql_where=text(ACTIVE_WORKFLOW_FILTER),
+        ),
+    )
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
     template_id: Mapped[uuid.UUID | None] = mapped_column()
     status: Mapped[str] = mapped_column(String(50), default="created")
-    current_node: Mapped[int] = mapped_column(Integer, default=0)
+    current_node_id: Mapped[str | None] = mapped_column(String(200))
     pause_reason: Mapped[str | None] = mapped_column(String(50))
     resume_from_node: Mapped[str | None] = mapped_column(String(200))
     snapshot: Mapped[dict | None] = mapped_column(JSON)
