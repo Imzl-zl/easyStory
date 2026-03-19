@@ -119,6 +119,8 @@ Project 新增 `owner_id`（FK → users.id），与 User 为多对一关系。
 
 请求模型调用时，按优先级链查找第一个可用（`is_active = true`）的凭证。如果项目级有该 provider 的凭证则使用项目级，否则使用用户级；仅当项目/租户策略**显式允许使用系统默认凭证**时，才继续解析到系统级。
 
+MVP 阶段，这个“显式允许”策略持久化在 `projects.allow_system_credential_pool`，默认值为 `false`。
+
 ---
 
 ## 6. 安全要求

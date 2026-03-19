@@ -250,10 +250,12 @@ async def test_user_creation(db):
 **关键设计约束（来源）：**
 - Project 有 `owner_id` FK → users（10-user-and-credentials §2.2）
 - Project 有 `deleted_at` 软删除（18-data-backup）
+- Project 有 `allow_system_credential_pool`，默认 false，仅显式允许时才可解析到系统默认凭证池（10-user-and-credentials §5.3）
 - Content 有 `parent_id` 自引用（database-design）
 - ContentVersion 有 `change_source`、`context_snapshot_hash`、`is_current`、`is_best`（05-content-editor；同一 Content 最多一个 best）
 - MVP 的 `Content.content_type` 以 `outline/opening_plan/chapter` 为主；`character_profile/world_setting` 作为 `ProjectSetting` 投影参与上下文，不再落独立主数据
 - `Outline` 与 `OpeningPlan` 复用 `Content + ContentVersion` 版本体系，不新增独立主表
+- `contents` 需补齐库级约束：同一项目最多一个 `outline`、最多一个 `opening_plan`、`chapter` 由 `(project_id, chapter_number)` 唯一标识，且 `chapter_number` 仅 `chapter` 可非空
 - `Analysis` 需保留 `source_title`、`analysis_scope`、`result`、`suggestions`、`generated_skill_key`，保证原始文本清理后仍可追溯分析输入边界
 
 **Implementation: project.py**
@@ -263,7 +265,7 @@ async def test_user_creation(db):
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -280,6 +282,7 @@ class Project(Base, TimestampMixin, UUIDMixin, SoftDeleteMixin):
     template_id: Mapped[uuid.UUID | None] = mapped_column()
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     project_setting: Mapped[dict | None] = mapped_column(JSON)
+    allow_system_credential_pool: Mapped[bool] = mapped_column(Boolean, default=False)
 
     owner: Mapped["User"] = relationship(back_populates="projects")
     contents: Mapped[list["Content"]] = relationship(
@@ -341,6 +344,13 @@ class ContentVersion(Base, TimestampMixin, UUIDMixin):
     content_ref: Mapped["Content"] = relationship(back_populates="versions")
 ```
 
+**Migration constraints（contents）**
+
+- `ck_contents_chapter_number_by_type`
+- `uq_contents_project_outline`
+- `uq_contents_project_opening_plan`
+- `uq_contents_project_chapter_number`
+
 **Implementation: analysis.py**
 
 ```python
@@ -355,7 +365,7 @@ from .base import Base, TimestampMixin, UUIDMixin
 
 
 class Analysis(Base, TimestampMixin, UUIDMixin):
-    __tablename__ = "analysis"
+    __tablename__ = "analyses"
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
     content_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("contents.id"))
@@ -660,6 +670,7 @@ def test_review_action_with_issues(db):
 **补充要求：**
 - `audit_logs` 用于记录 credential 安全事件和 project delete/restore 事件
 - `exports.format` 必须包含 `txt`
+- `token_usages` 必须记录 `usage_type`，不能只靠 `node_execution_id` 反推调用用途
 
 **Implementation: chapter_task.py**
 
@@ -747,6 +758,7 @@ class TokenUsage(Base, TimestampMixin, UUIDMixin):
     credential_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("model_credentials.id")
     )
+    usage_type: Mapped[str] = mapped_column(String(20))
     model_name: Mapped[str] = mapped_column(String(100))
     input_tokens: Mapped[int] = mapped_column(Integer)
     output_tokens: Mapped[int] = mapped_column(Integer)
@@ -1517,6 +1529,7 @@ async def test_parallel_review_partial_timeout():
 
 - CRUD + AES-256-GCM 加解密
 - 优先级解析（project > user > system[仅显式允许]）
+- 系统默认凭证池解析前必须检查 `projects.allow_system_credential_pool`
 - 连通性测试
 - 记录 credential 安全审计事件（create/update/delete/verify/enable/disable）
 - Commit: `feat: implement credential service with encryption`
@@ -1529,7 +1542,7 @@ async def test_parallel_review_partial_timeout():
 - ProjectService：CRUD、owner_id 过滤、软删除/恢复、设定完整度检查
 - ContentService：内容创建/编辑、版本管理、stale 标记传播、最佳版本标记
 - WorkflowService：启动（并发检查）、暂停/恢复/取消、配置快照保存、按新配置重跑时新建执行
-- CredentialService：AES-256-GCM 加解密、优先级解析（project > user > system[仅显式允许]）、连通性测试（mock）、安全审计事件
+- CredentialService：AES-256-GCM 加解密、优先级解析（project > user > system[仅显式允许]）、`allow_system_credential_pool` 校验、连通性测试（mock）、安全审计事件
 - Service 层 DTO 入参/返回（不依赖 HTTP Request/Response）
 
 **通过标准：**

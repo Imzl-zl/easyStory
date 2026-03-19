@@ -108,6 +108,7 @@ workflow:
 
 - `node_execution_id` 可为 None，用于记录非节点执行场景的 token 消耗（如 dry-run 预估调用）
 - `credential_id` 关联到 `ModelCredential`，通过 `credential.owner_type / owner_id` 可追溯费用归属（用户级或项目级）
+- `usage_type` 是强制分组字段，用于稳定区分 `generate/review/fix/analysis/dry_run`
 - `estimated_cost` 基于 `ModelPricing` 计算，token 数来自 LLM API 返回值（最权威来源）
 
 ---

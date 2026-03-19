@@ -49,7 +49,7 @@
 | 完成度 | 已完成章节 / ChapterTask 总数 | ChapterTask |
 | AI 原稿保留率 | 1 - (编辑距离/原文长度) 平均值 | EditPattern |
 | 审核首次通过率 | 首次 passed / 总审核章节数 | ReviewAction |
-| Token 消耗 | SUM(TokenUsage) 按类型分组 | TokenUsage |
+| Token 消耗 | SUM(TokenUsage) 按 `usage_type` 分组 | TokenUsage |
 | 每章成本 | 总费用 / 已完成章节数 | TokenUsage + ModelPricing |
 | 平均每章耗时 | AVG(execution_time) | NodeExecution |
 | 上下文裁剪率 | 被裁剪 section 数 / 构建总次数 | ContextReport |

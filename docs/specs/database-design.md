@@ -12,23 +12,25 @@
 
 ## 1. 实体关系
 
+> 约定：本节以**物理表名**为准，括号内标注领域对象名称；后文 SQL 示例也统一使用物理表名（如 `contents`、`workflow_executions`）。
+
 ```
-Project (项目)
-  ├── 1:N → Content (内容)
+projects (Project，项目)
+  ├── 1:N → contents (Content，内容)
   │         └── 1:N → content_versions (版本)
-  ├── 1:N → Analysis (分析结果)
-  ├── 1:N → WorkflowExecution (工作流执行)
-  │         └── 1:N → NodeExecution (节点执行)
-  │                   ├── 1:N → Artifact (产物)
-  │                   └── 1:N → ReviewAction (审核动作)
-  ├── 1:N → Export (导出)
-  └── N:1 → Template (模板)
-            └── 1:N → TemplateNode (模板节点)
+  ├── 1:N → analyses (Analysis，分析结果)
+  ├── 1:N → workflow_executions (WorkflowExecution，工作流执行)
+  │         └── 1:N → node_executions (NodeExecution，节点执行)
+  │                   ├── 1:N → artifacts (Artifact，产物)
+  │                   └── 1:N → review_actions (ReviewAction，审核动作)
+  ├── 1:N → exports (Export，导出)
+  └── N:1 → templates (Template，模板)
+            └── 1:N → template_nodes (TemplateNode，模板节点)
 
 独立配置（不与项目直接关联）：
-Skill (技能)
-Hook (钩子)
-Agent (智能体)
+skills (Skill，技能)
+hooks (Hook，钩子)
+agents (Agent，智能体)
 ```
 
 ---
@@ -37,7 +39,7 @@ Agent (智能体)
 
 ### 核心业务表
 
-**Project（项目）**
+**projects（Project，项目）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -50,12 +52,15 @@ Agent (智能体)
 | owner_id | UUID | 所属用户 ID（FK → users.id） |
 | deleted_at | TIMESTAMP | 软删除时间（回收站） |
 | project_setting | JSONB | 项目设定（ProjectSetting，长期约束唯一真值源） |
+| allow_system_credential_pool | BOOLEAN | 是否允许解析到系统级默认凭证池，默认 false |
 | created_at | TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | 更新时间 |
 
 > `project_setting` 在 MVP 中直接承载结构化 `ProjectSetting` 文档，不作为运行态杂项配置大杂烩。运行时快照、模板配置和节点临时参数应分别进入 `workflow_snapshot`、`Template.config`、`NodeExecution.input/output` 等边界明确的位置。
+>
+> `allow_system_credential_pool` 是显式安全开关，默认关闭；仅当该值为 `true` 时，凭证解析才允许继续回退到系统级默认凭证池。
 
-**Content（内容）**
+**contents（Content，内容）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -73,6 +78,12 @@ Agent (智能体)
 | last_edited_at | TIMESTAMP | 最后编辑时间 |
 
 > `character_profile` 与 `world_setting` 在 MVP 中作为 `ProjectSetting` 的结构化投影参与上下文注入，不作为独立 `Content` 主类型存储。
+>
+> 硬约束：
+> - 同一 `project_id` 最多只允许一个 `outline` 容器
+> - 同一 `project_id` 最多只允许一个 `opening_plan` 容器
+> - `chapter` 的逻辑身份由 `(project_id, chapter_number)` 唯一标识
+> - `chapter_number` 仅 `content_type='chapter'` 时允许非空，且必须大于 0
 
 **content_versions（版本快照）**
 
@@ -104,7 +115,7 @@ Agent (智能体)
 > - 同一 `content_id` 最多一条 `is_current=true`
 > - 同一 `content_id` 最多一条 `is_best=true`
 
-**Analysis（分析结果）**
+**analyses（Analysis，分析结果）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -123,7 +134,7 @@ Agent (智能体)
 >
 > 若分析结果落地为 Skill，业务记录应引用配置层的逻辑 `skill_id`，而不是配置缓存表的 UUID 主键，避免把缓存层误当主数据。
 
-**Template（模板）**
+**templates（Template，模板）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -135,7 +146,7 @@ Agent (智能体)
 | is_builtin | BOOLEAN | 是否内置模板 |
 | created_at | TIMESTAMP | 创建时间 |
 
-**TemplateNode（模板节点）**
+**template_nodes（TemplateNode，模板节点）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -157,7 +168,7 @@ Agent (智能体)
 
 ### 工作流表
 
-**WorkflowExecution（工作流执行）**
+**workflow_executions（WorkflowExecution，工作流执行）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -203,7 +214,7 @@ Agent (智能体)
 > }
 > ```
 
-**NodeExecution（节点执行）**
+**node_executions（NodeExecution，节点执行）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -226,7 +237,7 @@ Agent (智能体)
 >
 > `sequence` 是物理执行序号，不等同于业务上的 `chapter_number`。章节循环的逻辑身份由 `chapter_tasks.chapter_number` 与 `node_executions.input.chapter_task_id / chapter_number` 共同标识；同一章节的重试或手动重跑会创建新的 `NodeExecution` 并分配新的 `sequence`。
 
-**Artifact（产物）**
+**artifacts（Artifact，产物）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -240,7 +251,7 @@ Agent (智能体)
 
 > `Artifact` 用于执行过程产物追踪，不作为正文真值源。正式的 `outline / opening_plan / chapter` 内容必须落在 `Content + content_versions`；`Artifact` 对这类产物只保留 `content_version_id` 引用或辅助负载。
 
-**ReviewAction（审核动作）**
+**review_actions（ReviewAction，审核动作）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -269,7 +280,7 @@ Agent (智能体)
 > - 模型选择与参数在 Skill/Workflow/Node 配置中声明
 > - 模型凭证在业务表 `model_credentials` 中加密存储（不走 YAML，不属于配置缓存表）
 
-**Skill（技能）**
+**skills（Skill，技能）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -280,7 +291,7 @@ Agent (智能体)
 | config | JSONB | 完整配置快照 |
 | file_path | VARCHAR(255) | 对应 YAML 文件路径 |
 
-**Hook（钩子）**
+**hooks（Hook，钩子）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -291,7 +302,7 @@ Agent (智能体)
 | action_config | JSONB | 动作配置 |
 | file_path | VARCHAR(255) | 对应 YAML 文件路径 |
 
-**Agent（智能体）**
+**agents（Agent，智能体）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -306,7 +317,7 @@ Agent (智能体)
 
 ### 导出表
 
-**Export（导出记录）**
+**exports（Export，导出记录）**
 
 | 字段 | 类型 | 说明 |
 |-----|------|----- |
@@ -328,11 +339,33 @@ Agent (智能体)
 ### 核心查询索引
 
 ```sql
--- Content 表索引
-CREATE INDEX idx_content_project_id ON Content(project_id);
-CREATE INDEX idx_content_type_status ON Content(content_type, status);
-CREATE INDEX idx_content_parent_id ON Content(parent_id);
-CREATE INDEX idx_content_order_index ON Content(order_index);
+-- contents 表索引与约束
+CREATE INDEX idx_contents_project_id ON contents(project_id);
+CREATE INDEX idx_contents_type_status ON contents(content_type, status);
+CREATE INDEX idx_contents_parent_id ON contents(parent_id);
+CREATE INDEX idx_contents_order_index ON contents(order_index);
+ALTER TABLE contents
+ADD CONSTRAINT ck_contents_chapter_number_by_type
+CHECK (
+  (
+    content_type = 'chapter'
+    AND chapter_number IS NOT NULL
+    AND chapter_number > 0
+  )
+  OR (
+    content_type IN ('outline', 'opening_plan')
+    AND chapter_number IS NULL
+  )
+);
+CREATE UNIQUE INDEX uq_contents_project_outline
+ON contents(project_id)
+WHERE content_type = 'outline';
+CREATE UNIQUE INDEX uq_contents_project_opening_plan
+ON contents(project_id)
+WHERE content_type = 'opening_plan';
+CREATE UNIQUE INDEX uq_contents_project_chapter_number
+ON contents(project_id, chapter_number)
+WHERE content_type = 'chapter';
 
 -- content_versions 表索引
 CREATE INDEX idx_content_versions_content_id ON content_versions(content_id);
@@ -342,38 +375,43 @@ UNIQUE (content_id, version_number);
 CREATE UNIQUE INDEX uq_content_versions_current_true ON content_versions(content_id) WHERE is_current = TRUE;
 CREATE UNIQUE INDEX uq_content_versions_best_true ON content_versions(content_id) WHERE is_best = TRUE;
 
--- Analysis 表索引
-CREATE INDEX idx_analysis_project_id ON Analysis(project_id);
-CREATE INDEX idx_analysis_content_id ON Analysis(content_id);
-CREATE INDEX idx_analysis_type ON Analysis(analysis_type);
+-- analyses 表索引
+CREATE INDEX idx_analyses_project_id ON analyses(project_id);
+CREATE INDEX idx_analyses_content_id ON analyses(content_id);
+CREATE INDEX idx_analyses_type ON analyses(analysis_type);
 
--- WorkflowExecution 表索引
-CREATE INDEX idx_workflow_execution_project_id ON WorkflowExecution(project_id);
-CREATE INDEX idx_workflow_execution_status ON WorkflowExecution(status);
+-- workflow_executions 表索引
+CREATE INDEX idx_workflow_executions_project_id ON workflow_executions(project_id);
+CREATE INDEX idx_workflow_executions_status ON workflow_executions(status);
 CREATE UNIQUE INDEX uq_workflow_execution_active_project
 ON workflow_executions(project_id)
 WHERE status IN ('created', 'running', 'paused');
 
--- NodeExecution 表索引
-CREATE INDEX idx_node_execution_workflow_id ON NodeExecution(workflow_execution_id);
-CREATE INDEX idx_node_execution_status ON NodeExecution(status);
+-- node_executions 表索引
+CREATE INDEX idx_node_executions_workflow_id ON node_executions(workflow_execution_id);
+CREATE INDEX idx_node_executions_status ON node_executions(status);
 ALTER TABLE node_executions
 ADD CONSTRAINT uq_node_execution_unique
 UNIQUE (workflow_execution_id, node_id, sequence);
 
--- Artifact 表索引
-CREATE INDEX idx_artifact_node_execution_id ON Artifact(node_execution_id);
+-- artifacts 表索引
+CREATE INDEX idx_artifacts_node_execution_id ON artifacts(node_execution_id);
 
--- ReviewAction 表索引
-CREATE INDEX idx_review_action_node_execution_id ON ReviewAction(node_execution_id);
+-- review_actions 表索引
+CREATE INDEX idx_review_actions_node_execution_id ON review_actions(node_execution_id);
 
--- Export 表索引
-CREATE INDEX idx_export_project_id ON Export(project_id);
+-- token_usages 表索引
+CREATE INDEX idx_token_usages_project_usage_type_created_at
+ON token_usages(project_id, usage_type, created_at);
+CREATE INDEX idx_token_usages_node_execution_id ON token_usages(node_execution_id);
+
+-- exports 表索引
+CREATE INDEX idx_exports_project_id ON exports(project_id);
 
 -- 时间范围查询索引
-CREATE INDEX idx_content_created_at ON Content(created_at);
-CREATE INDEX idx_workflow_execution_started_at ON WorkflowExecution(started_at);
-CREATE INDEX idx_analysis_created_at ON Analysis(created_at);
+CREATE INDEX idx_contents_created_at ON contents(created_at);
+CREATE INDEX idx_workflow_executions_started_at ON workflow_executions(started_at);
+CREATE INDEX idx_analyses_created_at ON analyses(created_at);
 
 -- chapter_tasks 唯一约束
 ALTER TABLE chapter_tasks
@@ -471,11 +509,14 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | project_id | UUID | 项目 ID（FK → projects.id） |
 | node_execution_id | UUID | 节点执行 ID（可选，FK → node_executions.id） |
 | credential_id | UUID | 凭证 ID（FK → model_credentials.id） |
+| usage_type | VARCHAR(20) | 用途类型：generate/review/fix/analysis/dry_run |
 | model_name | VARCHAR(100) | 模型名称 |
 | input_tokens | INTEGER | 输入 token 数 |
 | output_tokens | INTEGER | 输出 token 数 |
 | estimated_cost | NUMERIC(12, 6) | 估算费用（美元，精确数值） |
 | created_at | TIMESTAMP | 创建时间 |
+
+> `usage_type` 是统计与预算分析的强制分组维度，不能仅依赖 `node_execution_id` 或 `node_type` 反推；例如 `dry_run` 场景天然没有 `node_execution_id`。
 
 ### execution_logs（工作流执行日志）
 
@@ -578,7 +619,7 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 
 | 表 | 变更 |
 |----|------|
-| `projects` | 新增 `owner_id` (FK → users)、`deleted_at` |
+| `projects` | 新增 `owner_id` (FK → users)、`deleted_at`、`allow_system_credential_pool` |
 
 ---
 
