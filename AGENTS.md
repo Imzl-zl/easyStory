@@ -1,5 +1,13 @@
 # easyStory AGENTS
 
+## 0. 实施基线
+
+- 环境：Windows 11
+- Python：3.13
+- 后端技术栈：FastAPI、SQLAlchemy 2、Pydantic 2
+- 配置根目录：`config/`
+- 后端标准验证命令：`cd apps/api && ruff check app tests && pytest -q`
+
 ## 1. 作用
 
 - 本文件是项目级**硬规则**，只保留需要长期约束实现结构的内容。
@@ -68,23 +76,27 @@
 
 ```text
 apps/api/app/
+  entry/
   shared/
+    db/
   modules/
+    model_registry.py
     <module>/
+      entry/
+      models/
+      service/
+      engine/
+      infrastructure/
+      schemas/
 ```
 
-当前仓库仍处于过渡态，允许存在：
+必须遵守：
 
-- `apps/api/app/core`
-- `apps/api/app/models`
-- `apps/api/app/schemas`
-- `apps/api/app/services`
-
-但必须遵守：
-
-- 新增中大型业务代码，优先落到 `apps/api/app/modules/<module>/`
-- 不允许继续扩大“全局扁平目录”承载复杂业务
-- 修改旧扁平文件时，必须明确其业务归属，并朝模块化结构收敛
+- ORM 基类统一放在 `apps/api/app/shared/db/base.py`
+- ORM 模型统一放在 `apps/api/app/modules/<module>/models/`
+- `apps/api/app/modules/model_registry.py` 只负责 ORM 注册，不承载业务逻辑
+- 不再保留根级 `apps/api/app/models` 作为聚合层或兼容层
+- 不允许继续把业务代码放回根级 `service / engine / infrastructure / schemas`
 
 ## 6. 分层依赖规则
 
@@ -179,4 +191,6 @@ infrastructure -> domain models
 
 - 本文件必须保持**短、小、硬**。
 - 适合放进每次会话读取的只有规则，不是大段说明。
+- 项目记忆、排障过程、阶段性经验，不进入本文件，统一沉淀到 `docs/`。
+- 当本文件接近 200 行时，优先删除重复规则，并把解释性内容迁回 `docs/specs`、`docs/design`、`docs/plans`。
 - 发现本文件过长或承载了应放入 `docs/` 的内容时，应主动压缩。

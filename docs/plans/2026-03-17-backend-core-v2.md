@@ -1,5 +1,7 @@
 # easyStory 后端核心实施计划 V2.1.1
 
+> 历史说明：本计划保留实施上下文，但其中部分目录路径示例仍停留在 2026-03-19 最终模块化收口之前。当前实现真值以 `docs/specs/architecture.md`、`AGENTS.md` 与实际代码目录 `apps/api/app/{entry,modules,shared}` 为准。
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** 实现 easyStory 的完整后端核心，包含数据模型、配置系统、工作流引擎、上下文注入、审核精修、成本控制和 API 层，完全对齐设计文档。

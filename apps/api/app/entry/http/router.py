@@ -1,8 +1,6 @@
 from fastapi import APIRouter
 
+from app.modules.system.entry.http.router import router as system_router
+
 api_router = APIRouter()
-
-
-@api_router.get("/healthz", tags=["system"])
-def healthcheck() -> dict[str, str]:
-    return {"status": "ok"}
+api_router.include_router(system_router)

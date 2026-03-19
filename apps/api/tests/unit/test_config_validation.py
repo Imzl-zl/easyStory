@@ -3,8 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from app.infrastructure.config_loader import ConfigLoader, ConfigurationError
-from app.schemas.config_schemas import HookConfig, SkillConfig
+from app.modules.config_registry.infrastructure.config_loader import (
+    ConfigLoader,
+    ConfigurationError,
+)
+from app.modules.config_registry.schemas.config_schemas import HookConfig, SkillConfig
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]

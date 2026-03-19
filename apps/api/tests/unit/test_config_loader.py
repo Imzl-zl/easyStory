@@ -4,8 +4,15 @@ import uuid
 
 import pytest
 
-from app.infrastructure.config_loader import ConfigLoader, ConfigurationError
-from app.schemas.config_schemas import AgentConfig, SkillConfig, WorkflowConfig
+from app.modules.config_registry.infrastructure.config_loader import (
+    ConfigLoader,
+    ConfigurationError,
+)
+from app.modules.config_registry.schemas.config_schemas import (
+    AgentConfig,
+    SkillConfig,
+    WorkflowConfig,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
