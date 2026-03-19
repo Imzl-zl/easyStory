@@ -6,7 +6,7 @@
 
 **Architecture:** 分层架构（Entry → Service → Engine → Infrastructure），Service 层不依赖 HTTP（DTO 入参/返回），为 MCP 预留接入点。工作流通过 WorkflowStateMachine 管理状态转换，模板渲染使用 SandboxedEnvironment，LLM 调用通过 LiteLLM 统一接口。
 
-**Tech Stack:** Python 3.12+, FastAPI 0.115+, SQLAlchemy 2.0 (async), Pydantic 2.x, LangGraph 0.2.70+, LiteLLM 1.82+, Jinja2 (Sandboxed), PyYAML, aiosqlite (dev) / asyncpg (prod)
+**Tech Stack:** Python 3.13.x, FastAPI 0.115+, SQLAlchemy 2.0 (async), Pydantic 2.x, LangGraph 1.x, LiteLLM 1.x, Jinja2 (Sandboxed), PyYAML, aiosqlite (dev) / asyncpg (prod)
 
 **Source of Truth:** `docs/specs/` 和 `docs/design/` 目录下的设计文档。与本计划有冲突时，以设计文档为准。本版已吸收 2026-03-19 的设计边界对齐决策。
 
