@@ -49,9 +49,11 @@ Agent (智能体)
 | template_id | UUID | 模板 ID |
 | owner_id | UUID | 所属用户 ID（FK → users.id） |
 | deleted_at | TIMESTAMP | 软删除时间（回收站） |
-| config | JSONB | 项目级配置 |
+| project_setting | JSONB | 项目设定（ProjectSetting，长期约束唯一真值源） |
 | created_at | TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | 更新时间 |
+
+> `project_setting` 在 MVP 中直接承载结构化 `ProjectSetting` 文档，不作为运行态杂项配置大杂烩。运行时快照、模板配置和节点临时参数应分别进入 `workflow_snapshot`、`Template.config`、`NodeExecution.input/output` 等边界明确的位置。
 
 **Content（内容）**
 
@@ -96,6 +98,11 @@ Agent (智能体)
 > 字段说明：
 > - `created_by`：记录"谁做的"操作者身份（system/user/ai_assist/auto_fix/ai_partial）
 > - `change_source`：记录"变更动因"（user_edit/ai_generate/ai_fix/import），两个字段职责互补，不冗余
+>
+> 硬约束：
+> - `UNIQUE (content_id, version_number)`
+> - 同一 `content_id` 最多一条 `is_current=true`
+> - 同一 `content_id` 最多一条 `is_best=true`
 
 **Analysis（分析结果）**
 
@@ -105,12 +112,16 @@ Agent (智能体)
 | project_id | UUID | 项目 ID |
 | content_id | UUID | 内容 ID（可选，分析特定内容时使用） |
 | analysis_type | VARCHAR(50) | 分析类型：plot/character/style/pacing/structure |
+| source_title | VARCHAR(255) | 来源标题快照（可选） |
+| analysis_scope | JSONB | 分析范围快照（章节范围/采样策略/采样结果） |
 | result | JSONB | 分析结果（结构化数据） |
 | suggestions | JSONB | 改进建议 |
-| generated_skill_id | UUID | 自动生成的 Skill ID（可选） |
+| generated_skill_key | VARCHAR(100) | 自动生成的 Skill 逻辑 ID（可选，对应 `skills.skill_id`） |
 | created_at | TIMESTAMP | 创建时间 |
 
-> 支持"小说分析功能"和"分析自动生成 Skill"核心需求。
+> 支持"小说分析功能"和"分析自动生成 Skill"核心需求。`source_title` 与 `analysis_scope` 用于保留最小可追溯输入快照，避免原始文件按保留策略清理后无法解释分析结果来源。
+>
+> 若分析结果落地为 Skill，业务记录应引用配置层的逻辑 `skill_id`，而不是配置缓存表的 UUID 主键，避免把缓存层误当主数据。
 
 **Template（模板）**
 
@@ -120,7 +131,7 @@ Agent (智能体)
 | name | VARCHAR(255) | 模板名称 |
 | description | TEXT | 描述 |
 | genre | VARCHAR(100) | 适用题材 |
-| config | JSONB | 模板配置 |
+| config | JSONB | 模板级默认配置（仅静态默认值） |
 | is_builtin | BOOLEAN | 是否内置模板 |
 | created_at | TIMESTAMP | 创建时间 |
 
@@ -133,10 +144,14 @@ Agent (智能体)
 | node_order | INTEGER | 节点顺序 |
 | node_type | VARCHAR(50) | 类型：generate/review/export |
 | skill_id | VARCHAR(100) | 技能 ID |
-| config | JSONB | 节点配置 |
+| config | JSONB | 节点静态默认配置（与 workflow node shape 对齐） |
 | position_x | INTEGER | 节点 X 坐标（工作流可视化用） |
 | position_y | INTEGER | 节点 Y 坐标（工作流可视化用） |
-| ui_config | JSONB | UI 配置（颜色、图标等） |
+| ui_config | JSONB | UI 展示配置（颜色、图标等） |
+
+> `Template.config` 只保存模板级默认值，例如推荐 workflow、引导问题、默认导出参数；不得写入项目私有数据、运行时状态或执行快照。
+>
+> `TemplateNode.config` 只保存节点静态默认配置；用户在项目内的修改应进入项目上下文或 `workflow_snapshot`，不回写模板。
 
 ---
 
@@ -150,9 +165,9 @@ Agent (智能体)
 | project_id | UUID | 项目 ID |
 | template_id | UUID | 模板 ID |
 | status | VARCHAR(50) | 状态：created/running/paused/completed/failed/cancelled |
-| current_node | INTEGER | 当前节点序号 |
+| current_node_id | VARCHAR(200) | 当前节点 ID（来自 workflow 配置） |
 | pause_reason | VARCHAR(50) | 暂停原因：user_request/user_interrupted/budget_exceeded/review_failed/error/loop_pause/max_chapters_reached |
-| resume_from_node | VARCHAR(200) | 恢复时从哪个节点继续 |
+| resume_from_node | VARCHAR(200) | 恢复时从哪个节点 ID 继续 |
 | snapshot | JSONB | 暂停时的运行时快照（最小 Schema 见下） |
 | workflow_snapshot | JSONB | 启动时工作流配置快照（不可变） |
 | skills_snapshot | JSONB | 启动时 Skills 配置快照（不可变） |
@@ -161,6 +176,10 @@ Agent (智能体)
 | completed_at | TIMESTAMP | 完成时间 |
 
 > `snapshot` 存放在 `workflow_executions.snapshot` 字段中，用于恢复执行；它是运行时快照，不同于启动时不可变的 `workflow_snapshot / skills_snapshot / agents_snapshot`。
+>
+> `current_node_id` 与 `resume_from_node` 均使用 workflow 中定义的 `node_id` 字符串，不再混用“节点序号”和“节点 ID”两套口径；展示顺序由 workflow 节点顺序或 `NodeExecution.node_order` 决定。
+>
+> 业务不变量：同一 `project_id` 同时最多只允许一个 active `WorkflowExecution`（`created` / `running` / `paused`），该约束应落成库级部分唯一索引，服务层只作为补充保护。
 >
 > 最小建议 Schema：
 > ```json
@@ -213,10 +232,13 @@ Agent (智能体)
 |-----|------|----- |
 | id | UUID | 主键 |
 | node_execution_id | UUID | 节点执行 ID |
-| artifact_type | VARCHAR(50) | 类型：outline/opening_plan/chapter/review_report 等 |
-| content | TEXT | 内容 |
-| word_count | INTEGER | 字数 |
+| artifact_type | VARCHAR(50) | 类型：content_version_ref/review_report/context_report/prompt_bundle 等 |
+| content_version_id | UUID | 关联内容版本 ID（正式正文/大纲/OpeningPlan 产物时使用，可选，FK → content_versions.id） |
+| payload | JSONB | 产物负载（结构化报告、引用信息、轻量文本片段） |
+| word_count | INTEGER | 文本型产物字数快照（可选） |
 | created_at | TIMESTAMP | 创建时间 |
+
+> `Artifact` 用于执行过程产物追踪，不作为正文真值源。正式的 `outline / opening_plan / chapter` 内容必须落在 `Content + content_versions`；`Artifact` 对这类产物只保留 `content_version_id` 引用或辅助负载。
 
 **ReviewAction（审核动作）**
 
@@ -225,10 +247,17 @@ Agent (智能体)
 | id | UUID | 主键 |
 | node_execution_id | UUID | 节点执行 ID |
 | agent_id | VARCHAR(100) | Agent ID（来自配置，非数据库外键） |
+| reviewer_name | VARCHAR(255) | Reviewer 显示名称 |
 | review_type | VARCHAR(100) | 审核类型（自由字符串，与 Agent 定义一致） |
-| result | VARCHAR(50) | 结果：passed/failed |
-| issues | JSONB | 问题列表 |
+| status | VARCHAR(50) | 结果：passed/failed/warning |
+| score | NUMERIC(5, 2) | 评分（0-100，可选） |
+| summary | TEXT | 审核摘要 |
+| issues | JSONB | `ReviewIssue[]` 结构化问题列表 |
+| execution_time_ms | INTEGER | 审核耗时（毫秒） |
+| tokens_used | INTEGER | 消耗 token 数 |
 | created_at | TIMESTAMP | 创建时间 |
+
+> `ReviewAction` 存储的是“单个 reviewer 的结构化审核结果”，字段应与 `ReviewResult` 对齐；聚合结果由运行时聚合器产生，可落在 `NodeExecution.output` 或独立响应 DTO 中。
 
 ---
 
@@ -283,7 +312,7 @@ Agent (智能体)
 |-----|------|----- |
 | id | UUID | 主键 |
 | project_id | UUID | 项目 ID |
-| format | VARCHAR(20) | 格式：txt/markdown/docx/pdf |
+| format | VARCHAR(20) | 格式：txt/markdown/docx（pdf 延后，不进入 MVP 枚举） |
 | filename | VARCHAR(255) | 文件名 |
 | file_path | VARCHAR(500) | 文件路径（相对于导出目录） |
 | file_size | INTEGER | 文件大小（字节） |
@@ -294,7 +323,7 @@ Agent (智能体)
 
 ---
 
-## 3. 索引设计
+## 3. 索引与唯一约束
 
 ### 核心查询索引
 
@@ -307,7 +336,11 @@ CREATE INDEX idx_content_order_index ON Content(order_index);
 
 -- content_versions 表索引
 CREATE INDEX idx_content_versions_content_id ON content_versions(content_id);
-CREATE INDEX idx_content_versions_content_version ON content_versions(content_id, version_number);
+ALTER TABLE content_versions
+ADD CONSTRAINT uq_content_versions_version_number
+UNIQUE (content_id, version_number);
+CREATE UNIQUE INDEX uq_content_versions_current_true ON content_versions(content_id) WHERE is_current = TRUE;
+CREATE UNIQUE INDEX uq_content_versions_best_true ON content_versions(content_id) WHERE is_best = TRUE;
 
 -- Analysis 表索引
 CREATE INDEX idx_analysis_project_id ON Analysis(project_id);
@@ -317,11 +350,16 @@ CREATE INDEX idx_analysis_type ON Analysis(analysis_type);
 -- WorkflowExecution 表索引
 CREATE INDEX idx_workflow_execution_project_id ON WorkflowExecution(project_id);
 CREATE INDEX idx_workflow_execution_status ON WorkflowExecution(status);
+CREATE UNIQUE INDEX uq_workflow_execution_active_project
+ON workflow_executions(project_id)
+WHERE status IN ('created', 'running', 'paused');
 
 -- NodeExecution 表索引
 CREATE INDEX idx_node_execution_workflow_id ON NodeExecution(workflow_execution_id);
-CREATE INDEX idx_node_execution_workflow_node ON NodeExecution(workflow_execution_id, node_id, sequence);
 CREATE INDEX idx_node_execution_status ON NodeExecution(status);
+ALTER TABLE node_executions
+ADD CONSTRAINT uq_node_execution_unique
+UNIQUE (workflow_execution_id, node_id, sequence);
 
 -- Artifact 表索引
 CREATE INDEX idx_artifact_node_execution_id ON Artifact(node_execution_id);
@@ -336,7 +374,14 @@ CREATE INDEX idx_export_project_id ON Export(project_id);
 CREATE INDEX idx_content_created_at ON Content(created_at);
 CREATE INDEX idx_workflow_execution_started_at ON WorkflowExecution(started_at);
 CREATE INDEX idx_analysis_created_at ON Analysis(created_at);
+
+-- chapter_tasks 唯一约束
+ALTER TABLE chapter_tasks
+ADD CONSTRAINT uq_chapter_task_plan
+UNIQUE (workflow_execution_id, chapter_number);
 ```
+
+> PostgreSQL 16.x 生产环境应按以上 SQL 落成硬约束；SQLite 开发环境需要保持等价唯一性约束，禁止在实现层只靠业务代码“约定保证”。
 
 ---
 
@@ -357,7 +402,7 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 
 **review_type 为自由字符串**：`ReviewAction.review_type` 不使用枚举，保持与用户自定义 Agent 配置的一致性。
 
-**内容正文与元信息分离**：`Content` 表只记录元信息（类型、标题、章节号、状态等），正文内容全部存储在 `content_versions` 表中。查询当前正文时通过 `content_versions.is_current=true` 获取。这保证了版本管理的单一职责，避免了 Content 和 ContentVersion 正文不一致的风险。
+**内容正文与元信息分离**：`Content` 表只记录元信息（类型、标题、章节号、状态等），正文内容全部存储在 `content_versions` 表中。查询当前正文时通过 `content_versions.is_current=true` 获取；并通过部分唯一索引确保同一 `Content` 只有一个 current 版本、最多一个 best 版本。这保证了版本管理的单一职责，避免了 Content 和 ContentVersion 正文不一致的风险。
 
 **全量版本快照**：v0.1 `content_versions` 表存全量内容，实现简单，后续视存储压力决定是否迁移为增量差异。
 
@@ -429,7 +474,7 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | model_name | VARCHAR(100) | 模型名称 |
 | input_tokens | INTEGER | 输入 token 数 |
 | output_tokens | INTEGER | 输出 token 数 |
-| estimated_cost | FLOAT | 估算费用（美元） |
+| estimated_cost | NUMERIC(12, 6) | 估算费用（美元，精确数值） |
 | created_at | TIMESTAMP | 创建时间 |
 
 ### execution_logs（工作流执行日志）
@@ -488,14 +533,14 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | chapter_number | INTEGER | 章节号 |
 | title | VARCHAR(255) | 章节标题 |
 | brief | TEXT | 章节摘要/任务描述 |
-| key_characters | JSONB | 关键角色列表 |
-| key_events | JSONB | 关键事件列表 |
+| key_characters | JSONB | 关键角色列表（JSON 数组，`string[]`） |
+| key_events | JSONB | 关键事件列表（JSON 数组，`string[]`） |
 | status | VARCHAR(50) | 状态：pending/generating/interrupted/completed/failed/skipped |
 | content_id | UUID | 关联生成的内容 ID（可选，FK → content.id） |
 | created_at | TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | 更新时间 |
 
-> 约束：唯一约束为 `UNIQUE (workflow_execution_id, chapter_number)`。`interrupted` 为非终态，表示用户在生成过程中主动停止，等待后续恢复或改写决策。
+> 硬约束：`UNIQUE (workflow_execution_id, chapter_number)`。`interrupted` 为非终态，表示用户在生成过程中主动停止，等待后续恢复或改写决策。
 
 ### story_facts（Story Bible 事实库）
 

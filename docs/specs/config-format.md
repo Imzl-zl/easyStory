@@ -5,6 +5,7 @@
 | 文档类型 | 技术规范 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-14 |
+| 更新时间 | 2026-03-19 |
 | 关联文档 | [系统架构设计](./architecture.md)、[数据库设计](./database-design.md) |
 
 ---
@@ -18,6 +19,8 @@
 /config/                           # 配置根目录（Git 管理）
 ├── skills/                        # Skills 配置
 │   ├── outline/                   # 大纲类
+│   │   └── *.yaml
+│   ├── opening_plan/              # 开篇设计类
 │   │   └── *.yaml
 │   ├── chapter/                   # 章节类
 │   │   └── *.yaml
@@ -227,6 +230,7 @@ skill:
 | 分类 | 说明 | ID 前缀示例 |
 |-----|------|------------|
 | `outline` | 大纲生成 | `skill.outline.*` |
+| `opening_plan` | 开篇设计生成 | `skill.opening_plan.*` |
 | `chapter` | 章节生成 | `skill.chapter.*` |
 | `character` | 人物设定 | `skill.character.*` |
 | `world_setting` | 世界观设定 | `skill.world_setting.*` |
@@ -441,21 +445,25 @@ workflow:
       - model: "claude-sonnet-4-20250514"
       - model: "gpt-4o"
       - model: "deepseek-v3"
-    on_all_fail: "pause"              # 全部失败后的动作：pause / fail / skip
+    on_all_fail: "pause"              # 全部失败后的动作：pause / fail
   
   context_injection:                  # 可选，上下文注入规则
     enabled: true
     rules:
       - node_pattern: "chapter_*"     # 匹配章节节点（支持通配符）
         inject:
-          - type: "outline"           # 注入类型
+          - type: "project_setting"   # 长期约束
+            required: true
+          - type: "outline"           # 主线约束
             required: true            # 是否必填
-          - type: "chapter_list"
+          - type: "opening_plan"      # 前 1-3 章通常高优先级注入，后续章节按需降级
+            required: false
+          - type: "chapter_task"      # 当前章节任务（ChapterTask）
             required: true
           - type: "previous_chapters"
             count: 2                  # 前 2 章
-            required: true
-          - type: "character_profile"
+            required: false
+          - type: "story_bible"
             required: false
   
   nodes:                              # 必填，节点列表
@@ -488,25 +496,31 @@ workflow:
         rewrite_threshold: 6          # 问题 > 6 → 整篇重写
       on_fix_fail: "pause"            # 精修失败后动作：pause/skip/fail
 
-    - id: "chapter_plan"
-      name: "规划章节"
+    - id: "opening_plan"
+      name: "生成开篇设计"
       type: "generate"
-      skill: "skill.chapter_plan"
+      skill: "skill.opening_plan.xuanhuan"
       depends_on: ["outline"]         # 依赖的节点
 
       auto_review: true
       reviewers:
         - "agent.consistency_checker"
 
+    - id: "chapter_split"
+      name: "拆分章节任务"
+      type: "generate"
+      skill: "skill.chapter_split"
+      depends_on: ["outline", "opening_plan"]
+
     - id: "chapter_gen"
       name: "生成章节"
       type: "generate"
       skill: "skill.chapter.xuanhuan"
-      depends_on: ["chapter_plan"]
+      depends_on: ["chapter_split"]
 
       loop:                           # 循环配置
         enabled: true
-        count_from: "chapter_plan"    # 从章节规划获取数量
+        count_from: "chapter_split"   # 从章节任务拆分结果获取数量
         item_var: "chapter_index"     # 循环变量名
         pause:                        # 可选：循环内暂停策略（用于“自动 + 每 N 章人工检查”等混合体验）
           strategy: "every_n"         # none / every / every_n
@@ -535,9 +549,12 @@ workflow:
       depends_on: ["chapter_gen"]
       
       formats:
+        - "txt"
         - "markdown"
-        - "docx"
+        # - "docx"                   # 建议简化预留；PDF 延后，不进入 MVP 枚举
 ```
+
+> 导出格式口径：MVP 必须支持 `txt`、`markdown`；`docx` 为建议简化预留；`pdf` 延后。
 
 **字段说明**：
 
@@ -550,11 +567,11 @@ workflow:
 | `budget` | object | ❌ | Token 预算配置（详见 [08-cost-and-safety](../design/08-cost-and-safety.md)） |
 | `safety` | object | ❌ | 执行安全阀配置（详见 [08-cost-and-safety](../design/08-cost-and-safety.md)） |
 | `retry` | object | ❌ | 重试策略 |
-| `model_fallback` | object | ❌ | 模型降级策略 |
+| `model_fallback` | object | ❌ | 显式启用的模型切换策略（默认关闭） |
 | `context_injection` | object | ❌ | 上下文注入规则 |
 | `nodes` | array | ✅ | 节点列表 |
 
-> 运行时执行 `model_fallback` 前，系统会先按当前 Skill / Agent / Node 的 `model.required_capabilities` 过滤不兼容的备选模型。
+> 运行时只有在 `model_fallback.enabled=true` 时才会执行模型切换；执行前会先按当前 Skill / Agent / Node 的 `model.required_capabilities` 过滤不兼容的备选模型。
 
 **节点类型说明**：
 
@@ -571,6 +588,7 @@ workflow:
 |-----|------|------|
 | `project_setting` | 项目设定（结构化设定文档） | - |
 | `outline` | 大纲 | - |
+| `opening_plan` | 开篇设计（前 1-3 章的阶段约束） | - |
 | `chapter_list` | 章节目录 | - |
 | `chapter_task` | 当前章节任务（来自 ChapterTask） | - |
 | `previous_chapters` | 前 N 章 | `count` |
@@ -607,7 +625,7 @@ model:
 - `streaming`：支持流式输出
 - `tool_calling`：支持工具调用
 
-> 当工作流配置了 `model_fallback.chain` 时，运行时会先过滤不满足 `required_capabilities` 的模型，再按降级链顺序尝试。
+> 当工作流显式配置并启用了 `model_fallback.chain` 时，运行时会先过滤不满足 `required_capabilities` 的模型，再按切换链顺序尝试；所有候选失败后只允许 `pause/fail`，不允许自动跳过关键节点。
 
 ### 7.2 选择优先级（高 → 低）
 
@@ -615,7 +633,7 @@ model:
 节点级 model > Skill 级 model > 工作流级 model > 项目级默认 model > 全局默认 model
 ```
 
-> `provider` 用于选择凭证（项目级 > 用户级 > 系统级），`name` 用于选择具体模型。
+> `provider` 用于选择凭证（项目级 > 用户级 > 系统级默认凭证池[仅显式允许]），`name` 用于选择具体模型。
 
 ---
 

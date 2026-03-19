@@ -53,7 +53,7 @@
 | 每章成本 | 总费用 / 已完成章节数 | TokenUsage + ModelPricing |
 | 平均每章耗时 | AVG(execution_time) | NodeExecution |
 | 上下文裁剪率 | 被裁剪 section 数 / 构建总次数 | ContextReport |
-| 模型降级触发率 | fallback 次数 / 模型调用总次数 | ExecutionLog + TokenUsage |
+| 显式模型切换率 | `model_fallback` 实际触发次数 / 模型调用总次数 | ExecutionLog + TokenUsage |
 | stale 章节数 | 当前被标记 stale 的章节数 | Content / stale 标记 |
 | partial 转正率 | `ai_partial` 最终进入正式版本的比例 | ContentVersion |
 

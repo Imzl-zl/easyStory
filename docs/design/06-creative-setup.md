@@ -210,7 +210,7 @@ template:
       - id: "chapter_split"
         name: "拆分章节任务"
         skill: "skill.chapter_split"
-        depends_on: ["opening_plan"]
+        depends_on: ["outline", "opening_plan"]
       - id: "chapter_gen"
         name: "生成章节"
         skill: "skill.chapter.xuanhuan"

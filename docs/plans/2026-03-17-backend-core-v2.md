@@ -243,6 +243,7 @@ async def test_user_creation(db):
 **Files:**
 - Rewrite: `apps/api/app/models/project.py`
 - Rewrite: `apps/api/app/models/content.py`
+- Create: `apps/api/app/models/analysis.py`
 - Update: `apps/api/app/models/__init__.py`
 - Update: `apps/api/tests/unit/test_models.py`
 
@@ -253,6 +254,7 @@ async def test_user_creation(db):
 - ContentVersion 有 `change_source`、`context_snapshot_hash`、`is_current`、`is_best`（05-content-editor；同一 Content 最多一个 best）
 - MVP 的 `Content.content_type` 以 `outline/opening_plan/chapter` 为主；`character_profile/world_setting` 作为 `ProjectSetting` 投影参与上下文，不再落独立主数据
 - `Outline` 与 `OpeningPlan` 复用 `Content + ContentVersion` 版本体系，不新增独立主表
+- `Analysis` 需保留 `source_title`、`analysis_scope`、`result`、`suggestions`、`generated_skill_key`，保证原始文本清理后仍可追溯分析输入边界
 
 **Implementation: project.py**
 
@@ -277,7 +279,7 @@ class Project(Base, TimestampMixin, UUIDMixin, SoftDeleteMixin):
     status: Mapped[str] = mapped_column(String(50), default="draft")
     template_id: Mapped[uuid.UUID | None] = mapped_column()
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    config: Mapped[dict | None] = mapped_column(JSON)
+    project_setting: Mapped[dict | None] = mapped_column(JSON)
 
     owner: Mapped["User"] = relationship(back_populates="projects")
     contents: Mapped[list["Content"]] = relationship(
@@ -339,6 +341,32 @@ class ContentVersion(Base, TimestampMixin, UUIDMixin):
     content_ref: Mapped["Content"] = relationship(back_populates="versions")
 ```
 
+**Implementation: analysis.py**
+
+```python
+# apps/api/app/models/analysis.py
+import uuid
+
+from sqlalchemy import ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import JSON
+
+from .base import Base, TimestampMixin, UUIDMixin
+
+
+class Analysis(Base, TimestampMixin, UUIDMixin):
+    __tablename__ = "analysis"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
+    content_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("contents.id"))
+    analysis_type: Mapped[str] = mapped_column(String(50))
+    source_title: Mapped[str | None] = mapped_column(String(255))
+    analysis_scope: Mapped[dict | None] = mapped_column(JSON)
+    result: Mapped[dict] = mapped_column(JSON)
+    suggestions: Mapped[dict | None] = mapped_column(JSON)
+    generated_skill_key: Mapped[str | None] = mapped_column(String(100))
+```
+
 **Tests:**
 
 ```python
@@ -372,6 +400,27 @@ def test_content_version_with_change_source(db):
     db.commit()
     assert v1.change_source == "ai_generate"
     assert v1.is_current is True
+
+def test_analysis_keeps_scope_snapshot(db):
+    user = User(username="u2", hashed_password="x")
+    db.add(user)
+    db.commit()
+    project = Project(name="p2", owner_id=user.id)
+    db.add(project)
+    db.commit()
+    analysis = Analysis(
+        project_id=project.id,
+        analysis_type="style",
+        source_title="样例小说",
+        analysis_scope={"mode": "chapter_range", "chapters": [1, 2, 3]},
+        result={"tone": "fast"},
+        suggestions={"keep": ["短句"]},
+        generated_skill_key="skill.style.sample",
+    )
+    db.add(analysis)
+    db.commit()
+    assert analysis.source_title == "样例小说"
+    assert analysis.analysis_scope["mode"] == "chapter_range"
 ```
 
 **Run:** `pytest tests/unit/test_models.py -v`
@@ -386,10 +435,12 @@ def test_content_version_with_change_source(db):
 **目标：** 完整实现工作流相关模型，含状态快照、唯一约束、审核产物。
 
 **关键设计约束：**
-- WorkflowExecution 需 `pause_reason`、`resume_from_node`、`snapshot`（01-core-workflow §4.2）
+- WorkflowExecution 需 `current_node_id`、`pause_reason`、`resume_from_node`、`snapshot`（01-core-workflow §4.2）
 - WorkflowExecution 需配置快照字段（17-cross-module-contracts §6.1）
+- 同一 `project_id` 最多一个 active WorkflowExecution（`created/running/paused`），需库级唯一约束
 - NodeExecution 需 `(workflow_execution_id, node_id, sequence)` 唯一约束（17-cross-module-contracts §2.3）
-- ReviewAction.review_type 为自由字符串（database-design §5）
+- `Artifact` 不得成为正文真值源；正式内容必须落 `ContentVersion`
+- `ReviewAction` 需与 `ReviewResult` Schema 对齐存储单 reviewer 结果
 
 **Files:**
 - Rewrite: `apps/api/app/models/workflow.py`
@@ -404,7 +455,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    DateTime, ForeignKey, Integer, String, Text, UniqueConstraint,
+    DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -414,11 +465,20 @@ from .base import Base, TimestampMixin, UUIDMixin
 
 class WorkflowExecution(Base, TimestampMixin, UUIDMixin):
     __tablename__ = "workflow_executions"
+    __table_args__ = (
+        Index(
+            "uq_workflow_execution_active_project",
+            "project_id",
+            unique=True,
+            postgresql_where=text("status IN ('created', 'running', 'paused')"),
+            sqlite_where=text("status IN ('created', 'running', 'paused')"),
+        ),
+    )
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
     template_id: Mapped[uuid.UUID | None] = mapped_column()
     status: Mapped[str] = mapped_column(String(50), default="created")
-    current_node: Mapped[int] = mapped_column(Integer, default=0)
+    current_node_id: Mapped[str | None] = mapped_column(String(200))
     pause_reason: Mapped[str | None] = mapped_column(String(50))
     resume_from_node: Mapped[str | None] = mapped_column(String(200))
     snapshot: Mapped[dict | None] = mapped_column(JSON)
@@ -476,8 +536,9 @@ class NodeExecution(Base, TimestampMixin, UUIDMixin):
 # apps/api/app/models/artifact.py
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import JSON
 
 from .base import Base, TimestampMixin, UUIDMixin
 
@@ -489,7 +550,10 @@ class Artifact(Base, TimestampMixin, UUIDMixin):
         ForeignKey("node_executions.id")
     )
     artifact_type: Mapped[str] = mapped_column(String(50))
-    content: Mapped[str] = mapped_column(Text)
+    content_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("content_versions.id")
+    )
+    payload: Mapped[dict | None] = mapped_column(JSON)
     word_count: Mapped[int | None] = mapped_column(Integer)
 
     node_execution: Mapped["NodeExecution"] = relationship(
@@ -502,8 +566,9 @@ class Artifact(Base, TimestampMixin, UUIDMixin):
 ```python
 # apps/api/app/models/review.py
 import uuid
+from decimal import Decimal
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -517,9 +582,14 @@ class ReviewAction(Base, TimestampMixin, UUIDMixin):
         ForeignKey("node_executions.id")
     )
     agent_id: Mapped[str] = mapped_column(String(100))
+    reviewer_name: Mapped[str] = mapped_column(String(255))
     review_type: Mapped[str] = mapped_column(String(100))
-    result: Mapped[str] = mapped_column(String(50))
-    issues: Mapped[dict | None] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(50))
+    score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    summary: Mapped[str] = mapped_column(Text)
+    issues: Mapped[list[dict]] = mapped_column(JSON)
+    execution_time_ms: Mapped[int] = mapped_column(Integer)
+    tokens_used: Mapped[int] = mapped_column(Integer)
 
     node_execution: Mapped["NodeExecution"] = relationship(
         back_populates="review_actions"
@@ -537,6 +607,12 @@ def test_node_execution_unique_constraint(db):
     from sqlalchemy.exc import IntegrityError
     import pytest
     # ... (完整测试代码在执行时编写)
+
+def test_single_active_workflow_per_project(db):
+    """同一 project 只能有一个 active workflow_execution"""
+    # ... 创建 project
+    # 插入 status="running" 的 workflow_execution -> OK
+    # 再插入同 project 且 status="paused"/"created" -> 应抛 IntegrityError
 
 def test_workflow_execution_snapshots(db):
     """验证工作流配置快照字段"""
@@ -653,8 +729,9 @@ class StoryFact(Base, TimestampMixin, UUIDMixin):
 ```python
 # apps/api/app/models/token_usage.py
 import uuid
+from decimal import Decimal
 
-from sqlalchemy import Float, ForeignKey, Integer, String
+from sqlalchemy import ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin, UUIDMixin
@@ -673,7 +750,7 @@ class TokenUsage(Base, TimestampMixin, UUIDMixin):
     model_name: Mapped[str] = mapped_column(String(100))
     input_tokens: Mapped[int] = mapped_column(Integer)
     output_tokens: Mapped[int] = mapped_column(Integer)
-    estimated_cost: Mapped[float] = mapped_column(Float)
+    estimated_cost: Mapped[Decimal] = mapped_column(Numeric(12, 6))
 ```
 
 **Implementation: credential.py**
@@ -915,7 +992,7 @@ class ModelFallbackItem(BaseModel):
 class ModelFallbackConfig(BaseModel):
     enabled: bool = False
     chain: list[ModelFallbackItem] = Field(default_factory=list)
-    on_all_fail: Literal["pause", "fail", "skip"] = "pause"
+    on_all_fail: Literal["pause", "fail"] = "pause"
 
 class WorkflowConfig(BaseModel):
     # ... 现有字段 ...
@@ -1395,7 +1472,7 @@ async def test_parallel_review_partial_timeout():
 - ContextBuilder：上下文注入（三层优先级）、裁剪算法（超预算时按优先级裁剪）、`opening_plan` 阶段注入、第 1 章特殊处理
 - ReviewExecutor：并行/串行审核、ReviewResult Schema 校验、聚合规则（all_pass/majority_pass/no_critical）
 - FixExecutor：精修策略选择（targeted/full_rewrite）、max_fix_attempts 计数、on_fix_fail 行为
-- LLM Service：通过 LiteLLM 调用（mock）、重试策略、模型降级链
+- LLM Service：通过 LiteLLM 调用（mock）、重试策略、显式启用的模型切换链
 - WorkflowEngine：完整工作流执行（mock LLM）、章节循环、暂停/恢复、中断语义
 
 **通过标准：**
@@ -1439,7 +1516,7 @@ async def test_parallel_review_partial_timeout():
 ### Task 18: CredentialService
 
 - CRUD + AES-256-GCM 加解密
-- 优先级解析（project > user > system）
+- 优先级解析（project > user > system[仅显式允许]）
 - 连通性测试
 - 记录 credential 安全审计事件（create/update/delete/verify/enable/disable）
 - Commit: `feat: implement credential service with encryption`
@@ -1452,7 +1529,7 @@ async def test_parallel_review_partial_timeout():
 - ProjectService：CRUD、owner_id 过滤、软删除/恢复、设定完整度检查
 - ContentService：内容创建/编辑、版本管理、stale 标记传播、最佳版本标记
 - WorkflowService：启动（并发检查）、暂停/恢复/取消、配置快照保存、按新配置重跑时新建执行
-- CredentialService：AES-256-GCM 加解密、优先级解析（project > user > system）、连通性测试（mock）、安全审计事件
+- CredentialService：AES-256-GCM 加解密、优先级解析（project > user > system[仅显式允许]）、连通性测试（mock）、安全审计事件
 - Service 层 DTO 入参/返回（不依赖 HTTP Request/Response）
 
 **通过标准：**

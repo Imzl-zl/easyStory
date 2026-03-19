@@ -44,12 +44,21 @@ UNIQUE (workflow_execution_id, node_id, sequence);
 ALTER TABLE chapter_tasks
 ADD CONSTRAINT uq_chapter_task_plan
 UNIQUE (workflow_execution_id, chapter_number);
+
+CREATE UNIQUE INDEX uq_workflow_execution_active_project
+ON workflow_executions(project_id)
+WHERE status IN ('created', 'running', 'paused');
 ```
 
 **`sequence` 语义：**
 - `sequence` 是**同一 `workflow_execution_id + node_id` 下的执行序号**
 - 它用于区分首次执行、重试、手动重跑和循环迭代，不等同于业务上的 `chapter_number`
 - 章节循环的逻辑身份由 `ChapterTask.chapter_number` 和 `NodeExecution.input_data.chapter_task_id/chapter_number` 共同标识
+
+**active workflow 语义：**
+- 同一 `project_id` 同时最多只允许一个 active `WorkflowExecution`
+- active 状态限定为 `created / running / paused`
+- 服务层可先做校验，但数据库部分唯一索引才是真正的最终约束
 
 ### 2.4 状态机
 
