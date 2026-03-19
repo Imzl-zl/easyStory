@@ -2,12 +2,17 @@ import re
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from app.modules.config_registry.infrastructure.config_loader import (
     ConfigLoader,
     ConfigurationError,
 )
-from app.modules.config_registry.schemas.config_schemas import HookConfig, SkillConfig
+from app.modules.config_registry.schemas.config_schemas import (
+    ContextInjectionItem,
+    HookConfig,
+    SkillConfig,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
@@ -175,3 +180,8 @@ def test_repository_chapter_skill_uses_previous_content_variable() -> None:
     assert "{{ previous_content }}" in skill.prompt
     assert "previous_content" in skill.variables
     assert "previous_chapters" not in skill.variables
+
+
+def test_context_injection_item_rejects_unsupported_type() -> None:
+    with pytest.raises(ValidationError, match="Input should be"):
+        ContextInjectionItem.model_validate({"type": "chapter_summary"})

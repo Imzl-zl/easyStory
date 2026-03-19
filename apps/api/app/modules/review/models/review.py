@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 import uuid
 
 from sqlalchemy import ForeignKey, Integer, Numeric, String, Text
@@ -23,7 +23,7 @@ class ReviewAction(Base, TimestampMixin, UUIDMixin):
     status: Mapped[str] = mapped_column(String(50))
     score: Mapped[float | None] = mapped_column(Numeric(5, 2))
     summary: Mapped[str | None] = mapped_column(Text)
-    issues: Mapped[dict | None] = mapped_column(JSON)
+    issues: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON)
     execution_time_ms: Mapped[int | None] = mapped_column(Integer)
     tokens_used: Mapped[int | None] = mapped_column(Integer)
 

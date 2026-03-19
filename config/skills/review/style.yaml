@@ -12,7 +12,12 @@ skill:
     【内容】
     {{ content }}
 
-    输出结构化审核结论。
+    输出一个严格符合 ReviewResult 的 JSON 对象：
+    - reviewer_id="agent.style_checker"
+    - reviewer_name="文风检查员"
+    - status 只能是 passed / failed / warning
+    - score 使用 0-100
+    - issues 中每条问题必须包含 category、severity、description
 
   variables:
     content:

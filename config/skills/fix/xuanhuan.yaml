@@ -10,20 +10,42 @@ skill:
     你是小说精修编辑。
 
     【原文】
-    {{ content }}
+    {{ original_content }}
 
     【审核问题】
-    {{ issues }}
+    {{ review_feedback }}
+
+    {% if fix_instructions %}
+    【额外要求】
+    {{ fix_instructions }}
+    {% endif %}
+
+    {% if original_prompt %}
+    【原始提示】
+    {{ original_prompt }}
+    {% endif %}
 
     请在不破坏世界观与主线的前提下，按问题逐项修正。
 
   variables:
-    content:
+    original_content:
       type: "string"
       required: true
-    issues:
+    review_feedback:
       type: "string"
       required: true
+    review_severity:
+      type: "string"
+      required: false
+      default: ""
+    original_prompt:
+      type: "string"
+      required: false
+      default: ""
+    fix_instructions:
+      type: "string"
+      required: false
+      default: ""
 
   model:
     provider: "anthropic"

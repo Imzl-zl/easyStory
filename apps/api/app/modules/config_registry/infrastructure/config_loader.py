@@ -15,12 +15,9 @@ from app.modules.config_registry.schemas.config_schemas import (
     SkillConfig,
     WorkflowConfig,
 )
+from app.shared.runtime.errors import ConfigurationError
 
 ConfigModel = TypeVar("ConfigModel", SkillConfig, AgentConfig, HookConfig, WorkflowConfig)
-
-
-class ConfigurationError(ValueError):
-    pass
 
 
 class ConfigLoader:
@@ -31,6 +28,14 @@ class ConfigLoader:
         self._hooks: dict[str, HookConfig] = {}
         self._workflows: dict[str, WorkflowConfig] = {}
         self._sources: dict[str, Path] = {}
+        self._load_all()
+
+    def reload(self) -> None:
+        self._skills = {}
+        self._agents = {}
+        self._hooks = {}
+        self._workflows = {}
+        self._sources = {}
         self._load_all()
 
     def _load_all(self) -> None:

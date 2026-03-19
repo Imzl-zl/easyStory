@@ -28,6 +28,7 @@ env/
 .nox/
 .hypothesis/
 .cache/
+.runtime/
 
 # Coverage
 .coverage

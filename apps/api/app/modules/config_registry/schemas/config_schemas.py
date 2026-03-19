@@ -134,7 +134,14 @@ class HookConfig(StrictSchema):
 
 
 class ContextInjectionItem(StrictSchema):
-    inject_type: str = Field(alias="type")
+    inject_type: Literal[
+        "project_setting",
+        "outline",
+        "opening_plan",
+        "chapter_task",
+        "previous_chapters",
+        "story_bible",
+    ] = Field(alias="type")
     required: bool = False
     count: int | None = None
 

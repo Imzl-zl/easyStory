@@ -27,8 +27,8 @@ workflow:
   context_injection:
     enabled: true
     default_inject:
+      - type: "project_setting"
       - type: "outline"
-      - type: "chapter_list"
 ```
 
 ### 层级 2：模式匹配规则
@@ -36,43 +36,39 @@ workflow:
 ```yaml
 context_injection:
   rules:
-    - node_pattern: "chapter_*"
+    - node_pattern: "chapter_gen"
       inject:
+        - type: "opening_plan"
+          required: true
+        - type: "chapter_task"
+          required: true
         - type: "previous_chapters"
           count: 2
-        - type: "character_profile"
-          required: true
+        - type: "story_bible"
 ```
 
 ### 层级 3：节点级覆盖
 
 ```yaml
-- id: "chapter_10"
+- id: "chapter_gen"
   context_injection:
     - type: "previous_chapters"
-      count: 5  # 覆盖全局的 2 章
-    - type: "world_setting"
-      required: true
+      count: 3  # 覆盖模式规则的 2 章
 ```
 
-### 支持的注入类型
+### 当前 v0.1 已实现的注入类型
 
 | 类型 | 映射到 Skill 变量 | 说明 |
 |-----|-------------------|------|
 | `project_setting` | `{{ project_setting }}` | 项目设定（结构化设定文档，可全文或摘要注入） |
 | `outline` | `{{ outline }}` | 大纲 |
 | `opening_plan` | `{{ opening_plan }}` | 开篇设计（前 1-3 章的阶段约束） |
-| `chapter_list` | `{{ chapter_list }}` | 章节目录 |
 | `chapter_task` | `{{ chapter_task }}` | 当前章节任务（来自 ChapterTask：title/brief/关键角色等） |
 | `previous_chapters` | `{{ previous_content }}` | 前 N 章，用 `\n\n---\n\n` 分隔 |
-| `character_profile` | `{{ character_profile }}` | 人物设定（从 `ProjectSetting` 投影） |
-| `world_setting` | `{{ world_setting }}` | 世界观设定（从 `ProjectSetting` 投影） |
 | `story_bible` | `{{ story_bible }}` | 事实库，按 fact_type 分组 |
-| `chapter_summary` | `{{ chapter_summaries }}` | 各章摘要 |
-| `style_reference` | `{{ style_reference }}` | 小说分析结果（选字段注入，用于文风参考） |
-| `writing_preferences` | `{{ writing_preferences }}` | 用户编辑学习出的高置信偏好摘要 |
-| `foreshadowing_reminder` | `{{ pending_foreshadowings }}` / `{{ overdue_foreshadowings }}` | 伏笔推进和遗忘提醒 |
-| `custom` | `{{ custom_<key> }}` | 用户自定义 |
+
+以下类型仍属于设计预留，**当前 runtime 尚未实现**，不能直接写入现有 workflow 配置：
+`chapter_list`、`character_profile`、`world_setting`、`chapter_summary`、`style_reference`、`writing_preferences`、`foreshadowing_reminder`、`custom`
 
 ### 前置创作资产的分层注入
 
@@ -80,9 +76,9 @@ context_injection:
 
 | 层级 | 默认资产 | 目的 |
 |------|---------|------|
-| 长期约束 | `project_setting` / `character_profile` / `world_setting` / `outline` / `story_bible` | 保持世界、人物、主线稳定 |
-| 阶段约束 | `opening_plan` / 当前阶段目标 / 近期伏笔 | 保持当前阶段节奏和体验稳定 |
-| 当前执行 | `chapter_task` / `previous_chapters` / `chapter_summary` | 保持本章真正落地 |
+| 长期约束 | `project_setting` / `outline` / `story_bible` | 保持世界、人物、主线稳定 |
+| 阶段约束 | `opening_plan` | 保持当前阶段节奏和体验稳定 |
+| 当前执行 | `chapter_task` / `previous_chapters` | 保持本章真正落地 |
 
 规则：
 
@@ -97,8 +93,10 @@ context_injection:
 上下文注入系统的输出是 **一组变量**，填充进 Skill 的 Jinja2 模板：
 
 ```
-ContextBuilder.build_context()
-  → 返回变量字典（如 outline、previous_content、character_profile、story_bible 等）
+SkillTemplateRenderer.referenced_variables(template)
+  → 得到模板实际引用变量集合
+ContextBuilder.build_context(..., referenced_variables=...)
+  → 返回变量字典（如 project_setting、outline、previous_content、story_bible 等）
   → SkillTemplateRenderer.render(template, variables)
   → 最终 Prompt 文本
 ```
@@ -106,7 +104,7 @@ ContextBuilder.build_context()
 > `variables` 会在渲染前由统一的 VariableResolver 合并默认值/循环变量/映射结果，并在 `StrictUndefined` 下做缺失校验，详见 [跨模块契约](./17-cross-module-contracts.md)。
 
 **关键规则：**
-- Skill 模板中**未引用的注入类型不会进入最终 Prompt**（不浪费 token），但会在上下文报告中标记为 `unused` 便于排查
+- Skill 模板中**未引用的注入类型不会进入最终 Prompt**（不浪费 token），当前通过 `SkillTemplateRenderer.referenced_variables(template)` + `ContextBuilder.build_context(..., referenced_variables=...)` 协同标记 `unused`
 - `required: true` 含义为"适用时必须注入"：不适用（如第 1 章无前文）→ 跳过并在报告中标记 `not_applicable`；适用但缺失 → 编译/运行时报错
 - 模板引用了变量但注入系统无数据：required=true → 编译时报错；required=false → 使用默认值
 
@@ -154,6 +152,12 @@ ContextBuilder.build_context()
 - 可能矛盾 → 新旧事实都保留，标记 `conflict_status="potential"`，在 UI 和上下文报告中提示
 - 用户确认矛盾成立 → 标记 `conflict_status="confirmed"`，默认不自动注入冲突项
 
+**当前 runtime 的 Story Bible 注入过滤条件：**
+- `is_active=true`
+- `superseded_by is null`
+- `conflict_status != "confirmed"`
+- 若存在 `chapter_number` 上下文，仅注入 `StoryFact.chapter_number <= 当前章节号`
+
 示例：
 - 旧事实：`character_state / 萧炎 / 16 岁，斗者三段`
 - 新事实：`character_state / 萧炎 / 18 岁，斗灵`
@@ -170,19 +174,18 @@ ContextBuilder.build_context()
 
 ## 5. 上下文裁剪算法
 
-### 5.1 Section 优先级配置
+### 5.1 当前 runtime 的 Section 优先级配置
 
 | Section | 优先级 | 最低 token | 裁剪策略 |
 |---------|--------|-----------|---------|
 | project_setting | 1（最高） | 0 | 永不裁剪 |
 | chapter_task | 1 | 0 | 永不裁剪 |
+| opening_plan | 2 | 200 | 第 4 章后优先降级为摘要，再参与裁剪 |
 | story_bible | 2 | 500 | 丢弃最早的事实 |
-| writing_preferences | 3 | 80 | 只保留高置信度偏好 |
-| foreshadowing_reminder | 4 | 80 | 只保留 major 伏笔 |
-| chapter_summaries | 5 | 200 | 丢弃最早的章节摘要 |
-| previous_chapters | 6 | 500 | 尾部截断 |
-| style_reference | 7 | 0 | 只保留选中字段 |
+| previous_chapters | 5 | 500 | 尾部截断 |
 | outline | 8（最低） | 200 | 尾部截断 |
+
+`writing_preferences`、`foreshadowing_reminder`、`chapter_summary`、`style_reference` 等裁剪策略仍属于后续扩展设计，当前运行时未实现。
 
 ### 5.2 裁剪流程
 
@@ -208,7 +211,7 @@ ContextBuilder.build_context()
 - 未告知用户就自动改用更大模型
 - 把超限伪装成普通生成失败
 
-### 5.3 裁剪策略可配置
+### 5.3 裁剪策略可配置（后续扩展）
 
 ```yaml
 context_injection:
@@ -225,7 +228,7 @@ context_injection:
       style_reference: 7         # 最低，先裁
 ```
 
-### 5.4 体验型上下文预算规则
+### 5.4 体验型上下文预算规则（后续扩展）
 
 - `writing_preferences` 只注入 `is_active=true` 且 `confidence >= 0.7` 的偏好，或用户手动 pin 的偏好
 - `writing_preferences` 默认最多 5 条、总计不超过 300 tokens
@@ -246,15 +249,15 @@ context_injection:
   "node_id": "chapter_10",
   "context_report": {
     "total_tokens": 8500,
-    "budget_limit": 10000,
-    "sections": [
-      {"type": "story_bible", "token_count": 1800, "items_count": 25, "items_truncated": 3},
-      {"type": "chapter_summary", "token_count": 900, "chapters": [6, 7, 8, 9]},
-      {"type": "previous_chapters", "token_count": 4500, "original_tokens": 6200},
-      {"type": "project_setting", "token_count": 1300}
-    ]
+      "budget_limit": 10000,
+      "sections": [
+        {"type": "story_bible", "token_count": 1800, "items_count": 25, "items_truncated": 3},
+        {"type": "previous_chapters", "token_count": 4500, "original_tokens": 6200},
+        {"type": "opening_plan", "token_count": 280, "phase": "degraded_reference"},
+        {"type": "project_setting", "token_count": 1300}
+      ]
+    }
   }
-}
 ```
 
 ### 6.2 UI 展示
@@ -262,8 +265,8 @@ context_injection:
 ```
 节点执行详情 → 🔍 上下文详情（可展开）
   ├─ 事实库: 25 条, 1800 tokens
-  ├─ 章节摘要: 4 章, 900 tokens
   ├─ 前章原文: 第9章, 4500 tokens (裁剪自 6200)
+  ├─ 开篇设计: 已降级为摘要, 280 tokens
   ├─ 项目设定: 1300 tokens
   └─ 总计: 8500 / 10000 tokens
 ```
@@ -276,9 +279,10 @@ context_injection:
 
 | 注入类型 | 状态 |
 |---------|------|
+| project_setting | 完整注入 ✅ |
 | outline | 完整注入 ✅ |
+| opening_plan | 完整注入 ✅ |
 | chapter_task | 从 ChapterTask 表读取 ✅ |
-| world_setting | 完整注入 ✅ |
 | previous_chapters | 无数据，跳过（not_applicable） |
 | story_bible | 无数据，跳过（not_applicable） |
 

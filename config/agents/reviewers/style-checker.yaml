@@ -13,7 +13,13 @@ agent:
     1. 文风是否一致
     2. 是否有突兀的转折
     3. 是否有重复的表达
-    请给出评分（0-1）和具体建议。
+    必须输出符合 ReviewResult 契约的 JSON 对象：
+    - reviewer_id: 固定为 "agent.style_checker"
+    - reviewer_name: 固定为 "文风检查员"
+    - status: 只能是 passed / failed / warning
+    - score: 0-100
+    - issues: passed 时必须为空；warning 只允许 minor / suggestion；failed 必须至少包含一个 critical 或 major
+    - summary / execution_time_ms / tokens_used 必填
 
   skills:
     - "skill.review.style"

@@ -5,7 +5,7 @@ from app.modules.content.models import Content, ContentVersion
 from app.modules.review.models import ReviewAction
 from app.modules.workflow.models import Artifact, NodeExecution, WorkflowExecution
 
-from tests.unit.models.helpers import create_project, create_workflow
+from tests.unit.models.helpers import create_project, create_template, create_workflow
 
 
 def test_workflow_execution_defaults(db):
@@ -19,8 +19,10 @@ def test_workflow_execution_defaults(db):
 
 def test_workflow_execution_with_snapshots(db):
     project = create_project(db)
+    template = create_template(db)
     workflow = WorkflowExecution(
         project_id=project.id,
+        template_id=template.id,
         status="running",
         workflow_snapshot={"id": "wf.test", "nodes": []},
         skills_snapshot={"skill.outline": {}},
@@ -32,6 +34,21 @@ def test_workflow_execution_with_snapshots(db):
 
     assert workflow.workflow_snapshot["id"] == "wf.test"
     assert "skill.outline" in workflow.skills_snapshot
+    assert workflow.template_id == template.id
+
+
+def test_project_and_workflow_can_reference_template(db):
+    template = create_template(db)
+    project = create_project(db, template_id=template.id)
+    workflow = create_workflow(db, project=project, template_id=template.id)
+
+    db.refresh(project)
+    db.refresh(workflow)
+
+    assert project.template is not None
+    assert workflow.template is not None
+    assert project.template.id == template.id
+    assert workflow.template.id == template.id
 
 
 def test_node_execution_basic(db):

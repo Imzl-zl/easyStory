@@ -123,6 +123,7 @@ opening_plan:
 - 从零开始的新项目，在生成第 1 章前，默认必须先确认 `OpeningPlan`
 - 对“导入已有中后期项目”或“从中途章节继续”的场景，可显式记录跳过原因后绕过
 - `OpeningPlan` 变更后，已生成的前几章应按内容编辑规则决定是否标记 stale 或重生
+- `ProjectSetting` / `Outline` / `OpeningPlan` 变更后，现有 `ChapterTask` 应标记为 `stale`，重新执行 `chapter_split` 后才可继续用于章节生成
 
 ### 3.4 ChapterTask
 

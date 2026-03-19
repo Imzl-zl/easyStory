@@ -76,6 +76,43 @@ skill:
         shutil.rmtree(temp_root, ignore_errors=True)
 
 
+def test_loader_reload_picks_up_new_config_file() -> None:
+    temp_root = _make_temp_config_root()
+    _write_yaml(
+        temp_root / "skills" / "outline.yaml",
+        """
+skill:
+  id: "skill.outline"
+  name: "Outline"
+  category: "outline"
+  prompt: "x"
+""",
+    )
+
+    try:
+        loader = ConfigLoader(temp_root)
+        assert [item.id for item in loader.list_skills()] == ["skill.outline"]
+
+        _write_yaml(
+            temp_root / "skills" / "chapter.yaml",
+            """
+skill:
+  id: "skill.chapter"
+  name: "Chapter"
+  category: "chapter"
+  prompt: "y"
+""",
+        )
+        loader.reload()
+
+        assert sorted(item.id for item in loader.list_skills()) == [
+            "skill.chapter",
+            "skill.outline",
+        ]
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
+
 def test_skill_schema_rejects_mixed_variable_modes() -> None:
     with pytest.raises(ValueError, match="mutually exclusive"):
         SkillConfig.model_validate(

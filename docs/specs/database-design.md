@@ -58,6 +58,8 @@ agents (Agent，智能体)
 
 > `project_setting` 在 MVP 中直接承载结构化 `ProjectSetting` 文档，不作为运行态杂项配置大杂烩。运行时快照、模板配置和节点临时参数应分别进入 `workflow_snapshot`、`Template.config`、`NodeExecution.input/output` 等边界明确的位置。
 >
+> 当前 `ProjectSetting` 采用固定 schema：`genre`、`sub_genre`、`target_readers`、`tone`、`core_conflict`、`plot_direction`、`protagonist`、`key_supporting_roles`、`world_setting`、`scale`、`special_requirements`。禁止继续写入 `worldview`、`target_length` 等模糊旧键。
+>
 > `allow_system_credential_pool` 是显式安全开关，默认关闭；仅当该值为 `true` 时，凭证解析才允许继续回退到系统级默认凭证池。
 
 **contents（Content，内容）**
@@ -269,6 +271,8 @@ agents (Agent，智能体)
 | created_at | TIMESTAMP | 创建时间 |
 
 > `ReviewAction` 存储的是“单个 reviewer 的结构化审核结果”，字段应与 `ReviewResult` 对齐；聚合结果由运行时聚合器产生，可落在 `NodeExecution.output` 或独立响应 DTO 中。
+>
+> reviewer 超时、执行异常、返回非法 Schema 等**执行层失败**不属于 `ReviewAction`，应单独作为审核执行失败记录处理，不能伪装成 `issues` 写入本表。
 
 ---
 
@@ -576,12 +580,12 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | brief | TEXT | 章节摘要/任务描述 |
 | key_characters | JSONB | 关键角色列表（JSON 数组，`string[]`） |
 | key_events | JSONB | 关键事件列表（JSON 数组，`string[]`） |
-| status | VARCHAR(50) | 状态：pending/generating/interrupted/completed/failed/skipped |
+| status | VARCHAR(50) | 状态：pending/generating/interrupted/completed/failed/skipped/stale |
 | content_id | UUID | 关联生成的内容 ID（可选，FK → content.id） |
 | created_at | TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | 更新时间 |
 
-> 硬约束：`UNIQUE (workflow_execution_id, chapter_number)`。`interrupted` 为非终态，表示用户在生成过程中主动停止，等待后续恢复或改写决策。
+> 硬约束：`UNIQUE (workflow_execution_id, chapter_number)`。`interrupted` 为非终态，表示用户在生成过程中主动停止，等待后续恢复或改写决策；`stale` 表示上游设定或前置资产已变化，当前章节计划已过期，必须重新执行 `chapter_split` 后才能继续使用。
 
 ### story_facts（Story Bible 事实库）
 
@@ -604,6 +608,8 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | updated_at | TIMESTAMP | 更新时间 |
 
 > 新事实写入前需和当前 active facts 做冲突检查。`potential` 表示检测到疑似矛盾但暂未确认，`confirmed` 表示已确认冲突，默认不自动注入到上下文中。
+>
+> 当前上下文注入只读取 `is_active=true`、`superseded_by is null` 且 `conflict_status != 'confirmed'` 的事实。
 
 ### 其他补充表（简要说明）
 

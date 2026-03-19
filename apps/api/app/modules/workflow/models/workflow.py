@@ -13,6 +13,7 @@ from app.shared.db.base import Base, TimestampMixin, UUIDMixin
 if TYPE_CHECKING:
     from app.modules.project.models import Project
     from app.modules.review.models import ReviewAction
+    from app.modules.template.models import Template
     from app.modules.workflow.models import Artifact
 
 ACTIVE_WORKFLOW_FILTER = "status IN ('created', 'running', 'paused')"
@@ -31,7 +32,7 @@ class WorkflowExecution(Base, TimestampMixin, UUIDMixin):
     )
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
-    template_id: Mapped[uuid.UUID | None] = mapped_column()
+    template_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("templates.id"))
     status: Mapped[str] = mapped_column(String(50), default="created")
     current_node_id: Mapped[str | None] = mapped_column(String(200))
     pause_reason: Mapped[str | None] = mapped_column(String(50))
@@ -44,6 +45,7 @@ class WorkflowExecution(Base, TimestampMixin, UUIDMixin):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     project: Mapped["Project"] = relationship(back_populates="workflow_executions")
+    template: Mapped["Template | None"] = relationship(back_populates="workflow_executions")
     node_executions: Mapped[list["NodeExecution"]] = relationship(
         back_populates="workflow_execution", cascade="all, delete-orphan"
     )

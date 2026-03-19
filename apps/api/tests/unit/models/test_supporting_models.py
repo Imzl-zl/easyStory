@@ -6,9 +6,16 @@ from app.modules.context.models import StoryFact
 from app.modules.credential.models import ModelCredential
 from app.modules.export.models import Export
 from app.modules.observability.models import ExecutionLog, PromptReplay
+from app.modules.template.models import TemplateNode
 from app.modules.workflow.models import ChapterTask, NodeExecution
 
-from tests.unit.models.helpers import create_content, create_content_version, create_project, create_workflow
+from tests.unit.models.helpers import (
+    create_content,
+    create_content_version,
+    create_project,
+    create_template,
+    create_workflow,
+)
 
 
 def test_chapter_task(db):
@@ -199,3 +206,22 @@ def test_export(db):
     assert export.format == "markdown"
     assert export.file_size == 50000
     assert export.config_snapshot["include_metadata"] is True
+
+
+def test_template_node_relationship(db):
+    template = create_template(db)
+    node = TemplateNode(
+        template_id=template.id,
+        node_order=1,
+        node_type="generate",
+        skill_id="skill.outline.xuanhuan",
+        config={"temperature": 0.6},
+        position_x=120,
+        position_y=40,
+    )
+    db.add(node)
+    db.commit()
+    db.refresh(template)
+
+    assert len(template.nodes) == 1
+    assert template.nodes[0].skill_id == "skill.outline.xuanhuan"

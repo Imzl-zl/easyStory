@@ -10,7 +10,7 @@
 
 ## 1. 概述
 
-审核与精修流程定义了内容质量保障机制，包括：并行/串行审核模式、ReviewResult 统一 Schema、聚合规则、精修策略和 Skill 来源。
+审核与精修流程定义了内容质量保障机制，包括：并行/串行审核模式、ReviewResult 统一 Schema、审核执行失败口径、聚合规则、精修策略和 Skill 来源。
 
 ---
 
@@ -83,12 +83,25 @@
 | execution_time_ms | int | 是 | 执行耗时（毫秒） |
 | tokens_used | int | 是 | 消耗 token 数 |
 
+### ReviewExecutionFailure（执行层失败）
+
+> 该结构**不是 Reviewer Agent 输出**，而是运行时在 reviewer 超时、异常、或返回非法 ReviewResult 时生成的执行失败记录。
+
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| reviewer_id | string | 审核 Agent ID |
+| reviewer_name | string | 显示名称 |
+| error_type | 枚举 | timeout / invalid_result / execution_error |
+| message | string | 失败原因 |
+| execution_time_ms | int | 执行耗时（毫秒） |
+
 ### AggregatedReviewResult（聚合审核结果）
 
 | 字段 | 类型 | 说明 |
 |-----|------|------|
 | overall_status | 枚举 | passed / failed |
 | results | ReviewResult[] | 各 Reviewer 结果列表 |
+| execution_failures | ReviewExecutionFailure[] | reviewer 执行失败列表 |
 | total_issues | int | 问题总数 |
 | critical_count | int | critical 级别问题数 |
 | major_count | int | major 级别问题数 |
@@ -97,6 +110,10 @@
 
 **使用约束：**
 - Reviewer 的 system prompt 中必须要求结构化输出
+- Reviewer 的 score 统一使用 `0-100`
+- `passed` 结果不得携带 issues；`warning` 只允许 `minor/suggestion`；`failed` 必须至少包含一个 `critical/major`
+- reviewer 超时、运行异常、非法 JSON/Schema 都不得伪装成 `ReviewIssue`；必须进入 `execution_failures`
+- 只要存在 `execution_failures`，聚合结果必须为 `failed`
 - 精修模块基于 `AggregatedReviewResult.critical_count` 和 `total_issues` 判断策略
 - 编辑器的"跳转到问题"基于 `ReviewLocation`
 
@@ -146,6 +163,12 @@ fix_context:
   fix_instructions: ""         # 用户额外精修指令（可选）
 ```
 
+当前 fix skill 的输入变量命名也必须与这组字段保持一致，避免出现 `content/issues` 与 `original_content/review_feedback` 双口径。
+
+前置约束：
+- 只有在 `execution_failures=[]` 时才允许进入 auto-fix
+- 若存在 reviewer 执行失败，应先重试 reviewer 或暂停流程，不得把基础设施故障当成内容问题修正文案
+
 ### 5.2 精修策略
 
 ```yaml
@@ -153,13 +176,13 @@ fix_strategy:
   selection_rule: "auto"       # auto / targeted / full_rewrite
   targeted_threshold: 3        # 问题 ≤ 3 → 局部修改
   rewrite_threshold: 6         # 问题 > 6 → 整篇重写
-  # 3-6 个之间 → 自动模式下局部精修，手动模式下询问用户
+  # 3-6 个之间 → 当前 runtime 仍局部精修
 ```
 
 **规则：**
 - `selection_rule=targeted` → 强制局部精修
 - `selection_rule=full_rewrite` → 强制整篇重写
-- `selection_rule=auto` → 按阈值自动判断
+- `selection_rule=auto` → 按阈值自动判断；当前 v0.1 不引入“手动询问用户”分支
 
 ### 5.3 精修 Prompt 来源
 
@@ -182,7 +205,7 @@ fix_strategy:
   ↓ 判断精修策略
   ├─ 问题 ≤ 3 → 局部精修
   ├─ 问题 > 6 → 整篇重写
-  └─ 3-6 个 → 自动模式局部，手动模式询问用户
+  └─ 3-6 个 → 当前 runtime 局部精修
   ↓ 加载精修 Skill
   ↓ 组装精修 Prompt
   ↓ 调用 LLM 精修
@@ -218,11 +241,12 @@ review_config:
 生成内容
   ↓ 自动审核（并行/串行）
   ├─ 全部通过 → 进入下一节点
-  └─ 有问题 → 自动精修
+  ├─ reviewer 执行失败 → 审核阶段失败，进入重试 / 暂停 / 报错，不触发 auto-fix
+  └─ 有内容问题 → 自动精修
        ↓ 重新审核
-       ├─ 通过 → 下一节点
-       └─ 失败且未达上限 → 继续下一轮精修
-       └─ 达 max_fix_attempts → 保留 final_candidate → 执行 on_fix_fail
+        ├─ 通过 → 下一节点
+        └─ 失败且未达上限 → 继续下一轮精修
+        └─ 达 max_fix_attempts → 保留 final_candidate → 执行 on_fix_fail
 ```
 
 配置：
@@ -242,4 +266,4 @@ review_config:
 
 ---
 
-*最后更新: 2026-03-17*
+*最后更新: 2026-03-19*

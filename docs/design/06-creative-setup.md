@@ -46,25 +46,37 @@
 {
   "genre": "玄幻修仙",
   "sub_genre": "废柴逆袭",
+  "target_readers": "男频成长流读者",
+  "tone": "热血燃向，偶有幽默",
+  "core_conflict": "主角必须在宗门压制中夺回成长机会",
+  "plot_direction": "从底层一步步崛起",
   "protagonist": {
     "name": "萧炎",
+    "identity": "没落家族少年",
+    "initial_situation": "天赋被夺，处于家族低谷",
     "background": "天赋被夺的没落家族少年",
     "personality": "坚韧不拔，性格倔强",
     "goal": "恢复天赋，为家族报仇"
   },
   "world_setting": {
     "name": "斗气大陆",
+    "era_baseline": "宗门林立、强者为尊",
+    "world_rules": "资源和血脉决定修炼上限，但存在逆天机缘",
     "power_system": "斗气修炼体系，分为斗者到斗帝",
     "key_locations": ["乌坦城", "迦南学院", "中州"]
   },
-  "plot_direction": "从底层一步步崛起",
-  "tone": "热血燃向，偶有幽默",
-  "target_length": "200章，约100万字",
+  "scale": {
+    "target_words": 1000000,
+    "target_chapters": 200,
+    "pacing": "前期快节奏，中后期稳步升级"
+  },
   "special_requirements": "每章结尾要有悬念"
 }
 ```
 
 > `world_setting`、`protagonist` 等结构都是 `ProjectSetting` 的组成部分；世界观设定和角色设定不再单独维护第二套真值源。
+>
+> `ProjectSetting` 当前按固定 schema 校验，禁止继续使用 `worldview`、`target_length`、`protagonist: "林渊"` 这类语义模糊或结构漂移的写法。
 
 ---
 
@@ -77,6 +89,7 @@ setting_to_skill_mapping:
     protagonist.name: "protagonist_name"
     protagonist.background: "protagonist"
     world_setting.name: "world_setting"
+    scale.target_words: "target_words"
   composite:
     character_summary: "{{ protagonist.name }}，{{ protagonist.background }}，性格{{ protagonist.personality }}"
   full_context: true  # 完整设定作为 {{ project_setting }} 注入
@@ -226,4 +239,4 @@ template:
 
 ---
 
-*最后更新: 2026-03-17*
+*最后更新: 2026-03-19*

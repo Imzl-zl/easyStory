@@ -494,6 +494,7 @@ workflow:
         selection_rule: "auto"        # auto / targeted / full_rewrite
         targeted_threshold: 3         # 问题 ≤ 3 → 局部修改
         rewrite_threshold: 6          # 问题 > 6 → 整篇重写
+        # 3-6 个之间 → 当前 runtime 仍局部精修
       on_fix_fail: "pause"            # 精修失败后动作：pause/skip/fail
 
     - id: "opening_plan"
@@ -582,22 +583,19 @@ workflow:
 | `export` | 导出文件 | `formats` |
 | `custom` | 自定义节点（**MVP 延期，v0.2 实现**） | `action` |
 
-**上下文注入类型**：
+**当前 runtime 支持的上下文注入类型**：
 
 | 类型 | 说明 | 参数 |
 |-----|------|------|
 | `project_setting` | 项目设定（结构化设定文档） | - |
 | `outline` | 大纲 | - |
 | `opening_plan` | 开篇设计（前 1-3 章的阶段约束） | - |
-| `chapter_list` | 章节目录 | - |
 | `chapter_task` | 当前章节任务（来自 ChapterTask） | - |
 | `previous_chapters` | 前 N 章 | `count` |
-| `character_profile` | 人物设定 | - |
-| `world_setting` | 世界观设定 | - |
-| `story_bible` | Story Bible 事实库 | `include`, `max_tokens` |
-| `chapter_summary` | 章节摘要（代替原文堆叠） | `count`, `max_tokens_per_summary` |
-| `style_reference` | 小说分析结果（文风参考） | `analysis_id`, `inject_fields` |
-| `custom` | 自定义 | `key`, `source`, `query` |
+| `story_bible` | Story Bible 事实库 | - |
+
+以下类型仍属扩展预留，**当前 schema 会直接拒绝**，不能写入现有 workflow 配置：
+`chapter_list`、`character_profile`、`world_setting`、`chapter_summary`、`style_reference`、`writing_preferences`、`foreshadowing_reminder`、`custom`
 
 ---
 
@@ -646,15 +644,16 @@ model:
 2. 解析所有 YAML 文件
 3. 校验配置格式
 4. 注册到内存注册表
-5. 启动文件监听（热更新）
+5. 启动完成；当前不默认开启文件监听
 
 运行时：
-1. Web UI 编辑配置
-2. 写入 YAML 文件
-3. 文件监听触发
-4. 重新加载配置
-5. 通知 Web UI 刷新
+1. Web UI 或外部工具编辑 YAML
+2. 显式调用 `ConfigLoader.reload()` 或重建 `ConfigLoader`
+3. 重新执行完整校验
+4. 替换内存注册表
 ```
+
+> 当前 v0.1 实现的是“启动加载 + 显式重载”，还没有内建文件监听和 UI 推送机制；热更新 watcher 属于后续扩展，不应默认假定已经存在。
 
 **校验规则**：
 - 必填字段检查

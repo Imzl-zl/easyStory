@@ -6,6 +6,7 @@ from app.modules.export.models import Export
 from app.modules.observability.models import ExecutionLog, PromptReplay
 from app.modules.project.models import Project
 from app.modules.review.models import ReviewAction
+from app.modules.template.models import Template, TemplateNode
 from app.modules.user.models import User
 from app.modules.workflow.models import Artifact, ChapterTask, NodeExecution, WorkflowExecution
 
@@ -22,6 +23,8 @@ __all__ = [
     "PromptReplay",
     "ReviewAction",
     "StoryFact",
+    "Template",
+    "TemplateNode",
     "TokenUsage",
     "User",
     "WorkflowExecution",

@@ -1,5 +1,8 @@
 from datetime import datetime, timezone
 
+import pytest
+from pydantic import ValidationError
+
 from app.modules.content.models import Content, ContentVersion
 from app.modules.project.models import Project
 
@@ -24,14 +27,45 @@ def test_project_stores_project_setting(db):
     project = Project(
         name="设定测试",
         owner_id=user.id,
-        project_setting={"worldview": "东方玄幻", "protagonist": "林渊"},
+        project_setting={
+            "genre": "东方玄幻",
+            "protagonist": {
+                "name": "林渊",
+                "identity": "寒门少年",
+                "goal": "进入内门",
+            },
+            "world_setting": {
+                "name": "九州大陆",
+                "power_system": "灵气修炼",
+            },
+            "scale": {
+                "target_words": 800000,
+                "target_chapters": 200,
+            },
+        },
     )
     db.add(project)
     db.commit()
     db.refresh(project)
 
-    assert project.project_setting["worldview"] == "东方玄幻"
-    assert project.project_setting["protagonist"] == "林渊"
+    assert project.project_setting["protagonist"]["name"] == "林渊"
+    assert project.project_setting["world_setting"]["name"] == "九州大陆"
+    assert project.project_setting["scale"]["target_words"] == 800000
+
+
+def test_project_rejects_project_setting_with_legacy_or_ambiguous_keys(db):
+    user = create_user(db, username="planner-legacy")
+
+    with pytest.raises(ValidationError):
+        Project(
+            name="错误设定",
+            owner_id=user.id,
+            project_setting={
+                "worldview": "东方玄幻",
+                "target_length": "200章",
+                "protagonist": "林渊",
+            },
+        )
 
 
 def test_project_soft_delete(db):
