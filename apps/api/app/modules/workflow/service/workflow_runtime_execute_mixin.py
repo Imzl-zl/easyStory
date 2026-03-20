@@ -6,9 +6,15 @@ import uuid
 
 from app.modules.config_registry.schemas.config_schemas import NodeConfig, WorkflowConfig
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
-from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
+from app.shared.runtime.errors import BudgetExceededError, BusinessRuleError, ConfigurationError
 
 from .snapshot_support import resolve_next_node_id
+from .workflow_runtime_budget_support import (
+    build_budget_review_outcome,
+    build_chapter_split_budget_outcome,
+    build_completed_snapshot,
+    ensure_chapter_split_budget_action_supported,
+)
 from .workflow_runtime_shared import NodeOutcome, ReviewCycleOutcome, WAITING_CONFIRM_TASK_STATUS
 
 
@@ -24,13 +30,30 @@ class WorkflowRuntimeExecuteMixin:
     ) -> NodeOutcome:
         execution = self._create_node_execution(db, workflow, node)
         started_at = datetime.now(timezone.utc)
+        budget_error: BudgetExceededError | None = None
         try:
             prompt_bundle = self._build_prompt_bundle(
                 db, workflow, workflow_config, node, chapter_number=None
             )
             execution.input_data = prompt_bundle["input_data"]
-            raw_output = asyncio.run(self._call_llm(db, workflow, prompt_bundle, owner_id=owner_id))
+            try:
+                raw_output = asyncio.run(
+                    self._call_llm(
+                        db,
+                        workflow,
+                        workflow_config,
+                        prompt_bundle,
+                        owner_id=owner_id,
+                        node_execution_id=execution.id,
+                        usage_type="generate",
+                    )
+                )
+            except BudgetExceededError as exc:
+                budget_error = exc
+                raw_output = exc.raw_output
             chapters = self._parse_chapter_split_output(raw_output["content"])
+            if budget_error is not None:
+                ensure_chapter_split_budget_action_supported(budget_error)
             self._replace_chapter_tasks(db, workflow, chapters)
             self._append_artifact(
                 execution, "chapter_tasks", {"chapters": [item.model_dump() for item in chapters]}
@@ -40,10 +63,15 @@ class WorkflowRuntimeExecuteMixin:
         except Exception as exc:
             self._fail_execution(db, execution, started_at, exc)
             raise
-        return NodeOutcome(
-            next_node_id=resolve_next_node_id(workflow.workflow_snapshot or {}, current_node_id=node.id),
-            snapshot_extra={"completed_nodes": [self._completed_marker(execution)]},
-        )
+        next_node_id = resolve_next_node_id(workflow.workflow_snapshot or {}, current_node_id=node.id)
+        completed_snapshot = build_completed_snapshot(self._completed_marker(execution))
+        if budget_error is not None:
+            return build_chapter_split_budget_outcome(
+                completed_snapshot=completed_snapshot,
+                next_node_id=next_node_id,
+                budget_error=budget_error,
+            )
+        return NodeOutcome(next_node_id=next_node_id, snapshot_extra=completed_snapshot)
 
     def _execute_chapter_gen(
         self,
@@ -63,11 +91,11 @@ class WorkflowRuntimeExecuteMixin:
         execution = self._create_node_execution(db, workflow, node)
         started_at = datetime.now(timezone.utc)
         try:
-            prompt_bundle, raw_output, generated_content = self._generate_chapter(
+            prompt_bundle, raw_output, generated_content, generation_budget_error = self._generate_chapter(
                 db, workflow, workflow_config, node, task, execution, owner_id=owner_id
             )
             self._record_prompt_replay(db, execution, prompt_bundle, raw_output)
-            review_outcome = self._run_auto_review(
+            review_outcome = self._resolve_review_outcome(
                 db,
                 workflow,
                 workflow_config,
@@ -76,6 +104,7 @@ class WorkflowRuntimeExecuteMixin:
                 generated_content,
                 prompt_bundle=prompt_bundle,
                 owner_id=owner_id,
+                generation_budget_error=generation_budget_error,
             )
             candidate = self._persist_chapter_candidate(
                 db, workflow, task, prompt_bundle["context_snapshot_hash"], review_outcome
@@ -98,72 +127,65 @@ class WorkflowRuntimeExecuteMixin:
         execution,
         *,
         owner_id: uuid.UUID,
-    ) -> tuple[dict, dict, str]:
+    ) -> tuple[dict, dict, str, BudgetExceededError | None]:
         prompt_bundle = self._build_prompt_bundle(
             db, workflow, workflow_config, node, chapter_number=task.chapter_number
         )
         prompt_bundle["input_data"]["chapter_task_id"] = str(task.id)
         prompt_bundle["input_data"]["chapter_number"] = task.chapter_number
         execution.input_data = prompt_bundle["input_data"]
-        raw_output = asyncio.run(self._call_llm(db, workflow, prompt_bundle, owner_id=owner_id))
+        budget_error: BudgetExceededError | None = None
+        try:
+            raw_output = asyncio.run(
+                self._call_llm(
+                    db,
+                    workflow,
+                    workflow_config,
+                    prompt_bundle,
+                    owner_id=owner_id,
+                    node_execution_id=execution.id,
+                    usage_type="generate",
+                )
+            )
+        except BudgetExceededError as exc:
+            budget_error = exc
+            raw_output = exc.raw_output
         content = raw_output.get("content")
         if not isinstance(content, str):
             raise ConfigurationError("Chapter generate output must be plain text")
-        return prompt_bundle, raw_output, content
+        return prompt_bundle, raw_output, content, budget_error
 
-    def _persist_chapter_candidate(
+    def _resolve_review_outcome(
         self,
         db,
         workflow: WorkflowExecution,
-        task: ChapterTask,
-        context_snapshot_hash: str,
-        review_outcome: ReviewCycleOutcome,
-    ) -> tuple[uuid.UUID | None, uuid.UUID | None, int | None]:
-        if review_outcome.resolution == "skip":
-            return None, None, None
-        content, version = self._save_review_candidate(
-            db,
-            workflow.project_id,
-            task.chapter_number,
-            task.title,
-            review_outcome,
-            context_snapshot_hash,
-        )
-        task.content_id = content.id
-        return content.id, version.id, version.word_count
-
-    def _save_review_candidate(
-        self,
-        db,
-        project_id,
-        chapter_number: int,
-        title: str,
-        review_outcome: ReviewCycleOutcome,
-        context_snapshot_hash: str,
-    ):
-        if review_outcome.content_source == "generated":
-            return self.chapter_content_service.save_generated_draft(
-                db,
-                project_id,
-                chapter_number,
-                title=title,
-                content_text=review_outcome.final_content,
-                context_snapshot_hash=context_snapshot_hash,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        execution,
+        generated_content: str,
+        *,
+        prompt_bundle: dict,
+        owner_id: uuid.UUID,
+        generation_budget_error: BudgetExceededError | None,
+    ) -> ReviewCycleOutcome:
+        if generation_budget_error is not None:
+            return build_budget_review_outcome(
+                generation_budget_error,
+                generated_content=generated_content,
             )
-        return self.chapter_content_service.save_auto_fix_draft(
-            db,
-            project_id,
-            chapter_number,
-            title=title,
-            content_text=review_outcome.final_content,
-            context_snapshot_hash=context_snapshot_hash,
-            change_summary=self._auto_fix_change_summary(review_outcome),
-        )
-
-    def _auto_fix_change_summary(self, review_outcome: ReviewCycleOutcome) -> str:
-        if review_outcome.resolution == "passed":
-            return "自动精修后通过复审"
-        return "自动精修最终候选"
+        try:
+            return self._run_auto_review(
+                db,
+                workflow,
+                workflow_config,
+                node,
+                execution,
+                generated_content,
+                prompt_bundle=prompt_bundle,
+                owner_id=owner_id,
+            )
+        except BudgetExceededError as exc:
+            return build_budget_review_outcome(exc, generated_content=generated_content)
 
     def _finalize_chapter_execution(
         self,
@@ -226,6 +248,8 @@ class WorkflowRuntimeExecuteMixin:
         )
 
     def _pause_reason(self, review_outcome: ReviewCycleOutcome) -> str:
+        if review_outcome.pause_reason is not None:
+            return review_outcome.pause_reason
         return "review_failed"
 
     def _failure_snapshot(self, execution, task: ChapterTask) -> dict[str, str | int | None]:
@@ -234,25 +258,3 @@ class WorkflowRuntimeExecuteMixin:
             "current_chapter_number": task.chapter_number,
             "content_id": str(task.content_id) if task.content_id is not None else None,
         }
-
-    def _execute_export(
-        self,
-        db,
-        workflow: WorkflowExecution,
-        node: NodeConfig,
-    ) -> NodeOutcome:
-        execution = self._create_node_execution(db, workflow, node)
-        started_at = datetime.now(timezone.utc)
-        try:
-            exports = self.export_service.export_workflow(
-                db, workflow, formats=list(node.formats), config_snapshot=workflow.workflow_snapshot
-            )
-            self._append_artifact(execution, "export", {"export_ids": [str(item.id) for item in exports]})
-            self._complete_execution(
-                db,
-                execution, started_at, {"export_ids": [str(item.id) for item in exports]}
-            )
-        except Exception as exc:
-            self._fail_execution(db, execution, started_at, exc)
-            raise
-        return NodeOutcome(next_node_id=None)

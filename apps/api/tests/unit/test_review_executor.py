@@ -13,6 +13,7 @@ from app.modules.review.engine import (
     ReviewIssue,
     ReviewResult,
 )
+from app.shared.runtime.errors import BudgetExceededError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 CONFIG_ROOT = PROJECT_ROOT / "config"
@@ -138,6 +139,46 @@ async def test_execute_review_invalid_result_becomes_execution_failure() -> None
     assert aggregated.execution_failures[0].error_type == "invalid_result"
     assert "passed review result cannot contain issues" in aggregated.execution_failures[0].message
     assert aggregated.overall_status == "failed"
+
+
+async def test_execute_review_parallel_budget_exceeded_keeps_completed_results() -> None:
+    reviewers = [
+        _build_reviewer("agent.fast", "快速审核"),
+        _build_reviewer("agent.blocked", "预算受限审核"),
+    ]
+
+    async def runner(content: str, reviewer: AgentConfig):
+        assert content == "正文"
+        if reviewer.id == "agent.blocked":
+            await asyncio.sleep(0.01)
+            raise BudgetExceededError(
+                "预算超限(workflow): used_tokens=98, limit_tokens=90",
+                action="pause",
+                scope="workflow",
+                used_tokens=98,
+                limit_tokens=90,
+                usage_type="review",
+                raw_output={"content": {}},
+            )
+        await asyncio.sleep(0)
+        return _passed_result(reviewer)
+
+    executor = ReviewExecutor(runner)
+
+    with pytest.raises(BudgetExceededError, match="预算超限") as exc_info:
+        await executor.execute_review(
+            "正文",
+            reviewers,
+            "parallel",
+            ReviewConfig(pass_rule="all_pass"),
+            max_concurrent_reviewers=2,
+        )
+
+    partial = exc_info.value.partial_aggregated_review
+    assert partial is not None
+    assert [item.reviewer_id for item in partial.results] == ["agent.fast"]
+    assert partial.execution_failures == []
+    assert partial.overall_status == "passed"
 
 
 def test_review_result_rejects_failed_without_blocking_issue() -> None:

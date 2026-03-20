@@ -37,3 +37,4 @@ class ReviewCycleOutcome:
     final_content: str
     content_source: Literal["generated", "auto_fix"]
     failure_message: str | None = None
+    pause_reason: str | None = None

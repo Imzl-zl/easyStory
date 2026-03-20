@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app.modules.billing.service import create_billing_service
 from app.modules.config_registry import ConfigLoader
 from app.modules.content.service import create_chapter_content_service
 from app.modules.context.engine import create_context_builder
@@ -58,6 +59,7 @@ def create_workflow_runtime_service(
 ) -> WorkflowRuntimeService:
     return WorkflowRuntimeService(
         workflow_service=workflow_service or create_workflow_service(),
+        billing_service=create_billing_service(),
         chapter_content_service=create_chapter_content_service(),
         context_builder=create_context_builder(),
         credential_service_factory=create_credential_service,

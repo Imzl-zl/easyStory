@@ -1,3 +1,6 @@
+from typing import Any, Literal
+
+
 class EasyStoryError(Exception):
     """Base exception for shared runtime failures."""
 
@@ -45,3 +48,25 @@ class UnknownModelError(ConfigurationError):
 
 class BudgetExceededError(EasyStoryError):
     """Raised when a budget guard refuses execution."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        action: Literal["pause", "skip", "fail"],
+        scope: str,
+        used_tokens: int,
+        limit_tokens: int,
+        usage_type: str,
+        raw_output: dict[str, Any],
+        partial_aggregated_review: Any | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.message = message
+        self.action = action
+        self.scope = scope
+        self.used_tokens = used_tokens
+        self.limit_tokens = limit_tokens
+        self.usage_type = usage_type
+        self.raw_output = raw_output
+        self.partial_aggregated_review = partial_aggregated_review

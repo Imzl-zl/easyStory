@@ -12,7 +12,9 @@ from sqlalchemy.pool import StaticPool
 
 from app.main import create_app
 from app.modules import model_registry as _model_registry  # noqa: F401
+from app.modules.billing.service import create_billing_service
 from app.modules.content.models import Content, ContentVersion
+from app.modules.credential.models import ModelCredential
 from app.modules.project.models import Project
 from app.modules.user.service import TokenService
 from app.modules.workflow.entry.http.router import get_workflow_app_service
@@ -420,6 +422,7 @@ def _build_runtime_client(
     workflow_service = create_workflow_service()
     runtime_service = WorkflowRuntimeService(
         workflow_service=workflow_service,
+        billing_service=create_billing_service(),
         chapter_content_service=create_chapter_content_service(),
         context_builder=create_context_builder(),
         credential_service_factory=lambda: _FakeCredentialService(),
@@ -439,12 +442,6 @@ class _FakeCrypto:
         return value
 
 
-class _FakeCredential:
-    def __init__(self, encrypted_key: str, base_url: str | None = None) -> None:
-        self.encrypted_key = encrypted_key
-        self.base_url = base_url
-
-
 class _FakeCredentialService:
     def __init__(self) -> None:
         self.crypto = _FakeCrypto()
@@ -456,9 +453,29 @@ class _FakeCredentialService:
         provider: str,
         user_id: uuid.UUID,
         project_id: uuid.UUID | None = None,
-    ) -> _FakeCredential:
-        del db, user_id, project_id
-        return _FakeCredential(encrypted_key=f"{provider}-fake-key")
+    ) -> ModelCredential:
+        del project_id
+        credential = (
+            db.query(ModelCredential)
+            .filter(
+                ModelCredential.owner_type == "user",
+                ModelCredential.owner_id == user_id,
+                ModelCredential.provider == provider,
+            )
+            .one_or_none()
+        )
+        if credential is None:
+            credential = ModelCredential(
+                owner_type="user",
+                owner_id=user_id,
+                provider=provider,
+                display_name=f"{provider}-fake",
+                encrypted_key=f"{provider}-fake-key",
+                is_active=True,
+            )
+            db.add(credential)
+            db.flush()
+        return credential
 
 
 class _FakeToolProvider(ToolProvider):

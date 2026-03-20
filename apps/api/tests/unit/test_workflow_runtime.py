@@ -7,12 +7,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import pytest
 from sqlalchemy.orm import Session
 
+from app.modules.billing.models import TokenUsage
+from app.modules.billing.service import create_billing_service
 from app.modules.config_registry import ConfigLoader
 from app.modules.content.models import Content, ContentVersion
 from app.modules.content.service import create_chapter_content_service
 from app.modules.context.engine import create_context_builder
+from app.modules.credential.models import ModelCredential
 from app.modules.export.models import Export
 from app.modules.export.service import ExportService
 from app.modules.observability.models import PromptReplay
@@ -22,6 +26,7 @@ from app.modules.workflow.service import WorkflowRuntimeService, WorkflowService
 from app.modules.workflow.service.snapshot_support import (
     dump_config, freeze_agents, freeze_skills, freeze_workflow, resolve_start_node_id,
 )
+from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime import SkillTemplateRenderer, ToolProvider
 from tests.unit.models.helpers import create_project, create_template, create_user, ready_project_setting
 
@@ -133,6 +138,55 @@ def test_runtime_manual_flow_generates_reviewed_chapters_and_exports(db) -> None
         shutil.rmtree(harness.export_root, ignore_errors=True)
 
 
+def test_runtime_records_token_usage_for_generate_and_review_calls(db) -> None:
+    harness = _build_runtime_harness(db)
+    try:
+        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        db.commit()
+        db.refresh(harness.workflow)
+        _resume_and_run(db, harness)
+        harness.chapter_content_service.approve_chapter(db, harness.project_id, 1)
+        db.refresh(harness.workflow)
+        _resume_and_run(db, harness)
+        harness.chapter_content_service.approve_chapter(db, harness.project_id, 2)
+        db.refresh(harness.workflow)
+        _resume_and_run(db, harness)
+
+        token_usages = _list_token_usages(db, harness.project_id)
+
+        assert [item.usage_type for item in token_usages] == [
+            "generate",
+            "generate",
+            "review",
+            "generate",
+            "review",
+        ]
+        assert all(item.node_execution_id is not None for item in token_usages)
+        assert all(item.input_tokens > 0 for item in token_usages)
+        assert all(item.credential_id is not None for item in token_usages)
+    finally:
+        shutil.rmtree(harness.export_root, ignore_errors=True)
+
+
+def test_runtime_chapter_split_budget_skip_raises_explicit_error(db) -> None:
+    harness = _build_runtime_harness(db)
+    try:
+        harness.workflow.workflow_snapshot["budget"]["max_tokens_per_workflow"] = 20
+        harness.workflow.workflow_snapshot["budget"]["on_exceed"] = "skip"
+
+        with pytest.raises(
+            ConfigurationError,
+            match="chapter_split does not support budget.on_exceed=skip",
+        ):
+            harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+
+        assert _list_chapter_tasks(db, harness.workflow.id) == []
+        assert [item.status for item in _list_node_executions(db, harness.workflow.id)] == ["failed"]
+        assert db.query(PromptReplay).all() == []
+    finally:
+        shutil.rmtree(harness.export_root, ignore_errors=True)
+
+
 def _build_runtime_harness(db: Session) -> RuntimeHarness:
     owner = create_user(db)
     template = create_template(db)
@@ -163,6 +217,7 @@ def _build_runtime_harness(db: Session) -> RuntimeHarness:
     export_root = Path.cwd() / ".pytest-exports" / f"workflow-runtime-{uuid.uuid4().hex}"
     runtime_service = WorkflowRuntimeService(
         workflow_service=workflow_service,
+        billing_service=create_billing_service(),
         chapter_content_service=create_chapter_content_service(),
         context_builder=create_context_builder(),
         credential_service_factory=lambda: _FakeCredentialService(),
@@ -245,6 +300,15 @@ def _require_current_version(content: Content) -> ContentVersion:
     return version
 
 
+def _list_token_usages(db: Session, project_id: uuid.UUID) -> list[TokenUsage]:
+    return (
+        db.query(TokenUsage)
+        .filter(TokenUsage.project_id == project_id)
+        .order_by(TokenUsage.created_at.asc(), TokenUsage.id.asc())
+        .all()
+    )
+
+
 def _resume_and_run(db: Session, harness: RuntimeHarness) -> None:
     harness.workflow_service.resume(harness.workflow)
     harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
@@ -255,12 +319,6 @@ def _resume_and_run(db: Session, harness: RuntimeHarness) -> None:
 class _FakeCrypto:
     def decrypt(self, value: str) -> str:
         return value
-
-
-class _FakeCredential:
-    def __init__(self, encrypted_key: str, base_url: str | None = None) -> None:
-        self.encrypted_key = encrypted_key
-        self.base_url = base_url
 
 
 class _FakeCredentialService:
@@ -274,9 +332,29 @@ class _FakeCredentialService:
         provider: str,
         user_id: uuid.UUID,
         project_id: uuid.UUID | None = None,
-    ) -> _FakeCredential:
-        del db, user_id, project_id
-        return _FakeCredential(encrypted_key=f"{provider}-fake-key")
+    ) -> ModelCredential:
+        del project_id
+        credential = (
+            db.query(ModelCredential)
+            .filter(
+                ModelCredential.owner_type == "user",
+                ModelCredential.owner_id == user_id,
+                ModelCredential.provider == provider,
+            )
+            .one_or_none()
+        )
+        if credential is None:
+            credential = ModelCredential(
+                owner_type="user",
+                owner_id=user_id,
+                provider=provider,
+                display_name=f"{provider}-fake",
+                encrypted_key=f"{provider}-fake-key",
+                is_active=True,
+            )
+            db.add(credential)
+            db.flush()
+        return credential
 
 
 class _FakeToolProvider(ToolProvider):
@@ -327,8 +405,18 @@ class _FakeToolProvider(ToolProvider):
                 "total_tokens": 16,
             }
         if "第二章 山门截杀" in prompt:
-            return {"content": "第二章正文：山门外的反杀正式展开。"}
-        return {"content": "第一章正文：林渊在夜色中踏上逃亡之路。"}
+            return {
+                "content": "第二章正文：山门外的反杀正式展开。",
+                "input_tokens": 15,
+                "output_tokens": 40,
+                "total_tokens": 55,
+            }
+        return {
+            "content": "第一章正文：林渊在夜色中踏上逃亡之路。",
+            "input_tokens": 12,
+            "output_tokens": 36,
+            "total_tokens": 48,
+        }
 
     def list_tools(self) -> list[str]:
         return ["llm.generate"]

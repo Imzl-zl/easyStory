@@ -7,6 +7,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from app.modules.billing.service import create_billing_service
 from app.modules.config_registry import ConfigLoader
 from app.modules.content.models import Content
 from app.modules.content.service import create_chapter_content_service
@@ -32,6 +33,7 @@ from tests.unit.test_workflow_runtime import (
     _create_asset,
     _list_chapter_tasks,
     _list_node_executions,
+    _list_token_usages,
     _require_chapter,
     _require_current_version,
     _resume_and_run,
@@ -60,6 +62,7 @@ def test_runtime_auto_fix_re_reviews_and_persists_fixed_candidate(db) -> None:
         review_actions = db.query(ReviewAction).order_by(ReviewAction.created_at.asc()).all()
         prompt_replays = _chapter_gen_replays(db, harness.workflow.id)
         node_executions = _list_node_executions(db, harness.workflow.id)
+        token_usages = _list_token_usages(db, harness.project_id)
 
         assert harness.workflow.status == "paused"
         assert harness.workflow.current_node_id == "chapter_gen"
@@ -73,6 +76,7 @@ def test_runtime_auto_fix_re_reviews_and_persists_fixed_candidate(db) -> None:
         assert [item.status for item in review_actions] == ["failed", "passed"]
         assert [item.replay_type for item in prompt_replays] == ["generate", "fix"]
         assert [item.status for item in node_executions] == ["completed", "completed"]
+        assert [item.usage_type for item in token_usages] == ["generate", "generate", "review", "fix", "review"]
     finally:
         shutil.rmtree(harness.export_root, ignore_errors=True)
 
@@ -210,6 +214,123 @@ def test_runtime_auto_fix_fail_can_resume_after_user_approves_final_candidate(db
         shutil.rmtree(harness.export_root, ignore_errors=True)
 
 
+def test_runtime_budget_pause_keeps_generated_candidate_and_stops_before_review(db) -> None:
+    harness = _build_auto_fix_harness(
+        db,
+        _ReviewCycleToolProvider(initial_content="第一章正文：预算刚好打满。"),
+        auto_fix=False,
+        max_fix_attempts=1,
+        on_fix_fail="pause",
+        budget_max_tokens_per_workflow=60,
+        budget_on_exceed="pause",
+    )
+    try:
+        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        db.commit()
+        db.refresh(harness.workflow)
+        _resume_and_run(db, harness)
+        chapter = _require_chapter(db, harness.project_id, 1)
+        version = _require_current_version(chapter)
+        token_usages = _list_token_usages(db, harness.project_id)
+
+        assert harness.workflow.status == "paused"
+        assert harness.workflow.pause_reason == "budget_exceeded"
+        assert [task.status for task in _list_chapter_tasks(db, harness.workflow.id)] == ["generating"]
+        assert version.change_source == "ai_generate"
+        assert db.query(ReviewAction).all() == []
+        assert [item.usage_type for item in token_usages] == ["generate", "generate"]
+    finally:
+        shutil.rmtree(harness.export_root, ignore_errors=True)
+
+
+def test_runtime_budget_pause_persists_completed_review_actions_before_interrupt(db) -> None:
+    harness = _build_auto_fix_harness(
+        db,
+        _ReviewCycleToolProvider(
+            initial_content="第一章正文：预算在第二个 reviewer 处中断。",
+            review_always_pass=True,
+        ),
+        auto_fix=False,
+        max_fix_attempts=1,
+        on_fix_fail="pause",
+        budget_max_tokens_per_workflow=90,
+        budget_on_exceed="pause",
+    )
+    try:
+        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        db.commit()
+        db.refresh(harness.workflow)
+        chapter_gen = next(
+            node for node in harness.workflow.workflow_snapshot["nodes"] if node["id"] == "chapter_gen"
+        )
+        chapter_gen["review_mode"] = "serial"
+        chapter_gen["reviewers"] = ["agent.style_checker", "agent.style_checker"]
+        _resume_and_run(db, harness)
+        chapter = _require_chapter(db, harness.project_id, 1)
+        version = _require_current_version(chapter)
+        review_actions = db.query(ReviewAction).order_by(ReviewAction.created_at.asc()).all()
+        token_usages = _list_token_usages(db, harness.project_id)
+
+        assert harness.workflow.status == "paused"
+        assert harness.workflow.pause_reason == "budget_exceeded"
+        assert [task.status for task in _list_chapter_tasks(db, harness.workflow.id)] == ["generating"]
+        assert version.change_source == "ai_generate"
+        assert [item.status for item in review_actions] == ["passed"]
+        assert [item.review_type for item in review_actions] == ["auto_review"]
+        assert [item.usage_type for item in token_usages] == ["generate", "generate", "review", "review"]
+    finally:
+        shutil.rmtree(harness.export_root, ignore_errors=True)
+
+
+def test_runtime_budget_skip_marks_chapter_skipped_without_review(db) -> None:
+    harness = _build_auto_fix_harness(
+        db,
+        _ReviewCycleToolProvider(initial_content="第一章正文：预算跳过。"),
+        auto_fix=False,
+        max_fix_attempts=1,
+        on_fix_fail="pause",
+        budget_max_tokens_per_workflow=60,
+        budget_on_exceed="skip",
+    )
+    try:
+        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        db.commit()
+        db.refresh(harness.workflow)
+        _resume_and_run(db, harness)
+
+        assert harness.workflow.status == "completed"
+        assert db.query(Content).filter(Content.project_id == harness.project_id, Content.content_type == "chapter").all() == []
+        assert [task.status for task in _list_chapter_tasks(db, harness.workflow.id)] == ["skipped"]
+        assert db.query(ReviewAction).all() == []
+    finally:
+        shutil.rmtree(harness.export_root, ignore_errors=True)
+
+
+def test_runtime_budget_fail_keeps_candidate_and_fails_workflow(db) -> None:
+    harness = _build_auto_fix_harness(
+        db,
+        _ReviewCycleToolProvider(initial_content="第一章正文：预算失败。"),
+        auto_fix=False,
+        max_fix_attempts=1,
+        on_fix_fail="pause",
+        budget_max_tokens_per_workflow=60,
+        budget_on_exceed="fail",
+    )
+    try:
+        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        db.commit()
+        db.refresh(harness.workflow)
+        _resume_and_run(db, harness)
+        chapter = _require_chapter(db, harness.project_id, 1)
+
+        assert harness.workflow.status == "failed"
+        assert [task.status for task in _list_chapter_tasks(db, harness.workflow.id)] == ["failed"]
+        assert _require_current_version(chapter).change_source == "ai_generate"
+        assert db.query(ReviewAction).all() == []
+    finally:
+        shutil.rmtree(harness.export_root, ignore_errors=True)
+
+
 def _build_auto_fix_harness(
     db: Session,
     tool_provider: ToolProvider,
@@ -217,6 +338,9 @@ def _build_auto_fix_harness(
     auto_fix: bool,
     max_fix_attempts: int,
     on_fix_fail: str,
+    budget_max_tokens_per_node: int | None = None,
+    budget_max_tokens_per_workflow: int | None = None,
+    budget_on_exceed: str = "pause",
 ) -> RuntimeHarness:
     owner = create_user(db)
     template = create_template(db)
@@ -235,6 +359,11 @@ def _build_auto_fix_harness(
     chapter_gen.auto_fix = auto_fix
     chapter_gen.max_fix_attempts = max_fix_attempts
     chapter_gen.on_fix_fail = on_fix_fail
+    if budget_max_tokens_per_node is not None:
+        workflow_config.budget.max_tokens_per_node = budget_max_tokens_per_node
+    if budget_max_tokens_per_workflow is not None:
+        workflow_config.budget.max_tokens_per_workflow = budget_max_tokens_per_workflow
+    workflow_config.budget.on_exceed = budget_on_exceed
     agents = freeze_agents(config_loader, workflow_config)
     workflow = WorkflowExecution(
         project_id=project.id,
@@ -252,6 +381,7 @@ def _build_auto_fix_harness(
     export_root = Path.cwd() / ".pytest-exports" / f"workflow-runtime-autofix-{uuid.uuid4().hex}"
     runtime_service = WorkflowRuntimeService(
         workflow_service=workflow_service,
+        billing_service=create_billing_service(),
         chapter_content_service=create_chapter_content_service(),
         context_builder=create_context_builder(),
         credential_service_factory=lambda: _FakeCredentialService(),
@@ -279,10 +409,12 @@ class _ReviewCycleToolProvider(ToolProvider):
         initial_content: str,
         fixed_content: str | None = None,
         pass_on_fixed: bool = False,
+        review_always_pass: bool = False,
     ) -> None:
         self.initial_content = initial_content
         self.fixed_content = fixed_content
         self.pass_on_fixed = pass_on_fixed
+        self.review_always_pass = review_always_pass
 
     async def execute(self, tool_name: str, params: dict) -> dict:
         assert tool_name == "llm.generate"
@@ -302,20 +434,40 @@ class _ReviewCycleToolProvider(ToolProvider):
                         ]
                     },
                     ensure_ascii=False,
-                )
+                ),
+                "input_tokens": 6,
+                "output_tokens": 12,
+                "total_tokens": 18,
             }
         if "输出一个严格符合 ReviewResult 的 JSON 对象" in prompt:
-            return {"content": self._review_result(prompt)}
+            return {
+                "content": self._review_result(prompt),
+                "input_tokens": 8,
+                "output_tokens": 8,
+                "total_tokens": 16,
+            }
         if "你是小说精修编辑" in prompt:
             assert self.fixed_content is not None
-            return {"content": self.fixed_content}
-        return {"content": self.initial_content}
+            return {
+                "content": self.fixed_content,
+                "input_tokens": 20,
+                "output_tokens": 30,
+                "total_tokens": 50,
+            }
+        return {
+            "content": self.initial_content,
+            "input_tokens": 12,
+            "output_tokens": 36,
+            "total_tokens": 48,
+        }
 
     def list_tools(self) -> list[str]:
         return ["llm.generate"]
 
     def _review_result(self, prompt: str) -> dict:
-        if self.pass_on_fixed and self.fixed_content and self.fixed_content in prompt:
+        if self.review_always_pass or (
+            self.pass_on_fixed and self.fixed_content and self.fixed_content in prompt
+        ):
             return {
                 "reviewer_id": "agent.style_checker",
                 "reviewer_name": "文风检查员",

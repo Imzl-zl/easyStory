@@ -8,16 +8,28 @@ from pydantic import ValidationError
 
 from app.modules.config_registry.infrastructure.config_loader import ConfigLoader
 from app.modules.config_registry.schemas.config_schemas import AgentConfig, ReviewConfig
-from app.shared.runtime.errors import EasyStoryError
+from app.shared.runtime.errors import BudgetExceededError, EasyStoryError
 
 from .contracts import AggregatedReviewResult, ReviewExecutionFailure, ReviewResult
 
 ReviewRunner = Callable[[str, AgentConfig], Awaitable[ReviewResult | dict[str, Any]]]
 ReviewOutcome = ReviewResult | ReviewExecutionFailure
+IndexedReviewOutcome = tuple[int, ReviewOutcome]
 
 
 class ReviewExecutorError(EasyStoryError):
     """Review execution contract errors."""
+
+
+class _ReviewBudgetInterruption(Exception):
+    def __init__(
+        self,
+        budget_error: BudgetExceededError,
+        outcomes: Sequence[IndexedReviewOutcome],
+    ) -> None:
+        super().__init__(budget_error.message)
+        self.budget_error = budget_error
+        self.outcomes = tuple(outcomes)
 
 
 class ReviewExecutor:
@@ -46,16 +58,23 @@ class ReviewExecutor:
         max_concurrent_reviewers: int = 3,
     ) -> AggregatedReviewResult:
         resolved_reviewers = self._resolve_reviewers(reviewers)
-        if mode == "parallel":
-            results = await self._execute_parallel(
-                content,
-                resolved_reviewers,
-                max_concurrent_reviewers,
+        try:
+            if mode == "parallel":
+                results = await self._execute_parallel(
+                    content,
+                    resolved_reviewers,
+                    max_concurrent_reviewers,
+                )
+            elif mode == "serial":
+                results = await self._execute_serial(content, resolved_reviewers)
+            else:
+                raise ReviewExecutorError(f"Unsupported review mode: {mode}")
+        except _ReviewBudgetInterruption as exc:
+            exc.budget_error.partial_aggregated_review = self._build_partial_aggregate(
+                exc.outcomes,
+                config.pass_rule,
             )
-        elif mode == "serial":
-            results = await self._execute_serial(content, resolved_reviewers)
-        else:
-            raise ReviewExecutorError(f"Unsupported review mode: {mode}")
+            raise exc.budget_error
         return self.aggregate(results, config.pass_rule)
 
     async def _execute_parallel(
@@ -67,22 +86,45 @@ class ReviewExecutor:
         if max_concurrent_reviewers < 1:
             raise ReviewExecutorError("max_concurrent_reviewers must be >= 1")
         semaphore = asyncio.Semaphore(max_concurrent_reviewers)
+        completed: list[IndexedReviewOutcome] = []
 
         async def run(reviewer: AgentConfig) -> ReviewOutcome:
             async with semaphore:
                 return await self._execute_single(content, reviewer)
 
-        return list(await asyncio.gather(*(run(reviewer) for reviewer in reviewers)))
+        pending = {
+            asyncio.create_task(run(reviewer)): index
+            for index, reviewer in enumerate(reviewers)
+        }
+        while pending:
+            done, _ = await asyncio.wait(tuple(pending), return_when=asyncio.FIRST_COMPLETED)
+            budget_error: BudgetExceededError | None = None
+            for task in done:
+                index = pending.pop(task)
+                try:
+                    completed.append((index, task.result()))
+                except BudgetExceededError as exc:
+                    if budget_error is None:
+                        budget_error = exc
+            if budget_error is None:
+                continue
+            completed.extend(await self._drain_pending_reviews(pending))
+            raise _ReviewBudgetInterruption(budget_error, completed)
+        return self._ordered_outcomes(completed)
 
     async def _execute_serial(
         self,
         content: str,
         reviewers: Sequence[AgentConfig],
     ) -> list[ReviewOutcome]:
-        results: list[ReviewOutcome] = []
-        for reviewer in reviewers:
-            results.append(await self._execute_single(content, reviewer))
-        return results
+        completed: list[IndexedReviewOutcome] = []
+        for index, reviewer in enumerate(reviewers):
+            try:
+                outcome = await self._execute_single(content, reviewer)
+            except BudgetExceededError as exc:
+                raise _ReviewBudgetInterruption(exc, completed) from exc
+            completed.append((index, outcome))
+        return self._ordered_outcomes(completed)
 
     def aggregate(
         self,
@@ -112,6 +154,37 @@ class ReviewExecutor:
             minor_count=counts["minor"],
             pass_rule=pass_rule,
         )
+
+    def _build_partial_aggregate(
+        self,
+        indexed_outcomes: Sequence[IndexedReviewOutcome],
+        pass_rule: str,
+    ) -> AggregatedReviewResult | None:
+        if not indexed_outcomes:
+            return None
+        return self.aggregate(self._ordered_outcomes(indexed_outcomes), pass_rule)
+
+    async def _drain_pending_reviews(
+        self,
+        pending: dict[asyncio.Task[ReviewOutcome], int],
+    ) -> list[IndexedReviewOutcome]:
+        tasks = list(pending.items())
+        if not tasks:
+            return []
+        for task, _ in tasks:
+            task.cancel()
+        drained = await asyncio.gather(*(task for task, _ in tasks), return_exceptions=True)
+        outcomes: list[IndexedReviewOutcome] = []
+        for item, (_, index) in zip(drained, tasks, strict=True):
+            if isinstance(item, ReviewResult) or isinstance(item, ReviewExecutionFailure):
+                outcomes.append((index, item))
+        return outcomes
+
+    def _ordered_outcomes(
+        self,
+        indexed_outcomes: Sequence[IndexedReviewOutcome],
+    ) -> list[ReviewOutcome]:
+        return [outcome for _, outcome in sorted(indexed_outcomes, key=lambda item: item[0])]
 
     def _resolve_reviewers(self, reviewers: Sequence[str | AgentConfig]) -> list[AgentConfig]:
         if not reviewers:
@@ -151,6 +224,8 @@ class ReviewExecutor:
                 "invalid_result",
                 str(exc),
             )
+        except BudgetExceededError:
+            raise
         except Exception as exc:
             return self._build_execution_failure(
                 reviewer,

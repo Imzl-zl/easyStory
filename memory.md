@@ -64,3 +64,19 @@
 - **Changes**：`chapter_mutation_support.py` 现在会优先完成活跃工作流的等待确认任务，并在必要时补全 matching failed 任务，保证 `on_fix_fail=fail` 后用户确认最终候选再 retry 时不会重复生成同章。
 - **Changes**：新增/扩展 `apps/api/tests/unit/test_workflow_runtime_auto_fix.py`、`apps/api/tests/unit/test_workflow_api.py`、`apps/api/tests/unit/test_chapter_content_service.py`，覆盖上述 3 条回归链路。
 - **Validation**：`cd apps/api && ruff check app tests && pytest -q` 通过，当前全量结果为 `222 passed`。
+
+## [2026-03-20 | billing runtime guard 闭环完成]
+- **Events**：完成 `billing` 主链路闭环，打通 `workflow runtime -> llm call -> token usage -> budget guard -> workflow pause/fail/skip`。
+- **Changes**：新增 `apps/api/app/modules/billing/service/`，实现 `BillingService`、factory 与 DTO；现在每次 LLM 调用都会记录 `TokenUsage`、计算 `estimated_cost`，并汇总 `node / workflow / project_day / user_day` 四级预算状态。
+- **Changes**：`WorkflowRuntimeService._call_llm()` 已接入 billing；预算达到 warning threshold 时写执行日志，预算超限时抛出携带原始输出的 `BudgetExceededError`，不做 silent fallback。
+- **Changes**：`ReviewExecutor` 现会透传 `BudgetExceededError`；`chapter_split`、`chapter_gen`、`review`、`fix` 已全部接入预算控制，预算超限后会按 `budget.on_exceed` 收敛，并尽量保留已产生的候选内容而不继续追加后续 LLM 调用。
+- **Changes**：为保持文件职责清晰，runtime 新拆出 `workflow_runtime_budget_support.py`、`workflow_runtime_chapter_candidate_mixin.py`、`workflow_runtime_export_mixin.py`；测试 fake credential 也改为真实 ORM 凭证，避免 `TokenUsage.credential_id` 漂空。
+- **Validation**：`cd apps/api && ruff check app tests`、`cd apps/api && pytest -q` 通过，当前全量结果为 `229 passed`。
+
+## [2026-03-20 | billing/review 语义一致性修复完成]
+- **Events**：完成对 billing/runtime/review 审查中 3 条一致性问题的真实修复，覆盖预算告警边界、review 预算中断持久化、`chapter_split` 的 unsupported skip 语义。
+- **Changes**：`BillingService` 的 warning threshold 计算改为向上取整，保证 `warning_threshold` 的展示值和实际告警生效边界一致。
+- **Changes**：`ReviewExecutor` 现在会在 `BudgetExceededError` 中附带已完成 reviewer 的 partial aggregate；`WorkflowRuntimeReviewMixin` 会先补写这些 `ReviewAction`，再让 runtime 继续按 budget 策略 pause/skip/fail，避免 `TokenUsage` 已落库但 `ReviewAction` 丢失。
+- **Changes**：`chapter_split` 遇到 `budget.on_exceed=skip` 时改为显式抛出 `ConfigurationError`，并在写入 `ChapterTask` 之前中断，避免继续使用静默改写语义。
+- **Changes**：新增/扩展 `test_billing_service.py`、`test_review_executor.py`、`test_workflow_runtime.py`、`test_workflow_runtime_auto_fix.py`，覆盖上述 3 条回归链路。
+- **Validation**：`cd apps/api && ruff check app tests && pytest -q` 通过，当前全量结果为 `233 passed`。

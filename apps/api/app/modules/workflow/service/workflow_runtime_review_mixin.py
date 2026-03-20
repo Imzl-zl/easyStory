@@ -1,20 +1,15 @@
 from __future__ import annotations
-
 import asyncio
 import uuid
 from typing import Any, Sequence
-
 from app.modules.config_registry.schemas.config_schemas import ModelConfig, NodeConfig, WorkflowConfig
 from app.modules.review.engine import FixExecutionRequest, FixExecutor, ReviewExecutor
 from app.modules.review.engine.contracts import AggregatedReviewResult
 from app.modules.review.models import ReviewAction
 from app.modules.workflow.models import NodeExecution, WorkflowExecution
-from app.shared.runtime.errors import ConfigurationError
-
+from app.shared.runtime.errors import BudgetExceededError, ConfigurationError
 from .snapshot_support import load_agent_snapshot, load_skill_snapshot
 from .workflow_runtime_shared import ReviewCycleOutcome
-
-
 class WorkflowRuntimeReviewMixin:
     def _run_auto_review(
         self,
@@ -33,7 +28,15 @@ class WorkflowRuntimeReviewMixin:
             return ReviewCycleOutcome("passed", content, "generated")
         reviewers = [load_agent_snapshot(workflow.agents_snapshot or {}, item) for item in node.reviewers]
         aggregated = self._run_review_round(
-            db, workflow, node, execution, content, reviewers, owner_id=owner_id, review_type="auto_review"
+            db,
+            workflow,
+            workflow_config,
+            node,
+            execution,
+            content,
+            reviewers,
+            owner_id=owner_id,
+            review_type="auto_review",
         )
         if aggregated.overall_status == "passed":
             return ReviewCycleOutcome("passed", content, "generated")
@@ -42,14 +45,12 @@ class WorkflowRuntimeReviewMixin:
         auto_fix = node.auto_fix if node.auto_fix is not None else workflow_config.settings.auto_fix
         if not auto_fix:
             return ReviewCycleOutcome("pause", content, "generated", failure_message="自动审核未通过")
-        return self._run_fix_cycle(
-            db, workflow, workflow_config, node, execution, prompt_bundle, content, aggregated, reviewers, owner_id
-        )
-
+        return self._run_fix_cycle(db, workflow, workflow_config, node, execution, prompt_bundle, content, aggregated, reviewers, owner_id)
     def _run_review_round(
         self,
         db,
         workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
         node: NodeConfig,
         execution: NodeExecution,
         content: str,
@@ -59,20 +60,33 @@ class WorkflowRuntimeReviewMixin:
         review_type: str,
     ) -> AggregatedReviewResult:
         async def runner(text: str, reviewer):
-            return await self._run_reviewer(db, workflow, reviewer, text, owner_id=owner_id)
-
-        aggregated = asyncio.run(
-            ReviewExecutor(runner).execute_review(
-                content,
-                reviewers,
-                node.review_mode,
-                node.review_config,
-                max_concurrent_reviewers=node.max_concurrent_reviewers,
+            return await self._run_reviewer(
+                db,
+                workflow,
+                workflow_config,
+                execution,
+                reviewer,
+                text,
+                owner_id=owner_id,
             )
-        )
+
+        try:
+            aggregated = asyncio.run(
+                ReviewExecutor(runner).execute_review(
+                    content,
+                    reviewers,
+                    node.review_mode,
+                    node.review_config,
+                    max_concurrent_reviewers=node.max_concurrent_reviewers,
+                )
+            )
+        except BudgetExceededError as exc:
+            partial = exc.partial_aggregated_review
+            if partial is not None:
+                self._append_review_actions(execution, partial, review_type)
+            raise
         self._append_review_actions(execution, aggregated, review_type)
         return aggregated
-
     def _append_review_actions(
         self,
         execution: NodeExecution,
@@ -104,7 +118,6 @@ class WorkflowRuntimeReviewMixin:
                     execution_time_ms=failure.execution_time_ms,
                 )
             )
-
     def _run_fix_cycle(
         self,
         db,
@@ -128,6 +141,7 @@ class WorkflowRuntimeReviewMixin:
             aggregated = self._run_review_round(
                 db,
                 workflow,
+                workflow_config,
                 node,
                 execution,
                 current_content,
@@ -140,7 +154,6 @@ class WorkflowRuntimeReviewMixin:
             if aggregated.execution_failures:
                 return ReviewCycleOutcome("pause", current_content, "auto_fix", failure_message="自动复审执行失败")
         return self._resolve_fix_failure(node, current_content)
-
     def _run_fix_attempt(
         self,
         db,
@@ -155,15 +168,17 @@ class WorkflowRuntimeReviewMixin:
     ) -> str:
         recorded_prompt_bundle: dict[str, Any] = {}
         recorded_raw_output: dict[str, Any] = {}
-
         async def runner(request: FixExecutionRequest) -> str:
             nonlocal recorded_prompt_bundle, recorded_raw_output
             recorded_prompt_bundle = self._build_fix_prompt_bundle(workflow, request, prompt_bundle["model"])
             recorded_raw_output = await self._call_llm(
                 db,
                 workflow,
+                workflow_config,
                 recorded_prompt_bundle,
                 owner_id=owner_id,
+                node_execution_id=execution.id,
+                usage_type="fix",
             )
             content = recorded_raw_output.get("content")
             if not isinstance(content, str):
@@ -173,14 +188,23 @@ class WorkflowRuntimeReviewMixin:
         executor = FixExecutor(runner)
         strategy = executor.determine_strategy(aggregated, node.fix_strategy)
         prompt_source = executor.resolve_prompt_source(node.fix_skill, workflow_config.settings.default_fix_skill)
-        fixed_content = asyncio.run(
-            executor.execute_fix(
-                content, aggregated, strategy, prompt_source, original_prompt=prompt_bundle["prompt"]
+        try:
+            fixed_content = asyncio.run(
+                executor.execute_fix(
+                    content, aggregated, strategy, prompt_source, original_prompt=prompt_bundle["prompt"]
+                )
             )
-        )
+        except BudgetExceededError as exc:
+            self._record_prompt_replay(
+                db,
+                execution,
+                recorded_prompt_bundle,
+                exc.raw_output,
+                replay_type="fix",
+            )
+            raise
         self._record_prompt_replay(db, execution, recorded_prompt_bundle, recorded_raw_output, replay_type="fix")
         return fixed_content
-
     def _build_fix_prompt_bundle(
         self,
         workflow: WorkflowExecution,
@@ -244,6 +268,8 @@ class WorkflowRuntimeReviewMixin:
         self,
         db,
         workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        execution: NodeExecution,
         reviewer,
         content: str,
         *,
@@ -259,6 +285,7 @@ class WorkflowRuntimeReviewMixin:
         raw_output = await self._call_llm(
             db,
             workflow,
+            workflow_config,
             {
                 "prompt": prompt,
                 "system_prompt": reviewer.system_prompt,
@@ -266,5 +293,7 @@ class WorkflowRuntimeReviewMixin:
                 "response_format": "json_object",
             },
             owner_id=owner_id,
+            node_execution_id=execution.id,
+            usage_type="review",
         )
         return self._parse_json(raw_output["content"])
