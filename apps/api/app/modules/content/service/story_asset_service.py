@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.modules.content.models import Content, ContentVersion
-from app.modules.project.models import Project
 from app.modules.project.service import ProjectService
 from app.modules.workflow.models import ChapterTask
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
@@ -30,7 +29,7 @@ class StoryAssetService:
         *,
         owner_id: uuid.UUID | None = None,
     ) -> StoryAssetDTO:
-        project = self._require_project(db, project_id, owner_id=owner_id)
+        project = self.project_service.require_project(db, project_id, owner_id=owner_id)
         self.project_service.ensure_setting_allows_preparation(project)
         if asset_type == "opening_plan":
             self._require_approved_asset(db, project_id, "outline")
@@ -58,7 +57,7 @@ class StoryAssetService:
         *,
         owner_id: uuid.UUID | None = None,
     ) -> StoryAssetDTO:
-        project = self._require_project(db, project_id, owner_id=owner_id)
+        project = self.project_service.require_project(db, project_id, owner_id=owner_id)
         self.project_service.ensure_setting_allows_preparation(project)
         if asset_type == "opening_plan":
             self._require_approved_asset(db, project_id, "outline")
@@ -71,21 +70,6 @@ class StoryAssetService:
         db.commit()
         db.refresh(content)
         return self._to_dto(content)
-
-    def _require_project(
-        self,
-        db: Session,
-        project_id: uuid.UUID,
-        *,
-        owner_id: uuid.UUID | None = None,
-    ) -> Project:
-        query = db.query(Project).filter(Project.id == project_id)
-        if owner_id is not None:
-            query = query.filter(Project.owner_id == owner_id)
-        project = query.one_or_none()
-        if project is None:
-            raise NotFoundError(f"Project not found: {project_id}")
-        return project
 
     def _get_asset(
         self,
@@ -152,14 +136,14 @@ class StoryAssetService:
     def _mark_stale_dependencies(
         self,
         db: Session,
-        project: Project,
+        project,
         asset_type: AssetType,
     ) -> None:
         self._mark_downstream_stale(project, asset_type)
         if asset_type in {"outline", "opening_plan"}:
             self._mark_chapter_tasks_stale(db, project.id)
 
-    def _mark_downstream_stale(self, project: Project, asset_type: AssetType) -> None:
+    def _mark_downstream_stale(self, project, asset_type: AssetType) -> None:
         for content in project.contents:
             if content.status != "approved":
                 continue
