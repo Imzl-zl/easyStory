@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -28,3 +28,12 @@ class NodeOutcome:
     next_node_id: str | None
     pause_reason: str | None = None
     snapshot_extra: dict[str, Any] | None = None
+    workflow_status: Literal["failed"] | None = None
+
+
+@dataclass(frozen=True)
+class ReviewCycleOutcome:
+    resolution: Literal["passed", "pause", "skip", "fail"]
+    final_content: str
+    content_source: Literal["generated", "auto_fix"]
+    failure_message: str | None = None

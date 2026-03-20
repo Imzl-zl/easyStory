@@ -39,3 +39,28 @@
 - **Changes**：`LLMToolProvider` 已把 `provider` 透传为 LiteLLM `custom_llm_provider`，消除“凭证选择和真实调用不一致”的双真值。
 - **Changes**：新增 `apps/api/tests/unit/test_export_service.py`、`apps/api/tests/unit/test_llm_tool_provider.py`、`apps/api/tests/unit/test_workflow_app_service.py`，并扩展章节确认与导出集成断言。
 - **Validation**：`cd apps/api && ruff check app tests`、`cd apps/api && pytest -q` 通过，当前全量结果为 `211 passed`。
+
+## [2026-03-20 | review auto-fix runtime 闭环完成]
+- **Events**：完成 `chapter_gen` 的 `auto_review -> auto_fix -> re-review` 真实执行闭环，并补齐失败策略。
+- **Changes**：`WorkflowRuntimeReviewMixin` 已接入 `FixExecutor`，支持节点级 `auto_fix / max_fix_attempts / on_fix_fail / fix_skill` 与 workflow 级 `default_fix_skill` 回退。
+- **Changes**：新增 `workflow_runtime_execute_mixin.py`，将章节生成后的候选正文落库、任务状态流转、`pause / skip / fail` 收尾逻辑从主服务拆出，保持 runtime 主服务文件精简。
+- **Changes**：`ChapterContentService` 新增 `save_auto_fix_draft()`；自动精修通过或保留最终候选时，会写入 `ContentVersion(created_by=auto_fix, change_source=ai_fix)`。
+- **Changes**：修正了旧逻辑混乱：审核失败但保留候选正文时，`ChapterTask` 现在进入 `generating` 等待确认态，而不是 `failed` 死状态；`PromptReplay` 也支持记录 `replay_type="fix"`。
+- **Changes**：新增 `apps/api/tests/unit/test_workflow_runtime_auto_fix.py`，覆盖 auto-fix 成功、`on_fix_fail=skip` 以及无 auto-fix 时 review_failed 候选正文仍可确认的回归场景。
+- **Validation**：`cd apps/api && ruff check app tests && pytest -q` 通过，当前全量结果为 `214 passed`。
+
+## [2026-03-20 | workflow observability API 闭环完成]
+- **Events**：完成工作流可观测性后端 API 闭环，让 runtime 已持久化的执行数据可直接查询。
+- **Changes**：新增 `observability` 路由与 `WorkflowObservabilityService`，可查询 `workflow executions`、`execution logs`、`node prompt replays`。
+- **Changes**：节点执行详情现在会返回 `input_summary`、`context_report`、`artifacts`、`review_actions`，将调试所需数据和完整 prompt 回放分开。
+- **Changes**：`WorkflowRuntimePersistenceMixin` 已接入 `ExecutionLog`，记录节点 `started/completed/skipped/failed`；`WorkflowAppService` 与 runtime 收尾逻辑会记录 `started/resumed/paused/cancelled/completed/failed/runtime_error` 等 workflow 级日志。
+- **Changes**：新增 `apps/api/tests/unit/test_workflow_observability_service.py`、`apps/api/tests/unit/test_workflow_observability_api.py`，覆盖查询结果结构和 owner 隔离。
+- **Validation**：`cd apps/api && ruff check app tests && pytest -q` 通过，当前全量结果为 `218 passed`。
+
+## [2026-03-20 | workflow 状态一致性修复完成]
+- **Events**：完成对 runtime 审查中 3 条 P1 状态一致性问题的真实修复，覆盖 auto-fix pause、resume 前置校验、failed 候选确认后的 retry 闭环。
+- **Changes**：新增 `workflow_task_runtime_support.py`，统一工作流恢复前的章节任务选择与可继续判断；`WorkflowAppService.resume_workflow()` 现会在状态迁移前阻止“章节待确认/failed 但候选未确认”的恢复请求，保留原始快照。
+- **Changes**：`WorkflowRuntimeExecuteMixin` 的 auto-fix pause 语义已统一为 `pause_reason=review_failed`，不再写入非法 `fix_failed`，与设计文档和状态机保持一致。
+- **Changes**：`chapter_mutation_support.py` 现在会优先完成活跃工作流的等待确认任务，并在必要时补全 matching failed 任务，保证 `on_fix_fail=fail` 后用户确认最终候选再 retry 时不会重复生成同章。
+- **Changes**：新增/扩展 `apps/api/tests/unit/test_workflow_runtime_auto_fix.py`、`apps/api/tests/unit/test_workflow_api.py`、`apps/api/tests/unit/test_chapter_content_service.py`，覆盖上述 3 条回归链路。
+- **Validation**：`cd apps/api && ruff check app tests && pytest -q` 通过，当前全量结果为 `222 passed`。

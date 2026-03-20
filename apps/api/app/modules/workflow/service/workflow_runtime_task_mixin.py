@@ -5,15 +5,13 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.modules.content.models import Content
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
 from app.shared.runtime.errors import BusinessRuleError
 
 from .workflow_runtime_shared import (
     ChapterSplitPayload,
-    TERMINAL_TASK_STATUSES,
-    WAITING_CONFIRM_TASK_STATUS,
 )
+from .workflow_task_runtime_support import ensure_task_can_continue, find_next_actionable_task
 
 
 class WorkflowRuntimeTaskMixin:
@@ -66,26 +64,10 @@ class WorkflowRuntimeTaskMixin:
             )
 
     def _next_actionable_task(self, db: Session, workflow: WorkflowExecution) -> ChapterTask | None:
-        tasks = (
-            db.query(ChapterTask)
-            .filter(ChapterTask.workflow_execution_id == workflow.id)
-            .order_by(ChapterTask.chapter_number.asc())
-            .all()
-        )
-        return next((task for task in tasks if task.status not in TERMINAL_TASK_STATUSES), None)
+        return find_next_actionable_task(db, workflow.id)
 
     def _ensure_task_can_continue(self, db: Session, task: ChapterTask) -> None:
-        if task.status == "stale":
-            raise BusinessRuleError("当前章节任务已失效，请先重新执行 chapter_split")
-        if task.status not in {WAITING_CONFIRM_TASK_STATUS, "failed"}:
-            return
-        if task.content_id is None:
-            if task.status == "failed":
-                return
-            raise BusinessRuleError("当前章节草稿待确认，请先确认或修改后再继续")
-        content = db.get(Content, task.content_id)
-        if content is None or content.status != "approved":
-            raise BusinessRuleError("当前章节草稿待确认，请先确认或修改后再继续")
+        ensure_task_can_continue(db, task)
 
     def _hash_payload(self, payload: dict[str, Any]) -> str:
         raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")

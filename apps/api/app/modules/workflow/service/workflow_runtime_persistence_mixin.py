@@ -6,10 +6,14 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.modules.observability.models import PromptReplay
+from app.modules.observability.models import ExecutionLog, PromptReplay
 from app.modules.workflow.models import Artifact, ChapterTask, NodeExecution
 
 from .snapshot_support import resolve_node_order
+
+LOG_LEVEL_INFO = "INFO"
+LOG_LEVEL_WARNING = "WARNING"
+LOG_LEVEL_ERROR = "ERROR"
 
 
 class WorkflowRuntimePersistenceMixin:
@@ -25,6 +29,14 @@ class WorkflowRuntimePersistenceMixin:
         )
         db.add(execution)
         db.flush()
+        self._record_execution_log(
+            db,
+            workflow_execution_id=workflow.id,
+            node_execution_id=execution.id,
+            level=LOG_LEVEL_INFO,
+            message="Node started",
+            details={"node_id": node.id, "sequence": execution.sequence},
+        )
         return execution
 
     def _next_sequence(self, db: Session, workflow_execution_id: uuid.UUID, node_id: str) -> int:
@@ -39,19 +51,72 @@ class WorkflowRuntimePersistenceMixin:
         )
         return 0 if existing is None else existing.sequence + 1
 
-    def _complete_execution(self, execution: NodeExecution, started_at: datetime, output_data: dict[str, Any]) -> None:
+    def _complete_execution(
+        self,
+        db: Session,
+        execution: NodeExecution,
+        started_at: datetime,
+        output_data: dict[str, Any],
+    ) -> None:
         finished_at = datetime.now(timezone.utc)
         execution.status = "completed"
         execution.output_data = output_data
         execution.completed_at = finished_at
         execution.execution_time_ms = int((finished_at - started_at).total_seconds() * 1000)
+        self._record_execution_log(
+            db,
+            workflow_execution_id=execution.workflow_execution_id,
+            node_execution_id=execution.id,
+            level=LOG_LEVEL_INFO,
+            message="Node completed",
+            details={"node_id": execution.node_id, "sequence": execution.sequence},
+        )
 
-    def _fail_execution(self, execution: NodeExecution, started_at: datetime, exc: Exception) -> None:
+    def _skip_execution(
+        self,
+        db: Session,
+        execution: NodeExecution,
+        started_at: datetime,
+        output_data: dict[str, Any],
+    ) -> None:
+        finished_at = datetime.now(timezone.utc)
+        execution.status = "skipped"
+        execution.output_data = output_data
+        execution.completed_at = finished_at
+        execution.execution_time_ms = int((finished_at - started_at).total_seconds() * 1000)
+        self._record_execution_log(
+            db,
+            workflow_execution_id=execution.workflow_execution_id,
+            node_execution_id=execution.id,
+            level=LOG_LEVEL_WARNING,
+            message="Node skipped",
+            details={"node_id": execution.node_id, "sequence": execution.sequence},
+        )
+
+    def _fail_execution(
+        self,
+        db: Session,
+        execution: NodeExecution,
+        started_at: datetime,
+        exc: Exception,
+    ) -> None:
         finished_at = datetime.now(timezone.utc)
         execution.status = "failed"
         execution.error_message = str(exc)
         execution.completed_at = finished_at
         execution.execution_time_ms = int((finished_at - started_at).total_seconds() * 1000)
+        self._record_execution_log(
+            db,
+            workflow_execution_id=execution.workflow_execution_id,
+            node_execution_id=execution.id,
+            level=LOG_LEVEL_ERROR,
+            message="Node failed",
+            details={
+                "node_id": execution.node_id,
+                "sequence": execution.sequence,
+                "error": str(exc),
+            },
+        )
 
     def _append_artifact(
         self,
@@ -77,16 +142,38 @@ class WorkflowRuntimePersistenceMixin:
         execution: NodeExecution,
         prompt_bundle: dict[str, Any],
         raw_output: dict[str, Any],
+        *,
+        replay_type: str = "generate",
     ) -> None:
         db.add(
             PromptReplay(
                 node_execution_id=execution.id,
-                replay_type="generate",
+                replay_type=replay_type,
                 model_name=prompt_bundle["model"].name or "",
                 prompt_text=prompt_bundle["prompt"],
                 response_text=self._serialize_replay_text(raw_output.get("content")),
                 input_tokens=raw_output.get("input_tokens"),
                 output_tokens=raw_output.get("output_tokens"),
+            )
+        )
+
+    def _record_execution_log(
+        self,
+        db: Session,
+        *,
+        workflow_execution_id: uuid.UUID,
+        node_execution_id: uuid.UUID | None,
+        level: str,
+        message: str,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        db.add(
+            ExecutionLog(
+                workflow_execution_id=workflow_execution_id,
+                node_execution_id=node_execution_id,
+                level=level,
+                message=message,
+                details=details,
             )
         )
 

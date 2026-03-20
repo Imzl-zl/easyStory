@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import shutil
 import uuid
 from pathlib import Path
@@ -205,6 +206,46 @@ def test_resume_workflow_blocks_when_chapter_tasks_are_stale(monkeypatch) -> Non
         assert resume_response.status_code == 422
         assert resume_response.json()["code"] == "business_rule_error"
         assert "chapter_split" in resume_response.json()["detail"]
+    finally:
+        client.close()
+        Base.metadata.drop_all(engine)
+
+
+def test_resume_workflow_waiting_confirmation_keeps_existing_snapshot(monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    session_factory, engine = _build_session_factory()
+    project_id, owner_id = _seed_project(session_factory, ready_assets=True)
+    client = _build_runtime_client(session_factory)
+    headers = _auth_headers(owner_id)
+
+    try:
+        start_response = client.post(
+            f"/api/v1/projects/{project_id}/workflows/start",
+            headers=headers,
+        )
+        execution_id = start_response.json()["execution_id"]
+
+        first_resume = client.post(f"/api/v1/workflows/{execution_id}/resume", headers=headers)
+        assert first_resume.status_code == 200
+        assert first_resume.json()["status"] == "paused"
+
+        with session_factory() as session:
+            workflow = session.get(WorkflowExecution, uuid.UUID(execution_id))
+            assert workflow is not None
+            original_snapshot = copy.deepcopy(workflow.snapshot)
+            assert original_snapshot["pending_actions"][0]["type"] == "chapter_confirmation"
+            assert workflow.pause_reason is None
+
+        second_resume = client.post(f"/api/v1/workflows/{execution_id}/resume", headers=headers)
+        assert second_resume.status_code == 422
+        assert second_resume.json()["code"] == "business_rule_error"
+        assert "待确认" in second_resume.json()["detail"]
+
+        with session_factory() as session:
+            workflow = session.get(WorkflowExecution, uuid.UUID(execution_id))
+            assert workflow is not None
+            assert workflow.snapshot == original_snapshot
+            assert workflow.pause_reason is None
     finally:
         client.close()
         Base.metadata.drop_all(engine)

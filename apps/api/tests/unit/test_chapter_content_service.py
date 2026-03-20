@@ -195,6 +195,28 @@ def test_approve_chapter_does_not_complete_non_matching_active_task(db):
     assert task.content_id == other_content.id
 
 
+def test_approve_chapter_completes_matching_failed_task_for_retry(db):
+    project = create_project(db, project_setting=ready_project_setting())
+    _create_preparation_assets(db, project)
+    service = create_chapter_content_service()
+    chapter = _create_chapter(db, project, 1, "第一章", "第一章正文")
+    workflow = create_workflow(db, project=project, status="failed")
+    task = create_chapter_task(
+        db,
+        workflow=workflow,
+        chapter_number=1,
+        status="failed",
+        content_id=chapter.id,
+    )
+
+    result = service.approve_chapter(db, project.id, 1)
+
+    db.refresh(task)
+    assert result.status == "approved"
+    assert task.status == "completed"
+    assert task.content_id == chapter.id
+
+
 def _create_preparation_assets(db, project):
     outline = create_content(
         db,

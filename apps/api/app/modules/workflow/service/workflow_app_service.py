@@ -8,10 +8,11 @@ from sqlalchemy.orm import Query, Session
 from app.modules.config_registry import ConfigLoader
 from app.modules.config_registry.schemas.config_schemas import WorkflowConfig
 from app.modules.content.models import Content
+from app.modules.observability.models import ExecutionLog
 from app.modules.project.models import Project
 from app.modules.project.service import ProjectService
 from app.modules.workflow.engine import InvalidTransitionError, WorkflowStateMachine
-from app.modules.workflow.models import ChapterTask, WorkflowExecution
+from app.modules.workflow.models import WorkflowExecution
 from app.shared.runtime.errors import (
     BusinessRuleError,
     ConfigurationError,
@@ -29,6 +30,7 @@ from .snapshot_support import (
     resolve_start_node_id,
     workflow_to_dto,
 )
+from .workflow_task_runtime_support import ensure_workflow_can_resume
 from .workflow_runtime_service import WorkflowRuntimeService
 from .workflow_service import WorkflowService
 
@@ -36,7 +38,6 @@ PREPARATION_ASSET_LABELS = {
     "outline": "大纲",
     "opening_plan": "开篇设计",
 }
-STALE_CHAPTER_TASK_STATUS = "stale"
 
 class WorkflowAppService:
     def __init__(
@@ -91,6 +92,13 @@ class WorkflowAppService:
         except InvalidTransitionError as exc:
             raise ConflictError(f"当前状态不允许暂停工作流: {workflow.status}") from exc
         workflow.snapshot = build_runtime_snapshot(workflow)
+        self._record_workflow_log(
+            db,
+            workflow,
+            level="WARNING",
+            message="Workflow paused by user",
+            details={"reason": payload.reason},
+        )
         db.commit()
         db.refresh(workflow)
         return workflow_to_dto(workflow)
@@ -110,6 +118,7 @@ class WorkflowAppService:
             self.workflow_service.resume(workflow)
         except InvalidTransitionError as exc:
             raise ConflictError(f"当前状态不允许恢复工作流: {workflow.status}") from exc
+        self._record_workflow_log(db, workflow, level="INFO", message="Workflow resumed")
         db.commit()
         self._run_persisted_workflow(db, workflow.id, owner_id=owner_id)
         workflow = self._require_workflow(db, workflow.id, owner_id=owner_id)
@@ -132,6 +141,7 @@ class WorkflowAppService:
             )
         except InvalidTransitionError as exc:
             raise ConflictError(f"当前状态不允许取消工作流: {workflow.status}") from exc
+        self._record_workflow_log(db, workflow, level="WARNING", message="Workflow cancelled")
         db.commit()
         db.refresh(workflow)
         return workflow_to_dto(workflow)
@@ -224,16 +234,7 @@ class WorkflowAppService:
         db: Session,
         workflow_id: uuid.UUID,
     ) -> None:
-        stale_task = (
-            db.query(ChapterTask.id)
-            .filter(
-                ChapterTask.workflow_execution_id == workflow_id,
-                ChapterTask.status == STALE_CHAPTER_TASK_STATUS,
-            )
-            .one_or_none()
-        )
-        if stale_task is not None:
-            raise BusinessRuleError("当前章节任务已失效，请重新执行 chapter_split 后再恢复工作流")
+        ensure_workflow_can_resume(db, workflow_id)
 
     def _persist_started_workflow(
         self,
@@ -248,6 +249,7 @@ class WorkflowAppService:
                 workflow,
                 current_node_id=resolve_start_node_id(workflow_config),
             )
+            self._record_workflow_log(db, workflow, level="INFO", message="Workflow started")
             db.commit()
         except BusinessRuleError:
             db.rollback()
@@ -309,6 +311,13 @@ class WorkflowAppService:
             current_node_id=current_node_id,
             detail=detail,
             reason=reason,
+        )
+        self._record_workflow_log(
+            db,
+            workflow,
+            level="ERROR",
+            message="Workflow paused after runtime error",
+            details={"detail": detail, "reason": reason},
         )
         db.commit()
 
@@ -372,6 +381,25 @@ class WorkflowAppService:
         workflow.snapshot = build_runtime_snapshot(
             workflow,
             extra={"pending_actions": [{"type": "runtime_error", "detail": detail}]},
+        )
+
+    def _record_workflow_log(
+        self,
+        db: Session,
+        workflow: WorkflowExecution,
+        *,
+        level: str,
+        message: str,
+        details: dict | None = None,
+    ) -> None:
+        db.add(
+            ExecutionLog(
+                workflow_execution_id=workflow.id,
+                node_execution_id=None,
+                level=level,
+                message=message,
+                details=details,
+            )
         )
 
 
