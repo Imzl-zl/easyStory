@@ -21,13 +21,24 @@ CHAPTER_TASK_STALE_STATUS = "stale"
 
 
 class ProjectService:
+    def require_project(
+        self,
+        db: Session,
+        project_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID | None = None,
+    ) -> Project:
+        return self._require_project(db, project_id, owner_id=owner_id)
+
     def update_project_setting(
         self,
         db: Session,
         project_id: uuid.UUID,
         payload: ProjectSettingUpdateDTO,
+        *,
+        owner_id: uuid.UUID | None = None,
     ) -> ProjectSettingSnapshotDTO:
-        project = self._require_project(db, project_id)
+        project = self._require_project(db, project_id, owner_id=owner_id)
         setting_dict = payload.project_setting.model_dump(exclude_none=True)
         setting_changed = project.project_setting != setting_dict
         project.project_setting = setting_dict
@@ -43,8 +54,10 @@ class ProjectService:
         self,
         db: Session,
         project_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID | None = None,
     ) -> SettingCompletenessResultDTO:
-        project = self._require_project(db, project_id)
+        project = self._require_project(db, project_id, owner_id=owner_id)
         return self._evaluate_setting(project)
 
     def ensure_setting_allows_preparation(
@@ -56,8 +69,17 @@ class ProjectService:
             raise BusinessRuleError(self._format_blocked_message(result.issues))
         return result
 
-    def _require_project(self, db: Session, project_id: uuid.UUID) -> Project:
-        project = db.query(Project).filter(Project.id == project_id).one_or_none()
+    def _require_project(
+        self,
+        db: Session,
+        project_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID | None = None,
+    ) -> Project:
+        query = db.query(Project).filter(Project.id == project_id)
+        if owner_id is not None:
+            query = query.filter(Project.owner_id == owner_id)
+        project = query.one_or_none()
         if project is None:
             raise NotFoundError(f"Project not found: {project_id}")
         return project

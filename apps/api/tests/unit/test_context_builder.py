@@ -5,7 +5,12 @@ from pathlib import Path
 import pytest
 
 from app.modules.config_registry.infrastructure.config_loader import ConfigLoader
-from app.modules.context.engine import ContextBuilder, ContextOverflowError, ContextSection
+from app.modules.context.engine import (
+    ContextBuilder,
+    ContextOverflowError,
+    ContextSection,
+    create_context_builder,
+)
 from app.modules.context.engine.errors import RequiredContextMissingError
 from app.modules.content.models import Content, ContentVersion
 from app.modules.context.models import StoryFact
@@ -21,7 +26,7 @@ CONFIG_ROOT = PROJECT_ROOT / "config"
 
 def test_match_patterns_and_merge_rules_for_chapter_gen() -> None:
     workflow = ConfigLoader(CONFIG_ROOT).load_workflow("workflow.xuanhuan_manual")
-    builder = ContextBuilder()
+    builder = create_context_builder()
 
     merged = builder.merge_rules(
         workflow.context_injection.default_inject,
@@ -42,7 +47,7 @@ def test_match_patterns_and_merge_rules_for_chapter_gen() -> None:
 
 
 def test_build_context_for_first_chapter_marks_optional_sources_not_applicable(db) -> None:
-    builder = ContextBuilder()
+    builder = create_context_builder()
     project = create_project(
         db,
         project_setting={
@@ -88,7 +93,7 @@ def test_build_context_for_first_chapter_marks_optional_sources_not_applicable(d
 
 
 def test_build_context_degrades_opening_plan_after_third_chapter(db) -> None:
-    builder = ContextBuilder()
+    builder = create_context_builder()
     project = create_project(
         db,
         project_setting={"protagonist": {"name": "林渊", "goal": "变强"}},
@@ -128,7 +133,7 @@ def test_build_context_degrades_opening_plan_after_third_chapter(db) -> None:
 
 
 def test_build_context_rejects_unapproved_opening_plan(db) -> None:
-    builder = ContextBuilder()
+    builder = create_context_builder()
     project = create_project(
         db,
         project_setting={"protagonist": {"name": "林渊", "goal": "变强"}},
@@ -166,7 +171,7 @@ def test_build_context_rejects_unapproved_opening_plan(db) -> None:
 
 
 def test_build_context_rejects_stale_chapter_task(db) -> None:
-    builder = ContextBuilder()
+    builder = create_context_builder()
     project = create_project(
         db,
         project_setting={"protagonist": {"name": "林渊", "goal": "变强"}},
@@ -204,7 +209,7 @@ def test_build_context_rejects_stale_chapter_task(db) -> None:
 
 
 def test_build_context_story_bible_excludes_confirmed_conflicts(db) -> None:
-    builder = ContextBuilder()
+    builder = create_context_builder()
     project = create_project(
         db,
         project_setting={"protagonist": {"name": "林渊", "goal": "进入宗门"}},
@@ -263,7 +268,7 @@ def test_build_context_story_bible_excludes_confirmed_conflicts(db) -> None:
 
 
 def test_build_context_story_bible_excludes_superseded_facts(db) -> None:
-    builder = ContextBuilder()
+    builder = create_context_builder()
     project = create_project(
         db,
         project_setting={"protagonist": {"name": "林渊", "goal": "进入宗门"}},
@@ -324,7 +329,7 @@ def test_build_context_story_bible_excludes_superseded_facts(db) -> None:
 
 
 def test_truncate_context_keeps_priority_one_sections() -> None:
-    builder = ContextBuilder()
+    builder = create_context_builder()
     sections = [
         _make_section(builder, "project_setting", 600, 1, 0, True),
         _make_section(builder, "chapter_task", 300, 1, 0, True),
@@ -350,7 +355,7 @@ def test_ensure_model_window_raises_when_required_context_still_exceeds_window()
     )
 
     try:
-        builder = ContextBuilder(model_pricing=ModelPricing(config_path))
+        builder = create_context_builder(model_pricing=ModelPricing(config_path))
         sections = [
             _make_section(builder, "project_setting", 240, 1, 0, True),
             _make_section(builder, "chapter_task", 240, 1, 0, True),
@@ -363,7 +368,7 @@ def test_ensure_model_window_raises_when_required_context_still_exceeds_window()
 
 
 def test_build_context_marks_unreferenced_sections_unused(db) -> None:
-    builder = ContextBuilder()
+    builder = create_context_builder()
     renderer = SkillTemplateRenderer()
     project = create_project(
         db,
@@ -411,7 +416,7 @@ def test_build_context_marks_unreferenced_sections_unused(db) -> None:
 
 def _chapter_context_rules():
     workflow = ConfigLoader(CONFIG_ROOT).load_workflow("workflow.xuanhuan_manual")
-    return ContextBuilder().merge_rules(
+    return create_context_builder().merge_rules(
         workflow.context_injection.default_inject,
         workflow.context_injection.rules,
         "chapter_gen",

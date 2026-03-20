@@ -167,6 +167,16 @@ def test_validate_skill_input_enforces_recursive_schema_rules() -> None:
             },
             "settings.extra",
         ),
+        (
+            {
+                "genre": "玄幻",
+                "target_chapters": 50,
+                "chapter_list": [{"number": 1, "title": "开篇"}],
+                "settings": {"tone": "热血"},
+                "extra": "x",
+            },
+            "Unknown field: extra",
+        ),
     ],
 )
 def test_validate_skill_input_rejects_invalid_nested_values(input_data, error_fragment) -> None:

@@ -23,6 +23,11 @@ class ConflictError(BusinessError):
     code = "conflict"
 
 
+class UnauthorizedError(BusinessError):
+    status_code = 401
+    code = "unauthorized"
+
+
 class BusinessRuleError(BusinessError):
     status_code = 422
     code = "business_rule_error"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from math import ceil
 from pathlib import Path
 
@@ -12,12 +13,14 @@ MODEL_TOKEN_RATIOS: dict[str, float] = {
     "default": 1.5,
 }
 DEFAULT_PRICING_PATH = Path(__file__).resolve().parents[5] / "config" / "model_pricing.yaml"
+THOUSAND = Decimal("1000")
+COST_PRECISION = Decimal("0.000001")
 
 
 @dataclass(frozen=True)
 class ModelPrice:
-    input_per_1k: float
-    output_per_1k: float
+    input_per_1k: Decimal
+    output_per_1k: Decimal
     context_window: int
 
 
@@ -44,7 +47,11 @@ class ModelPricing:
             data = yaml.safe_load(handle) or {}
         self.version = data.get("version")
         for model_name, info in data.get("models", {}).items():
-            self._prices[model_name] = ModelPrice(**info)
+            self._prices[model_name] = ModelPrice(
+                input_per_1k=Decimal(str(info["input_per_1k"])),
+                output_per_1k=Decimal(str(info["output_per_1k"])),
+                context_window=info["context_window"],
+            )
         if not self._prices:
             raise ConfigurationError(f"Model pricing config has no models: {path}")
 
@@ -53,12 +60,11 @@ class ModelPricing:
         model: str,
         input_tokens: int,
         output_tokens: int,
-    ) -> float:
+    ) -> Decimal:
         price = self._get_price(model)
-        return (
-            input_tokens * price.input_per_1k / 1000
-            + output_tokens * price.output_per_1k / 1000
-        )
+        input_cost = Decimal(input_tokens) * price.input_per_1k / THOUSAND
+        output_cost = Decimal(output_tokens) * price.output_per_1k / THOUSAND
+        return (input_cost + output_cost).quantize(COST_PRECISION)
 
     def get_context_window(self, model: str) -> int:
         return self._get_price(model).context_window

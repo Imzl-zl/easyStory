@@ -76,6 +76,30 @@ skill:
         shutil.rmtree(temp_root, ignore_errors=True)
 
 
+def test_loader_rejects_skill_prompt_with_undeclared_variables() -> None:
+    temp_root = _make_temp_config_root()
+    _write_yaml(
+        temp_root / "skills" / "bad.yaml",
+        """
+skill:
+  id: "skill.bad"
+  name: "Bad"
+  category: "outline"
+  prompt: "{{ declared }} {{ missing }}"
+  variables:
+    declared:
+      type: "string"
+      required: true
+""",
+    )
+
+    try:
+        with pytest.raises(ConfigurationError, match="Undeclared variable: missing"):
+            ConfigLoader(temp_root)
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
+
 def test_loader_reload_picks_up_new_config_file() -> None:
     temp_root = _make_temp_config_root()
     _write_yaml(

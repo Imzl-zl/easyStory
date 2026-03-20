@@ -16,6 +16,7 @@ from app.modules.config_registry.schemas.config_schemas import (
     WorkflowConfig,
 )
 from app.shared.runtime.errors import ConfigurationError
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 
 ConfigModel = TypeVar("ConfigModel", SkillConfig, AgentConfig, HookConfig, WorkflowConfig)
 
@@ -23,6 +24,7 @@ ConfigModel = TypeVar("ConfigModel", SkillConfig, AgentConfig, HookConfig, Workf
 class ConfigLoader:
     def __init__(self, config_root: Path):
         self.config_root = config_root
+        self._template_renderer = SkillTemplateRenderer()
         self._skills: dict[str, SkillConfig] = {}
         self._agents: dict[str, AgentConfig] = {}
         self._hooks: dict[str, HookConfig] = {}
@@ -85,9 +87,18 @@ class ConfigLoader:
         self._sources[config_id] = yaml_file
 
     def _validate_references(self) -> None:
+        self._validate_skill_templates()
         self._validate_agent_refs()
         self._validate_hook_refs()
         self._validate_workflow_refs()
+
+    def _validate_skill_templates(self) -> None:
+        for skill in self._skills.values():
+            declared = set(skill.inputs or skill.variables)
+            errors = self._template_renderer.validate(skill.prompt, declared)
+            if errors:
+                message = "; ".join(errors)
+                raise ConfigurationError(f"skill {skill.id} template is invalid: {message}")
 
     def _validate_agent_refs(self) -> None:
         for agent in self._agents.values():

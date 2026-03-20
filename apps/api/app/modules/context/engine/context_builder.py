@@ -22,15 +22,15 @@ class ContextBuilder:
 
     def __init__(
         self,
-        token_counter: TokenCounter | None = None,
-        model_pricing: ModelPricing | None = None,
-        source_loader: ContextSourceLoader | None = None,
-        truncator: ContextTruncator | None = None,
+        token_counter: TokenCounter,
+        model_pricing: ModelPricing,
+        source_loader: ContextSourceLoader,
+        truncator: ContextTruncator,
     ) -> None:
-        self.token_counter = token_counter or TokenCounter()
-        self.model_pricing = model_pricing or ModelPricing()
-        self.source_loader = source_loader or ContextSourceLoader()
-        self.truncator = truncator or ContextTruncator(self.token_counter, self.model_pricing)
+        self.token_counter = token_counter
+        self.model_pricing = model_pricing
+        self.source_loader = source_loader
+        self.truncator = truncator
 
     def match_patterns(
         self,

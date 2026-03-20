@@ -1,6 +1,7 @@
+from decimal import Decimal
 import uuid
 
-from sqlalchemy import Float, ForeignKey, Integer, String
+from sqlalchemy import ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.shared.db.base import Base, TimestampMixin, UUIDMixin
@@ -20,4 +21,4 @@ class TokenUsage(Base, TimestampMixin, UUIDMixin):
     model_name: Mapped[str] = mapped_column(String(100))
     input_tokens: Mapped[int] = mapped_column(Integer)
     output_tokens: Mapped[int] = mapped_column(Integer)
-    estimated_cost: Mapped[float] = mapped_column(Float)
+    estimated_cost: Mapped[Decimal] = mapped_column(Numeric(12, 6))

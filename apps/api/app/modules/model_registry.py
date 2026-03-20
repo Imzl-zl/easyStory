@@ -3,7 +3,7 @@ from app.modules.content.models import Content, ContentVersion
 from app.modules.context.models import StoryFact
 from app.modules.credential.models import ModelCredential
 from app.modules.export.models import Export
-from app.modules.observability.models import ExecutionLog, PromptReplay
+from app.modules.observability.models import AuditLog, ExecutionLog, PromptReplay
 from app.modules.project.models import Project
 from app.modules.review.models import ReviewAction
 from app.modules.template.models import Template, TemplateNode
@@ -12,6 +12,7 @@ from app.modules.workflow.models import Artifact, ChapterTask, NodeExecution, Wo
 
 __all__ = [
     "Artifact",
+    "AuditLog",
     "ChapterTask",
     "Content",
     "ContentVersion",

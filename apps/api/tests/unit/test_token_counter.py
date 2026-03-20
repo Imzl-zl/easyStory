@@ -1,3 +1,4 @@
+from decimal import Decimal
 import shutil
 import uuid
 from pathlib import Path
@@ -36,7 +37,7 @@ def test_model_pricing_calculates_cost() -> None:
 
     cost = pricing.calculate_cost("gpt-4o", input_tokens=1000, output_tokens=500)
 
-    assert cost == pytest.approx(0.0125)
+    assert cost == Decimal("0.012500")
 
 
 def test_model_pricing_rejects_unknown_model() -> None:

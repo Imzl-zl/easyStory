@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.modules.content.models import Content, ContentVersion
 from app.modules.project.models import Project
 from app.modules.project.service import ProjectService
+from app.modules.workflow.models import ChapterTask
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 
 from .dto import AssetType, StoryAssetDTO, StoryAssetSaveDTO
@@ -17,8 +18,8 @@ STALE_FROM_OPENING_PLAN = frozenset({"chapter"})
 
 
 class StoryAssetService:
-    def __init__(self, project_service: ProjectService | None = None) -> None:
-        self.project_service = project_service or ProjectService()
+    def __init__(self, project_service: ProjectService) -> None:
+        self.project_service = project_service
 
     def save_asset_draft(
         self,
@@ -26,8 +27,10 @@ class StoryAssetService:
         project_id: uuid.UUID,
         asset_type: AssetType,
         payload: StoryAssetSaveDTO,
+        *,
+        owner_id: uuid.UUID | None = None,
     ) -> StoryAssetDTO:
-        project = self._require_project(db, project_id)
+        project = self._require_project(db, project_id, owner_id=owner_id)
         self.project_service.ensure_setting_allows_preparation(project)
         if asset_type == "opening_plan":
             self._require_approved_asset(db, project_id, "outline")
@@ -42,7 +45,7 @@ class StoryAssetService:
             db.add(content)
             db.flush()
         self._append_new_version(content, payload)
-        self._mark_downstream_stale(project, asset_type)
+        self._mark_stale_dependencies(db, project, asset_type)
         db.commit()
         db.refresh(content)
         return self._to_dto(content)
@@ -52,8 +55,10 @@ class StoryAssetService:
         db: Session,
         project_id: uuid.UUID,
         asset_type: AssetType,
+        *,
+        owner_id: uuid.UUID | None = None,
     ) -> StoryAssetDTO:
-        project = self._require_project(db, project_id)
+        project = self._require_project(db, project_id, owner_id=owner_id)
         self.project_service.ensure_setting_allows_preparation(project)
         if asset_type == "opening_plan":
             self._require_approved_asset(db, project_id, "outline")
@@ -67,8 +72,17 @@ class StoryAssetService:
         db.refresh(content)
         return self._to_dto(content)
 
-    def _require_project(self, db: Session, project_id: uuid.UUID) -> Project:
-        project = db.query(Project).filter(Project.id == project_id).one_or_none()
+    def _require_project(
+        self,
+        db: Session,
+        project_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID | None = None,
+    ) -> Project:
+        query = db.query(Project).filter(Project.id == project_id)
+        if owner_id is not None:
+            query = query.filter(Project.owner_id == owner_id)
+        project = query.one_or_none()
         if project is None:
             raise NotFoundError(f"Project not found: {project_id}")
         return project
@@ -135,12 +149,27 @@ class StoryAssetService:
         content.last_edited_at = datetime.now(timezone.utc)
         content.versions.append(version)
 
+    def _mark_stale_dependencies(
+        self,
+        db: Session,
+        project: Project,
+        asset_type: AssetType,
+    ) -> None:
+        self._mark_downstream_stale(project, asset_type)
+        if asset_type in {"outline", "opening_plan"}:
+            self._mark_chapter_tasks_stale(db, project.id)
+
     def _mark_downstream_stale(self, project: Project, asset_type: AssetType) -> None:
         for content in project.contents:
             if content.status != "approved":
                 continue
             if self._should_mark_stale(content, asset_type):
                 content.status = "stale"
+
+    def _mark_chapter_tasks_stale(self, db: Session, project_id: uuid.UUID) -> None:
+        for task in db.query(ChapterTask).filter(ChapterTask.project_id == project_id).all():
+            if task.status != "stale":
+                task.status = "stale"
 
     def _should_mark_stale(self, content: Content, asset_type: AssetType) -> bool:
         if asset_type == "outline":

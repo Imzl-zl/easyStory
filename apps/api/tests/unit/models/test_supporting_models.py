@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 
@@ -5,7 +7,7 @@ from app.modules.billing.models import TokenUsage
 from app.modules.context.models import StoryFact
 from app.modules.credential.models import ModelCredential
 from app.modules.export.models import Export
-from app.modules.observability.models import ExecutionLog, PromptReplay
+from app.modules.observability.models import AuditLog, ExecutionLog, PromptReplay
 from app.modules.template.models import TemplateNode
 from app.modules.workflow.models import ChapterTask, NodeExecution
 
@@ -14,6 +16,7 @@ from tests.unit.models.helpers import (
     create_content_version,
     create_project,
     create_template,
+    create_user,
     create_workflow,
 )
 
@@ -133,7 +136,7 @@ def test_token_usage(db):
         model_name="gpt-4o",
         input_tokens=1000,
         output_tokens=500,
-        estimated_cost=0.015,
+        estimated_cost=Decimal("0.015000"),
     )
     db.add(usage)
     db.commit()
@@ -141,7 +144,7 @@ def test_token_usage(db):
 
     assert usage.usage_type == "generation"
     assert usage.input_tokens == 1000
-    assert usage.estimated_cost == 0.015
+    assert usage.estimated_cost == Decimal("0.015000")
 
 
 def test_execution_log(db):
@@ -158,6 +161,23 @@ def test_execution_log(db):
 
     assert log.level == "ERROR"
     assert log.details["error"] == "timeout"
+
+
+def test_audit_log(db):
+    actor = create_user(db)
+    audit_log = AuditLog(
+        actor_user_id=actor.id,
+        event_type="credential_create",
+        entity_type="model_credential",
+        entity_id=actor.id,
+        details={"provider": "openai"},
+    )
+    db.add(audit_log)
+    db.commit()
+    db.refresh(audit_log)
+
+    assert audit_log.event_type == "credential_create"
+    assert audit_log.details["provider"] == "openai"
 
 
 def test_prompt_replay(db):

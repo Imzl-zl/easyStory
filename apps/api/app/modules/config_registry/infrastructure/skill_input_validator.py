@@ -15,6 +15,13 @@ def validate_input_schema(schema_map: dict[str, SchemaField], input_data: dict[s
             _validate_missing(field_name, schema)
             continue
         _validate_field(field_name, schema, input_data[field_name])
+    _validate_extra_fields(schema_map, input_data)
+
+
+def _validate_extra_fields(schema_map: dict[str, SchemaField], input_data: dict[str, Any]) -> None:
+    extra_fields = sorted(set(input_data) - set(schema_map))
+    if extra_fields:
+        raise SkillInputValidationError(f"Unknown field: {extra_fields[0]}")
 
 
 def _validate_missing(path: str, schema: SchemaField) -> None:
