@@ -80,3 +80,8 @@
 - **Changes**：`chapter_split` 遇到 `budget.on_exceed=skip` 时改为显式抛出 `ConfigurationError`，并在写入 `ChapterTask` 之前中断，避免继续使用静默改写语义。
 - **Changes**：新增/扩展 `test_billing_service.py`、`test_review_executor.py`、`test_workflow_runtime.py`、`test_workflow_runtime_auto_fix.py`，覆盖上述 3 条回归链路。
 - **Validation**：`cd apps/api && ruff check app tests && pytest -q` 通过，当前全量结果为 `233 passed`。
+
+## [2026-03-20 | 仓库换行符真值补齐]
+- **Events**：为仓库补充 `.gitattributes`，降低 Windows 与 WSL 之间的整仓换行符漂移风险。
+- **Changes**：新增仓库根 `.gitattributes`，默认文本文件统一为 `LF`；`*.bat`、`*.cmd`、`*.ps1` 固定为 `CRLF`；常见二进制文件标记为 `binary`。
+- **Insights**：当前仓库此前没有 `.gitattributes`，且 Windows Git 配置为 `core.autocrlf=true`，这是跨环境出现“大量伪变更”的高风险组合。
