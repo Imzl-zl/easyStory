@@ -3,11 +3,13 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.modules.content.models import Content, ContentVersion
 from app.modules.project.models import Project
 from app.modules.project.service import ProjectService
+from app.modules.workflow.models import ChapterTask, WorkflowExecution
 from app.shared.runtime.errors import BusinessRuleError
 
 from .chapter_service_support import (
@@ -28,6 +30,8 @@ from .chapter_store import (
     require_preparation_assets_ready,
 )
 from .dto import ChapterDetailDTO, ChapterSaveDTO, ChapterSummaryDTO, ChapterVersionDTO
+
+WAITING_CONFIRM_TASK_STATUS = "generating"
 
 
 class ChapterContentService:
@@ -90,10 +94,40 @@ class ChapterContentService:
         content = require_chapter(db, project.id, chapter_number)
         require_current_version(content)
         content.status = "approved"
+        self._mark_active_chapter_task_completed(db, project.id, chapter_number, content.id)
         db.add(content)
         db.commit()
         db.refresh(content)
         return to_detail(content)
+
+    def save_generated_draft(
+        self,
+        db: Session,
+        project_id: uuid.UUID,
+        chapter_number: int,
+        *,
+        title: str,
+        content_text: str,
+        context_snapshot_hash: str,
+    ) -> tuple[Content, ContentVersion]:
+        project = self.project_service.require_project(db, project_id)
+        self.project_service.ensure_setting_allows_preparation(project)
+        require_preparation_assets_ready(db, project.id, PREPARATION_ASSET_TYPES)
+        content = get_or_create_chapter(db, project, chapter_number, title)
+        self._append_new_version(
+            content,
+            ChapterSaveDTO(
+                title=title,
+                content_text=content_text,
+                created_by="ai_assist",
+                change_source="ai_generate",
+                change_summary="工作流自动生成草稿",
+                context_snapshot_hash=context_snapshot_hash,
+            ),
+        )
+        self._mark_downstream_chapters_stale(project, chapter_number)
+        db.flush()
+        return content, require_current_version(content)
 
     def list_versions(
         self,
@@ -242,3 +276,34 @@ class ChapterContentService:
         if not content.versions:
             return 1
         return max(version.version_number for version in content.versions) + 1
+
+    def _mark_active_chapter_task_completed(
+        self,
+        db: Session,
+        project_id: uuid.UUID,
+        chapter_number: int,
+        content_id: uuid.UUID,
+    ) -> None:
+        task = (
+            db.query(ChapterTask)
+            .join(
+                WorkflowExecution,
+                ChapterTask.workflow_execution_id == WorkflowExecution.id,
+            )
+            .filter(
+                ChapterTask.project_id == project_id,
+                ChapterTask.chapter_number == chapter_number,
+                ChapterTask.status == WAITING_CONFIRM_TASK_STATUS,
+                WorkflowExecution.status.in_(("running", "paused")),
+                or_(
+                    ChapterTask.content_id.is_(None),
+                    ChapterTask.content_id == content_id,
+                ),
+            )
+            .order_by(WorkflowExecution.updated_at.desc())
+            .first()
+        )
+        if task is None:
+            return
+        task.content_id = content_id
+        task.status = "completed"

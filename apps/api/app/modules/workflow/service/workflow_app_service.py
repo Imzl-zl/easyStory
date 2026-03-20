@@ -29,6 +29,7 @@ from .snapshot_support import (
     resolve_start_node_id,
     workflow_to_dto,
 )
+from .workflow_runtime_service import WorkflowRuntimeService
 from .workflow_service import WorkflowService
 
 PREPARATION_ASSET_LABELS = {
@@ -43,10 +44,12 @@ class WorkflowAppService:
         workflow_service: WorkflowService,
         project_service: ProjectService,
         config_loader: ConfigLoader,
+        runtime_service: WorkflowRuntimeService,
     ) -> None:
         self.workflow_service = workflow_service
         self.project_service = project_service
         self.config_loader = config_loader
+        self.runtime_service = runtime_service
 
     def start_workflow(
         self,
@@ -62,21 +65,9 @@ class WorkflowAppService:
         self._ensure_preparation_assets_ready(db, project.id)
         self._ensure_no_active_workflow(db, project.id)
         workflow = self._build_execution(project, workflow_config)
-        try:
-            db.add(workflow)
-            db.flush()
-            self.workflow_service.start(
-                workflow,
-                current_node_id=resolve_start_node_id(workflow_config),
-            )
-            db.commit()
-        except IntegrityError as exc:
-            db.rollback()
-            raise ConflictError("项目已存在未结束的工作流，必须先恢复或取消当前执行") from exc
-        except InvalidTransitionError as exc:
-            db.rollback()
-            raise ConflictError(f"工作流无法启动，当前状态不允许: {exc}") from exc
-        db.refresh(workflow)
+        self._persist_started_workflow(db, workflow, workflow_config)
+        self._run_persisted_workflow(db, workflow.id, owner_id=owner_id)
+        workflow = self._require_workflow(db, workflow.id, owner_id=owner_id)
         return workflow_to_dto(workflow)
 
     def pause_workflow(
@@ -120,7 +111,8 @@ class WorkflowAppService:
         except InvalidTransitionError as exc:
             raise ConflictError(f"当前状态不允许恢复工作流: {workflow.status}") from exc
         db.commit()
-        db.refresh(workflow)
+        self._run_persisted_workflow(db, workflow.id, owner_id=owner_id)
+        workflow = self._require_workflow(db, workflow.id, owner_id=owner_id)
         return workflow_to_dto(workflow)
 
     def cancel_workflow(
@@ -243,6 +235,83 @@ class WorkflowAppService:
         if stale_task is not None:
             raise BusinessRuleError("当前章节任务已失效，请重新执行 chapter_split 后再恢复工作流")
 
+    def _persist_started_workflow(
+        self,
+        db: Session,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+    ) -> None:
+        try:
+            db.add(workflow)
+            db.flush()
+            self.workflow_service.start(
+                workflow,
+                current_node_id=resolve_start_node_id(workflow_config),
+            )
+            db.commit()
+        except BusinessRuleError:
+            db.rollback()
+            raise
+        except IntegrityError as exc:
+            db.rollback()
+            raise ConflictError("项目已存在未结束的工作流，必须先恢复或取消当前执行") from exc
+        except InvalidTransitionError as exc:
+            db.rollback()
+            raise ConflictError(f"工作流无法启动，当前状态不允许: {exc}") from exc
+
+    def _run_persisted_workflow(
+        self,
+        db: Session,
+        workflow_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+    ) -> None:
+        workflow = self._require_workflow_for_update(db, workflow_id, owner_id=owner_id)
+        current_node_id = workflow.current_node_id
+        try:
+            self.runtime_service.run(db, workflow, owner_id=owner_id)
+            db.commit()
+        except BusinessRuleError as exc:
+            self._recover_runtime_failure(
+                db,
+                workflow_id=workflow_id,
+                owner_id=owner_id,
+                current_node_id=current_node_id,
+                detail=str(exc),
+                reason=None,
+            )
+            raise
+        except Exception as exc:
+            self._recover_runtime_failure(
+                db,
+                workflow_id=workflow_id,
+                owner_id=owner_id,
+                current_node_id=current_node_id,
+                detail=str(exc),
+                reason="error",
+            )
+            raise
+
+    def _recover_runtime_failure(
+        self,
+        db: Session,
+        workflow_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+        current_node_id: str | None,
+        detail: str,
+        reason: str | None,
+    ) -> None:
+        db.rollback()
+        workflow = self._require_workflow_for_update(db, workflow_id, owner_id=owner_id)
+        self._pause_after_runtime_error(
+            workflow,
+            current_node_id=current_node_id,
+            detail=detail,
+            reason=reason,
+        )
+        db.commit()
+
     def _require_workflow(
         self,
         db: Session,
@@ -284,6 +353,25 @@ class WorkflowAppService:
                 WorkflowExecution.id == workflow_id,
                 Project.owner_id == owner_id,
             )
+        )
+
+    def _pause_after_runtime_error(
+        self,
+        workflow: WorkflowExecution,
+        *,
+        current_node_id: str | None,
+        detail: str,
+        reason: str | None,
+    ) -> None:
+        self.workflow_service.pause(
+            workflow,
+            reason=reason,
+            current_node_id=current_node_id,
+            resume_from_node=current_node_id,
+        )
+        workflow.snapshot = build_runtime_snapshot(
+            workflow,
+            extra={"pending_actions": [{"type": "runtime_error", "detail": detail}]},
         )
 
 

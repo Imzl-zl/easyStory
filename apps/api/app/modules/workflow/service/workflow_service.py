@@ -26,7 +26,7 @@ class WorkflowService:
         self,
         workflow: WorkflowExecution,
         *,
-        reason: str,
+        reason: str | None,
         current_node_id: str | None = None,
         resume_from_node: str | None = None,
     ) -> WorkflowExecution:

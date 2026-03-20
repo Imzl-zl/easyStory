@@ -5,6 +5,8 @@ from tests.unit.models.helpers import (
     create_content,
     create_content_version,
     create_project,
+    create_workflow,
+    create_chapter_task,
     ready_project_setting,
 )
 
@@ -132,6 +134,65 @@ def test_mark_best_version_replaces_previous_best_and_can_be_cleared(db):
     assert marked.is_best is True
     assert cleared.is_best is False
     assert [item.version_number for item in versions if item.is_best] == []
+
+
+def test_approve_chapter_completes_only_waiting_confirm_task_for_same_content(db):
+    project = create_project(db, project_setting=ready_project_setting())
+    _create_preparation_assets(db, project)
+    service = create_chapter_content_service()
+    chapter = _create_chapter(db, project, 1, "第一章", "第一章正文")
+    workflow = create_workflow(db, project=project, status="running")
+    task = create_chapter_task(
+        db,
+        workflow=workflow,
+        chapter_number=1,
+        status="generating",
+        content_id=chapter.id,
+    )
+
+    result = service.approve_chapter(db, project.id, 1)
+
+    db.refresh(task)
+    assert result.status == "approved"
+    assert task.status == "completed"
+    assert task.content_id == chapter.id
+
+
+def test_approve_chapter_does_not_complete_non_matching_active_task(db):
+    project = create_project(db, project_setting=ready_project_setting())
+    other_project = create_project(db, project_setting=ready_project_setting())
+    _create_preparation_assets(db, project)
+    service = create_chapter_content_service()
+    _create_chapter(db, project, 1, "第一章", "第一章正文")
+    other_content = create_content(
+        db,
+        project=other_project,
+        chapter_number=1,
+        title="外部章节",
+        status="approved",
+    )
+    create_content_version(
+        db,
+        content=other_content,
+        version_number=1,
+        content_text="外部正文",
+        is_current=True,
+    )
+    workflow = create_workflow(db, project=project, status="running")
+    task = create_chapter_task(
+        db,
+        workflow=workflow,
+        chapter_number=1,
+        status="generating",
+        content_id=other_content.id,
+    )
+
+    result = service.approve_chapter(db, project.id, 1)
+
+    db.refresh(task)
+    assert result.status == "approved"
+    assert task.status == "generating"
+    assert task.content_id == other_content.id
 
 
 def _create_preparation_assets(db, project):

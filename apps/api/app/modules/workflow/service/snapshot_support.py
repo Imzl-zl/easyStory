@@ -6,6 +6,7 @@ from app.modules.config_registry import ConfigLoader
 from app.modules.config_registry.schemas.config_schemas import (
     AgentConfig,
     HookConfig,
+    NodeConfig,
     SkillConfig,
     WorkflowConfig,
 )
@@ -96,6 +97,8 @@ def collect_skill_ids(
 
 def build_runtime_snapshot(
     workflow: WorkflowExecution,
+    *,
+    extra: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     snapshot: dict[str, Any] = {}
     if workflow.current_node_id is not None:
@@ -104,7 +107,60 @@ def build_runtime_snapshot(
         snapshot["resume_from_node"] = workflow.resume_from_node
     if workflow.pause_reason is not None:
         snapshot["pause_reason"] = workflow.pause_reason
+    if extra:
+        snapshot.update(extra)
     return snapshot or None
+
+
+def load_workflow_snapshot(snapshot: dict[str, Any]) -> WorkflowConfig:
+    normalized = {
+        key: value
+        for key, value in snapshot.items()
+        if key in WorkflowConfig.model_fields
+    }
+    return WorkflowConfig.model_validate(normalized)
+
+
+def load_skill_snapshot(
+    skills_snapshot: dict[str, Any],
+    skill_id: str | None,
+) -> SkillConfig:
+    if skill_id is None:
+        raise ConfigurationError("Node is missing skill id")
+    raw = skills_snapshot.get(skill_id)
+    if not isinstance(raw, dict):
+        raise ConfigurationError(f"Skill snapshot not found: {skill_id}")
+    return SkillConfig.model_validate(raw)
+
+
+def load_agent_snapshot(
+    agents_snapshot: dict[str, Any],
+    agent_id: str,
+) -> AgentConfig:
+    raw = agents_snapshot.get(agent_id)
+    if not isinstance(raw, dict):
+        raise ConfigurationError(f"Agent snapshot not found: {agent_id}")
+    return AgentConfig.model_validate(raw)
+
+
+def resolve_node_config(
+    workflow_config: WorkflowConfig,
+    node_id: str | None,
+) -> NodeConfig:
+    if node_id is None:
+        raise ConfigurationError("Workflow current_node_id is not set")
+    for node in workflow_config.nodes:
+        if node.id == node_id:
+            return node
+    raise ConfigurationError(f"Workflow node not found in snapshot: {node_id}")
+
+
+def resolve_node_order(snapshot: dict[str, Any], node_id: str) -> int:
+    nodes = parse_nodes(snapshot)
+    for index, node in enumerate(nodes):
+        if node.id == node_id:
+            return index
+    raise ConfigurationError(f"Workflow node not found in snapshot: {node_id}")
 
 
 def workflow_to_dto(workflow: WorkflowExecution) -> WorkflowExecutionDTO:
