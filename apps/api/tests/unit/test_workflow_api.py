@@ -15,14 +15,18 @@ from app.modules import model_registry as _model_registry  # noqa: F401
 from app.modules.billing.service import create_billing_service
 from app.modules.content.models import Content, ContentVersion
 from app.modules.credential.models import ModelCredential
+from app.modules.export.entry.http.router import get_export_service
 from app.modules.project.models import Project
 from app.modules.user.service import TokenService
-from app.modules.workflow.entry.http.router import get_workflow_app_service
+from app.modules.workflow.entry.http.router import (
+    get_workflow_app_service,
+    get_workflow_runtime_dispatcher,
+)
 from app.modules.workflow.service import WorkflowRuntimeService, create_workflow_app_service, create_workflow_service
 from app.modules.content.service import create_chapter_content_service
 from app.modules.context.engine import create_context_builder
 from app.modules.export.models import Export
-from app.modules.export.service import ExportService
+from app.modules.export.service import ExportService, create_export_service
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
 from app.shared.runtime import SkillTemplateRenderer, ToolProvider
 from app.shared.db import Base
@@ -85,6 +89,35 @@ def test_start_workflow_creates_running_execution_with_snapshots(monkeypatch) ->
                 .all()
             )
             assert [task.chapter_number for task in tasks] == [1, 2]
+    finally:
+        client.close()
+        Base.metadata.drop_all(engine)
+
+
+def test_start_workflow_route_uses_dispatcher_and_returns_before_runtime(monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    session_factory, engine = _build_session_factory()
+    project_id, owner_id = _seed_project(session_factory, ready_assets=True)
+    dispatcher = _NoopDispatcher()
+    client = _build_runtime_client(session_factory, runtime_dispatcher=dispatcher)
+
+    try:
+        response = client.post(
+            f"/api/v1/projects/{project_id}/workflows/start",
+            headers=_auth_headers(owner_id),
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "running"
+        assert dispatcher.calls == [(uuid.UUID(body["execution_id"]), owner_id)]
+
+        with session_factory() as session:
+            workflow = session.get(WorkflowExecution, uuid.UUID(body["execution_id"]))
+            assert workflow is not None
+            assert workflow.status == "running"
+            assert workflow.current_node_id == "chapter_split"
+            assert session.query(ChapterTask).count() == 0
     finally:
         client.close()
         Base.metadata.drop_all(engine)
@@ -417,22 +450,33 @@ def _build_runtime_client(
     session_factory: sessionmaker[Session],
     *,
     export_root: Path | None = None,
+    runtime_dispatcher=None,
 ) -> TestClient:
     app = create_app(session_factory=session_factory)
     workflow_service = create_workflow_service()
+    export_service = ExportService(export_root or (Path.cwd() / ".pytest-exports"))
     runtime_service = WorkflowRuntimeService(
         workflow_service=workflow_service,
         billing_service=create_billing_service(),
         chapter_content_service=create_chapter_content_service(),
         context_builder=create_context_builder(),
         credential_service_factory=lambda: _FakeCredentialService(),
-        export_service=ExportService(export_root or (Path.cwd() / ".pytest-exports")),
+        export_service=export_service,
         template_renderer=SkillTemplateRenderer(),
         tool_provider=_FakeToolProvider(),
     )
-    app.dependency_overrides[get_workflow_app_service] = lambda: create_workflow_app_service(
+    workflow_app_service = create_workflow_app_service(
         workflow_service=workflow_service,
         runtime_service=runtime_service,
+    )
+    dispatcher = runtime_dispatcher or _InlineWorkflowDispatcher(
+        session_factory,
+        workflow_app_service,
+    )
+    app.dependency_overrides[get_workflow_app_service] = lambda: workflow_app_service
+    app.dependency_overrides[get_workflow_runtime_dispatcher] = lambda: dispatcher
+    app.dependency_overrides[get_export_service] = lambda: create_export_service(
+        export_root=export_service.export_root
     )
     return TestClient(app)
 
@@ -538,3 +582,29 @@ class _FakeToolProvider(ToolProvider):
 
     def list_tools(self) -> list[str]:
         return ["llm.generate"]
+
+
+class _InlineWorkflowDispatcher:
+    def __init__(
+        self,
+        session_factory: sessionmaker[Session],
+        workflow_app_service,
+    ) -> None:
+        self.session_factory = session_factory
+        self.workflow_app_service = workflow_app_service
+
+    def __call__(self, workflow_id: uuid.UUID, owner_id: uuid.UUID) -> None:
+        with self.session_factory() as session:
+            self.workflow_app_service.run_workflow_runtime(
+                session,
+                workflow_id,
+                owner_id=owner_id,
+            )
+
+
+class _NoopDispatcher:
+    def __init__(self) -> None:
+        self.calls: list[tuple[uuid.UUID, uuid.UUID]] = []
+
+    def __call__(self, workflow_id: uuid.UUID, owner_id: uuid.UUID) -> None:
+        self.calls.append((workflow_id, owner_id))

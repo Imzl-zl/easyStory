@@ -11,6 +11,7 @@ VARIABLE_NAMES = {
     "previous_chapters": "previous_content",
     "story_bible": "story_bible",
 }
+VARIABLE_TO_INJECT_TYPE = {value: key for key, value in VARIABLE_NAMES.items()}
 SECTION_POLICIES = {
     "project_setting": (1, 0),
     "chapter_task": (1, 0),

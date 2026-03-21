@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from app.shared.runtime.errors import EasyStoryError
+from app.shared.runtime.errors import BusinessRuleError
 
 
-class ContextBuilderError(EasyStoryError):
+class ContextBuilderError(BusinessRuleError):
     """Base error for context building failures."""
 
 

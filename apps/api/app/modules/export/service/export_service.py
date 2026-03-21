@@ -7,8 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.modules.content.models import Content
 from app.modules.export.models import Export
+from app.modules.project.models import Project
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
-from app.shared.runtime.errors import BusinessRuleError
+from app.shared.runtime.errors import BusinessRuleError, NotFoundError
+
+from .dto import ExportViewDTO
 
 EXPORT_ROOT_DIR = ".runtime/exports"
 SUPPORTED_EXPORT_FORMATS = frozenset({"txt", "markdown"})
@@ -26,6 +29,67 @@ BLOCKING_TASK_STATUS_MESSAGES = {
 class ExportService:
     def __init__(self, export_root: Path) -> None:
         self.export_root = export_root
+
+    def create_workflow_exports(
+        self,
+        db: Session,
+        workflow_id: uuid.UUID,
+        *,
+        formats: list[str],
+        owner_id: uuid.UUID,
+    ) -> list[Export]:
+        workflow = self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        exports = self.export_workflow(
+            db,
+            workflow,
+            formats=formats,
+            config_snapshot=workflow.workflow_snapshot,
+        )
+        db.commit()
+        for export in exports:
+            db.refresh(export)
+        return exports
+
+    def list_project_exports(
+        self,
+        db: Session,
+        project_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+    ) -> list[Export]:
+        self._require_owned_project(db, project_id, owner_id=owner_id)
+        return (
+            db.query(Export)
+            .filter(Export.project_id == project_id)
+            .order_by(Export.created_at.desc())
+            .all()
+        )
+
+    def resolve_download(
+        self,
+        db: Session,
+        export_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+    ) -> tuple[Export, Path]:
+        export = self._require_owned_export(db, export_id, owner_id=owner_id)
+        file_path = (self.export_root / export.file_path).resolve()
+        export_root = self.export_root.resolve()
+        if not file_path.is_relative_to(export_root):
+            raise NotFoundError(f"Export file not found: {export_id}")
+        if not file_path.exists() or not file_path.is_file():
+            raise NotFoundError(f"Export file not found: {export_id}")
+        return export, file_path
+
+    def to_view_dto(self, export: Export) -> ExportViewDTO:
+        return ExportViewDTO(
+            id=export.id,
+            project_id=export.project_id,
+            format=export.format,
+            filename=export.filename,
+            file_size=export.file_size,
+            created_at=export.created_at,
+        )
 
     def export_workflow(
         self,
@@ -156,6 +220,65 @@ class ExportService:
         for file_path in file_paths:
             if file_path.exists():
                 file_path.unlink()
+
+    def _require_owned_workflow(
+        self,
+        db: Session,
+        workflow_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+    ) -> WorkflowExecution:
+        workflow = (
+            db.query(WorkflowExecution)
+            .join(Project, WorkflowExecution.project_id == Project.id)
+            .filter(
+                WorkflowExecution.id == workflow_id,
+                Project.owner_id == owner_id,
+            )
+            .one_or_none()
+        )
+        if workflow is None:
+            raise NotFoundError(f"Workflow execution not found: {workflow_id}")
+        return workflow
+
+    def _require_owned_project(
+        self,
+        db: Session,
+        project_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+    ) -> Project:
+        project = (
+            db.query(Project)
+            .filter(
+                Project.id == project_id,
+                Project.owner_id == owner_id,
+            )
+            .one_or_none()
+        )
+        if project is None:
+            raise NotFoundError(f"Project not found: {project_id}")
+        return project
+
+    def _require_owned_export(
+        self,
+        db: Session,
+        export_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+    ) -> Export:
+        export = (
+            db.query(Export)
+            .join(Project, Export.project_id == Project.id)
+            .filter(
+                Export.id == export_id,
+                Project.owner_id == owner_id,
+            )
+            .one_or_none()
+        )
+        if export is None:
+            raise NotFoundError(f"Export not found: {export_id}")
+        return export
 
     def _render_document(
         self,

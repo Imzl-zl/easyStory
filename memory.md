@@ -85,3 +85,49 @@
 - **Events**：为仓库补充 `.gitattributes`，降低 Windows 与 WSL 之间的整仓换行符漂移风险。
 - **Changes**：新增仓库根 `.gitattributes`，默认文本文件统一为 `LF`；`*.bat`、`*.cmd`、`*.ps1` 固定为 `CRLF`；常见二进制文件标记为 `binary`。
 - **Insights**：当前仓库此前没有 `.gitattributes`，且 Windows Git 配置为 `core.autocrlf=true`，这是跨环境出现“大量伪变更”的高风险组合。
+
+## [2026-03-21 | 后端审查问题修复完成]
+- **Events**：完成一轮后端审查问题修复，覆盖 git 跟踪污染、workflow 请求阻塞、SSE 可观测性和 export 对外 API 缺口。
+- **Changes**：已把历史上误跟踪进仓库的 `apps/api/**/__pycache__/*.pyc` 全部从 git 移除；`.gitignore` 原本已正确配置，后续再次生成的 pyc 将只作为本地忽略文件存在。
+- **Changes**：`workflow` 路由新增 runtime dispatcher，`start_workflow / resume_workflow` 现在默认通过后台线程触发 runtime；`WorkflowAppService` 额外拆出 `workflow_app_runtime_support.py`，把 runtime 持久化/恢复逻辑移出主服务文件。
+- **Changes**：`observability` 新增 `/api/v1/workflows/{workflow_id}/events` SSE 端点；服务层新增按时间增量读取执行日志与终态判断能力。
+- **Changes**：`export` 新增对外 API：按 workflow 创建导出、按 project 列表查询、按 export_id 下载文件；并新增 `test_export_api.py`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `237 passed`。
+
+## [2026-03-21 | SSE 复合游标修复完成]
+- **Events**：完成第二轮后端稳步推进，修复 workflow events SSE 的增量游标漏日志问题。
+- **Changes**：`WorkflowObservabilityService.list_execution_logs_since()` 改为按 `(created_at, id)` 复合游标与稳定排序查询，避免多条 `ExecutionLog` 共享同一时间戳时被 `created_at > last_created_at` 跳过。
+- **Changes**：`observability` SSE 路由已同步保存 `last_created_at + last_log_id` 两段游标，并新增服务层/API 层回归测试覆盖相同时间戳场景。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_workflow_observability_service.py tests/unit/test_workflow_observability_api.py` 通过，`7 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `239 passed`。
+
+## [2026-03-21 | billing workflow 查询 API 闭环完成]
+- **Events**：继续稳步推进后端，实现 `billing` 的 workflow 维度查询 API 闭环。
+- **Changes**：新增 `BillingQueryService`，支持 workflow owner 校验、billing summary 聚合、token usage 列表查询，并保持现有 `BillingService` 只负责写入与预算守卫。
+- **Changes**：新增 `billing/entry/http/router.py`，开放 `GET /api/v1/workflows/{workflow_id}/billing/summary` 与 `GET /api/v1/workflows/{workflow_id}/billing/token-usages`；根 API 路由已挂载 billing router。
+- **Changes**：新增 `test_billing_query_service.py` 与 `test_billing_api.py`，覆盖 summary 聚合、usage_type 过滤和 owner 隔离。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_billing_query_service.py tests/unit/test_billing_api.py` 通过，`4 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `243 passed`。
+
+## [2026-03-21 | context preview API 闭环完成]
+- **Events**：继续稳步推进后端，实现 `context` 模块的 workflow 节点上下文预览 API。
+- **Changes**：新增 `ContextPreviewService`、`context/service/dto.py`、`context/entry/http/router.py`，开放 `POST /api/v1/workflows/{workflow_id}/context-preview`，可基于 workflow/skill 快照预览指定 generate 节点的真实上下文变量和 `context_report`。
+- **Changes**：将 `VARIABLE_TO_INJECT_TYPE` 从 `workflow` 内部 support 文件归位到 `context/engine/contracts.py`，让 runtime prompt 构建与 preview service 共用同一份映射真值，减少后续维护分叉。
+- **Changes**：`ContextBuilderError` 体系已接入 `BusinessRuleError` 口径，preview 缺少章节号或上下文缺失时可直接返回业务错误而不是裸 500。
+- **Changes**：新增 `test_context_preview_service.py` 与 `test_context_api.py`，覆盖真实变量预览、chapter 依赖校验和 owner 隔离。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_context_preview_service.py tests/unit/test_context_api.py` 通过，`6 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `249 passed`。
+
+## [2026-03-21 | review query API 闭环完成]
+- **Events**：继续稳步推进后端，实现 `review` 模块的最小读取 API 闭环。
+- **Changes**：新增 `ReviewQueryService`、`review/service/dto.py`、`review/entry/http/router.py`，开放 `GET /api/v1/workflows/{workflow_id}/reviews/summary` 与 `GET /api/v1/workflows/{workflow_id}/reviews/actions`。
+- **Changes**：review 汇总接口返回 workflow 级审核状态计数、问题严重级别计数和 `review_type` 分组统计；action 列表接口返回节点上下文信息，并支持按 `node_execution_id / review_type / status` 过滤。
+- **Changes**：`review` 查询层显式兼容历史 `ReviewAction.issues` 已存在的两种 JSON 形态：`[]` 与 `{\"items\": [...]}`；非法负载继续直接暴露错误，不做 silent fallback。
+- **Insights**：`review_actions` 的主查询职责现在回到 `review` 模块；`observability` 继续只负责执行过程排障和 node execution 详情展示，避免模块边界继续混乱。
+- **Changes**：新增 `test_review_query_service.py` 与 `test_review_api.py`，覆盖汇总统计、action 过滤和 owner 隔离。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_review_query_service.py tests/unit/test_review_api.py` 通过，`4 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `253 passed`。

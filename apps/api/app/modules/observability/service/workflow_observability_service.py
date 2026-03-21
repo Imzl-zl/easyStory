@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 import uuid
 from typing import Any
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.modules.observability.models import ExecutionLog, PromptReplay
@@ -18,6 +20,8 @@ from .dto import (
     PromptReplayViewDTO,
     ReviewActionViewDTO,
 )
+
+TERMINAL_WORKFLOW_STATUSES = frozenset({"completed", "failed", "cancelled"})
 
 
 class WorkflowObservabilityService:
@@ -54,8 +58,38 @@ class WorkflowObservabilityService:
         query = db.query(ExecutionLog).filter(ExecutionLog.workflow_execution_id == workflow_id)
         if level is not None:
             query = query.filter(ExecutionLog.level == level)
-        logs = query.order_by(ExecutionLog.created_at.desc()).limit(limit).all()
+        logs = query.order_by(ExecutionLog.created_at.desc(), ExecutionLog.id.desc()).limit(limit).all()
         return [ExecutionLogViewDTO.model_validate(item, from_attributes=True) for item in logs]
+
+    def list_execution_logs_since(
+        self,
+        db: Session,
+        workflow_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+        after_created_at: datetime | None,
+        after_id: uuid.UUID | None = None,
+        level: str | None = None,
+        limit: int = 100,
+    ) -> list[ExecutionLogViewDTO]:
+        self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        query = db.query(ExecutionLog).filter(ExecutionLog.workflow_execution_id == workflow_id)
+        if level is not None:
+            query = query.filter(ExecutionLog.level == level)
+        if after_created_at is not None:
+            query = query.filter(self._build_after_cursor(after_created_at, after_id))
+        logs = query.order_by(ExecutionLog.created_at.asc(), ExecutionLog.id.asc()).limit(limit).all()
+        return [ExecutionLogViewDTO.model_validate(item, from_attributes=True) for item in logs]
+
+    def is_workflow_terminal(
+        self,
+        db: Session,
+        workflow_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+    ) -> bool:
+        workflow = self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        return workflow.status in TERMINAL_WORKFLOW_STATUSES
 
     def list_prompt_replays(
         self,
@@ -121,6 +155,21 @@ class WorkflowObservabilityService:
         if execution is None:
             raise NotFoundError(f"Node execution not found: {node_execution_id}")
         return execution
+
+    def _build_after_cursor(
+        self,
+        after_created_at: datetime,
+        after_id: uuid.UUID | None,
+    ):
+        if after_id is None:
+            return ExecutionLog.created_at > after_created_at
+        return or_(
+            ExecutionLog.created_at > after_created_at,
+            and_(
+                ExecutionLog.created_at == after_created_at,
+                ExecutionLog.id > after_id,
+            ),
+        )
 
     def _to_node_execution_dto(self, execution: NodeExecution) -> NodeExecutionViewDTO:
         input_data = execution.input_data if isinstance(execution.input_data, dict) else {}

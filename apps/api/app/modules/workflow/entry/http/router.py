@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import threading
 import uuid
+from collections.abc import Callable
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.modules.user.entry.http.dependencies import get_current_user
@@ -20,9 +22,10 @@ from app.modules.workflow.service import (
     create_chapter_task_service,
     create_workflow_app_service,
 )
-from app.shared.db import get_db_session
+from app.shared.db import SessionFactory, get_db_session, get_session_factory
 
 router = APIRouter(tags=["workflow"])
+WorkflowRuntimeDispatcher = Callable[[uuid.UUID, uuid.UUID], None]
 
 
 def get_workflow_app_service() -> WorkflowAppService:
@@ -33,6 +36,23 @@ def get_chapter_task_service() -> ChapterTaskService:
     return create_chapter_task_service()
 
 
+def get_workflow_runtime_dispatcher(
+    request: Request,
+    workflow_app_service: WorkflowAppService = Depends(get_workflow_app_service),
+) -> WorkflowRuntimeDispatcher:
+    session_factory = get_session_factory(request)
+
+    def dispatch(workflow_id: uuid.UUID, owner_id: uuid.UUID) -> None:
+        thread = threading.Thread(
+            target=_run_workflow_runtime,
+            args=(workflow_app_service, session_factory, workflow_id, owner_id),
+            daemon=True,
+        )
+        thread.start()
+
+    return dispatch
+
+
 @router.post(
     "/api/v1/projects/{project_id}/workflows/start",
     response_model=WorkflowExecutionDTO,
@@ -41,6 +61,7 @@ def start_workflow(
     project_id: uuid.UUID,
     payload: WorkflowStartDTO | None = None,
     workflow_app_service: WorkflowAppService = Depends(get_workflow_app_service),
+    runtime_dispatcher: WorkflowRuntimeDispatcher = Depends(get_workflow_runtime_dispatcher),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db_session),
 ) -> WorkflowExecutionDTO:
@@ -49,6 +70,7 @@ def start_workflow(
         project_id,
         payload or WorkflowStartDTO(),
         owner_id=current_user.id,
+        runtime_dispatcher=runtime_dispatcher,
     )
 
 
@@ -92,6 +114,7 @@ def pause_workflow(
 def resume_workflow(
     workflow_id: uuid.UUID,
     workflow_app_service: WorkflowAppService = Depends(get_workflow_app_service),
+    runtime_dispatcher: WorkflowRuntimeDispatcher = Depends(get_workflow_runtime_dispatcher),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db_session),
 ) -> WorkflowExecutionDTO:
@@ -99,6 +122,7 @@ def resume_workflow(
         db,
         workflow_id,
         owner_id=current_user.id,
+        runtime_dispatcher=runtime_dispatcher,
     )
 
 
@@ -174,3 +198,17 @@ def update_chapter_task(
         payload,
         owner_id=current_user.id,
     )
+
+
+def _run_workflow_runtime(
+    workflow_app_service: WorkflowAppService,
+    session_factory: SessionFactory,
+    workflow_id: uuid.UUID,
+    owner_id: uuid.UUID,
+) -> None:
+    with session_factory() as session:
+        workflow_app_service.run_workflow_runtime(
+            session,
+            workflow_id,
+            owner_id=owner_id,
+        )

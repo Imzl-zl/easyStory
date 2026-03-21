@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+import uuid
+
 import pytest
 
 from app.modules.observability.models import ExecutionLog, PromptReplay
@@ -145,3 +148,54 @@ def test_workflow_observability_service_hides_other_users_data(db) -> None:
         service.list_execution_logs(db, workflow.id, owner_id=outsider.id)
     with pytest.raises(NotFoundError):
         service.list_prompt_replays(db, workflow.id, execution.id, owner_id=outsider.id)
+
+
+def test_workflow_observability_service_cursor_keeps_logs_with_same_timestamp(db) -> None:
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    workflow = create_workflow(db, project=project, status="running")
+    shared_created_at = datetime(2026, 3, 21, 12, 0, tzinfo=UTC)
+    first_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    second_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+    later_id = uuid.UUID("00000000-0000-0000-0000-000000000003")
+    db.add_all(
+        [
+            ExecutionLog(
+                id=first_id,
+                workflow_execution_id=workflow.id,
+                node_execution_id=None,
+                level="INFO",
+                message="first",
+                created_at=shared_created_at,
+            ),
+            ExecutionLog(
+                id=second_id,
+                workflow_execution_id=workflow.id,
+                node_execution_id=None,
+                level="INFO",
+                message="second",
+                created_at=shared_created_at,
+            ),
+            ExecutionLog(
+                id=later_id,
+                workflow_execution_id=workflow.id,
+                node_execution_id=None,
+                level="INFO",
+                message="later",
+                created_at=datetime(2026, 3, 21, 12, 0, 1, tzinfo=UTC),
+            ),
+        ]
+    )
+    db.commit()
+
+    service = WorkflowObservabilityService()
+
+    logs = service.list_execution_logs_since(
+        db,
+        workflow.id,
+        owner_id=owner.id,
+        after_created_at=shared_created_at,
+        after_id=first_id,
+    )
+
+    assert [item.id for item in logs] == [second_id, later_id]

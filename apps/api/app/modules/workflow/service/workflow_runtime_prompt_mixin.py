@@ -10,12 +10,12 @@ from app.modules.config_registry.schemas.config_schemas import (
     SkillConfig,
     WorkflowConfig,
 )
+from app.modules.context.engine.contracts import VARIABLE_TO_INJECT_TYPE
 from app.modules.project.models import Project
 from app.modules.workflow.models import WorkflowExecution
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 
 from .snapshot_support import load_skill_snapshot
-from .workflow_runtime_shared import VARIABLE_TO_INJECT_TYPE
 
 
 class WorkflowRuntimePromptMixin:

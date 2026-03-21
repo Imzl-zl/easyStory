@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import json
+import time
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.modules.observability.service import (
@@ -15,7 +19,7 @@ from app.modules.observability.service import (
 )
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
-from app.shared.db import get_db_session
+from app.shared.db import SessionFactory, get_db_session, get_session_factory
 
 router = APIRouter(tags=["observability"])
 
@@ -62,6 +66,71 @@ def list_workflow_logs(
     )
 
 
+@router.get("/api/v1/workflows/{workflow_id}/events")
+async def stream_workflow_events(
+    workflow_id: uuid.UUID,
+    request: Request,
+    level: Literal["INFO", "WARNING", "ERROR"] | None = Query(default=None),
+    timeout_seconds: int = Query(default=15, ge=1, le=300),
+    poll_interval_ms: int = Query(default=500, ge=100, le=5000),
+    observability_service: WorkflowObservabilityService = Depends(get_workflow_observability_service),
+    current_user: User = Depends(get_current_user),
+    session_factory: SessionFactory = Depends(get_session_factory),
+) -> StreamingResponse:
+    with session_factory() as session:
+        observability_service.is_workflow_terminal(
+            session,
+            workflow_id,
+            owner_id=current_user.id,
+        )
+
+    async def event_stream():
+        deadline = time.monotonic() + timeout_seconds
+        last_created_at = None
+        last_log_id = None
+        while time.monotonic() < deadline:
+            if await request.is_disconnected():
+                break
+            with session_factory() as session:
+                logs = observability_service.list_execution_logs_since(
+                    session,
+                    workflow_id,
+                    owner_id=current_user.id,
+                    after_created_at=last_created_at,
+                    after_id=last_log_id,
+                    level=level,
+                )
+                is_terminal = observability_service.is_workflow_terminal(
+                    session,
+                    workflow_id,
+                    owner_id=current_user.id,
+                )
+            if logs:
+                for log in logs:
+                    yield _format_sse_event(
+                        event="execution_log",
+                        data=log.model_dump(mode="json"),
+                        event_id=str(log.id),
+                    )
+                last_created_at = logs[-1].created_at
+                last_log_id = logs[-1].id
+                continue
+            yield ": keep-alive\n\n"
+            if is_terminal:
+                yield _format_sse_event(event="end", data={"workflow_id": str(workflow_id)})
+                break
+            await asyncio.sleep(poll_interval_ms / 1000)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get(
     "/api/v1/workflows/{workflow_id}/node-executions/{node_execution_id}/prompt-replays",
     response_model=list[PromptReplayViewDTO],
@@ -79,3 +148,17 @@ def list_prompt_replays(
         node_execution_id,
         owner_id=current_user.id,
     )
+
+
+def _format_sse_event(
+    *,
+    event: str,
+    data: dict,
+    event_id: str | None = None,
+) -> str:
+    lines: list[str] = []
+    if event_id is not None:
+        lines.append(f"id: {event_id}")
+    lines.append(f"event: {event}")
+    lines.append(f"data: {json.dumps(data, ensure_ascii=False)}")
+    return "\n".join(lines) + "\n\n"
