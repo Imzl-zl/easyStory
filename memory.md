@@ -207,3 +207,12 @@
 - **Validation**：`pnpm --dir apps/web lint` 通过。
 - **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
 - **Validation**：`pnpm --dir apps/web exec next build --webpack` 通过。
+
+## [2026-03-21 | Auth CORS 预检修复完成]
+- **Events**：修复了 Web 注册接口的浏览器预检失败问题，解决 `OPTIONS /api/v1/auth/register` 返回 `405 Method Not Allowed`。
+- **Changes**：新增 `app/entry/http/cors.py`，将 CORS 装配收敛到入口层；`create_app()` 现在会注册 `CORSMiddleware`，默认允许 `localhost/127.0.0.1` 任意端口的本地 Web 开发源通过预检。
+- **Changes**：额外跨域白名单支持通过 `EASYSTORY_CORS_ALLOWED_ORIGINS`（逗号分隔）和 `EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX` 扩展，不再把 origin 策略硬编码死在 `main.py`。
+- **Changes**：新增 `tests/unit/test_auth_api.py`，覆盖本地 Web origin 对 `/api/v1/auth/register` 的 CORS 预检，以及 CORS 修复后注册接口仍正常签发 token 的回归场景。
+- **Insights**：这次报错根因不在认证服务，而是在 API 入口层缺少跨域中间件；浏览器跨域 JSON `POST` 会先发 `OPTIONS`，如果入口层不处理，业务路由即使正确也会先被 405 拦掉。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_auth_api.py tests/unit/test_preparation_api.py::test_auth_register_and_login_issue_tokens` 通过，`3 passed`。
