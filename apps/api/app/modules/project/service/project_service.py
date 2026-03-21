@@ -27,8 +27,14 @@ class ProjectService:
         project_id: uuid.UUID,
         *,
         owner_id: uuid.UUID | None = None,
+        include_deleted: bool = False,
     ) -> Project:
-        return self._require_project(db, project_id, owner_id=owner_id)
+        return self._require_project(
+            db,
+            project_id,
+            owner_id=owner_id,
+            include_deleted=include_deleted,
+        )
 
     def update_project_setting(
         self,
@@ -75,10 +81,13 @@ class ProjectService:
         project_id: uuid.UUID,
         *,
         owner_id: uuid.UUID | None = None,
+        include_deleted: bool = False,
     ) -> Project:
         query = db.query(Project).filter(Project.id == project_id)
         if owner_id is not None:
             query = query.filter(Project.owner_id == owner_id)
+        if not include_deleted:
+            query = query.filter(Project.deleted_at.is_(None))
         project = query.one_or_none()
         if project is None:
             raise NotFoundError(f"Project not found: {project_id}")

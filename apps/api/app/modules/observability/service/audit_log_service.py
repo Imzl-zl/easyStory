@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.modules.observability.models import AuditLog
 
 AUDIT_ENTITY_MODEL_CREDENTIAL = "model_credential"
+AUDIT_ENTITY_PROJECT = "project"
 
 
 class AuditLogService:

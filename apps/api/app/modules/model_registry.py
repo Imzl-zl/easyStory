@@ -1,3 +1,4 @@
+from app.modules.analysis.models import Analysis
 from app.modules.billing.models import TokenUsage
 from app.modules.content.models import Content, ContentVersion
 from app.modules.context.models import StoryFact
@@ -12,6 +13,7 @@ from app.modules.workflow.models import Artifact, ChapterTask, NodeExecution, Wo
 
 __all__ = [
     "Artifact",
+    "Analysis",
     "AuditLog",
     "ChapterTask",
     "Content",

@@ -141,3 +141,25 @@
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_review_query_service.py tests/unit/test_review_api.py` 通过，`8 passed`。
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `257 passed`。
+
+## [2026-03-21 | analysis API 最小闭环完成]
+- **Events**：补齐 `analysis` 模块最小后端闭环，支持 project 维度分析结果创建、列表查询和详情查询。
+- **Changes**：新增 `analysis/models/analysis.py`、`analysis/service/`、`analysis/entry/http/router.py`，并将 `Analysis` 注册到 `model_registry`、将 `analysis` 路由挂到根 API。
+- **Changes**：`project.models.Project` 新增 `analyses` relationship；`analysis` 当前沿用仓库既有模块模式，采用 `models/service/entry` 分层，DTO 放在 `service/dto.py`，未补空壳 `engine/infrastructure`。
+- **Changes**：新增 `test_analysis_service.py` 与 `test_analysis_api.py`，覆盖 owner 隔离、foreign content 校验、创建/列表/详情闭环；同时将 service 单测构造方式收敛为 `create_analysis_service()`，移除动态 `__import__` 写法。
+- **Insights**：当前仓库多数业务模块都把应用层 DTO 放在模块内 `service/dto.py`，`analysis` 继续遵循这一约定，比单独再造一套 `schemas` 目录更一致，维护成本更低。
+- **Insights**：`__pycache__/*.pyc` 目前已由根 `.gitignore` 忽略；测试运行后会在本地重新生成缓存文件，但不会再进入 git 变更。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_analysis_service.py tests/unit/test_analysis_api.py` 通过，`6 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `263 passed`。
+
+## [2026-03-21 | project 管理 API 闭环完成]
+- **Events**：继续稳步推进后端，补齐 `project` 聚合的最小管理闭环，支持创建、列表、详情、基础更新、软删除和恢复。
+- **Changes**：新增 `ProjectManagementService`、扩展 `project/service/dto.py` 与 `project/service/factory.py`，并在 `project` 路由上开放 `POST/GET/PUT/DELETE /api/v1/projects` 与 `POST /api/v1/projects/{project_id}/restore`。
+- **Changes**：`ProjectService.require_project()` 现在默认过滤 `deleted_at is not null`，仅恢复场景通过 `include_deleted=True` 显式访问回收站项目；这会同步让复用该校验的 `content / analysis / workflow` 等模块默认隐藏已删除项目。
+- **Changes**：`observability.audit_log_service` 新增 `AUDIT_ENTITY_PROJECT`；项目删除和恢复都会写入 `audit_logs`，事件类型分别为 `project_delete` 和 `project_restore`。
+- **Insights**：项目基础元数据更新与 `project_setting` 仍保持分离边界更稳妥；`PUT /projects/{id}` 只处理 `name / template_id / allow_system_credential_pool`，长期设定继续走专用 `setting` 路径，避免未来维护时把聚合元数据和创作真值混在一起。
+- **Insights**：软删除一旦进入系统，`require_project()` 的默认过滤就必须尽早收紧，否则回收站项目仍会被后续内容、分析、工作流接口继续访问，形成“删除只是 UI 假象”的边界漏洞。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_project_management_service.py tests/unit/test_project_api.py` 通过，`5 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `268 passed`。

@@ -1,4 +1,8 @@
-from .audit_log_service import AUDIT_ENTITY_MODEL_CREDENTIAL, AuditLogService
+from .audit_log_service import (
+    AUDIT_ENTITY_MODEL_CREDENTIAL,
+    AUDIT_ENTITY_PROJECT,
+    AuditLogService,
+)
 from .dto import (
     ArtifactViewDTO,
     ExecutionLogViewDTO,
@@ -11,6 +15,7 @@ from .workflow_observability_service import WorkflowObservabilityService
 
 __all__ = [
     "AUDIT_ENTITY_MODEL_CREDENTIAL",
+    "AUDIT_ENTITY_PROJECT",
     "ArtifactViewDTO",
     "AuditLogService",
     "ExecutionLogViewDTO",

@@ -9,6 +9,7 @@ from app.modules.project.schemas import extract_project_summary_fields, validate
 from app.shared.db.base import Base, SoftDeleteMixin, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
+    from app.modules.analysis.models import Analysis
     from app.modules.content.models import Content
     from app.modules.template.models import Template
     from app.modules.user.models import User
@@ -30,6 +31,9 @@ class Project(Base, TimestampMixin, UUIDMixin, SoftDeleteMixin):
     owner: Mapped["User"] = relationship(back_populates="projects")
     template: Mapped["Template | None"] = relationship(back_populates="projects")
     contents: Mapped[list["Content"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    analyses: Mapped[list["Analysis"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
     workflow_executions: Mapped[list["WorkflowExecution"]] = relationship(
