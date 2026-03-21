@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -8,9 +7,10 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.shared.settings import get_settings
+
 from .base import Base
 
-DATABASE_URL_ENV = "EASYSTORY_DATABASE_URL"
 DEFAULT_DB_DIR = ".runtime"
 DEFAULT_DB_NAME = "easystory.db"
 
@@ -29,9 +29,9 @@ def create_database_engine(database_url: str | None = None) -> Engine:
 def resolve_database_url(database_url: str | None = None) -> str:
     if database_url:
         return database_url
-    env_url = os.getenv(DATABASE_URL_ENV)
-    if env_url:
-        return env_url
+    settings_database_url = get_settings().database_url
+    if settings_database_url:
+        return settings_database_url
     database_path = _default_database_path()
     database_path.parent.mkdir(parents=True, exist_ok=True)
     return f"sqlite:///{database_path.as_posix()}"

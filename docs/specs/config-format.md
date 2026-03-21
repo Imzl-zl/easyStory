@@ -5,7 +5,7 @@
 | 文档类型 | 技术规范 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-14 |
-| 更新时间 | 2026-03-19 |
+| 更新时间 | 2026-03-21 |
 | 关联文档 | [系统架构设计](./architecture.md)、[数据库设计](./database-design.md) |
 
 ---
@@ -54,6 +54,8 @@
 - 文件名：`{name}.yaml`（小写字母 + 连字符）
 - ID 在文件内部定义
 - 示例：`style-checker.yaml` → `id: "agent.style_checker"`
+
+> 本节约束的是 Git 管理的业务配置目录 `/config`。后端运行时环境配置不放在 `/config`，而是通过 `apps/api/.env` 注入，详见 [8.1 后端运行时 Settings](#81-后端运行时-settings)。
 
 ---
 
@@ -637,14 +639,43 @@ model:
 
 ## 8. 配置加载机制
 
+### 8.1 后端运行时 Settings
+
+后端运行时环境配置与 `/config/*.yaml` 属于不同边界：
+
+- `/config/*.yaml` 是业务配置真值源，受 Git 管理，由 `config_registry` 加载。
+- `apps/api/.env` 是部署 / 本地运行时注入，不纳入 Git；仅提交 `apps/api/.env.example` 作为模板。
+- 运行时代码统一通过 `apps/api/app/shared/settings.py` 暴露的 `get_settings()` / `validate_startup_settings()` 读取，禁止继续在模块内部散落 `os.getenv()`。
+
+**当前环境变量约定**：
+
+| 变量 | 必需性 | 默认值 | 说明 |
+|---|---|---|---|
+| `EASYSTORY_JWT_SECRET` | 必需 | 无 | 用户认证 JWT 签名密钥；应用启动时必须存在 |
+| `EASYSTORY_CREDENTIAL_MASTER_KEY` | 条件必需 | 无 | 仅在使用 `Credential Center` 创建、加密或校验模型凭证时需要 |
+| `EASYSTORY_DATABASE_URL` | 可选 | `sqlite:///apps/api/.runtime/easystory.db` | 数据库连接串 |
+| `EASYSTORY_JWT_EXPIRE_HOURS` | 可选 | `24` | JWT 过期小时数，必须 `> 0` |
+| `EASYSTORY_CORS_ALLOWED_ORIGINS` | 可选 | 空列表 | 逗号分隔 origin 白名单 |
+| `EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX` | 可选 | `^https?://(localhost|127\.0\.0\.1)(:\d+)?$` | CORS 正则白名单 |
+
+**校验与暴露规则**：
+
+- `EASYSTORY_JWT_SECRET` 由 `validate_startup_settings()` 在 FastAPI 启动阶段强制校验；缺失时直接启动失败，不做 silent fallback。
+- `EASYSTORY_CREDENTIAL_MASTER_KEY` 保持按能力懒校验；只有真正触发凭证加密/解密路径时才显式报错。
+- `EASYSTORY_CORS_ALLOWED_ORIGINS` 接受逗号分隔字符串；解析失败视为配置错误。
+- 新增运行时环境变量时，必须同时更新 `app/shared/settings.py`、`apps/api/.env.example`、本规范与 `docs/README.md`。
+
+### 8.2 YAML 配置注册表加载
+
 **加载流程**：
 ```
 启动时：
-1. 扫描 /config/ 目录
-2. 解析所有 YAML 文件
-3. 校验配置格式
-4. 注册到内存注册表
-5. 启动完成；当前不默认开启文件监听
+1. 加载 `apps/api/.env` 并构建统一 settings
+2. 扫描 /config/ 目录
+3. 解析所有 YAML 文件
+4. 校验配置格式
+5. 注册到内存注册表
+6. 启动完成；当前不默认开启文件监听
 
 运行时：
 1. Web UI 或外部工具编辑 YAML
@@ -670,4 +701,4 @@ model:
 
 *文档版本: 1.0.0*  
 *创建日期: 2026-03-14*  
-*更新日期: 2026-03-19*
+*更新日期: 2026-03-21*

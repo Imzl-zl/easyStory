@@ -216,3 +216,28 @@
 - **Insights**：这次报错根因不在认证服务，而是在 API 入口层缺少跨域中间件；浏览器跨域 JSON `POST` 会先发 `OPTIONS`，如果入口层不处理，业务路由即使正确也会先被 405 拦掉。
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_auth_api.py tests/unit/test_preparation_api.py::test_auth_register_and_login_issue_tokens` 通过，`3 passed`。
+
+## [2026-03-21 | 后端 settings 与 .env 基线补齐完成]
+- **Events**：完成后端运行时配置基线收口，补齐统一 settings 层、`.env` 自动加载、`.env.example`、测试基座和文档说明。
+- **Changes**：新增 `app/shared/settings.py`，用 `pydantic-settings` 统一管理 `EASYSTORY_DATABASE_URL`、`EASYSTORY_JWT_SECRET`、`EASYSTORY_JWT_EXPIRE_HOURS`、`EASYSTORY_CREDENTIAL_MASTER_KEY`、`EASYSTORY_CORS_ALLOWED_ORIGINS`、`EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX`，并提供 `get_settings()/clear_settings_cache()/validate_startup_settings()`。
+- **Changes**：`create_app()` 现在改为通过 lifespan 在服务启动时校验 `EASYSTORY_JWT_SECRET`；JWT、数据库、CORS、Credential master key 的读取点都已改为走 settings 真值源，不再各自散落 `os.getenv()`。
+- **Changes**：新增 `apps/api/.env.example`，明确区分必需项、条件必需项和可选项；`docs/README.md` 已补后端环境配置说明，`.gitignore` 已忽略本地 `.env` 并保留示例文件。
+- **Changes**：`tests/conftest.py` 新增自动清理 settings cache 的 fixture，避免 `monkeypatch.setenv()` 与 `lru_cache` 互相污染；新增 `tests/unit/test_settings.py` 覆盖 `.env` 文件读取、JWT 必需项校验和 CORS 逗号分隔解析。
+- **Changes**：`apps/api/pyproject.toml` 已把 `python-dotenv` 声明为直接依赖，并通过 `uv lock --offline` 同步锁文件，避免继续依赖 `litellm` 的传递安装。
+- **Insights**：统一 settings 后，配置错误会在“启动应用”或“触发对应能力”时明确暴露，不再变成分散在不同链路中的偶发问题；同时保持了测试里 `create_app(session_factory=...) + monkeypatch.setenv()` 的现有使用方式。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_settings.py tests/unit/test_auth_api.py tests/unit/test_preparation_api.py::test_create_app_bootstraps_database_session_factory tests/unit/test_preparation_api.py::test_auth_register_and_login_issue_tokens tests/unit/test_credential_service.py tests/unit/test_credential_api.py tests/unit/test_workflow_engine.py::test_app_registers_health_route` 通过，`19 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv lock --offline` 通过。
+
+## [2026-03-21 | settings 正式规格同步完成]
+- **Events**：完成 settings 基线任务收尾，将运行时 `.env` 约定同步回正式配置规格。
+- **Changes**：`docs/specs/config-format.md` 已补充 `apps/api/.env` / `apps/api/.env.example`、统一 settings 入口、环境变量表和启动/懒校验规则，避免 README、代码与规格文档脱节。
+- **Insights**：后端运行时环境配置与 `/config/*.yaml` 必须明确区分边界；前者属于部署注入，后者属于业务配置真值，不能再混写成一套“默认大家都懂”的隐式约定。
+
+## [2026-03-21 | settings 审查回归问题修复完成]
+- **Events**：完成 settings 基线在代码审查后暴露出的异常语义与依赖注入回归修复。
+- **Changes**：`app/shared/settings.py` 现在会在 `jwt_expire_hours` 的原始值阶段显式解析整数，并把非整数配置也统一收敛为 `ConfigurationError`，不再泄漏 `pydantic ValidationError`。
+- **Changes**：`TokenService` 改为仅在需要默认值时才读取 settings；显式传入 `secret` / `expire_hours` 时不再被全局坏环境变量反向污染，同时会拒绝空字符串 secret。
+- **Changes**：新增 `test_token_service.py`，并扩展 `test_settings.py`，覆盖非整数过期时间、显式注入绕开坏环境变量以及空 secret 拒绝场景。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_settings.py tests/unit/test_token_service.py tests/unit/test_auth_api.py tests/unit/test_preparation_api.py::test_create_app_bootstraps_database_session_factory tests/unit/test_preparation_api.py::test_auth_register_and_login_issue_tokens tests/unit/test_credential_service.py tests/unit/test_credential_api.py tests/unit/test_workflow_engine.py::test_app_registers_health_route` 通过，`23 passed`。

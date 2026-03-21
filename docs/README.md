@@ -75,6 +75,21 @@
 4. **配置格式规范** → 了解配置系统
 5. 按开发任务查阅对应的 design/ 文件
 
+### 后端环境配置
+
+- 后端运行时环境变量模板位于 `apps/api/.env.example`。
+- 本地启动前先复制为 `apps/api/.env`，再填写必需项。
+- 当前必需项：
+  - `EASYSTORY_JWT_SECRET`
+- 条件必需项：
+  - `EASYSTORY_CREDENTIAL_MASTER_KEY`
+    在使用 `Credential Center` 创建、加密或验证模型凭证前必须配置。
+- 当前可选项：
+  - `EASYSTORY_DATABASE_URL`
+  - `EASYSTORY_JWT_EXPIRE_HOURS`
+  - `EASYSTORY_CORS_ALLOWED_ORIGINS`
+  - `EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX`
+
 ---
 
 ## 优先级说明
@@ -108,4 +123,4 @@ docs/
 
 ---
 
-*最后更新: 2026-03-19*
+*最后更新: 2026-03-21*

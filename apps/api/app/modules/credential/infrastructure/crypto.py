@@ -7,9 +7,13 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+from app.shared.settings import (
+    CREDENTIAL_MASTER_KEY_ENV as SETTINGS_CREDENTIAL_MASTER_KEY_ENV,
+    get_settings,
+)
 from app.shared.runtime.errors import ConfigurationError
 
-CREDENTIAL_MASTER_KEY_ENV = "EASYSTORY_CREDENTIAL_MASTER_KEY"
+CREDENTIAL_MASTER_KEY_ENV = SETTINGS_CREDENTIAL_MASTER_KEY_ENV
 AES_KEY_BYTES = 32
 PBKDF2_ITERATIONS = 600_000
 SALT_BYTES = 16
@@ -48,11 +52,7 @@ class CredentialCrypto:
         return plaintext.decode("utf-8")
 
     def _load_master_key(self, master_key: str | None) -> bytes:
-        value = master_key or os.getenv(CREDENTIAL_MASTER_KEY_ENV)
-        if not value:
-            raise ConfigurationError(
-                f"Missing required environment variable: {CREDENTIAL_MASTER_KEY_ENV}"
-            )
+        value = master_key or get_settings().require_credential_master_key()
         return value.encode("utf-8")
 
     def _derive_key(self, salt: bytes) -> bytes:

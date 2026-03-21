@@ -1,23 +1,25 @@
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
 
 from app.shared.runtime.errors import ConfigurationError, UnauthorizedError
+from app.shared.settings import JWT_EXPIRE_HOURS_ENV, JWT_SECRET_ENV, get_settings
 
 JWT_ALGORITHM = "HS256"
-JWT_SECRET_ENV = "EASYSTORY_JWT_SECRET"
-JWT_EXPIRE_HOURS_ENV = "EASYSTORY_JWT_EXPIRE_HOURS"
-DEFAULT_JWT_EXPIRE_HOURS = 24
 
 
 class TokenService:
-    def __init__(self) -> None:
-        self.secret = self._load_secret()
-        self.expire_hours = self._load_expire_hours()
+    def __init__(
+        self,
+        *,
+        secret: str | None = None,
+        expire_hours: int | None = None,
+    ) -> None:
+        self.secret = self._resolve_secret(secret)
+        self.expire_hours = self._resolve_expire_hours(expire_hours)
 
     def issue_for_user(self, user_id: uuid.UUID) -> str:
         now = datetime.now(timezone.utc)
@@ -35,20 +37,19 @@ class TokenService:
         except (JWTError, KeyError, ValueError) as exc:
             raise UnauthorizedError("Invalid authentication credentials") from exc
 
-    def _load_secret(self) -> str:
-        secret = os.getenv(JWT_SECRET_ENV)
-        if not secret:
-            raise ConfigurationError(f"Missing required environment variable: {JWT_SECRET_ENV}")
-        return secret
+    def _resolve_secret(self, secret: str | None) -> str:
+        if secret is not None:
+            if secret.strip():
+                return secret
+            raise ConfigurationError(f"{JWT_SECRET_ENV} must be a non-empty string")
+        return get_settings().require_jwt_secret()
 
-    def _load_expire_hours(self) -> int:
-        raw_value = os.getenv(JWT_EXPIRE_HOURS_ENV, str(DEFAULT_JWT_EXPIRE_HOURS))
-        try:
-            expire_hours = int(raw_value)
-        except ValueError as exc:
-            raise ConfigurationError(
-                f"Invalid integer for {JWT_EXPIRE_HOURS_ENV}: {raw_value}"
-            ) from exc
-        if expire_hours <= 0:
+    def _resolve_expire_hours(self, expire_hours: int | None) -> int:
+        if expire_hours is not None:
+            if expire_hours <= 0:
+                raise ConfigurationError(f"{JWT_EXPIRE_HOURS_ENV} must be > 0")
+            return expire_hours
+        configured_expire_hours = get_settings().jwt_expire_hours
+        if configured_expire_hours <= 0:
             raise ConfigurationError(f"{JWT_EXPIRE_HOURS_ENV} must be > 0")
-        return expire_hours
+        return configured_expire_hours
