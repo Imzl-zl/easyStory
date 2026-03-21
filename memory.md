@@ -163,3 +163,17 @@
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_project_management_service.py tests/unit/test_project_api.py` 通过，`5 passed`。
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `268 passed`。
+
+## [2026-03-21 | UI 文档 MVP 对齐完成]
+- **Events**：完成 `docs/ui/ui-design.md` 与 `docs/ui/ui-interaction-supplement.md` 的收口重写，改为当前前后端联调阶段可执行的 UI 真值文档。
+- **Changes**：`ui-design.md` 已固定 `Auth + Lobby / Studio / Engine / Lab` 的工作台 IA，明确子视图层级，并把 `Lab` 收口为分析结果工作台、`Engine` 收口为执行控制台。
+- **Changes**：`ui-interaction-supplement.md` 已新增后端能力矩阵、状态映射、响应式、无障碍、边界态规则，并明确 `Auth` 无忘记密码、`Export` 仅 `txt/markdown`、`Recycle Bin` 仅恢复、`Workflow` 模式只读展示。
+- **Insights**：本轮无需为迁就 UI 草案而扩散后端改造；更稳妥的方案是把未来态能力显式标注为 `MVP UI 占位` 或 `Future`，避免 UI 文档继续制造伪完成态。
+- **Insights**：`chapter_task.status=\"generating\"` 在前端不能直接等同于“生成中”；需要结合 `content_id` 区分“运行中”和“待确认”，否则会把当前后端真实语义渲染错。
+
+## [2026-03-21 | UI 文档审查修复完成]
+- **Events**：根据代码审查结论，修复了 UI 文档里关于 `credential` 范围和 `Review & Diff` 挂载边界的剩余偏差。
+- **Changes**：`ui-design.md` 现在把 `Credential Center` 明确为 `MVP 已支持`，并限定 `Studio` 仅保留跳转到当前 workflow 审核面板的联动语义。
+- **Changes**：`ui-interaction-supplement.md` 已补充 `Credential` 能力矩阵，明确 `Review & Diff` 归属 `Engine` 的 workflow 子视图，不再写成 `Studio` 可直接承载审核数据面板。
+- **Changes**：`docs/README.md` 已把两份 UI 文档的索引描述更新为当前的 MVP 对齐定位。
+- **Insights**：`credential` 已有真实后端 CRUD/verify/enable/disable 能力，不能继续被文档误降级为占位；否则前端会把关键可用模块排除出 MVP。
