@@ -115,6 +115,77 @@ def test_review_api_hides_other_users_workflow(monkeypatch) -> None:
         engine.dispose()
 
 
+def test_review_api_rejects_node_execution_from_other_workflow(monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    session_factory, engine = _build_session_factory()
+    client = _build_runtime_client(session_factory)
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+            other_project = create_project(session, owner=owner)
+            workflow = create_workflow(session, project=project, status="running")
+            other_workflow = create_workflow(session, project=other_project, status="paused")
+            foreign_execution = _create_node_execution(
+                session,
+                other_workflow.id,
+                node_id="chapter_gen",
+                node_order=1,
+            )
+            workflow_id = workflow.id
+            owner_id = owner.id
+
+        response = client.get(
+            f"/api/v1/workflows/{workflow_id}/reviews/actions",
+            params={"node_execution_id": str(foreign_execution.id)},
+            headers=_auth_headers(owner_id),
+        )
+        assert response.status_code == 404
+        assert response.json()["code"] == "not_found"
+    finally:
+        client.close()
+        engine.dispose()
+
+
+def test_review_api_returns_configuration_error_for_malformed_issues(monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    session_factory, engine = _build_session_factory()
+    client = _build_runtime_client(session_factory)
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+            workflow = create_workflow(session, project=project, status="paused")
+            execution = _create_node_execution(
+                session,
+                workflow.id,
+                node_id="chapter_gen",
+                node_order=1,
+            )
+            _create_review_action(
+                session,
+                execution.id,
+                review_type="auto_review",
+                status="failed",
+                issues="bad-payload",
+                created_at=datetime(2026, 3, 21, 15, 0, tzinfo=UTC),
+            )
+            workflow_id = workflow.id
+            owner_id = owner.id
+
+        response = client.get(
+            f"/api/v1/workflows/{workflow_id}/reviews/summary",
+            headers=_auth_headers(owner_id),
+        )
+        assert response.status_code == 500
+        assert response.json()["code"] == "configuration_error"
+    finally:
+        client.close()
+        engine.dispose()
+
+
 def _create_node_execution(
     db,
     workflow_id,

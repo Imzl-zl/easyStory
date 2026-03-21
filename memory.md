@@ -131,3 +131,13 @@
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_review_query_service.py tests/unit/test_review_api.py` 通过，`4 passed`。
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `253 passed`。
+
+## [2026-03-21 | review query API 审查修复完成]
+- **Events**：根据审查结论，修复 `review` 查询 API 的统计口径、子资源归属校验和异常负载显式暴露问题。
+- **Changes**：`reviewed_node_count` 已改为按逻辑 `node_id` 去重，不再把同一节点的多次 `sequence` 执行重复计为多个 reviewed node。
+- **Changes**：`GET /api/v1/workflows/{workflow_id}/reviews/actions` 在传入 `node_execution_id` 时，现会先校验该记录是否属于目标 workflow 且 owner 正确；错误参数会返回 `404 not_found`，不再静默返回空列表。
+- **Changes**：`ReviewQueryService._parse_issues()` 现会把异常 `issues` 负载抛成带 `review action id` 的 `ConfigurationError`，避免裸 `ValueError` 变成无上下文 500。
+- **Changes**：扩展 `test_review_query_service.py` 与 `test_review_api.py`，新增多 `sequence` 统计、跨 workflow `node_execution_id` 校验和异常 issues 负载回归用例。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_review_query_service.py tests/unit/test_review_api.py` 通过，`8 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `257 passed`。

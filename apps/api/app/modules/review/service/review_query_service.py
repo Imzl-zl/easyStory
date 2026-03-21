@@ -6,13 +6,14 @@ from decimal import Decimal
 import uuid
 from typing import Any
 
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.modules.project.models import Project
 from app.modules.review.engine.contracts import ReviewIssue
 from app.modules.review.models import ReviewAction
 from app.modules.workflow.models import NodeExecution, WorkflowExecution
-from app.shared.runtime.errors import NotFoundError
+from app.shared.runtime.errors import ConfigurationError, NotFoundError
 
 from .dto import (
     ReviewIssueSummaryDTO,
@@ -82,16 +83,15 @@ class ReviewQueryService:
         actions = self._list_workflow_actions(db, workflow.id)
         aggregate = _ReviewAggregate()
         grouped: dict[str, _ReviewAggregate] = {}
-        reviewed_nodes = {action.node_execution_id for action in actions}
         for action in actions:
-            issues = self._parse_issues(action.issues)
+            issues = self._parse_issues(action)
             aggregate.add(action, issues)
             grouped.setdefault(action.review_type, _ReviewAggregate()).add(action, issues)
         return WorkflowReviewSummaryDTO(
             workflow_execution_id=workflow.id,
             project_id=workflow.project_id,
             workflow_status=workflow.status,
-            reviewed_node_count=len(reviewed_nodes),
+            reviewed_node_count=self._count_reviewed_nodes(db, workflow.id),
             total_actions=len(actions),
             last_reviewed_at=self._last_reviewed_at(actions),
             statuses=aggregate.to_status_summary(),
@@ -110,7 +110,15 @@ class ReviewQueryService:
         status: ReviewStatus | None = None,
         limit: int = 100,
     ) -> list[WorkflowReviewActionDTO]:
-        self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        if node_execution_id is None:
+            self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        else:
+            self._require_owned_node_execution(
+                db,
+                workflow_id,
+                node_execution_id,
+                owner_id=owner_id,
+            )
         query = (
             db.query(ReviewAction, NodeExecution)
             .join(NodeExecution, ReviewAction.node_execution_id == NodeExecution.id)
@@ -142,6 +150,19 @@ class ReviewQueryService:
             .all()
         )
 
+    def _count_reviewed_nodes(
+        self,
+        db: Session,
+        workflow_id: uuid.UUID,
+    ) -> int:
+        return (
+            db.query(NodeExecution.node_id)
+            .join(ReviewAction, ReviewAction.node_execution_id == NodeExecution.id)
+            .filter(NodeExecution.workflow_execution_id == workflow_id)
+            .distinct()
+            .count()
+        )
+
     def _require_owned_workflow(
         self,
         db: Session,
@@ -161,6 +182,29 @@ class ReviewQueryService:
         if workflow is None:
             raise NotFoundError(f"Workflow execution not found: {workflow_id}")
         return workflow
+
+    def _require_owned_node_execution(
+        self,
+        db: Session,
+        workflow_id: uuid.UUID,
+        node_execution_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+    ) -> NodeExecution:
+        execution = (
+            db.query(NodeExecution)
+            .join(WorkflowExecution, NodeExecution.workflow_execution_id == WorkflowExecution.id)
+            .join(Project, WorkflowExecution.project_id == Project.id)
+            .filter(
+                NodeExecution.id == node_execution_id,
+                WorkflowExecution.id == workflow_id,
+                Project.owner_id == owner_id,
+            )
+            .one_or_none()
+        )
+        if execution is None:
+            raise NotFoundError(f"Node execution not found: {node_execution_id}")
+        return execution
 
     def _build_review_type_summaries(
         self,
@@ -185,7 +229,7 @@ class ReviewQueryService:
         action: ReviewAction,
         execution: NodeExecution,
     ) -> WorkflowReviewActionDTO:
-        issues = self._parse_issues(action.issues)
+        issues = self._parse_issues(action)
         score = float(action.score) if isinstance(action.score, Decimal) else action.score
         return WorkflowReviewActionDTO(
             id=action.id,
@@ -209,15 +253,23 @@ class ReviewQueryService:
 
     def _parse_issues(
         self,
-        raw_issues: Any,
+        action: ReviewAction,
     ) -> list[ReviewIssue]:
+        raw_issues: Any = action.issues
         if raw_issues is None:
             return []
-        if isinstance(raw_issues, list):
-            return [ReviewIssue.model_validate(item) for item in raw_issues]
-        if isinstance(raw_issues, dict) and isinstance(raw_issues.get("items"), list):
-            return [ReviewIssue.model_validate(item) for item in raw_issues["items"]]
-        raise ValueError("Malformed review issues payload")
+        try:
+            if isinstance(raw_issues, list):
+                return [ReviewIssue.model_validate(item) for item in raw_issues]
+            if isinstance(raw_issues, dict) and isinstance(raw_issues.get("items"), list):
+                return [ReviewIssue.model_validate(item) for item in raw_issues["items"]]
+        except ValidationError as exc:
+            raise ConfigurationError(
+                f"Malformed review issues payload for review action {action.id}"
+            ) from exc
+        raise ConfigurationError(
+            f"Malformed review issues payload for review action {action.id}"
+        )
 
     def _last_reviewed_at(
         self,
