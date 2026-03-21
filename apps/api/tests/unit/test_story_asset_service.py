@@ -35,6 +35,27 @@ def test_save_outline_draft_creates_versioned_asset(db):
     assert "第一幕" in result.content_text
 
 
+def test_get_asset_returns_current_outline_version(db):
+    project = create_project(db, project_setting=ready_project_setting())
+    service = create_story_asset_service()
+    service.save_asset_draft(
+        db,
+        project.id,
+        "outline",
+        StoryAssetSaveDTO(
+            title="主线大纲",
+            content_text="第一幕：主角入宗。",
+            change_summary="初版大纲",
+        ),
+    )
+
+    result = service.get_asset(db, project.id, "outline")
+
+    assert result.title == "主线大纲"
+    assert result.status == "draft"
+    assert result.content_text == "第一幕：主角入宗。"
+
+
 def test_save_outline_requires_non_blocked_project_setting(db):
     project = create_project(db)
     service = create_story_asset_service()

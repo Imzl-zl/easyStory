@@ -20,6 +20,18 @@ class StoryAssetService:
     def __init__(self, project_service: ProjectService) -> None:
         self.project_service = project_service
 
+    def get_asset(
+        self,
+        db: Session,
+        project_id: uuid.UUID,
+        asset_type: AssetType,
+        *,
+        owner_id: uuid.UUID | None = None,
+    ) -> StoryAssetDTO:
+        self.project_service.require_project(db, project_id, owner_id=owner_id)
+        content = self._require_asset(db, project_id, asset_type)
+        return self._to_dto(content)
+
     def save_asset_draft(
         self,
         db: Session,

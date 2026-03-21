@@ -49,6 +49,21 @@ def save_outline_draft(
     )
 
 
+@router.get("/outline", response_model=StoryAssetDTO)
+def get_outline(
+    project_id: uuid.UUID,
+    story_asset_service: StoryAssetService = Depends(get_story_asset_service),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> StoryAssetDTO:
+    return story_asset_service.get_asset(
+        db,
+        project_id,
+        "outline",
+        owner_id=current_user.id,
+    )
+
+
 @router.post("/outline/approve", response_model=StoryAssetDTO)
 def approve_outline(
     project_id: uuid.UUID,
@@ -77,6 +92,21 @@ def save_opening_plan_draft(
         project_id,
         "opening_plan",
         payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/opening-plan", response_model=StoryAssetDTO)
+def get_opening_plan(
+    project_id: uuid.UUID,
+    story_asset_service: StoryAssetService = Depends(get_story_asset_service),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> StoryAssetDTO:
+    return story_asset_service.get_asset(
+        db,
+        project_id,
+        "opening_plan",
         owner_id=current_user.id,
     )
 

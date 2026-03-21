@@ -184,3 +184,26 @@
 - **Changes**：`ui-interaction-supplement.md` 已补充对应实施约束，明确 `Version Panel` 只允许轻量折扇式开合、`running/completed` 用水墨反馈替代呼吸灯、`Ink Pool` 只跟 token/账单更新联动。
 - **Insights**：`stale` 目前只能保持单一视觉语言，不能被文档升级成轻重分级；当前后端和状态真值并没有这一层语义。
 - **Insights**：字体锐化不是当前 Web 写作体验的主抓手，真正优先级更高的是首行缩进、阅读行宽、行间距和正文稳定性。
+
+## [2026-03-21 | Web 前端基座与首批工作台页面完成]
+- **Events**：基于已收口的 UI 文档，正式创建 `apps/web` 并落地首批 Web 工作台实现。
+- **Changes**：新增根 `package.json`、`pnpm-workspace.yaml`、`pnpm-lock.yaml`，创建 `apps/web` 的 `Next.js 16 + React 19 + TypeScript + Tailwind 4` 工程骨架，并补齐 `Auth / Lobby / Studio / Engine / Lab` 路由。
+- **Changes**：前端已接入真实 API 客户端、React Query 远程状态、Zustand 本地会话与工作台偏好存储；`Lobby` 已支持项目列表/创建/回收站恢复与 `Credential Center`，`Studio` 已支持项目设定、`outline/opening_plan`、章节编辑与版本面板，`Engine` 已支持工作流控制、任务/日志/审核/账单/上下文/回放/导出面板，`Lab` 已支持分析列表/详情/创建。
+- **Changes**：为满足 `Studio` 回显需求，后端补充了 `GET /api/v1/projects/{project_id}/outline` 与 `GET /api/v1/projects/{project_id}/opening-plan`，并新增 `test_story_asset_api.py` 覆盖读取闭环。
+- **Insights**：当前后端的 SSE 认证仍是 `Authorization Bearer` 方案，浏览器原生 `EventSource` 不能直接带这个头，因此本轮 `Engine` 明确采用轮询刷新，而不是做隐式前端降级。
+- **Insights**：工作台页面依赖本地会话和查询参数，不适合静态预渲染；前端路由已显式标记为动态页，并将 Zustand 持久化存储改为 SSR 安全实现。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_story_asset_service.py tests/unit/test_story_asset_api.py` 通过，`7 passed`。
+- **Validation**：`pnpm install` 已完成并生成锁文件。
+- **Validation**：`pnpm --dir apps/web lint`、`pnpm --dir apps/web exec tsc --noEmit`、`pnpm --dir apps/web exec next build --webpack` 通过。
+- **Validation**：默认 `next build` 在当前沙箱中会因 Turbopack/PostCSS 子进程端口绑定限制失败；这已确认是环境级现象，不是当前前端代码编译错误。
+
+## [2026-03-21 | Web 前端 review 问题修复完成]
+- **Events**：完成 Web MVP 首轮代码审查后的 3 个前端修复，覆盖工作台导航上下文、导出认证下载和 Engine 状态动作映射。
+- **Changes**：`workspace-store` 新增 `lastProjectId`，`WorkspaceShell` 现在按当前 pathname 解析 `projectId` 并回写最近项目；`Studio / Engine / Lab` 不再硬编码 `demo`，无项目上下文时改为禁用导航项，避免坏链路。
+- **Changes**：`export.ts` 新增受控下载 helper，`EngineExportPanel` 改为 Bearer `fetch -> blob -> a.click()` 下载链路，并在面板内显式显示下载成功或失败反馈，不再使用会丢认证头的 `window.open()`。
+- **Changes**：`EnginePage` 已把工作流控制按钮改为基于 `workflow.status` 的显式派生；新增 `engine-workflow-controls.ts` 收敛状态动作与轮询判定，并拆出 `engine-block.tsx` 保持文件职责清晰。
+- **Insights**：`failed` 不能简单当成“新建一次”的终态；当前后端状态机允许 `failed -> running`，因此前端动作映射保留为 `恢复 + 取消`，而 `completed / cancelled / 无 workflow` 才回到“启动工作流”主入口。
+- **Insights**：认证下载属于 API 客户端职责，不能继续走浏览器默认新开页链路；否则一旦接口只认 `Authorization: Bearer`，UI 就会稳定 401。
+- **Validation**：`pnpm --dir apps/web lint` 通过。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+- **Validation**：`pnpm --dir apps/web exec next build --webpack` 通过。
