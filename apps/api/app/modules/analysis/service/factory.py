@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from app.modules.project.service import ProjectService, create_project_service
+from app.modules.project.service import (
+    ProjectService,
+    create_project_service,
+)
 
 from .analysis_service import AnalysisService
 

@@ -5,8 +5,9 @@ from decimal import Decimal
 import uuid
 from typing import Any
 
-from sqlalchemy import and_, or_
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import and_, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.observability.models import ExecutionLog, PromptReplay
 from app.modules.project.models import Project
@@ -25,45 +26,49 @@ TERMINAL_WORKFLOW_STATUSES = frozenset({"completed", "failed", "cancelled"})
 
 
 class WorkflowObservabilityService:
-    def list_node_executions(
+    async def list_node_executions(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> list[NodeExecutionViewDTO]:
-        self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
-        executions = (
-            db.query(NodeExecution)
+        await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        statement = (
+            select(NodeExecution)
             .options(
                 selectinload(NodeExecution.artifacts),
                 selectinload(NodeExecution.review_actions),
             )
-            .filter(NodeExecution.workflow_execution_id == workflow_id)
+            .where(NodeExecution.workflow_execution_id == workflow_id)
             .order_by(NodeExecution.node_order.asc(), NodeExecution.sequence.asc())
-            .all()
         )
+        executions = (await db.scalars(statement)).all()
         return [self._to_node_execution_dto(item) for item in executions]
 
-    def list_execution_logs(
+    async def list_execution_logs(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
         level: str | None = None,
         limit: int = 50,
     ) -> list[ExecutionLogViewDTO]:
-        self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
-        query = db.query(ExecutionLog).filter(ExecutionLog.workflow_execution_id == workflow_id)
+        await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        statement = select(ExecutionLog).where(ExecutionLog.workflow_execution_id == workflow_id)
         if level is not None:
-            query = query.filter(ExecutionLog.level == level)
-        logs = query.order_by(ExecutionLog.created_at.desc(), ExecutionLog.id.desc()).limit(limit).all()
+            statement = statement.where(ExecutionLog.level == level)
+        logs = (
+            await db.scalars(
+                statement.order_by(ExecutionLog.created_at.desc(), ExecutionLog.id.desc()).limit(limit)
+            )
+        ).all()
         return [ExecutionLogViewDTO.model_validate(item, from_attributes=True) for item in logs]
 
-    def list_execution_logs_since(
+    async def list_execution_logs_since(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
@@ -72,85 +77,87 @@ class WorkflowObservabilityService:
         level: str | None = None,
         limit: int = 100,
     ) -> list[ExecutionLogViewDTO]:
-        self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
-        query = db.query(ExecutionLog).filter(ExecutionLog.workflow_execution_id == workflow_id)
+        await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        statement = select(ExecutionLog).where(ExecutionLog.workflow_execution_id == workflow_id)
         if level is not None:
-            query = query.filter(ExecutionLog.level == level)
+            statement = statement.where(ExecutionLog.level == level)
         if after_created_at is not None:
-            query = query.filter(self._build_after_cursor(after_created_at, after_id))
-        logs = query.order_by(ExecutionLog.created_at.asc(), ExecutionLog.id.asc()).limit(limit).all()
+            statement = statement.where(self._build_after_cursor(after_created_at, after_id))
+        logs = (
+            await db.scalars(
+                statement.order_by(ExecutionLog.created_at.asc(), ExecutionLog.id.asc()).limit(limit)
+            )
+        ).all()
         return [ExecutionLogViewDTO.model_validate(item, from_attributes=True) for item in logs]
 
-    def is_workflow_terminal(
+    async def is_workflow_terminal(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> bool:
-        workflow = self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        workflow = await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
         return workflow.status in TERMINAL_WORKFLOW_STATUSES
 
-    def list_prompt_replays(
+    async def list_prompt_replays(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         node_execution_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> list[PromptReplayViewDTO]:
-        self._require_owned_node_execution(
+        await self._require_owned_node_execution(
             db,
             workflow_id,
             node_execution_id,
             owner_id=owner_id,
         )
-        replays = (
-            db.query(PromptReplay)
-            .filter(PromptReplay.node_execution_id == node_execution_id)
+        statement = (
+            select(PromptReplay)
+            .where(PromptReplay.node_execution_id == node_execution_id)
             .order_by(PromptReplay.created_at.asc())
-            .all()
         )
+        replays = (await db.scalars(statement)).all()
         return [PromptReplayViewDTO.model_validate(item, from_attributes=True) for item in replays]
 
-    def _require_owned_workflow(
+    async def _require_owned_workflow(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> WorkflowExecution:
-        workflow = (
-            db.query(WorkflowExecution)
+        workflow = await db.scalar(
+            select(WorkflowExecution)
             .join(Project, WorkflowExecution.project_id == Project.id)
-            .filter(
+            .where(
                 WorkflowExecution.id == workflow_id,
                 Project.owner_id == owner_id,
             )
-            .one_or_none()
         )
         if workflow is None:
             raise NotFoundError(f"Workflow execution not found: {workflow_id}")
         return workflow
 
-    def _require_owned_node_execution(
+    async def _require_owned_node_execution(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         node_execution_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> NodeExecution:
-        execution = (
-            db.query(NodeExecution)
+        execution = await db.scalar(
+            select(NodeExecution)
             .join(WorkflowExecution, NodeExecution.workflow_execution_id == WorkflowExecution.id)
             .join(Project, WorkflowExecution.project_id == Project.id)
-            .filter(
+            .where(
                 NodeExecution.id == node_execution_id,
                 WorkflowExecution.id == workflow_id,
                 Project.owner_id == owner_id,
             )
-            .one_or_none()
         )
         if execution is None:
             raise NotFoundError(f"Node execution not found: {node_execution_id}")

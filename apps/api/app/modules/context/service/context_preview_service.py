@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any
 import uuid
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.config_registry.schemas.config_schemas import ContextInjectionItem, ModelConfig, NodeConfig
 from app.modules.context.engine import ContextBuilder
@@ -33,15 +34,15 @@ class ContextPreviewService:
         self.context_builder = context_builder
         self.template_renderer = template_renderer
 
-    def preview_workflow_context(
+    async def preview_workflow_context(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         payload: ContextPreviewRequestDTO,
         *,
         owner_id: uuid.UUID,
     ) -> ContextPreviewDTO:
-        workflow = self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        workflow = await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
         workflow_config = load_workflow_snapshot(workflow.workflow_snapshot or {})
         node = resolve_node_config(workflow_config, payload.node_id)
         if node.node_type != "generate":
@@ -52,7 +53,7 @@ class ContextPreviewService:
         rules = self._merge_rules(workflow_config, node, declared)
         self._ensure_chapter_number_if_needed(rules, payload, node)
         referenced = self.template_renderer.referenced_variables(skill.prompt)
-        context_variables, context_report = self.context_builder.build_context(
+        context_variables, context_report = await self.context_builder.build_context(
             workflow.project_id,
             rules,
             db,
@@ -63,7 +64,7 @@ class ContextPreviewService:
             referenced_variables=referenced,
         )
         variables = {
-            **self._project_setting_variables(db, workflow.project_id, declared),
+            **await self._project_setting_variables(db, workflow.project_id, declared),
             **context_variables,
         }
         return ContextPreviewDTO(
@@ -79,21 +80,20 @@ class ContextPreviewService:
             context_report=context_report,
         )
 
-    def _require_owned_workflow(
+    async def _require_owned_workflow(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> WorkflowExecution:
-        workflow = (
-            db.query(WorkflowExecution)
+        workflow = await db.scalar(
+            select(WorkflowExecution)
             .join(Project, WorkflowExecution.project_id == Project.id)
-            .filter(
+            .where(
                 WorkflowExecution.id == workflow_id,
                 Project.owner_id == owner_id,
             )
-            .one_or_none()
         )
         if workflow is None:
             raise NotFoundError(f"Workflow execution not found: {workflow_id}")
@@ -138,13 +138,13 @@ class ContextPreviewService:
         if needs_chapter_number and payload.chapter_number is None:
             raise BusinessRuleError(f"节点上下文预览需要 chapter_number: {node.id}")
 
-    def _project_setting_variables(
+    async def _project_setting_variables(
         self,
-        db: Session,
+        db: AsyncSession,
         project_id: uuid.UUID,
         declared: dict[str, Any],
     ) -> dict[str, str]:
-        project = db.get(Project, project_id)
+        project = await db.get(Project, project_id)
         setting = project.project_setting if project and project.project_setting else {}
         return {
             name: self._stringify_value(setting.get(name))

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime, timezone
 import uuid
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.config_registry.schemas.config_schemas import NodeConfig, WorkflowConfig
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
@@ -19,34 +20,36 @@ from .workflow_runtime_shared import NodeOutcome, ReviewCycleOutcome, WAITING_CO
 
 
 class WorkflowRuntimeExecuteMixin:
-    def _execute_chapter_split(
+    async def _execute_chapter_split(
         self,
-        db,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         workflow_config: WorkflowConfig,
         node: NodeConfig,
         *,
         owner_id: uuid.UUID,
     ) -> NodeOutcome:
-        execution = self._create_node_execution(db, workflow, node)
+        execution = await self._create_node_execution(db, workflow, node)
         started_at = datetime.now(timezone.utc)
         budget_error: BudgetExceededError | None = None
         try:
-            prompt_bundle = self._build_prompt_bundle(
-                db, workflow, workflow_config, node, chapter_number=None
+            prompt_bundle = await self._build_prompt_bundle(
+                db,
+                workflow,
+                workflow_config,
+                node,
+                chapter_number=None,
             )
             execution.input_data = prompt_bundle["input_data"]
             try:
-                raw_output = asyncio.run(
-                    self._call_llm(
-                        db,
-                        workflow,
-                        workflow_config,
-                        prompt_bundle,
-                        owner_id=owner_id,
-                        node_execution_id=execution.id,
-                        usage_type="generate",
-                    )
+                raw_output = await self._call_llm(
+                    db,
+                    workflow,
+                    workflow_config,
+                    prompt_bundle,
+                    owner_id=owner_id,
+                    node_execution_id=execution.id,
+                    usage_type="generate",
                 )
             except BudgetExceededError as exc:
                 budget_error = exc
@@ -54,9 +57,12 @@ class WorkflowRuntimeExecuteMixin:
             chapters = self._parse_chapter_split_output(raw_output["content"])
             if budget_error is not None:
                 ensure_chapter_split_budget_action_supported(budget_error)
-            self._replace_chapter_tasks(db, workflow, chapters)
+            await self._replace_chapter_tasks(db, workflow, chapters)
             self._append_artifact(
-                execution, "chapter_tasks", {"chapters": [item.model_dump() for item in chapters]}
+                db,
+                execution,
+                "chapter_tasks",
+                {"chapters": [item.model_dump() for item in chapters]},
             )
             self._record_prompt_replay(db, execution, prompt_bundle, raw_output)
             self._complete_execution(db, execution, started_at, {"chapters_count": len(chapters)})
@@ -73,29 +79,35 @@ class WorkflowRuntimeExecuteMixin:
             )
         return NodeOutcome(next_node_id=next_node_id, snapshot_extra=completed_snapshot)
 
-    def _execute_chapter_gen(
+    async def _execute_chapter_gen(
         self,
-        db,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         workflow_config: WorkflowConfig,
         node: NodeConfig,
         *,
         owner_id: uuid.UUID,
     ) -> NodeOutcome:
-        task = self._next_actionable_task(db, workflow)
+        task = await self._next_actionable_task(db, workflow)
         if task is None:
             return NodeOutcome(
                 next_node_id=resolve_next_node_id(workflow.workflow_snapshot or {}, current_node_id=node.id)
             )
-        self._ensure_task_can_continue(db, task)
-        execution = self._create_node_execution(db, workflow, node)
+        await self._ensure_task_can_continue(db, task)
+        execution = await self._create_node_execution(db, workflow, node)
         started_at = datetime.now(timezone.utc)
         try:
-            prompt_bundle, raw_output, generated_content, generation_budget_error = self._generate_chapter(
-                db, workflow, workflow_config, node, task, execution, owner_id=owner_id
+            prompt_bundle, raw_output, generated_content, generation_budget_error = await self._generate_chapter(
+                db,
+                workflow,
+                workflow_config,
+                node,
+                task,
+                execution,
+                owner_id=owner_id,
             )
             self._record_prompt_replay(db, execution, prompt_bundle, raw_output)
-            review_outcome = self._resolve_review_outcome(
+            review_outcome = await self._resolve_review_outcome(
                 db,
                 workflow,
                 workflow_config,
@@ -106,20 +118,22 @@ class WorkflowRuntimeExecuteMixin:
                 owner_id=owner_id,
                 generation_budget_error=generation_budget_error,
             )
-            candidate = self._persist_chapter_candidate(
-                db, workflow, task, prompt_bundle["context_snapshot_hash"], review_outcome
+            candidate = await self._persist_chapter_candidate(
+                db,
+                workflow,
+                task,
+                prompt_bundle["context_snapshot_hash"],
+                review_outcome,
             )
-            return self._finalize_chapter_execution(
-                db, task, execution, started_at, review_outcome, candidate
-            )
+            return self._finalize_chapter_execution(db, task, execution, started_at, review_outcome, candidate)
         except Exception as exc:
             task.status = "failed"
             self._fail_execution(db, execution, started_at, exc)
             raise
 
-    def _generate_chapter(
+    async def _generate_chapter(
         self,
-        db,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         workflow_config: WorkflowConfig,
         node: NodeConfig,
@@ -128,24 +142,26 @@ class WorkflowRuntimeExecuteMixin:
         *,
         owner_id: uuid.UUID,
     ) -> tuple[dict, dict, str, BudgetExceededError | None]:
-        prompt_bundle = self._build_prompt_bundle(
-            db, workflow, workflow_config, node, chapter_number=task.chapter_number
+        prompt_bundle = await self._build_prompt_bundle(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            chapter_number=task.chapter_number,
         )
         prompt_bundle["input_data"]["chapter_task_id"] = str(task.id)
         prompt_bundle["input_data"]["chapter_number"] = task.chapter_number
         execution.input_data = prompt_bundle["input_data"]
         budget_error: BudgetExceededError | None = None
         try:
-            raw_output = asyncio.run(
-                self._call_llm(
-                    db,
-                    workflow,
-                    workflow_config,
-                    prompt_bundle,
-                    owner_id=owner_id,
-                    node_execution_id=execution.id,
-                    usage_type="generate",
-                )
+            raw_output = await self._call_llm(
+                db,
+                workflow,
+                workflow_config,
+                prompt_bundle,
+                owner_id=owner_id,
+                node_execution_id=execution.id,
+                usage_type="generate",
             )
         except BudgetExceededError as exc:
             budget_error = exc
@@ -155,9 +171,9 @@ class WorkflowRuntimeExecuteMixin:
             raise ConfigurationError("Chapter generate output must be plain text")
         return prompt_bundle, raw_output, content, budget_error
 
-    def _resolve_review_outcome(
+    async def _resolve_review_outcome(
         self,
-        db,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         workflow_config: WorkflowConfig,
         node: NodeConfig,
@@ -174,7 +190,7 @@ class WorkflowRuntimeExecuteMixin:
                 generated_content=generated_content,
             )
         try:
-            return self._run_auto_review(
+            return await self._run_auto_review(
                 db,
                 workflow,
                 workflow_config,
@@ -189,7 +205,7 @@ class WorkflowRuntimeExecuteMixin:
 
     def _finalize_chapter_execution(
         self,
-        db,
+        db: AsyncSession,
         task: ChapterTask,
         execution,
         started_at: datetime,
@@ -199,6 +215,7 @@ class WorkflowRuntimeExecuteMixin:
         content_id, version_id, word_count = candidate
         if version_id is not None:
             self._append_artifact(
+                db,
                 execution,
                 "chapter_content",
                 {"chapter_number": task.chapter_number, "content_id": str(content_id)},
@@ -218,7 +235,9 @@ class WorkflowRuntimeExecuteMixin:
             task.status = "skipped"
             self._skip_execution(
                 db,
-                execution, started_at, {"chapter_number": task.chapter_number, "status": "skipped"}
+                execution,
+                started_at,
+                {"chapter_number": task.chapter_number, "status": "skipped"},
             )
             return NodeOutcome(next_node_id=execution.node_id)
         if review_outcome.resolution == "pause":

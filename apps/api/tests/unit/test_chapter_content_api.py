@@ -2,165 +2,166 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.main import create_app
-from app.modules import model_registry as _model_registry  # noqa: F401
 from app.modules.content.models import Content, ContentVersion
 from app.modules.project.models import Project
 from app.modules.user.service import TokenService
-from app.shared.db import Base
+from tests.unit.async_api_support import (
+    build_sqlite_session_factories,
+    cleanup_sqlite_session_factories,
+    started_async_client,
+)
 from tests.unit.models.helpers import create_user, ready_project_setting
 
 TEST_JWT_SECRET = "test-jwt-secret"
 
 
-def test_chapter_api_supports_save_history_rollback_and_best_version(monkeypatch):
+async def test_chapter_api_supports_save_history_rollback_and_best_version(monkeypatch, tmp_path):
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="chapter-api-history")
+    )
     project_id, owner_id = _seed_project(session_factory, ready_assets=True)
-    client = TestClient(create_app(session_factory=session_factory))
-    headers = _auth_headers(owner_id)
 
     try:
-        save_response = client.put(
-            f"/api/v1/projects/{project_id}/chapters/1",
-            json={
-                "title": "第一章 逃亡夜",
-                "content_text": "林渊连夜逃离宗门，山门外杀机四伏。",
-                "change_summary": "初版正文",
-            },
-            headers=headers,
+        app = create_app(
+            async_session_factory=async_session_factory,
         )
-        assert save_response.status_code == 200
-        assert save_response.json()["current_version_number"] == 1
+        headers = _auth_headers(owner_id)
+        async with started_async_client(app) as client:
+            save_response = await client.put(
+                f"/api/v1/projects/{project_id}/chapters/1",
+                json={
+                    "title": "第一章 逃亡夜",
+                    "content_text": "林渊连夜逃离宗门，山门外杀机四伏。",
+                    "change_summary": "初版正文",
+                },
+                headers=headers,
+            )
+            assert save_response.status_code == 200
+            assert save_response.json()["current_version_number"] == 1
 
-        approve_response = client.post(
-            f"/api/v1/projects/{project_id}/chapters/1/approve",
-            headers=headers,
-        )
-        assert approve_response.status_code == 200
-        assert approve_response.json()["status"] == "approved"
+            approve_response = await client.post(
+                f"/api/v1/projects/{project_id}/chapters/1/approve",
+                headers=headers,
+            )
+            assert approve_response.status_code == 200
+            assert approve_response.json()["status"] == "approved"
 
-        best_response = client.post(
-            f"/api/v1/projects/{project_id}/chapters/1/versions/1/best",
-            headers=headers,
-        )
-        assert best_response.status_code == 200
-        assert best_response.json()["is_best"] is True
+            best_response = await client.post(
+                f"/api/v1/projects/{project_id}/chapters/1/versions/1/best",
+                headers=headers,
+            )
+            assert best_response.status_code == 200
+            assert best_response.json()["is_best"] is True
 
-        second_save = client.put(
-            f"/api/v1/projects/{project_id}/chapters/1",
-            json={
-                "title": "第一章 逃亡夜",
-                "content_text": "林渊连夜逃离宗门，山门外埋伏比预想更多。",
-                "change_summary": "补强追杀压迫感",
-            },
-            headers=headers,
-        )
-        assert second_save.status_code == 200
-        assert second_save.json()["current_version_number"] == 2
+            second_save = await client.put(
+                f"/api/v1/projects/{project_id}/chapters/1",
+                json={
+                    "title": "第一章 逃亡夜",
+                    "content_text": "林渊连夜逃离宗门，山门外埋伏比预想更多。",
+                    "change_summary": "补强追杀压迫感",
+                },
+                headers=headers,
+            )
+            assert second_save.status_code == 200
+            assert second_save.json()["current_version_number"] == 2
 
-        versions_response = client.get(
-            f"/api/v1/projects/{project_id}/chapters/1/versions",
-            headers=headers,
-        )
-        assert versions_response.status_code == 200
-        assert [item["version_number"] for item in versions_response.json()] == [2, 1]
+            versions_response = await client.get(
+                f"/api/v1/projects/{project_id}/chapters/1/versions",
+                headers=headers,
+            )
+            assert versions_response.status_code == 200
+            assert [item["version_number"] for item in versions_response.json()] == [2, 1]
 
-        rollback_response = client.post(
-            f"/api/v1/projects/{project_id}/chapters/1/versions/1/rollback",
-            headers=headers,
-        )
-        assert rollback_response.status_code == 200
-        assert rollback_response.json()["current_version_number"] == 3
-        assert rollback_response.json()["content_text"].startswith("林渊连夜逃离宗门")
+            rollback_response = await client.post(
+                f"/api/v1/projects/{project_id}/chapters/1/versions/1/rollback",
+                headers=headers,
+            )
+            assert rollback_response.status_code == 200
+            assert rollback_response.json()["current_version_number"] == 3
+            assert rollback_response.json()["content_text"].startswith("林渊连夜逃离宗门")
 
-        clear_best_response = client.delete(
-            f"/api/v1/projects/{project_id}/chapters/1/versions/1/best",
-            headers=headers,
-        )
-        assert clear_best_response.status_code == 200
-        assert clear_best_response.json()["is_best"] is False
+            clear_best_response = await client.delete(
+                f"/api/v1/projects/{project_id}/chapters/1/versions/1/best",
+                headers=headers,
+            )
+            assert clear_best_response.status_code == 200
+            assert clear_best_response.json()["is_best"] is False
 
-        chapter_response = client.get(
-            f"/api/v1/projects/{project_id}/chapters/1",
-            headers=headers,
-        )
-        assert chapter_response.status_code == 200
-        assert chapter_response.json()["current_version_number"] == 3
+            chapter_response = await client.get(
+                f"/api/v1/projects/{project_id}/chapters/1",
+                headers=headers,
+            )
+            assert chapter_response.status_code == 200
+            assert chapter_response.json()["current_version_number"] == 3
 
-        list_response = client.get(
-            f"/api/v1/projects/{project_id}/chapters",
-            headers=headers,
-        )
-        assert list_response.status_code == 200
-        assert list_response.json()[0]["best_version_number"] is None
+            list_response = await client.get(
+                f"/api/v1/projects/{project_id}/chapters",
+                headers=headers,
+            )
+            assert list_response.status_code == 200
+            assert list_response.json()[0]["best_version_number"] is None
     finally:
-        client.close()
-        Base.metadata.drop_all(engine)
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_chapter_api_requires_preparation_assets(monkeypatch):
+async def test_chapter_api_requires_preparation_assets(monkeypatch, tmp_path):
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="chapter-api-assets")
+    )
     project_id, owner_id = _seed_project(session_factory, ready_assets=False)
-    client = TestClient(create_app(session_factory=session_factory))
 
     try:
-        response = client.put(
-            f"/api/v1/projects/{project_id}/chapters/1",
-            json={"title": "第一章", "content_text": "章节正文"},
-            headers=_auth_headers(owner_id),
+        app = create_app(
+            async_session_factory=async_session_factory,
         )
-        assert response.status_code == 422
-        assert "outline 必须先确认后才能继续" in response.json()["detail"]
+        async with started_async_client(app) as client:
+            response = await client.put(
+                f"/api/v1/projects/{project_id}/chapters/1",
+                json={"title": "第一章", "content_text": "章节正文"},
+                headers=_auth_headers(owner_id),
+            )
+            assert response.status_code == 422
+            assert "outline 必须先确认后才能继续" in response.json()["detail"]
     finally:
-        client.close()
-        Base.metadata.drop_all(engine)
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_chapter_api_editing_old_chapter_marks_later_chapters_stale(monkeypatch):
+async def test_chapter_api_editing_old_chapter_marks_later_chapters_stale(monkeypatch, tmp_path):
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="chapter-api-stale")
+    )
     project_id, owner_id = _seed_project(session_factory, ready_assets=True)
     _seed_chapter(session_factory, uuid.UUID(project_id), 1, "第一章", "第一章正文")
     _seed_chapter(session_factory, uuid.UUID(project_id), 2, "第二章", "第二章正文")
-    client = TestClient(create_app(session_factory=session_factory))
-    headers = _auth_headers(owner_id)
 
     try:
-        response = client.put(
-            f"/api/v1/projects/{project_id}/chapters/1",
-            json={"title": "第一章", "content_text": "第一章重写版"},
-            headers=headers,
+        app = create_app(
+            async_session_factory=async_session_factory,
         )
-        assert response.status_code == 200
-        assert response.json()["status"] == "draft"
+        headers = _auth_headers(owner_id)
+        async with started_async_client(app) as client:
+            response = await client.put(
+                f"/api/v1/projects/{project_id}/chapters/1",
+                json={"title": "第一章", "content_text": "第一章重写版"},
+                headers=headers,
+            )
+            assert response.status_code == 200
+            assert response.json()["status"] == "draft"
 
-        downstream = client.get(
-            f"/api/v1/projects/{project_id}/chapters/2",
-            headers=headers,
-        )
-        assert downstream.status_code == 200
-        assert downstream.json()["status"] == "stale"
+            downstream = await client.get(
+                f"/api/v1/projects/{project_id}/chapters/2",
+                headers=headers,
+            )
+            assert downstream.status_code == 200
+            assert downstream.json()["status"] == "stale"
     finally:
-        client.close()
-        Base.metadata.drop_all(engine)
-
-
-def _build_session_factory() -> tuple[sessionmaker[Session], object]:
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    session_factory = sessionmaker(engine, expire_on_commit=False, class_=Session)
-    return session_factory, engine
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
 def _seed_project(
@@ -232,6 +233,7 @@ def _create_asset(
             content_id=content.id,
             version_number=1,
             content_text=f"{title}内容",
+            is_current=True,
         )
     )
     session.commit()

@@ -8,7 +8,6 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
 
 from app.modules.observability.service import (
     ExecutionLogViewDTO,
@@ -19,12 +18,12 @@ from app.modules.observability.service import (
 )
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
-from app.shared.db import SessionFactory, get_db_session, get_session_factory
+from app.shared.db import AsyncSessionFactory, get_async_db_session, get_async_session_factory
 
 router = APIRouter(tags=["observability"])
 
 
-def get_workflow_observability_service() -> WorkflowObservabilityService:
+async def get_workflow_observability_service() -> WorkflowObservabilityService:
     return create_workflow_observability_service()
 
 
@@ -32,13 +31,13 @@ def get_workflow_observability_service() -> WorkflowObservabilityService:
     "/api/v1/workflows/{workflow_id}/executions",
     response_model=list[NodeExecutionViewDTO],
 )
-def list_workflow_executions(
+async def list_workflow_executions(
     workflow_id: uuid.UUID,
     observability_service: WorkflowObservabilityService = Depends(get_workflow_observability_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db=Depends(get_async_db_session),
 ) -> list[NodeExecutionViewDTO]:
-    return observability_service.list_node_executions(
+    return await observability_service.list_node_executions(
         db,
         workflow_id,
         owner_id=current_user.id,
@@ -49,15 +48,15 @@ def list_workflow_executions(
     "/api/v1/workflows/{workflow_id}/logs",
     response_model=list[ExecutionLogViewDTO],
 )
-def list_workflow_logs(
+async def list_workflow_logs(
     workflow_id: uuid.UUID,
     level: Literal["INFO", "WARNING", "ERROR"] | None = Query(default=None),
     limit: int = Query(default=50, ge=1),
     observability_service: WorkflowObservabilityService = Depends(get_workflow_observability_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db=Depends(get_async_db_session),
 ) -> list[ExecutionLogViewDTO]:
-    return observability_service.list_execution_logs(
+    return await observability_service.list_execution_logs(
         db,
         workflow_id,
         owner_id=current_user.id,
@@ -75,10 +74,10 @@ async def stream_workflow_events(
     poll_interval_ms: int = Query(default=500, ge=100, le=5000),
     observability_service: WorkflowObservabilityService = Depends(get_workflow_observability_service),
     current_user: User = Depends(get_current_user),
-    session_factory: SessionFactory = Depends(get_session_factory),
+    session_factory: AsyncSessionFactory = Depends(get_async_session_factory),
 ) -> StreamingResponse:
-    with session_factory() as session:
-        observability_service.is_workflow_terminal(
+    async with session_factory() as session:
+        await observability_service.is_workflow_terminal(
             session,
             workflow_id,
             owner_id=current_user.id,
@@ -91,8 +90,8 @@ async def stream_workflow_events(
         while time.monotonic() < deadline:
             if await request.is_disconnected():
                 break
-            with session_factory() as session:
-                logs = observability_service.list_execution_logs_since(
+            async with session_factory() as session:
+                logs = await observability_service.list_execution_logs_since(
                     session,
                     workflow_id,
                     owner_id=current_user.id,
@@ -100,7 +99,7 @@ async def stream_workflow_events(
                     after_id=last_log_id,
                     level=level,
                 )
-                is_terminal = observability_service.is_workflow_terminal(
+                is_terminal = await observability_service.is_workflow_terminal(
                     session,
                     workflow_id,
                     owner_id=current_user.id,
@@ -135,14 +134,14 @@ async def stream_workflow_events(
     "/api/v1/workflows/{workflow_id}/node-executions/{node_execution_id}/prompt-replays",
     response_model=list[PromptReplayViewDTO],
 )
-def list_prompt_replays(
+async def list_prompt_replays(
     workflow_id: uuid.UUID,
     node_execution_id: uuid.UUID,
     observability_service: WorkflowObservabilityService = Depends(get_workflow_observability_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db=Depends(get_async_db_session),
 ) -> list[PromptReplayViewDTO]:
-    return observability_service.list_prompt_replays(
+    return await observability_service.list_prompt_replays(
         db,
         workflow_id,
         node_execution_id,

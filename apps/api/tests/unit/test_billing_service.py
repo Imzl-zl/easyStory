@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 import pytest
@@ -10,6 +11,7 @@ from app.modules.config_registry.schemas.config_schemas import BudgetConfig
 from app.modules.credential.models import ModelCredential
 from app.modules.workflow.models import NodeExecution
 from app.shared.runtime.errors import ConfigurationError
+from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, create_user, create_workflow
 
 
@@ -20,25 +22,27 @@ def test_billing_service_records_usage_and_budget_statuses(db) -> None:
     node_execution = _create_node_execution(db, workflow.id)
     credential = _create_credential(db, project.owner_id)
 
-    result = service.record_usage_and_check_budget(
-        db,
-        workflow_execution_id=workflow.id,
-        project_id=project.id,
-        user_id=project.owner_id,
-        node_execution_id=node_execution.id,
-        credential_id=credential.id,
-        usage_type="generate",
-        model_name="gpt-4o",
-        input_tokens=1000,
-        output_tokens=500,
-        budget_config=BudgetConfig(
-            max_tokens_per_node=2000,
-            max_tokens_per_workflow=2000,
-            max_tokens_per_day=2000,
-            max_tokens_per_day_per_user=2000,
-            warning_threshold=0.5,
-            on_exceed="pause",
-        ),
+    result = asyncio.run(
+        service.record_usage_and_check_budget(
+            async_db(db),
+            workflow_execution_id=workflow.id,
+            project_id=project.id,
+            user_id=project.owner_id,
+            node_execution_id=node_execution.id,
+            credential_id=credential.id,
+            usage_type="generate",
+            model_name="gpt-4o",
+            input_tokens=1000,
+            output_tokens=500,
+            budget_config=BudgetConfig(
+                max_tokens_per_node=2000,
+                max_tokens_per_workflow=2000,
+                max_tokens_per_day=2000,
+                max_tokens_per_day_per_user=2000,
+                warning_threshold=0.5,
+                on_exceed="pause",
+            ),
+        )
     )
 
     usage = db.query(TokenUsage).one()
@@ -75,31 +79,35 @@ def test_billing_service_detects_cross_project_user_daily_budget(db) -> None:
         on_exceed="pause",
     )
 
-    service.record_usage_and_check_budget(
-        db,
-        workflow_execution_id=workflow_one.id,
-        project_id=project_one.id,
-        user_id=owner.id,
-        node_execution_id=node_one.id,
-        credential_id=credential.id,
-        usage_type="generate",
-        model_name="gpt-4o",
-        input_tokens=20,
-        output_tokens=20,
-        budget_config=budget,
+    asyncio.run(
+        service.record_usage_and_check_budget(
+            async_db(db),
+            workflow_execution_id=workflow_one.id,
+            project_id=project_one.id,
+            user_id=owner.id,
+            node_execution_id=node_one.id,
+            credential_id=credential.id,
+            usage_type="generate",
+            model_name="gpt-4o",
+            input_tokens=20,
+            output_tokens=20,
+            budget_config=budget,
+        )
     )
-    result = service.record_usage_and_check_budget(
-        db,
-        workflow_execution_id=workflow_two.id,
-        project_id=project_two.id,
-        user_id=owner.id,
-        node_execution_id=node_two.id,
-        credential_id=credential.id,
-        usage_type="review",
-        model_name="gpt-4o",
-        input_tokens=30,
-        output_tokens=40,
-        budget_config=budget,
+    result = asyncio.run(
+        service.record_usage_and_check_budget(
+            async_db(db),
+            workflow_execution_id=workflow_two.id,
+            project_id=project_two.id,
+            user_id=owner.id,
+            node_execution_id=node_two.id,
+            credential_id=credential.id,
+            usage_type="review",
+            model_name="gpt-4o",
+            input_tokens=30,
+            output_tokens=40,
+            budget_config=budget,
+        )
     )
 
     assert result.exceeded_status is not None
@@ -114,25 +122,27 @@ def test_billing_service_warning_threshold_matches_effective_boundary(db) -> Non
     node_execution = _create_node_execution(db, workflow.id)
     credential = _create_credential(db, project.owner_id)
 
-    result = service.record_usage_and_check_budget(
-        db,
-        workflow_execution_id=workflow.id,
-        project_id=project.id,
-        user_id=project.owner_id,
-        node_execution_id=node_execution.id,
-        credential_id=credential.id,
-        usage_type="generate",
-        model_name="gpt-4o",
-        input_tokens=1,
-        output_tokens=1,
-        budget_config=BudgetConfig(
-            max_tokens_per_node=3,
-            max_tokens_per_workflow=3,
-            max_tokens_per_day=3,
-            max_tokens_per_day_per_user=3,
-            warning_threshold=0.8,
-            on_exceed="pause",
-        ),
+    result = asyncio.run(
+        service.record_usage_and_check_budget(
+            async_db(db),
+            workflow_execution_id=workflow.id,
+            project_id=project.id,
+            user_id=project.owner_id,
+            node_execution_id=node_execution.id,
+            credential_id=credential.id,
+            usage_type="generate",
+            model_name="gpt-4o",
+            input_tokens=1,
+            output_tokens=1,
+            budget_config=BudgetConfig(
+                max_tokens_per_node=3,
+                max_tokens_per_workflow=3,
+                max_tokens_per_day=3,
+                max_tokens_per_day_per_user=3,
+                warning_threshold=0.8,
+                on_exceed="pause",
+            ),
+        )
     )
 
     assert all(not status.warning_reached for status in result.statuses)
@@ -147,18 +157,20 @@ def test_billing_service_rejects_missing_llm_usage_tokens(db) -> None:
     credential = _create_credential(db, project.owner_id)
 
     with pytest.raises(ConfigurationError, match="missing token usage"):
-        service.record_usage_and_check_budget(
-            db,
-            workflow_execution_id=workflow.id,
-            project_id=project.id,
-            user_id=project.owner_id,
-            node_execution_id=node_execution.id,
-            credential_id=credential.id,
-            usage_type="generate",
-            model_name="gpt-4o",
-            input_tokens=None,
-            output_tokens=10,
-            budget_config=BudgetConfig(),
+        asyncio.run(
+            service.record_usage_and_check_budget(
+                async_db(db),
+                workflow_execution_id=workflow.id,
+                project_id=project.id,
+                user_id=project.owner_id,
+                node_execution_id=node_execution.id,
+                credential_id=credential.id,
+                usage_type="generate",
+                model_name="gpt-4o",
+                input_tokens=None,
+                output_tokens=10,
+                budget_config=BudgetConfig(),
+            )
         )
 
 

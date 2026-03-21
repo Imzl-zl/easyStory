@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from app.modules.content.models import Content, ContentVersion
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 
-from .dto import ChapterDetailDTO, ChapterSummaryDTO, ChapterVersionDTO
+from .dto import ChapterDetailDTO, ChapterSaveDTO, ChapterSummaryDTO, ChapterVersionDTO
 
 CHAPTER_TYPE = "chapter"
 PREPARATION_ASSET_TYPES = ("outline", "opening_plan")
@@ -30,6 +32,53 @@ def require_version(content: Content, version_number: int) -> ContentVersion:
             return version
     raise NotFoundError(
         f"Chapter version not found: chapter={content.chapter_number}, version={version_number}"
+    )
+
+
+def next_version_number(content: Content) -> int:
+    if not content.versions:
+        return 1
+    return max(version.version_number for version in content.versions) + 1
+
+
+def clear_current_version(content: Content) -> None:
+    for version in content.versions:
+        if version.is_current:
+            version.is_current = False
+
+
+def append_chapter_version(content: Content, payload: ChapterSaveDTO) -> None:
+    clear_current_version(content)
+    content.title = payload.title
+    content.status = "draft"
+    content.last_edited_at = datetime.now(timezone.utc)
+    content.versions.append(
+        ContentVersion(
+            content_id=content.id,
+            version_number=next_version_number(content),
+            content_text=payload.content_text,
+            created_by=payload.created_by,
+            change_source=payload.change_source,
+            change_summary=payload.change_summary,
+            is_current=True,
+            is_best=False,
+            word_count=count_text_units(payload.content_text),
+            context_snapshot_hash=payload.context_snapshot_hash,
+        )
+    )
+
+
+def build_rollback_payload(
+    content: Content,
+    source_version: ContentVersion,
+) -> ChapterSaveDTO:
+    return ChapterSaveDTO(
+        title=content.title,
+        content_text=source_version.content_text,
+        change_summary=f"回滚至版本 v{source_version.version_number}",
+        created_by="user",
+        change_source="user_edit",
+        context_snapshot_hash=source_version.context_snapshot_hash,
     )
 
 

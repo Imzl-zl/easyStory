@@ -1,4 +1,7 @@
+import asyncio
+
 from app.modules.project.service import ProjectService, ProjectSettingUpdateDTO
+from tests.unit.async_service_support import async_db
 
 from tests.unit.models.helpers import (
     create_chapter_task,
@@ -57,26 +60,28 @@ def test_update_project_setting_syncs_summary_and_marks_related_content_stale(db
         version_number=1,
     )
 
-    result = ProjectService().update_project_setting(
-        db,
-        project.id,
-        ProjectSettingUpdateDTO(
-            project_setting={
-                "genre": "仙侠",
-                "tone": "冷峻",
-                "core_conflict": "主角在宗门追杀中求生",
-                "protagonist": {
-                    "name": "林渊",
-                    "identity": "弃徒",
-                    "goal": "重返内门",
-                },
-                "world_setting": {
-                    "era_baseline": "宗门割据时代",
-                    "world_rules": "境界压制",
-                },
-                "scale": {"target_words": 800000},
-            }
-        ),
+    result = asyncio.run(
+        ProjectService().update_project_setting(
+            async_db(db),
+            project.id,
+            ProjectSettingUpdateDTO(
+                project_setting={
+                    "genre": "仙侠",
+                    "tone": "冷峻",
+                    "core_conflict": "主角在宗门追杀中求生",
+                    "protagonist": {
+                        "name": "林渊",
+                        "identity": "弃徒",
+                        "goal": "重返内门",
+                    },
+                    "world_setting": {
+                        "era_baseline": "宗门割据时代",
+                        "world_rules": "境界压制",
+                    },
+                    "scale": {"target_words": 800000},
+                }
+            ),
+        )
     )
 
     db.refresh(project)
@@ -104,7 +109,7 @@ def test_check_setting_completeness_returns_blocked_and_warning_issues(db):
         },
     )
 
-    result = ProjectService().check_setting_completeness(db, project.id)
+    result = asyncio.run(ProjectService().check_setting_completeness(async_db(db), project.id))
 
     issue_fields = {issue.field: issue.level for issue in result.issues}
     assert result.status == "blocked"

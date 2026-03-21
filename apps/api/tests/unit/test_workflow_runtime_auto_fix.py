@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 import uuid
@@ -25,6 +26,7 @@ from app.modules.workflow.service.snapshot_support import (
     resolve_start_node_id,
 )
 from app.shared.runtime import SkillTemplateRenderer, ToolProvider
+from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, create_template, create_user, ready_project_setting
 from tests.unit.test_workflow_runtime import (
     CONFIG_ROOT,
@@ -53,7 +55,7 @@ def test_runtime_auto_fix_re_reviews_and_persists_fixed_candidate(db) -> None:
         on_fix_fail="pause",
     )
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
@@ -90,7 +92,7 @@ def test_runtime_review_failed_candidate_stays_confirmable_without_auto_fix(db) 
         on_fix_fail="pause",
     )
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
@@ -105,7 +107,7 @@ def test_runtime_review_failed_candidate_stays_confirmable_without_auto_fix(db) 
         assert version.change_source == "ai_generate"
         assert [item.status for item in node_executions] == ["completed", "failed"]
 
-        harness.chapter_content_service.approve_chapter(db, harness.project_id, 1)
+        asyncio.run(harness.chapter_content_service.approve_chapter(async_db(db), harness.project_id, 1))
         assert [task.status for task in _list_chapter_tasks(db, harness.workflow.id)] == ["completed"]
     finally:
         shutil.rmtree(harness.export_root, ignore_errors=True)
@@ -124,7 +126,7 @@ def test_runtime_auto_fix_pause_keeps_candidate_and_uses_review_failed_reason(db
         on_fix_fail="pause",
     )
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
@@ -159,7 +161,7 @@ def test_runtime_auto_fix_skip_drops_candidate_and_completes_workflow(db) -> Non
         on_fix_fail="skip",
     )
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
@@ -190,7 +192,7 @@ def test_runtime_auto_fix_fail_can_resume_after_user_approves_final_candidate(db
         on_fix_fail="fail",
     )
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
@@ -199,11 +201,11 @@ def test_runtime_auto_fix_fail_can_resume_after_user_approves_final_candidate(db
         assert harness.workflow.status == "failed"
         assert [task.status for task in _list_chapter_tasks(db, harness.workflow.id)] == ["failed"]
 
-        harness.chapter_content_service.approve_chapter(db, harness.project_id, 1)
+        asyncio.run(harness.chapter_content_service.approve_chapter(async_db(db), harness.project_id, 1))
         assert [task.status for task in _list_chapter_tasks(db, harness.workflow.id)] == ["completed"]
 
         harness.workflow_service.resume(harness.workflow)
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         db.refresh(chapter)
@@ -225,7 +227,7 @@ def test_runtime_budget_pause_keeps_generated_candidate_and_stops_before_review(
         budget_on_exceed="pause",
     )
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
@@ -257,7 +259,7 @@ def test_runtime_budget_pause_persists_completed_review_actions_before_interrupt
         budget_on_exceed="pause",
     )
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         chapter_gen = next(
@@ -293,7 +295,7 @@ def test_runtime_budget_skip_marks_chapter_skipped_without_review(db) -> None:
         budget_on_exceed="skip",
     )
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
@@ -317,7 +319,7 @@ def test_runtime_budget_fail_keeps_candidate_and_fails_workflow(db) -> None:
         budget_on_exceed="fail",
     )
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
@@ -392,7 +394,7 @@ def _build_auto_fix_harness(
     db.commit()
     db.refresh(workflow)
     return RuntimeHarness(
-        chapter_content_service=runtime_service.chapter_content_service,
+        chapter_content_service=create_chapter_content_service(),
         export_root=export_root,
         owner_id=owner.id,
         project_id=project.id,

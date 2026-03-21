@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-import threading
+import asyncio
+import logging
 import uuid
 from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
 from app.modules.workflow.service import (
     ChapterTaskBatchDTO,
-    ChapterTaskRegenerateDTO,
     ChapterTaskService,
+    ChapterTaskRegenerateDTO,
     ChapterTaskUpdateDTO,
     ChapterTaskViewDTO,
     WorkflowAppService,
@@ -22,33 +23,32 @@ from app.modules.workflow.service import (
     create_chapter_task_service,
     create_workflow_app_service,
 )
-from app.shared.db import SessionFactory, get_db_session, get_session_factory
+from app.shared.db import AsyncSessionFactory, get_async_db_session, get_async_session_factory
 
 router = APIRouter(tags=["workflow"])
 WorkflowRuntimeDispatcher = Callable[[uuid.UUID, uuid.UUID], None]
+logger = logging.getLogger(__name__)
 
 
-def get_workflow_app_service() -> WorkflowAppService:
+async def get_workflow_app_service() -> WorkflowAppService:
     return create_workflow_app_service()
 
 
-def get_chapter_task_service() -> ChapterTaskService:
+async def get_chapter_task_service() -> ChapterTaskService:
     return create_chapter_task_service()
 
 
-def get_workflow_runtime_dispatcher(
+async def get_workflow_runtime_dispatcher(
     request: Request,
     workflow_app_service: WorkflowAppService = Depends(get_workflow_app_service),
 ) -> WorkflowRuntimeDispatcher:
-    session_factory = get_session_factory(request)
+    session_factory = get_async_session_factory(request)
 
     def dispatch(workflow_id: uuid.UUID, owner_id: uuid.UUID) -> None:
-        thread = threading.Thread(
-            target=_run_workflow_runtime,
-            args=(workflow_app_service, session_factory, workflow_id, owner_id),
-            daemon=True,
+        task = asyncio.create_task(
+            _run_workflow_runtime(workflow_app_service, session_factory, workflow_id, owner_id)
         )
-        thread.start()
+        task.add_done_callback(_log_runtime_dispatch_failure)
 
     return dispatch
 
@@ -57,15 +57,15 @@ def get_workflow_runtime_dispatcher(
     "/api/v1/projects/{project_id}/workflows/start",
     response_model=WorkflowExecutionDTO,
 )
-def start_workflow(
+async def start_workflow(
     project_id: uuid.UUID,
     payload: WorkflowStartDTO | None = None,
     workflow_app_service: WorkflowAppService = Depends(get_workflow_app_service),
     runtime_dispatcher: WorkflowRuntimeDispatcher = Depends(get_workflow_runtime_dispatcher),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> WorkflowExecutionDTO:
-    return workflow_app_service.start_workflow(
+    return await workflow_app_service.start_workflow(
         db,
         project_id,
         payload or WorkflowStartDTO(),
@@ -75,13 +75,13 @@ def start_workflow(
 
 
 @router.get("/api/v1/workflows/{workflow_id}", response_model=WorkflowExecutionDTO)
-def get_workflow_detail(
+async def get_workflow_detail(
     workflow_id: uuid.UUID,
     workflow_app_service: WorkflowAppService = Depends(get_workflow_app_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> WorkflowExecutionDTO:
-    return workflow_app_service.get_workflow_detail(
+    return await workflow_app_service.get_workflow_detail(
         db,
         workflow_id,
         owner_id=current_user.id,
@@ -92,14 +92,14 @@ def get_workflow_detail(
     "/api/v1/workflows/{workflow_id}/pause",
     response_model=WorkflowExecutionDTO,
 )
-def pause_workflow(
+async def pause_workflow(
     workflow_id: uuid.UUID,
     payload: WorkflowPauseDTO | None = None,
     workflow_app_service: WorkflowAppService = Depends(get_workflow_app_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> WorkflowExecutionDTO:
-    return workflow_app_service.pause_workflow(
+    return await workflow_app_service.pause_workflow(
         db,
         workflow_id,
         payload or WorkflowPauseDTO(),
@@ -111,14 +111,14 @@ def pause_workflow(
     "/api/v1/workflows/{workflow_id}/resume",
     response_model=WorkflowExecutionDTO,
 )
-def resume_workflow(
+async def resume_workflow(
     workflow_id: uuid.UUID,
     workflow_app_service: WorkflowAppService = Depends(get_workflow_app_service),
     runtime_dispatcher: WorkflowRuntimeDispatcher = Depends(get_workflow_runtime_dispatcher),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> WorkflowExecutionDTO:
-    return workflow_app_service.resume_workflow(
+    return await workflow_app_service.resume_workflow(
         db,
         workflow_id,
         owner_id=current_user.id,
@@ -130,13 +130,13 @@ def resume_workflow(
     "/api/v1/workflows/{workflow_id}/cancel",
     response_model=WorkflowExecutionDTO,
 )
-def cancel_workflow(
+async def cancel_workflow(
     workflow_id: uuid.UUID,
     workflow_app_service: WorkflowAppService = Depends(get_workflow_app_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> WorkflowExecutionDTO:
-    return workflow_app_service.cancel_workflow(
+    return await workflow_app_service.cancel_workflow(
         db,
         workflow_id,
         owner_id=current_user.id,
@@ -147,14 +147,14 @@ def cancel_workflow(
     "/api/v1/projects/{project_id}/chapter-tasks/regenerate",
     response_model=ChapterTaskBatchDTO,
 )
-def regenerate_chapter_tasks(
+async def regenerate_chapter_tasks(
     project_id: uuid.UUID,
     payload: ChapterTaskRegenerateDTO,
     chapter_task_service: ChapterTaskService = Depends(get_chapter_task_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ChapterTaskBatchDTO:
-    return chapter_task_service.regenerate_tasks(
+    return await chapter_task_service.regenerate_tasks(
         db,
         project_id,
         payload,
@@ -166,13 +166,13 @@ def regenerate_chapter_tasks(
     "/api/v1/workflows/{workflow_id}/chapter-tasks",
     response_model=list[ChapterTaskViewDTO],
 )
-def list_chapter_tasks(
+async def list_chapter_tasks(
     workflow_id: uuid.UUID,
     chapter_task_service: ChapterTaskService = Depends(get_chapter_task_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> list[ChapterTaskViewDTO]:
-    return chapter_task_service.list_tasks(
+    return await chapter_task_service.list_tasks(
         db,
         workflow_id,
         owner_id=current_user.id,
@@ -183,15 +183,15 @@ def list_chapter_tasks(
     "/api/v1/workflows/{workflow_id}/chapter-tasks/{chapter_number}",
     response_model=ChapterTaskViewDTO,
 )
-def update_chapter_task(
+async def update_chapter_task(
     workflow_id: uuid.UUID,
     chapter_number: int,
     payload: ChapterTaskUpdateDTO,
     chapter_task_service: ChapterTaskService = Depends(get_chapter_task_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ChapterTaskViewDTO:
-    return chapter_task_service.update_task(
+    return await chapter_task_service.update_task(
         db,
         workflow_id,
         chapter_number,
@@ -200,15 +200,28 @@ def update_chapter_task(
     )
 
 
-def _run_workflow_runtime(
+async def _run_workflow_runtime(
     workflow_app_service: WorkflowAppService,
-    session_factory: SessionFactory,
+    session_factory: AsyncSessionFactory,
     workflow_id: uuid.UUID,
     owner_id: uuid.UUID,
 ) -> None:
-    with session_factory() as session:
-        workflow_app_service.run_workflow_runtime(
+    async with session_factory() as session:
+        await workflow_app_service.run_workflow_runtime(
             session,
             workflow_id,
             owner_id=owner_id,
+        )
+
+
+def _log_runtime_dispatch_failure(task: asyncio.Task[None]) -> None:
+    try:
+        exception = task.exception()
+    except asyncio.CancelledError:
+        logger.warning("Workflow runtime task was cancelled")
+        return
+    if exception is not None:
+        logger.error(
+            "Workflow runtime task failed",
+            exc_info=(type(exception), exception, exception.__traceback__),
         )

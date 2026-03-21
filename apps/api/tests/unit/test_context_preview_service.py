@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ from app.modules.workflow.service.snapshot_support import (
     freeze_workflow,
 )
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
+from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, create_user, create_workflow
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
@@ -26,11 +28,13 @@ def test_context_preview_service_returns_runtime_aligned_variables_and_report(db
     workflow = _create_preview_workflow(db, owner=owner)
     service = create_context_preview_service()
 
-    preview = service.preview_workflow_context(
-        db,
-        workflow.id,
-        ContextPreviewRequestDTO(node_id="chapter_gen", chapter_number=1),
-        owner_id=owner.id,
+    preview = asyncio.run(
+        service.preview_workflow_context(
+            async_db(db),
+            workflow.id,
+            ContextPreviewRequestDTO(node_id="chapter_gen", chapter_number=1),
+            owner_id=owner.id,
+        )
     )
 
     assert preview.node_id == "chapter_gen"
@@ -50,11 +54,13 @@ def test_context_preview_service_requires_chapter_number_when_rules_need_it(db) 
     service = create_context_preview_service()
 
     with pytest.raises(BusinessRuleError, match="chapter_number"):
-        service.preview_workflow_context(
-            db,
-            workflow.id,
-            ContextPreviewRequestDTO(node_id="chapter_gen"),
-            owner_id=owner.id,
+        asyncio.run(
+            service.preview_workflow_context(
+                async_db(db),
+                workflow.id,
+                ContextPreviewRequestDTO(node_id="chapter_gen"),
+                owner_id=owner.id,
+            )
         )
 
 
@@ -65,11 +71,13 @@ def test_context_preview_service_hides_other_users_workflow(db) -> None:
     service = create_context_preview_service()
 
     with pytest.raises(NotFoundError):
-        service.preview_workflow_context(
-            db,
-            workflow.id,
-            ContextPreviewRequestDTO(node_id="chapter_gen", chapter_number=1),
-            owner_id=outsider.id,
+        asyncio.run(
+            service.preview_workflow_context(
+                async_db(db),
+                workflow.id,
+                ContextPreviewRequestDTO(node_id="chapter_gen", chapter_number=1),
+                owner_id=outsider.id,
+            )
         )
 
 

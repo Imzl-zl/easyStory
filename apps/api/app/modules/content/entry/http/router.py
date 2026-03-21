@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.content.service import (
     ChapterContentService,
@@ -11,15 +11,15 @@ from app.modules.content.service import (
     ChapterSaveDTO,
     ChapterSummaryDTO,
     ChapterVersionDTO,
+    StoryAssetService,
     StoryAssetDTO,
     StoryAssetSaveDTO,
-    StoryAssetService,
     create_chapter_content_service,
     create_story_asset_service,
 )
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
-from app.shared.db import get_db_session
+from app.shared.db import get_async_db_session
 
 router = APIRouter(prefix="/api/v1/projects/{project_id}", tags=["content"])
 
@@ -33,14 +33,14 @@ def get_chapter_content_service() -> ChapterContentService:
 
 
 @router.put("/outline", response_model=StoryAssetDTO)
-def save_outline_draft(
+async def save_outline_draft(
     project_id: uuid.UUID,
     payload: StoryAssetSaveDTO,
     story_asset_service: StoryAssetService = Depends(get_story_asset_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> StoryAssetDTO:
-    return story_asset_service.save_asset_draft(
+    return await story_asset_service.save_asset_draft(
         db,
         project_id,
         "outline",
@@ -50,13 +50,13 @@ def save_outline_draft(
 
 
 @router.get("/outline", response_model=StoryAssetDTO)
-def get_outline(
+async def get_outline(
     project_id: uuid.UUID,
     story_asset_service: StoryAssetService = Depends(get_story_asset_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> StoryAssetDTO:
-    return story_asset_service.get_asset(
+    return await story_asset_service.get_asset(
         db,
         project_id,
         "outline",
@@ -65,13 +65,13 @@ def get_outline(
 
 
 @router.post("/outline/approve", response_model=StoryAssetDTO)
-def approve_outline(
+async def approve_outline(
     project_id: uuid.UUID,
     story_asset_service: StoryAssetService = Depends(get_story_asset_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> StoryAssetDTO:
-    return story_asset_service.approve_asset(
+    return await story_asset_service.approve_asset(
         db,
         project_id,
         "outline",
@@ -80,14 +80,14 @@ def approve_outline(
 
 
 @router.put("/opening-plan", response_model=StoryAssetDTO)
-def save_opening_plan_draft(
+async def save_opening_plan_draft(
     project_id: uuid.UUID,
     payload: StoryAssetSaveDTO,
     story_asset_service: StoryAssetService = Depends(get_story_asset_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> StoryAssetDTO:
-    return story_asset_service.save_asset_draft(
+    return await story_asset_service.save_asset_draft(
         db,
         project_id,
         "opening_plan",
@@ -97,13 +97,13 @@ def save_opening_plan_draft(
 
 
 @router.get("/opening-plan", response_model=StoryAssetDTO)
-def get_opening_plan(
+async def get_opening_plan(
     project_id: uuid.UUID,
     story_asset_service: StoryAssetService = Depends(get_story_asset_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> StoryAssetDTO:
-    return story_asset_service.get_asset(
+    return await story_asset_service.get_asset(
         db,
         project_id,
         "opening_plan",
@@ -112,13 +112,13 @@ def get_opening_plan(
 
 
 @router.post("/opening-plan/approve", response_model=StoryAssetDTO)
-def approve_opening_plan(
+async def approve_opening_plan(
     project_id: uuid.UUID,
     story_asset_service: StoryAssetService = Depends(get_story_asset_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> StoryAssetDTO:
-    return story_asset_service.approve_asset(
+    return await story_asset_service.approve_asset(
         db,
         project_id,
         "opening_plan",
@@ -127,13 +127,13 @@ def approve_opening_plan(
 
 
 @router.get("/chapters", response_model=list[ChapterSummaryDTO])
-def list_chapters(
+async def list_chapters(
     project_id: uuid.UUID,
     chapter_content_service: ChapterContentService = Depends(get_chapter_content_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> list[ChapterSummaryDTO]:
-    return chapter_content_service.list_chapters(
+    return await chapter_content_service.list_chapters(
         db,
         project_id,
         owner_id=current_user.id,
@@ -141,14 +141,14 @@ def list_chapters(
 
 
 @router.get("/chapters/{chapter_number}", response_model=ChapterDetailDTO)
-def get_chapter(
+async def get_chapter(
     project_id: uuid.UUID,
     chapter_number: int,
     chapter_content_service: ChapterContentService = Depends(get_chapter_content_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ChapterDetailDTO:
-    return chapter_content_service.get_chapter(
+    return await chapter_content_service.get_chapter(
         db,
         project_id,
         chapter_number,
@@ -157,15 +157,15 @@ def get_chapter(
 
 
 @router.put("/chapters/{chapter_number}", response_model=ChapterDetailDTO)
-def save_chapter_draft(
+async def save_chapter_draft(
     project_id: uuid.UUID,
     chapter_number: int,
     payload: ChapterSaveDTO,
     chapter_content_service: ChapterContentService = Depends(get_chapter_content_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ChapterDetailDTO:
-    return chapter_content_service.save_chapter_draft(
+    return await chapter_content_service.save_chapter_draft(
         db,
         project_id,
         chapter_number,
@@ -175,14 +175,14 @@ def save_chapter_draft(
 
 
 @router.post("/chapters/{chapter_number}/approve", response_model=ChapterDetailDTO)
-def approve_chapter(
+async def approve_chapter(
     project_id: uuid.UUID,
     chapter_number: int,
     chapter_content_service: ChapterContentService = Depends(get_chapter_content_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ChapterDetailDTO:
-    return chapter_content_service.approve_chapter(
+    return await chapter_content_service.approve_chapter(
         db,
         project_id,
         chapter_number,
@@ -191,14 +191,14 @@ def approve_chapter(
 
 
 @router.get("/chapters/{chapter_number}/versions", response_model=list[ChapterVersionDTO])
-def list_chapter_versions(
+async def list_chapter_versions(
     project_id: uuid.UUID,
     chapter_number: int,
     chapter_content_service: ChapterContentService = Depends(get_chapter_content_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> list[ChapterVersionDTO]:
-    return chapter_content_service.list_versions(
+    return await chapter_content_service.list_versions(
         db,
         project_id,
         chapter_number,
@@ -210,15 +210,15 @@ def list_chapter_versions(
     "/chapters/{chapter_number}/versions/{version_number}/rollback",
     response_model=ChapterDetailDTO,
 )
-def rollback_chapter_version(
+async def rollback_chapter_version(
     project_id: uuid.UUID,
     chapter_number: int,
     version_number: int,
     chapter_content_service: ChapterContentService = Depends(get_chapter_content_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ChapterDetailDTO:
-    return chapter_content_service.rollback_version(
+    return await chapter_content_service.rollback_version(
         db,
         project_id,
         chapter_number,
@@ -231,15 +231,15 @@ def rollback_chapter_version(
     "/chapters/{chapter_number}/versions/{version_number}/best",
     response_model=ChapterVersionDTO,
 )
-def mark_best_version(
+async def mark_best_version(
     project_id: uuid.UUID,
     chapter_number: int,
     version_number: int,
     chapter_content_service: ChapterContentService = Depends(get_chapter_content_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ChapterVersionDTO:
-    return chapter_content_service.mark_best_version(
+    return await chapter_content_service.mark_best_version(
         db,
         project_id,
         chapter_number,
@@ -252,15 +252,15 @@ def mark_best_version(
     "/chapters/{chapter_number}/versions/{version_number}/best",
     response_model=ChapterVersionDTO,
 )
-def clear_best_version(
+async def clear_best_version(
     project_id: uuid.UUID,
     chapter_number: int,
     version_number: int,
     chapter_content_service: ChapterContentService = Depends(get_chapter_content_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ChapterVersionDTO:
-    return chapter_content_service.clear_best_version(
+    return await chapter_content_service.clear_best_version(
         db,
         project_id,
         chapter_number,

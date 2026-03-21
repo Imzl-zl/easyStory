@@ -68,6 +68,42 @@ export type ProjectCreatePayload = {
   allow_system_credential_pool?: boolean;
 };
 
+export type TemplateNodeView = {
+  id: string;
+  node_order: number;
+  node_id: string | null;
+  node_name: string | null;
+  node_type: string;
+  skill_id: string | null;
+  config: Record<string, JsonValue> | null;
+  position_x: number | null;
+  position_y: number | null;
+  ui_config: Record<string, JsonValue> | null;
+};
+
+export type TemplateGuidedQuestion = {
+  question: string;
+  variable: string;
+};
+
+export type TemplateSummary = {
+  id: string;
+  name: string;
+  description: string | null;
+  genre: string | null;
+  workflow_id: string | null;
+  is_builtin: boolean;
+  node_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TemplateDetail = TemplateSummary & {
+  config: Record<string, JsonValue> | null;
+  guided_questions: TemplateGuidedQuestion[];
+  nodes: TemplateNodeView[];
+};
+
 export type ProjectSummary = {
   id: string;
   name: string;

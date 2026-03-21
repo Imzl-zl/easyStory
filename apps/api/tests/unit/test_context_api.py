@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app.main import create_app
 from app.modules.config_registry import ConfigLoader
 from app.modules.content.models import Content, ContentVersion
 from app.modules.workflow.models import ChapterTask
@@ -11,35 +12,40 @@ from app.modules.workflow.service.snapshot_support import (
     freeze_skills,
     freeze_workflow,
 )
-from tests.unit.models.helpers import create_project, create_user, create_workflow
-from tests.unit.test_workflow_api import (
-    TEST_JWT_SECRET,
-    _auth_headers,
-    _build_runtime_client,
-    _build_session_factory,
+from tests.unit.async_api_support import (
+    build_sqlite_session_factories,
+    cleanup_sqlite_session_factories,
+    started_async_client,
 )
+from tests.unit.api_test_support import TEST_JWT_SECRET, auth_headers as _auth_headers
+from tests.unit.models.helpers import create_project, create_user, create_workflow
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 CONFIG_ROOT = PROJECT_ROOT / "config"
 
 
-def test_context_api_previews_workflow_node_context(monkeypatch) -> None:
+async def test_context_api_previews_workflow_node_context(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
-    client = _build_runtime_client(session_factory)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="context-api-preview")
+    )
 
     try:
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
         with session_factory() as session:
             owner = create_user(session)
             workflow = _create_preview_workflow(session, owner=owner)
             workflow_id = workflow.id
             owner_id = owner.id
 
-        response = client.post(
-            f"/api/v1/workflows/{workflow_id}/context-preview",
-            json={"node_id": "chapter_gen", "chapter_number": 1},
-            headers=_auth_headers(owner_id),
-        )
+        async with started_async_client(app) as client:
+            response = await client.post(
+                f"/api/v1/workflows/{workflow_id}/context-preview",
+                json={"node_id": "chapter_gen", "chapter_number": 1},
+                headers=_auth_headers(owner_id),
+            )
 
         assert response.status_code == 200
         body = response.json()
@@ -49,41 +55,51 @@ def test_context_api_previews_workflow_node_context(monkeypatch) -> None:
         statuses = {item["type"]: item["status"] for item in body["context_report"]["sections"]}
         assert statuses["previous_chapters"] == "not_applicable"
     finally:
-        client.close()
-        engine.dispose()
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_context_api_rejects_preview_without_required_chapter_number(monkeypatch) -> None:
+async def test_context_api_rejects_preview_without_required_chapter_number(
+    monkeypatch,
+    tmp_path,
+) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
-    client = _build_runtime_client(session_factory)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="context-api-validation")
+    )
 
     try:
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
         with session_factory() as session:
             owner = create_user(session)
             workflow = _create_preview_workflow(session, owner=owner)
             workflow_id = workflow.id
             owner_id = owner.id
 
-        response = client.post(
-            f"/api/v1/workflows/{workflow_id}/context-preview",
-            json={"node_id": "chapter_gen"},
-            headers=_auth_headers(owner_id),
-        )
+        async with started_async_client(app) as client:
+            response = await client.post(
+                f"/api/v1/workflows/{workflow_id}/context-preview",
+                json={"node_id": "chapter_gen"},
+                headers=_auth_headers(owner_id),
+            )
 
         assert response.status_code == 422
         assert response.json()["code"] == "business_rule_error"
     finally:
-        client.close()
-        engine.dispose()
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_context_api_hides_other_users_workflow(monkeypatch) -> None:
+async def test_context_api_hides_other_users_workflow(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
-    client = _build_runtime_client(session_factory)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="context-api-owner")
+    )
 
     try:
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
         with session_factory() as session:
             owner = create_user(session)
             workflow = _create_preview_workflow(session, owner=owner)
@@ -91,17 +107,17 @@ def test_context_api_hides_other_users_workflow(monkeypatch) -> None:
             workflow_id = workflow.id
             outsider_id = outsider.id
 
-        response = client.post(
-            f"/api/v1/workflows/{workflow_id}/context-preview",
-            json={"node_id": "chapter_gen", "chapter_number": 1},
-            headers=_auth_headers(outsider_id),
-        )
+        async with started_async_client(app) as client:
+            response = await client.post(
+                f"/api/v1/workflows/{workflow_id}/context-preview",
+                json={"node_id": "chapter_gen", "chapter_number": 1},
+                headers=_auth_headers(outsider_id),
+            )
 
         assert response.status_code == 404
         assert response.json()["code"] == "not_found"
     finally:
-        client.close()
-        engine.dispose()
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
 def _create_preview_workflow(db, *, owner):

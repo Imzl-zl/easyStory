@@ -10,7 +10,10 @@ from .dto import (
     PromptReplayViewDTO,
     ReviewActionViewDTO,
 )
-from .factory import create_audit_log_service, create_workflow_observability_service
+from .factory import (
+    create_audit_log_service,
+    create_workflow_observability_service,
+)
 from .workflow_observability_service import WorkflowObservabilityService
 
 __all__ = [

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.project.service import (
     ProjectCreateDTO,
+    ProjectDeletionService,
     ProjectDetailDTO,
     ProjectManagementService,
     ProjectService,
@@ -15,12 +16,13 @@ from app.modules.project.service import (
     ProjectSummaryDTO,
     ProjectUpdateDTO,
     SettingCompletenessResultDTO,
+    create_project_deletion_service,
     create_project_management_service,
     create_project_service,
 )
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
-from app.shared.db import get_db_session
+from app.shared.db import get_async_db_session
 
 router = APIRouter(prefix="/api/v1/projects", tags=["projects"])
 
@@ -33,16 +35,20 @@ def get_project_management_service() -> ProjectManagementService:
     return create_project_management_service()
 
 
+def get_project_deletion_service() -> ProjectDeletionService:
+    return create_project_deletion_service()
+
+
 @router.post("", response_model=ProjectDetailDTO)
-def create_project(
+async def create_project(
     payload: ProjectCreateDTO,
     project_management_service: ProjectManagementService = Depends(
         get_project_management_service
     ),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ProjectDetailDTO:
-    return project_management_service.create_project(
+    return await project_management_service.create_project(
         db,
         payload,
         owner_id=current_user.id,
@@ -50,15 +56,15 @@ def create_project(
 
 
 @router.get("", response_model=list[ProjectSummaryDTO])
-def list_projects(
+async def list_projects(
     deleted_only: bool = Query(default=False),
     project_management_service: ProjectManagementService = Depends(
         get_project_management_service
     ),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> list[ProjectSummaryDTO]:
-    return project_management_service.list_projects(
+    return await project_management_service.list_projects(
         db,
         owner_id=current_user.id,
         deleted_only=deleted_only,
@@ -66,15 +72,15 @@ def list_projects(
 
 
 @router.get("/{project_id}", response_model=ProjectDetailDTO)
-def get_project(
+async def get_project(
     project_id: uuid.UUID,
     project_management_service: ProjectManagementService = Depends(
         get_project_management_service
     ),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ProjectDetailDTO:
-    return project_management_service.get_project(
+    return await project_management_service.get_project(
         db,
         project_id,
         owner_id=current_user.id,
@@ -82,16 +88,16 @@ def get_project(
 
 
 @router.put("/{project_id}", response_model=ProjectDetailDTO)
-def update_project(
+async def update_project(
     project_id: uuid.UUID,
     payload: ProjectUpdateDTO,
     project_management_service: ProjectManagementService = Depends(
         get_project_management_service
     ),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ProjectDetailDTO:
-    return project_management_service.update_project(
+    return await project_management_service.update_project(
         db,
         project_id,
         payload,
@@ -100,15 +106,15 @@ def update_project(
 
 
 @router.delete("/{project_id}", response_model=ProjectDetailDTO)
-def soft_delete_project(
+async def soft_delete_project(
     project_id: uuid.UUID,
-    project_management_service: ProjectManagementService = Depends(
-        get_project_management_service
+    project_deletion_service: ProjectDeletionService = Depends(
+        get_project_deletion_service
     ),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ProjectDetailDTO:
-    return project_management_service.soft_delete_project(
+    return await project_deletion_service.soft_delete_project(
         db,
         project_id,
         owner_id=current_user.id,
@@ -116,30 +122,47 @@ def soft_delete_project(
 
 
 @router.post("/{project_id}/restore", response_model=ProjectDetailDTO)
-def restore_project(
+async def restore_project(
     project_id: uuid.UUID,
-    project_management_service: ProjectManagementService = Depends(
-        get_project_management_service
+    project_deletion_service: ProjectDeletionService = Depends(
+        get_project_deletion_service
     ),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ProjectDetailDTO:
-    return project_management_service.restore_project(
+    return await project_deletion_service.restore_project(
         db,
         project_id,
         owner_id=current_user.id,
     )
 
 
+@router.delete("/{project_id}/physical", status_code=status.HTTP_204_NO_CONTENT)
+async def physical_delete_project(
+    project_id: uuid.UUID,
+    project_deletion_service: ProjectDeletionService = Depends(
+        get_project_deletion_service
+    ),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> Response:
+    await project_deletion_service.physical_delete_project(
+        db,
+        project_id,
+        owner_id=current_user.id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.put("/{project_id}/setting", response_model=ProjectSettingSnapshotDTO)
-def update_project_setting(
+async def update_project_setting(
     project_id: uuid.UUID,
     payload: ProjectSettingUpdateDTO,
     project_service: ProjectService = Depends(get_project_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> ProjectSettingSnapshotDTO:
-    return project_service.update_project_setting(
+    return await project_service.update_project_setting(
         db,
         project_id,
         payload,
@@ -151,13 +174,13 @@ def update_project_setting(
     "/{project_id}/setting/complete-check",
     response_model=SettingCompletenessResultDTO,
 )
-def check_project_setting_completeness(
+async def check_project_setting_completeness(
     project_id: uuid.UUID,
     project_service: ProjectService = Depends(get_project_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> SettingCompletenessResultDTO:
-    return project_service.check_setting_completeness(
+    return await project_service.check_setting_completeness(
         db,
         project_id,
         owner_id=current_user.id,

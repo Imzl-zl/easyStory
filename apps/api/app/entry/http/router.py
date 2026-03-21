@@ -10,6 +10,7 @@ from app.modules.observability.entry.http.router import router as observability_
 from app.modules.project.entry.http.router import router as project_router
 from app.modules.review.entry.http.router import router as review_router
 from app.modules.system.entry.http.router import router as system_router
+from app.modules.template.entry.http.router import router as template_router
 from app.modules.user.entry.http.router import router as auth_router
 from app.modules.workflow.entry.http.router import router as workflow_router
 
@@ -25,4 +26,5 @@ api_router.include_router(billing_router)
 api_router.include_router(export_router)
 api_router.include_router(review_router)
 api_router.include_router(observability_router)
+api_router.include_router(template_router)
 api_router.include_router(system_router)

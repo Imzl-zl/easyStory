@@ -5,188 +5,235 @@ from datetime import datetime
 import pytest
 
 from app.modules.review.models import ReviewAction
-from app.modules.review.service import ReviewQueryService
+from app.modules.review.service import create_review_query_service
 from app.modules.workflow.models import NodeExecution
 from app.shared.runtime.errors import ConfigurationError, NotFoundError
+from tests.unit.async_api_support import (
+    build_sqlite_session_factories,
+    cleanup_sqlite_session_factories,
+)
 from tests.unit.models.helpers import create_project, create_user, create_workflow
 
 
-def test_review_query_service_returns_workflow_summary_and_filtered_actions(db) -> None:
-    owner = create_user(db)
-    project = create_project(db, owner=owner)
-    workflow = create_workflow(db, project=project, status="paused")
-    chapter_execution = _create_node_execution(
-        db,
-        workflow.id,
-        node_id="chapter_gen",
-        node_order=1,
-    )
-    review_execution = _create_node_execution(
-        db,
-        workflow.id,
-        node_id="review",
-        node_type="review",
-        node_order=2,
-    )
-    chapter_retry_execution = _create_node_execution(
-        db,
-        workflow.id,
-        node_id="chapter_gen",
-        node_order=1,
-        sequence=1,
-    )
-    _create_review_action(
-        db,
-        chapter_execution.id,
-        agent_id="agent.style_checker",
-        review_type="auto_review",
-        status="failed",
-        issues=[
-            {
-                "category": "style_deviation",
-                "severity": "major",
-                "description": "文风偏移",
-            },
-            {
-                "category": "ai_flavor",
-                "severity": "minor",
-                "description": "AI 味偏重",
-            },
-        ],
-        created_at=datetime(2026, 3, 21, 12, 0),
-    )
-    _create_review_action(
-        db,
-        chapter_execution.id,
-        agent_id="agent.style_checker",
-        review_type="auto_re_review_1",
-        status="passed",
-        issues=[],
-        created_at=datetime(2026, 3, 21, 12, 1),
-    )
-    _create_review_action(
-        db,
-        review_execution.id,
-        agent_id="agent.logic_checker",
-        review_type="manual_review",
-        status="warning",
-        issues={
-            "items": [
-                {
-                    "category": "other",
-                    "severity": "suggestion",
-                    "description": "可以再压缩一句",
-                }
-            ]
-        },
-        created_at=datetime(2026, 3, 21, 12, 2),
-    )
-    _create_review_action(
-        db,
-        chapter_retry_execution.id,
-        agent_id="agent.style_checker",
-        review_type="auto_review",
-        status="passed",
-        issues=[],
-        created_at=datetime(2026, 3, 21, 12, 3),
+async def test_review_query_service_returns_workflow_summary_and_filtered_actions(tmp_path) -> None:
+    service = create_review_query_service()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="review-query-service")
     )
 
-    service = ReviewQueryService()
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+            workflow = create_workflow(session, project=project, status="paused")
+            chapter_execution = _create_node_execution(
+                session,
+                workflow.id,
+                node_id="chapter_gen",
+                node_order=1,
+            )
+            review_execution = _create_node_execution(
+                session,
+                workflow.id,
+                node_id="review",
+                node_type="review",
+                node_order=2,
+            )
+            chapter_retry_execution = _create_node_execution(
+                session,
+                workflow.id,
+                node_id="chapter_gen",
+                node_order=1,
+                sequence=1,
+            )
+            _create_review_action(
+                session,
+                chapter_execution.id,
+                agent_id="agent.style_checker",
+                review_type="auto_review",
+                status="failed",
+                issues=[
+                    {
+                        "category": "style_deviation",
+                        "severity": "major",
+                        "description": "文风偏移",
+                    },
+                    {
+                        "category": "ai_flavor",
+                        "severity": "minor",
+                        "description": "AI 味偏重",
+                    },
+                ],
+                created_at=datetime(2026, 3, 21, 12, 0),
+            )
+            _create_review_action(
+                session,
+                chapter_execution.id,
+                agent_id="agent.style_checker",
+                review_type="auto_re_review_1",
+                status="passed",
+                issues=[],
+                created_at=datetime(2026, 3, 21, 12, 1),
+            )
+            _create_review_action(
+                session,
+                review_execution.id,
+                agent_id="agent.logic_checker",
+                review_type="manual_review",
+                status="warning",
+                issues={
+                    "items": [
+                        {
+                            "category": "other",
+                            "severity": "suggestion",
+                            "description": "可以再压缩一句",
+                        }
+                    ]
+                },
+                created_at=datetime(2026, 3, 21, 12, 2),
+            )
+            _create_review_action(
+                session,
+                chapter_retry_execution.id,
+                agent_id="agent.style_checker",
+                review_type="auto_review",
+                status="passed",
+                issues=[],
+                created_at=datetime(2026, 3, 21, 12, 3),
+            )
+            owner_id = owner.id
+            workflow_id = workflow.id
+            chapter_execution_id = chapter_execution.id
 
-    summary = service.get_workflow_summary(db, workflow.id, owner_id=owner.id)
-    actions = service.list_workflow_review_actions(
-        db,
-        workflow.id,
-        owner_id=owner.id,
-        node_execution_id=chapter_execution.id,
-        status="failed",
+        async with async_session_factory() as session:
+            summary = await service.get_workflow_summary(session, workflow_id, owner_id=owner_id)
+            actions = await service.list_workflow_review_actions(
+                session,
+                workflow_id,
+                owner_id=owner_id,
+                node_execution_id=chapter_execution_id,
+                status="failed",
+            )
+
+        assert summary.workflow_execution_id == workflow_id
+        assert summary.reviewed_node_count == 2
+        assert summary.total_actions == 4
+        assert summary.last_reviewed_at == datetime(2026, 3, 21, 12, 3)
+        assert summary.statuses.model_dump() == {"passed": 2, "failed": 1, "warning": 1}
+        assert summary.issues.model_dump() == {
+            "total": 3,
+            "critical": 0,
+            "major": 1,
+            "minor": 1,
+            "suggestion": 1,
+        }
+        review_types = {item.review_type: item.action_count for item in summary.review_types}
+        assert review_types == {
+            "auto_re_review_1": 1,
+            "auto_review": 2,
+            "manual_review": 1,
+        }
+        assert len(actions) == 1
+        assert actions[0].node_id == "chapter_gen"
+        assert actions[0].review_type == "auto_review"
+        assert actions[0].issue_count == 2
+        assert actions[0].issues[0].severity == "major"
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_review_query_service_hides_other_users_workflow(tmp_path) -> None:
+    service = create_review_query_service()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="review-query-service-owner")
     )
 
-    assert summary.workflow_execution_id == workflow.id
-    assert summary.reviewed_node_count == 2
-    assert summary.total_actions == 4
-    assert summary.last_reviewed_at == datetime(2026, 3, 21, 12, 3)
-    assert summary.statuses.model_dump() == {"passed": 2, "failed": 1, "warning": 1}
-    assert summary.issues.model_dump() == {
-        "total": 3,
-        "critical": 0,
-        "major": 1,
-        "minor": 1,
-        "suggestion": 1,
-    }
-    review_types = {item.review_type: item.action_count for item in summary.review_types}
-    assert review_types == {
-        "auto_re_review_1": 1,
-        "auto_review": 2,
-        "manual_review": 1,
-    }
-    assert len(actions) == 1
-    assert actions[0].node_id == "chapter_gen"
-    assert actions[0].review_type == "auto_review"
-    assert actions[0].issue_count == 2
-    assert actions[0].issues[0].severity == "major"
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            outsider = create_user(session)
+            project = create_project(session, owner=owner)
+            workflow = create_workflow(session, project=project, status="running")
+            outsider_id = outsider.id
+            workflow_id = workflow.id
+
+        async with async_session_factory() as session:
+            with pytest.raises(NotFoundError):
+                await service.get_workflow_summary(session, workflow_id, owner_id=outsider_id)
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_review_query_service_hides_other_users_workflow(db) -> None:
-    owner = create_user(db)
-    outsider = create_user(db)
-    project = create_project(db, owner=owner)
-    workflow = create_workflow(db, project=project, status="running")
-
-    service = ReviewQueryService()
-
-    with pytest.raises(NotFoundError):
-        service.get_workflow_summary(db, workflow.id, owner_id=outsider.id)
-
-
-def test_review_query_service_rejects_node_execution_from_other_workflow(db) -> None:
-    owner = create_user(db)
-    project = create_project(db, owner=owner)
-    other_project = create_project(db, owner=owner)
-    workflow = create_workflow(db, project=project, status="running")
-    other_workflow = create_workflow(db, project=other_project, status="paused")
-    foreign_execution = _create_node_execution(
-        db,
-        other_workflow.id,
-        node_id="chapter_gen",
-        node_order=1,
+async def test_review_query_service_rejects_node_execution_from_other_workflow(tmp_path) -> None:
+    service = create_review_query_service()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="review-query-service-foreign-node")
     )
 
-    service = ReviewQueryService()
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+            other_project = create_project(session, owner=owner)
+            workflow = create_workflow(session, project=project, status="running")
+            other_workflow = create_workflow(session, project=other_project, status="paused")
+            foreign_execution = _create_node_execution(
+                session,
+                other_workflow.id,
+                node_id="chapter_gen",
+                node_order=1,
+            )
+            owner_id = owner.id
+            workflow_id = workflow.id
+            foreign_execution_id = foreign_execution.id
 
-    with pytest.raises(NotFoundError):
-        service.list_workflow_review_actions(
-            db,
-            workflow.id,
-            owner_id=owner.id,
-            node_execution_id=foreign_execution.id,
-        )
+        async with async_session_factory() as session:
+            with pytest.raises(NotFoundError):
+                await service.list_workflow_review_actions(
+                    session,
+                    workflow_id,
+                    owner_id=owner_id,
+                    node_execution_id=foreign_execution_id,
+                )
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_review_query_service_raises_configuration_error_for_malformed_issues(db) -> None:
-    owner = create_user(db)
-    project = create_project(db, owner=owner)
-    workflow = create_workflow(db, project=project, status="paused")
-    execution = _create_node_execution(
-        db,
-        workflow.id,
-        node_id="chapter_gen",
-        node_order=1,
+async def test_review_query_service_raises_configuration_error_for_malformed_issues(tmp_path) -> None:
+    service = create_review_query_service()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="review-query-service-bad-issues")
     )
-    action = _create_review_action(
-        db,
-        execution.id,
-        agent_id="agent.style_checker",
-        review_type="auto_review",
-        status="failed",
-        issues="bad-payload",
-        created_at=datetime(2026, 3, 21, 14, 0),
-    )
 
-    service = ReviewQueryService()
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+            workflow = create_workflow(session, project=project, status="paused")
+            execution = _create_node_execution(
+                session,
+                workflow.id,
+                node_id="chapter_gen",
+                node_order=1,
+            )
+            action = _create_review_action(
+                session,
+                execution.id,
+                agent_id="agent.style_checker",
+                review_type="auto_review",
+                status="failed",
+                issues="bad-payload",
+                created_at=datetime(2026, 3, 21, 14, 0),
+            )
+            owner_id = owner.id
+            workflow_id = workflow.id
+            action_id = action.id
 
-    with pytest.raises(ConfigurationError, match=str(action.id)):
-        service.get_workflow_summary(db, workflow.id, owner_id=owner.id)
+        async with async_session_factory() as session:
+            with pytest.raises(ConfigurationError, match=str(action_id)):
+                await service.get_workflow_summary(session, workflow_id, owner_id=owner_id)
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
 def _create_node_execution(

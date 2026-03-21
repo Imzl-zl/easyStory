@@ -12,7 +12,10 @@ from .dto import (
     StoryAssetDTO,
     StoryAssetSaveDTO,
 )
-from .factory import create_chapter_content_service, create_story_asset_service
+from .factory import (
+    create_chapter_content_service,
+    create_story_asset_service,
+)
 from .story_asset_service import StoryAssetService
 
 __all__ = [

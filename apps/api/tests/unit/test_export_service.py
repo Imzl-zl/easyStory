@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import shutil
 import uuid
 from pathlib import Path
@@ -8,6 +9,7 @@ import pytest
 
 from app.modules.export.service import ExportService
 from app.shared.runtime.errors import BusinessRuleError
+from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import (
     create_chapter_task,
     create_content,
@@ -42,12 +44,12 @@ def test_export_workflow_uses_only_current_workflow_tasks_and_relative_paths(db)
     service = ExportService(export_root)
 
     try:
-        first_exports = service.export_workflow(db, workflow, formats=["txt"])
+        first_exports = asyncio.run(service.export_workflow(async_db(db), workflow, formats=["txt"]))
         db.commit()
         first_path = export_root / Path(first_exports[0].file_path)
         first_text = first_path.read_text(encoding="utf-8")
 
-        second_exports = service.export_workflow(db, workflow, formats=["txt"])
+        second_exports = asyncio.run(service.export_workflow(async_db(db), workflow, formats=["txt"]))
         db.commit()
         second_path = export_root / Path(second_exports[0].file_path)
 
@@ -77,7 +79,7 @@ def test_export_workflow_blocks_generating_task(db):
 
     try:
         with pytest.raises(BusinessRuleError, match="正在生成中"):
-            service.export_workflow(db, workflow, formats=["txt"])
+            asyncio.run(service.export_workflow(async_db(db), workflow, formats=["txt"]))
     finally:
         shutil.rmtree(export_root, ignore_errors=True)
 
@@ -106,7 +108,7 @@ def test_export_workflow_cleans_up_files_when_flush_fails(
 
     try:
         with pytest.raises(RuntimeError, match="flush failed"):
-            service.export_workflow(db, workflow, formats=["txt"])
+            asyncio.run(service.export_workflow(async_db(db), workflow, formats=["txt"]))
         db.rollback()
         assert list(export_root.rglob("*.txt")) == []
     finally:

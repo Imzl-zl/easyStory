@@ -3,7 +3,9 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.content.models import Content
 from app.modules.export.models import Export
@@ -12,12 +14,10 @@ from app.modules.workflow.models import ChapterTask, WorkflowExecution
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 
 from .dto import ExportViewDTO
+from .export_file_support import cleanup_files, resolve_download_path, write_export_file
 
 EXPORT_ROOT_DIR = ".runtime/exports"
-SUPPORTED_EXPORT_FORMATS = frozenset({"txt", "markdown"})
 EXPORTABLE_CONTENT_STATUSES = frozenset({"approved", "stale"})
-EXPORT_FILENAME_PREFIX = "workflow-export"
-EXPORT_FILENAME_TOKEN_LENGTH = 8
 BLOCKING_TASK_STATUS_MESSAGES = {
     "pending": "第{chapter_number}章尚未完成，无法导出",
     "generating": "第{chapter_number}章正在生成中，无法导出",
@@ -30,55 +30,50 @@ class ExportService:
     def __init__(self, export_root: Path) -> None:
         self.export_root = export_root
 
-    def create_workflow_exports(
+    async def create_workflow_exports(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         *,
         formats: list[str],
         owner_id: uuid.UUID,
     ) -> list[Export]:
-        workflow = self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
-        exports = self.export_workflow(
+        workflow = await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        exports = await self.export_workflow(
             db,
             workflow,
             formats=formats,
             config_snapshot=workflow.workflow_snapshot,
         )
-        db.commit()
+        await db.commit()
         for export in exports:
-            db.refresh(export)
+            await db.refresh(export)
         return exports
 
-    def list_project_exports(
+    async def list_project_exports(
         self,
-        db: Session,
+        db: AsyncSession,
         project_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> list[Export]:
-        self._require_owned_project(db, project_id, owner_id=owner_id)
-        return (
-            db.query(Export)
-            .filter(Export.project_id == project_id)
-            .order_by(Export.created_at.desc())
-            .all()
-        )
+        await self._require_owned_project(db, project_id, owner_id=owner_id)
+        statement = select(Export).where(Export.project_id == project_id)
+        return (await db.scalars(statement.order_by(Export.created_at.desc()))).all()
 
-    def resolve_download(
+    async def resolve_download(
         self,
-        db: Session,
+        db: AsyncSession,
         export_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> tuple[Export, Path]:
-        export = self._require_owned_export(db, export_id, owner_id=owner_id)
-        file_path = (self.export_root / export.file_path).resolve()
-        export_root = self.export_root.resolve()
-        if not file_path.is_relative_to(export_root):
-            raise NotFoundError(f"Export file not found: {export_id}")
-        if not file_path.exists() or not file_path.is_file():
-            raise NotFoundError(f"Export file not found: {export_id}")
+        export = await self._require_owned_export(db, export_id, owner_id=owner_id)
+        file_path = resolve_download_path(
+            self.export_root,
+            export,
+            export_id=export_id,
+        )
         return export, file_path
 
     def to_view_dto(self, export: Export) -> ExportViewDTO:
@@ -91,15 +86,15 @@ class ExportService:
             created_at=export.created_at,
         )
 
-    def export_workflow(
+    async def export_workflow(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         *,
         formats: list[str],
         config_snapshot: dict | None = None,
     ) -> list[Export]:
-        chapters = self._load_chapters(db, workflow)
+        chapters = await self._load_chapters(db, workflow)
         rendered = self._render_current_versions(chapters)
         output_dir = self.export_root / str(workflow.project_id) / str(workflow.id)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -107,36 +102,56 @@ class ExportService:
         try:
             for export_format in formats:
                 prepared_exports.append(
-                    self._write_export(
-                        workflow.project_id,
-                        output_dir,
-                        rendered,
-                        export_format,
-                        config_snapshot,
+                    write_export_file(
+                        self.export_root,
+                        project_id=workflow.project_id,
+                        output_dir=output_dir,
+                        rendered=rendered,
+                        export_format=export_format,
+                        config_snapshot=config_snapshot or workflow.workflow_snapshot,
                     )
                 )
             exports = [item[0] for item in prepared_exports]
             db.add_all(exports)
-            db.flush()
+            await db.flush()
             return exports
         except Exception:
-            self._cleanup_files([path for _, path in prepared_exports])
+            cleanup_files([path for _, path in prepared_exports])
             raise
 
-    def _load_chapters(
+    async def _load_chapters(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow: WorkflowExecution,
     ) -> list[Content]:
         tasks = (
-            db.query(ChapterTask)
-            .filter(ChapterTask.workflow_execution_id == workflow.id)
-            .order_by(ChapterTask.chapter_number.asc())
-            .all()
-        )
+            await db.scalars(
+                select(ChapterTask)
+                .where(ChapterTask.workflow_execution_id == workflow.id)
+                .order_by(ChapterTask.chapter_number.asc())
+            )
+        ).all()
         if not tasks:
             raise BusinessRuleError("当前工作流没有章节计划，无法导出")
-        chapters: list[Content] = []
+        content_ids = self._collect_content_ids(tasks)
+        contents = (
+            await db.scalars(
+                select(Content)
+                .options(selectinload(Content.versions))
+                .where(Content.id.in_(content_ids))
+            )
+        ).all()
+        chapters = self._match_completed_chapters(
+            tasks,
+            {content.id: content for content in contents},
+            workflow.project_id,
+        )
+        if not chapters:
+            raise BusinessRuleError("没有可导出的已完成章节内容")
+        return chapters
+
+    def _collect_content_ids(self, tasks: list[ChapterTask]) -> list[uuid.UUID]:
+        content_ids: list[uuid.UUID] = []
         for task in tasks:
             if task.status == "skipped":
                 continue
@@ -149,8 +164,22 @@ class ExportService:
                 )
             if task.content_id is None:
                 raise BusinessRuleError(f"第{task.chapter_number}章缺少已确认正文，无法导出")
-            content = db.get(Content, task.content_id)
-            if content is None or content.project_id != workflow.project_id:
+            content_ids.append(task.content_id)
+        return content_ids
+
+    def _match_completed_chapters(
+        self,
+        tasks: list[ChapterTask],
+        content_map: dict[uuid.UUID, Content],
+        project_id: uuid.UUID,
+    ) -> list[Content]:
+        chapters: list[Content] = []
+        for task in tasks:
+            if task.status == "skipped":
+                continue
+            assert task.content_id is not None
+            content = content_map.get(task.content_id)
+            if content is None or content.project_id != project_id:
                 raise BusinessRuleError(f"第{task.chapter_number}章内容不存在，无法导出")
             if content.content_type != "chapter" or content.chapter_number != task.chapter_number:
                 raise BusinessRuleError(f"第{task.chapter_number}章内容绑定不一致，无法导出")
@@ -159,8 +188,6 @@ class ExportService:
                     f"第{task.chapter_number}章当前状态为 {content.status}，无法导出"
                 )
             chapters.append(content)
-        if not chapters:
-            raise BusinessRuleError("没有可导出的已完成章节内容")
         return chapters
 
     def _render_current_versions(
@@ -175,122 +202,46 @@ class ExportService:
             rendered.append((chapter, current_version.content_text.strip()))
         return rendered
 
-    def _write_export(
+    async def _require_owned_workflow(
         self,
-        project_id: uuid.UUID,
-        output_dir: Path,
-        rendered: list[tuple[Content, str]],
-        export_format: str,
-        config_snapshot: dict | None,
-    ) -> tuple[Export, Path]:
-        if export_format not in SUPPORTED_EXPORT_FORMATS:
-            raise BusinessRuleError(f"暂不支持导出格式: {export_format}")
-        suffix = "md" if export_format == "markdown" else export_format
-        filename = (
-            f"{EXPORT_FILENAME_PREFIX}-"
-            f"{uuid.uuid4().hex[:EXPORT_FILENAME_TOKEN_LENGTH]}.{suffix}"
-        )
-        file_path = output_dir / filename
-        try:
-            file_path.write_text(
-                self._render_document(rendered, markdown=export_format == "markdown"),
-                encoding="utf-8",
-            )
-            relative_path = file_path.relative_to(self.export_root).as_posix()
-            return (
-                Export(
-                    project_id=project_id,
-                    format=export_format,
-                    filename=filename,
-                    file_path=relative_path,
-                    file_size=file_path.stat().st_size,
-                    config_snapshot=config_snapshot,
-                ),
-                file_path,
-            )
-        except Exception:
-            if file_path.exists():
-                file_path.unlink()
-            raise
-
-    def _cleanup_files(
-        self,
-        file_paths: list[Path],
-    ) -> None:
-        for file_path in file_paths:
-            if file_path.exists():
-                file_path.unlink()
-
-    def _require_owned_workflow(
-        self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> WorkflowExecution:
-        workflow = (
-            db.query(WorkflowExecution)
+        workflow = await db.scalar(
+            select(WorkflowExecution)
             .join(Project, WorkflowExecution.project_id == Project.id)
-            .filter(
-                WorkflowExecution.id == workflow_id,
-                Project.owner_id == owner_id,
-            )
-            .one_or_none()
+            .where(WorkflowExecution.id == workflow_id, Project.owner_id == owner_id)
         )
         if workflow is None:
             raise NotFoundError(f"Workflow execution not found: {workflow_id}")
         return workflow
 
-    def _require_owned_project(
+    async def _require_owned_project(
         self,
-        db: Session,
+        db: AsyncSession,
         project_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> Project:
-        project = (
-            db.query(Project)
-            .filter(
-                Project.id == project_id,
-                Project.owner_id == owner_id,
-            )
-            .one_or_none()
-        )
+        project = await db.scalar(select(Project).where(Project.id == project_id, Project.owner_id == owner_id))
         if project is None:
             raise NotFoundError(f"Project not found: {project_id}")
         return project
 
-    def _require_owned_export(
+    async def _require_owned_export(
         self,
-        db: Session,
+        db: AsyncSession,
         export_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> Export:
-        export = (
-            db.query(Export)
+        export = await db.scalar(
+            select(Export)
             .join(Project, Export.project_id == Project.id)
-            .filter(
-                Export.id == export_id,
-                Project.owner_id == owner_id,
-            )
-            .one_or_none()
+            .where(Export.id == export_id, Project.owner_id == owner_id)
         )
         if export is None:
             raise NotFoundError(f"Export not found: {export_id}")
         return export
-
-    def _render_document(
-        self,
-        rendered: list[tuple[Content, str]],
-        *,
-        markdown: bool,
-    ) -> str:
-        blocks = []
-        for chapter, text in rendered:
-            number = chapter.chapter_number or 0
-            heading = f"第{number}章 {chapter.title}"
-            if markdown:
-                heading = f"# {heading}"
-            blocks.append(f"{heading}\n\n{text}")
-        return "\n\n".join(blocks).strip() + "\n"

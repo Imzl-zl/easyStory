@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.review.service import (
     ReviewQueryService,
@@ -14,12 +14,12 @@ from app.modules.review.service import (
 )
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
-from app.shared.db import get_db_session
+from app.shared.db import get_async_db_session
 
 router = APIRouter(tags=["review"])
 
 
-def get_review_query_service() -> ReviewQueryService:
+async def get_review_query_service() -> ReviewQueryService:
     return create_review_query_service()
 
 
@@ -27,13 +27,13 @@ def get_review_query_service() -> ReviewQueryService:
     "/api/v1/workflows/{workflow_id}/reviews/summary",
     response_model=WorkflowReviewSummaryDTO,
 )
-def get_workflow_review_summary(
+async def get_workflow_review_summary(
     workflow_id: uuid.UUID,
     review_query_service: ReviewQueryService = Depends(get_review_query_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> WorkflowReviewSummaryDTO:
-    return review_query_service.get_workflow_summary(
+    return await review_query_service.get_workflow_summary(
         db,
         workflow_id,
         owner_id=current_user.id,
@@ -44,7 +44,7 @@ def get_workflow_review_summary(
     "/api/v1/workflows/{workflow_id}/reviews/actions",
     response_model=list[WorkflowReviewActionDTO],
 )
-def list_workflow_review_actions(
+async def list_workflow_review_actions(
     workflow_id: uuid.UUID,
     node_execution_id: uuid.UUID | None = Query(default=None),
     review_type: str | None = Query(default=None, min_length=1),
@@ -52,9 +52,9 @@ def list_workflow_review_actions(
     limit: int = Query(default=100, ge=1, le=200),
     review_query_service: ReviewQueryService = Depends(get_review_query_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> list[WorkflowReviewActionDTO]:
-    return review_query_service.list_workflow_review_actions(
+    return await review_query_service.list_workflow_review_actions(
         db,
         workflow_id,
         owner_id=current_user.id,

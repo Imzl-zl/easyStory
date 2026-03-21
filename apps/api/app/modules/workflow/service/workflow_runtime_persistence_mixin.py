@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from typing import Any
 import uuid
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.observability.models import ExecutionLog, PromptReplay
 from app.modules.workflow.models import Artifact, ChapterTask, NodeExecution
@@ -17,18 +18,18 @@ LOG_LEVEL_ERROR = "ERROR"
 
 
 class WorkflowRuntimePersistenceMixin:
-    def _create_node_execution(self, db: Session, workflow, node) -> NodeExecution:
+    async def _create_node_execution(self, db: AsyncSession, workflow, node) -> NodeExecution:
         execution = NodeExecution(
             workflow_execution_id=workflow.id,
             node_id=node.id,
-            sequence=self._next_sequence(db, workflow.id, node.id),
+            sequence=await self._next_sequence(db, workflow.id, node.id),
             node_order=resolve_node_order(workflow.workflow_snapshot or {}, node.id),
             node_type=node.node_type,
             status="running",
             started_at=datetime.now(timezone.utc),
         )
         db.add(execution)
-        db.flush()
+        await db.flush()
         self._record_execution_log(
             db,
             workflow_execution_id=workflow.id,
@@ -39,21 +40,27 @@ class WorkflowRuntimePersistenceMixin:
         )
         return execution
 
-    def _next_sequence(self, db: Session, workflow_execution_id: uuid.UUID, node_id: str) -> int:
-        existing = (
-            db.query(NodeExecution)
-            .filter(
+    async def _next_sequence(
+        self,
+        db: AsyncSession,
+        workflow_execution_id: uuid.UUID,
+        node_id: str,
+    ) -> int:
+        statement = (
+            select(NodeExecution.sequence)
+            .where(
                 NodeExecution.workflow_execution_id == workflow_execution_id,
                 NodeExecution.node_id == node_id,
             )
             .order_by(NodeExecution.sequence.desc())
-            .first()
+            .limit(1)
         )
-        return 0 if existing is None else existing.sequence + 1
+        existing = await db.scalar(statement)
+        return 0 if existing is None else existing + 1
 
     def _complete_execution(
         self,
-        db: Session,
+        db: AsyncSession,
         execution: NodeExecution,
         started_at: datetime,
         output_data: dict[str, Any],
@@ -74,7 +81,7 @@ class WorkflowRuntimePersistenceMixin:
 
     def _skip_execution(
         self,
-        db: Session,
+        db: AsyncSession,
         execution: NodeExecution,
         started_at: datetime,
         output_data: dict[str, Any],
@@ -95,7 +102,7 @@ class WorkflowRuntimePersistenceMixin:
 
     def _fail_execution(
         self,
-        db: Session,
+        db: AsyncSession,
         execution: NodeExecution,
         started_at: datetime,
         exc: Exception,
@@ -120,6 +127,7 @@ class WorkflowRuntimePersistenceMixin:
 
     def _append_artifact(
         self,
+        db: AsyncSession,
         execution: NodeExecution,
         artifact_type: str,
         payload: dict[str, Any],
@@ -127,8 +135,9 @@ class WorkflowRuntimePersistenceMixin:
         content_version_id: uuid.UUID | None = None,
         word_count: int | None = None,
     ) -> None:
-        execution.artifacts.append(
+        db.add(
             Artifact(
+                node_execution_id=execution.id,
                 artifact_type=artifact_type,
                 content_version_id=content_version_id,
                 payload=payload,
@@ -138,7 +147,7 @@ class WorkflowRuntimePersistenceMixin:
 
     def _record_prompt_replay(
         self,
-        db: Session,
+        db: AsyncSession,
         execution: NodeExecution,
         prompt_bundle: dict[str, Any],
         raw_output: dict[str, Any],
@@ -159,7 +168,7 @@ class WorkflowRuntimePersistenceMixin:
 
     def _record_execution_log(
         self,
-        db: Session,
+        db: AsyncSession,
         *,
         workflow_execution_id: uuid.UUID,
         node_execution_id: uuid.UUID | None,

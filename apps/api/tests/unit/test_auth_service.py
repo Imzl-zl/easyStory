@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy.exc import IntegrityError
+from unittest.mock import AsyncMock, Mock
 
 from app.modules.user.service.auth_service import AuthService
 from app.modules.user.service.dto import AuthRegisterDTO
@@ -13,23 +14,18 @@ class DummyTokenService:
         return "token"
 
 
-def test_auth_register_translates_integrity_error_to_conflict(db, monkeypatch):
+async def test_auth_register_translates_integrity_error_to_conflict(monkeypatch):
     service = AuthService(DummyTokenService())
-    rollback_called = {"value": False}
-
-    def fake_commit() -> None:
-        raise IntegrityError("insert", {}, Exception("duplicate"))
-
-    def fake_rollback() -> None:
-        rollback_called["value"] = True
-
-    monkeypatch.setattr(db, "commit", fake_commit)
-    monkeypatch.setattr(db, "rollback", fake_rollback)
+    db = AsyncMock()
+    db.add = Mock()
+    db.commit = AsyncMock(side_effect=IntegrityError("insert", {}, Exception("duplicate")))
+    db.rollback = AsyncMock()
+    monkeypatch.setattr(service, "_ensure_username_available", AsyncMock(return_value=None))
 
     with pytest.raises(ConflictError):
-        service.register(
+        await service.register(
             db,
             AuthRegisterDTO(username="writer_user", password="password123"),
         )
 
-    assert rollback_called["value"] is True
+    db.rollback.assert_awaited_once()

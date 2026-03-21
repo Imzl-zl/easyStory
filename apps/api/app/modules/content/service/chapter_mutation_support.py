@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.project.models import Project
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
@@ -26,13 +27,13 @@ def mark_downstream_chapters_stale(project: Project, chapter_number: int) -> Non
             content.status = "stale"
 
 
-def mark_active_chapter_task_completed(
-    db: Session,
+async def mark_active_chapter_task_completed(
+    db: AsyncSession,
     project_id: uuid.UUID,
     chapter_number: int,
     content_id: uuid.UUID,
 ) -> None:
-    task = _find_matching_task(
+    task = await _find_matching_task(
         db,
         project_id,
         chapter_number,
@@ -42,7 +43,7 @@ def mark_active_chapter_task_completed(
         allow_empty_content=True,
     )
     if task is None:
-        task = _find_matching_task(
+        task = await _find_matching_task(
             db,
             project_id,
             chapter_number,
@@ -57,8 +58,8 @@ def mark_active_chapter_task_completed(
     task.status = "completed"
 
 
-def _find_matching_task(
-    db: Session,
+async def _find_matching_task(
+    db: AsyncSession,
     project_id: uuid.UUID,
     chapter_number: int,
     content_id: uuid.UUID,
@@ -70,10 +71,10 @@ def _find_matching_task(
     content_filter = ChapterTask.content_id == content_id
     if allow_empty_content:
         content_filter = or_(ChapterTask.content_id.is_(None), content_filter)
-    return (
-        db.query(ChapterTask)
+    statement = (
+        select(ChapterTask)
         .join(WorkflowExecution, ChapterTask.workflow_execution_id == WorkflowExecution.id)
-        .filter(
+        .where(
             ChapterTask.project_id == project_id,
             ChapterTask.chapter_number == chapter_number,
             ChapterTask.status.in_(task_statuses),
@@ -81,5 +82,6 @@ def _find_matching_task(
             content_filter,
         )
         .order_by(WorkflowExecution.updated_at.desc())
-        .first()
+        .limit(1)
     )
+    return await db.scalar(statement)

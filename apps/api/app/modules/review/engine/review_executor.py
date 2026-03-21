@@ -4,17 +4,23 @@ import asyncio
 from time import perf_counter
 from typing import Any, Awaitable, Callable, Sequence
 
-from pydantic import ValidationError
-
 from app.modules.config_registry.infrastructure.config_loader import ConfigLoader
 from app.modules.config_registry.schemas.config_schemas import AgentConfig, ReviewConfig
 from app.shared.runtime.errors import BudgetExceededError, EasyStoryError
 
 from .contracts import AggregatedReviewResult, ReviewExecutionFailure, ReviewResult
+from .review_executor_support import (
+    IndexedReviewOutcome,
+    ReviewOutcome,
+    build_execution_failure,
+    count_severity,
+    drain_pending_reviews,
+    normalize_review_result,
+    ordered_outcomes,
+    resolve_overall_status,
+)
 
 ReviewRunner = Callable[[str, AgentConfig], Awaitable[ReviewResult | dict[str, Any]]]
-ReviewOutcome = ReviewResult | ReviewExecutionFailure
-IndexedReviewOutcome = tuple[int, ReviewOutcome]
 
 
 class ReviewExecutorError(EasyStoryError):
@@ -108,9 +114,9 @@ class ReviewExecutor:
                         budget_error = exc
             if budget_error is None:
                 continue
-            completed.extend(await self._drain_pending_reviews(pending))
+            completed.extend(await drain_pending_reviews(pending))
             raise _ReviewBudgetInterruption(budget_error, completed)
-        return self._ordered_outcomes(completed)
+        return ordered_outcomes(completed)
 
     async def _execute_serial(
         self,
@@ -124,7 +130,7 @@ class ReviewExecutor:
             except BudgetExceededError as exc:
                 raise _ReviewBudgetInterruption(exc, completed) from exc
             completed.append((index, outcome))
-        return self._ordered_outcomes(completed)
+        return ordered_outcomes(completed)
 
     def aggregate(
         self,
@@ -137,12 +143,13 @@ class ReviewExecutor:
         execution_failures = [
             outcome for outcome in outcomes if isinstance(outcome, ReviewExecutionFailure)
         ]
-        counts = self._count_severity(results)
-        overall_status = self._resolve_overall_status(
+        counts = count_severity(results)
+        overall_status = resolve_overall_status(
             results,
             execution_failures,
             pass_rule,
             counts["critical"],
+            error_factory=ReviewExecutorError,
         )
         return AggregatedReviewResult(
             overall_status=overall_status,
@@ -162,29 +169,7 @@ class ReviewExecutor:
     ) -> AggregatedReviewResult | None:
         if not indexed_outcomes:
             return None
-        return self.aggregate(self._ordered_outcomes(indexed_outcomes), pass_rule)
-
-    async def _drain_pending_reviews(
-        self,
-        pending: dict[asyncio.Task[ReviewOutcome], int],
-    ) -> list[IndexedReviewOutcome]:
-        tasks = list(pending.items())
-        if not tasks:
-            return []
-        for task, _ in tasks:
-            task.cancel()
-        drained = await asyncio.gather(*(task for task, _ in tasks), return_exceptions=True)
-        outcomes: list[IndexedReviewOutcome] = []
-        for item, (_, index) in zip(drained, tasks, strict=True):
-            if isinstance(item, ReviewResult) or isinstance(item, ReviewExecutionFailure):
-                outcomes.append((index, item))
-        return outcomes
-
-    def _ordered_outcomes(
-        self,
-        indexed_outcomes: Sequence[IndexedReviewOutcome],
-    ) -> list[ReviewOutcome]:
-        return [outcome for _, outcome in sorted(indexed_outcomes, key=lambda item: item[0])]
+        return self.aggregate(ordered_outcomes(indexed_outcomes), pass_rule)
 
     def _resolve_reviewers(self, reviewers: Sequence[str | AgentConfig]) -> list[AgentConfig]:
         if not reviewers:
@@ -209,16 +194,21 @@ class ReviewExecutor:
                 self.review_runner(content, reviewer),
                 timeout=self.timeout_seconds,
             )
-            return self._normalize_result(raw_result, reviewer, started_at)
+            return normalize_review_result(
+                raw_result,
+                reviewer,
+                started_at,
+                error_factory=ReviewExecutorError,
+            )
         except TimeoutError:
-            return self._build_execution_failure(
+            return build_execution_failure(
                 reviewer,
                 started_at,
                 "timeout",
                 "Reviewer timed out",
             )
         except ReviewExecutorError as exc:
-            return self._build_execution_failure(
+            return build_execution_failure(
                 reviewer,
                 started_at,
                 "invalid_result",
@@ -227,72 +217,9 @@ class ReviewExecutor:
         except BudgetExceededError:
             raise
         except Exception as exc:
-            return self._build_execution_failure(
+            return build_execution_failure(
                 reviewer,
                 started_at,
                 "execution_error",
                 f"Reviewer failed: {exc}",
             )
-
-    def _normalize_result(
-        self,
-        raw_result: ReviewResult | dict[str, Any],
-        reviewer: AgentConfig,
-        started_at: float,
-    ) -> ReviewResult:
-        try:
-            result = ReviewResult.model_validate(raw_result)
-        except ValidationError as exc:
-            raise ReviewExecutorError(f"Invalid review result from {reviewer.id}: {exc}") from exc
-        if result.reviewer_id != reviewer.id:
-            raise ReviewExecutorError(f"Reviewer id mismatch: expected {reviewer.id}, got {result.reviewer_id}")
-        if result.reviewer_name != reviewer.name:
-            raise ReviewExecutorError(
-                f"Reviewer name mismatch: expected {reviewer.name}, got {result.reviewer_name}"
-            )
-        duration_ms = self._elapsed_ms(started_at)
-        return result.model_copy(update={"execution_time_ms": max(result.execution_time_ms, duration_ms)})
-
-    def _build_execution_failure(
-        self,
-        reviewer: AgentConfig,
-        started_at: float,
-        error_type: str,
-        message: str,
-    ) -> ReviewExecutionFailure:
-        return ReviewExecutionFailure(
-            reviewer_id=reviewer.id,
-            reviewer_name=reviewer.name,
-            error_type=error_type,
-            message=message,
-            execution_time_ms=self._elapsed_ms(started_at),
-        )
-
-    def _count_severity(self, results: Sequence[ReviewResult]) -> dict[str, int]:
-        counts = {"critical": 0, "major": 0, "minor": 0}
-        for result in results:
-            for issue in result.issues:
-                if issue.severity in counts:
-                    counts[issue.severity] += 1
-        return counts
-
-    def _resolve_overall_status(
-        self,
-        results: Sequence[ReviewResult],
-        execution_failures: Sequence[ReviewExecutionFailure],
-        pass_rule: str,
-        critical_count: int,
-    ) -> str:
-        if execution_failures:
-            return "failed"
-        if pass_rule == "all_pass":
-            return "passed" if all(result.status == "passed" for result in results) else "failed"
-        if pass_rule == "majority_pass":
-            passed_count = sum(1 for result in results if result.status == "passed")
-            return "passed" if passed_count > len(results) / 2 else "failed"
-        if pass_rule == "no_critical":
-            return "passed" if critical_count == 0 else "failed"
-        raise ReviewExecutorError(f"Unsupported pass rule: {pass_rule}")
-
-    def _elapsed_ms(self, started_at: float) -> int:
-        return int((perf_counter() - started_at) * 1000)

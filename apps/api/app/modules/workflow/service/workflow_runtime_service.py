@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.config_registry.schemas.config_schemas import NodeConfig, WorkflowConfig
 from app.modules.billing.service import BillingService
+from app.modules.config_registry.schemas.config_schemas import NodeConfig, WorkflowConfig
 from app.modules.content.service import ChapterContentService
+from app.modules.context.engine import ContextBuilder
 from app.modules.credential.service import CredentialService
 from app.modules.export.service import ExportService
 from app.modules.workflow.models import WorkflowExecution
@@ -15,17 +17,14 @@ from app.shared.runtime import SkillTemplateRenderer, ToolProvider
 from app.shared.runtime.errors import BudgetExceededError, ConfigurationError
 from app.shared.runtime.llm_tool_provider import LLM_GENERATE_TOOL
 
-from .snapshot_support import (
-    build_runtime_snapshot,
-    load_workflow_snapshot,
-    resolve_node_config,
-)
+from .snapshot_support import build_runtime_snapshot, load_workflow_snapshot, resolve_node_config
+from .workflow_runtime_chapter_candidate_mixin import WorkflowRuntimeChapterCandidateMixin
 from .workflow_runtime_execute_mixin import WorkflowRuntimeExecuteMixin
 from .workflow_runtime_export_mixin import WorkflowRuntimeExportMixin
+from .workflow_runtime_fix_mixin import WorkflowRuntimeFixMixin
 from .workflow_runtime_persistence_mixin import WorkflowRuntimePersistenceMixin
 from .workflow_runtime_prompt_mixin import WorkflowRuntimePromptMixin
 from .workflow_runtime_review_mixin import WorkflowRuntimeReviewMixin
-from .workflow_runtime_chapter_candidate_mixin import WorkflowRuntimeChapterCandidateMixin
 from .workflow_runtime_shared import NodeOutcome
 from .workflow_runtime_task_mixin import WorkflowRuntimeTaskMixin
 from .workflow_service import WorkflowService
@@ -37,6 +36,7 @@ class WorkflowRuntimeService(
     WorkflowRuntimeTaskMixin,
     WorkflowRuntimePromptMixin,
     WorkflowRuntimeReviewMixin,
+    WorkflowRuntimeFixMixin,
     WorkflowRuntimeExportMixin,
     WorkflowRuntimePersistenceMixin,
 ):
@@ -45,7 +45,7 @@ class WorkflowRuntimeService(
         workflow_service: WorkflowService,
         billing_service: BillingService,
         chapter_content_service: ChapterContentService,
-        context_builder,
+        context_builder: ContextBuilder,
         credential_service_factory: Callable[[], CredentialService],
         export_service: ExportService,
         template_renderer: SkillTemplateRenderer,
@@ -61,9 +61,9 @@ class WorkflowRuntimeService(
         self.tool_provider = tool_provider
         self._credential_service: CredentialService | None = None
 
-    def run(
+    async def run(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         *,
         owner_id: uuid.UUID,
@@ -71,14 +71,14 @@ class WorkflowRuntimeService(
         workflow_config = load_workflow_snapshot(workflow.workflow_snapshot or {})
         while workflow.status == "running":
             node = resolve_node_config(workflow_config, workflow.current_node_id)
-            outcome = self._execute_node(db, workflow, workflow_config, node, owner_id=owner_id)
+            outcome = await self._execute_node(db, workflow, workflow_config, node, owner_id=owner_id)
             if self._apply_outcome(db, workflow, node, outcome):
                 break
         return workflow
 
-    def _execute_node(
+    async def _execute_node(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         workflow_config: WorkflowConfig,
         node: NodeConfig,
@@ -86,16 +86,28 @@ class WorkflowRuntimeService(
         owner_id: uuid.UUID,
     ) -> NodeOutcome:
         if node.id == "chapter_split":
-            return self._execute_chapter_split(db, workflow, workflow_config, node, owner_id=owner_id)
+            return await self._execute_chapter_split(
+                db,
+                workflow,
+                workflow_config,
+                node,
+                owner_id=owner_id,
+            )
         if node.id == "chapter_gen":
-            return self._execute_chapter_gen(db, workflow, workflow_config, node, owner_id=owner_id)
+            return await self._execute_chapter_gen(
+                db,
+                workflow,
+                workflow_config,
+                node,
+                owner_id=owner_id,
+            )
         if node.node_type == "export":
-            return self._execute_export(db, workflow, node)
+            return await self._execute_export(db, workflow, node)
         raise ConfigurationError(f"Unsupported runtime node: {node.id}")
 
     def _apply_outcome(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         node: NodeConfig,
         outcome: NodeOutcome,
@@ -150,7 +162,7 @@ class WorkflowRuntimeService(
 
     async def _call_llm(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         workflow_config: WorkflowConfig,
         prompt_bundle: dict[str, Any],
@@ -161,7 +173,7 @@ class WorkflowRuntimeService(
     ) -> dict[str, Any]:
         model = prompt_bundle["model"]
         credential_service = self._resolve_credential_service()
-        credential = credential_service.resolve_active_credential(
+        credential = await credential_service.resolve_active_credential(
             db,
             provider=model.provider or "",
             user_id=owner_id,
@@ -180,7 +192,7 @@ class WorkflowRuntimeService(
                 "response_format": prompt_bundle["response_format"],
             },
         )
-        budget_result = self.billing_service.record_usage_and_check_budget(
+        budget_result = await self.billing_service.record_usage_and_check_budget(
             db,
             workflow_execution_id=workflow.id,
             project_id=workflow.project_id,
@@ -219,7 +231,7 @@ class WorkflowRuntimeService(
 
     def _record_budget_warnings(
         self,
-        db: Session,
+        db: AsyncSession,
         *,
         workflow_execution_id: uuid.UUID,
         node_execution_id: uuid.UUID | None,

@@ -7,7 +7,8 @@ import uuid
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.project.models import Project
 from app.modules.review.engine.contracts import ReviewIssue
@@ -72,15 +73,15 @@ class _ReviewAggregate:
 
 
 class ReviewQueryService:
-    def get_workflow_summary(
+    async def get_workflow_summary(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> WorkflowReviewSummaryDTO:
-        workflow = self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
-        actions = self._list_workflow_actions(db, workflow.id)
+        workflow = await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        actions = await self._list_workflow_actions(db, workflow.id)
         aggregate = _ReviewAggregate()
         grouped: dict[str, _ReviewAggregate] = {}
         for action in actions:
@@ -91,7 +92,7 @@ class ReviewQueryService:
             workflow_execution_id=workflow.id,
             project_id=workflow.project_id,
             workflow_status=workflow.status,
-            reviewed_node_count=self._count_reviewed_nodes(db, workflow.id),
+            reviewed_node_count=await self._count_reviewed_nodes(db, workflow.id),
             total_actions=len(actions),
             last_reviewed_at=self._last_reviewed_at(actions),
             statuses=aggregate.to_status_summary(),
@@ -99,9 +100,9 @@ class ReviewQueryService:
             review_types=self._build_review_type_summaries(grouped, actions),
         )
 
-    def list_workflow_review_actions(
+    async def list_workflow_review_actions(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
@@ -111,96 +112,91 @@ class ReviewQueryService:
         limit: int = 100,
     ) -> list[WorkflowReviewActionDTO]:
         if node_execution_id is None:
-            self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+            await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
         else:
-            self._require_owned_node_execution(
+            await self._require_owned_node_execution(
                 db,
                 workflow_id,
                 node_execution_id,
                 owner_id=owner_id,
             )
-        query = (
-            db.query(ReviewAction, NodeExecution)
+        statement = (
+            select(ReviewAction, NodeExecution)
             .join(NodeExecution, ReviewAction.node_execution_id == NodeExecution.id)
-            .filter(NodeExecution.workflow_execution_id == workflow_id)
+            .where(NodeExecution.workflow_execution_id == workflow_id)
         )
         if node_execution_id is not None:
-            query = query.filter(NodeExecution.id == node_execution_id)
+            statement = statement.where(NodeExecution.id == node_execution_id)
         if review_type is not None:
-            query = query.filter(ReviewAction.review_type == review_type)
+            statement = statement.where(ReviewAction.review_type == review_type)
         if status is not None:
-            query = query.filter(ReviewAction.status == status)
-        records = (
-            query.order_by(ReviewAction.created_at.desc(), ReviewAction.id.desc())
-            .limit(limit)
-            .all()
-        )
+            statement = statement.where(ReviewAction.status == status)
+        statement = statement.order_by(ReviewAction.created_at.desc(), ReviewAction.id.desc()).limit(limit)
+        records = (await db.execute(statement)).all()
         return [self._to_action_view(action, execution) for action, execution in records]
 
-    def _list_workflow_actions(
+    async def _list_workflow_actions(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
     ) -> list[ReviewAction]:
-        return (
-            db.query(ReviewAction)
+        statement = (
+            select(ReviewAction)
             .join(NodeExecution, ReviewAction.node_execution_id == NodeExecution.id)
-            .filter(NodeExecution.workflow_execution_id == workflow_id)
+            .where(NodeExecution.workflow_execution_id == workflow_id)
             .order_by(ReviewAction.created_at.asc(), ReviewAction.id.asc())
-            .all()
         )
+        return (await db.scalars(statement)).all()
 
-    def _count_reviewed_nodes(
+    async def _count_reviewed_nodes(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
     ) -> int:
-        return (
-            db.query(NodeExecution.node_id)
+        total = await db.scalar(
+            select(func.count(func.distinct(NodeExecution.node_id)))
+            .select_from(NodeExecution)
             .join(ReviewAction, ReviewAction.node_execution_id == NodeExecution.id)
-            .filter(NodeExecution.workflow_execution_id == workflow_id)
-            .distinct()
-            .count()
+            .where(NodeExecution.workflow_execution_id == workflow_id)
         )
+        return int(total or 0)
 
-    def _require_owned_workflow(
+    async def _require_owned_workflow(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> WorkflowExecution:
-        workflow = (
-            db.query(WorkflowExecution)
+        workflow = await db.scalar(
+            select(WorkflowExecution)
             .join(Project, WorkflowExecution.project_id == Project.id)
-            .filter(
+            .where(
                 WorkflowExecution.id == workflow_id,
                 Project.owner_id == owner_id,
             )
-            .one_or_none()
         )
         if workflow is None:
             raise NotFoundError(f"Workflow execution not found: {workflow_id}")
         return workflow
 
-    def _require_owned_node_execution(
+    async def _require_owned_node_execution(
         self,
-        db: Session,
+        db: AsyncSession,
         workflow_id: uuid.UUID,
         node_execution_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
     ) -> NodeExecution:
-        execution = (
-            db.query(NodeExecution)
+        execution = await db.scalar(
+            select(NodeExecution)
             .join(WorkflowExecution, NodeExecution.workflow_execution_id == WorkflowExecution.id)
             .join(Project, WorkflowExecution.project_id == Project.id)
-            .filter(
+            .where(
                 NodeExecution.id == node_execution_id,
                 WorkflowExecution.id == workflow_id,
                 Project.owner_id == owner_id,
             )
-            .one_or_none()
         )
         if execution is None:
             raise NotFoundError(f"Node execution not found: {node_execution_id}")

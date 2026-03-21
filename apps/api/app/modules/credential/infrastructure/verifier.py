@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Protocol
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+
+import httpx
 
 from app.shared.runtime.errors import BusinessRuleError
 
@@ -24,8 +24,8 @@ class CredentialVerificationResult:
     message: str
 
 
-class CredentialVerifier(Protocol):
-    def verify(
+class AsyncCredentialVerifier(Protocol):
+    async def verify(
         self,
         *,
         provider: str,
@@ -34,41 +34,31 @@ class CredentialVerifier(Protocol):
     ) -> CredentialVerificationResult: ...
 
 
-class HttpCredentialVerifier:
-    def verify(
+class AsyncHttpCredentialVerifier:
+    async def verify(
         self,
         *,
         provider: str,
         api_key: str,
         base_url: str | None,
     ) -> CredentialVerificationResult:
-        request = self._build_request(provider=provider, api_key=api_key, base_url=base_url)
-        try:
-            with urlopen(request, timeout=VERIFY_TIMEOUT_SECONDS) as response:
-                if response.status >= 400:
-                    raise BusinessRuleError(f"无法验证 {provider} 凭证")
-        except HTTPError as exc:
-            self._raise_http_error(provider, exc.code)
-        except URLError as exc:
-            raise BusinessRuleError(f"无法连接到 {provider}") from exc
-        return CredentialVerificationResult(
-            verified_at=datetime.now(timezone.utc),
-            message="Credential verified",
-        )
-
-    def _build_request(
-        self,
-        *,
-        provider: str,
-        api_key: str,
-        base_url: str | None,
-    ) -> Request:
         normalized_provider = provider.lower()
         if normalized_provider not in DEFAULT_VERIFY_URLS:
             raise BusinessRuleError(f"Unsupported credential provider: {provider}")
         url = _resolve_verify_url(normalized_provider, base_url)
         headers = _build_headers(normalized_provider, api_key)
-        return Request(url=url, headers=headers, method="GET")
+        try:
+            async with httpx.AsyncClient(timeout=VERIFY_TIMEOUT_SECONDS) as client:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            self._raise_http_error(provider, exc.response.status_code)
+        except httpx.RequestError as exc:
+            raise BusinessRuleError(f"无法连接到 {provider}") from exc
+        return CredentialVerificationResult(
+            verified_at=datetime.now(timezone.utc),
+            message="Credential verified",
+        )
 
     def _raise_http_error(self, provider: str, status_code: int) -> None:
         if status_code in {401, 403}:

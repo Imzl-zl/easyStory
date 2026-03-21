@@ -1,8 +1,11 @@
+import asyncio
+
 from app.modules.content.service import (
     StoryAssetSaveDTO,
     create_story_asset_service,
 )
 from app.shared.runtime.errors import BusinessRuleError
+from tests.unit.async_service_support import async_db
 
 from tests.unit.models.helpers import (
     create_chapter_task,
@@ -18,15 +21,17 @@ def test_save_outline_draft_creates_versioned_asset(db):
     project = create_project(db, project_setting=ready_project_setting())
     service = create_story_asset_service()
 
-    result = service.save_asset_draft(
-        db,
-        project.id,
-        "outline",
-        StoryAssetSaveDTO(
-            title="主线大纲",
-            content_text="第一幕：主角入宗。\n第二幕：查出真相。",
-            change_summary="初版大纲",
-        ),
+    result = asyncio.run(
+        service.save_asset_draft(
+            async_db(db),
+            project.id,
+            "outline",
+            StoryAssetSaveDTO(
+                title="主线大纲",
+                content_text="第一幕：主角入宗。\n第二幕：查出真相。",
+                change_summary="初版大纲",
+            ),
+        )
     )
 
     assert result.content_type == "outline"
@@ -38,18 +43,20 @@ def test_save_outline_draft_creates_versioned_asset(db):
 def test_get_asset_returns_current_outline_version(db):
     project = create_project(db, project_setting=ready_project_setting())
     service = create_story_asset_service()
-    service.save_asset_draft(
-        db,
-        project.id,
-        "outline",
-        StoryAssetSaveDTO(
-            title="主线大纲",
-            content_text="第一幕：主角入宗。",
-            change_summary="初版大纲",
-        ),
+    asyncio.run(
+        service.save_asset_draft(
+            async_db(db),
+            project.id,
+            "outline",
+            StoryAssetSaveDTO(
+                title="主线大纲",
+                content_text="第一幕：主角入宗。",
+                change_summary="初版大纲",
+            ),
+        )
     )
 
-    result = service.get_asset(db, project.id, "outline")
+    result = asyncio.run(service.get_asset(async_db(db), project.id, "outline"))
 
     assert result.title == "主线大纲"
     assert result.status == "draft"
@@ -61,11 +68,13 @@ def test_save_outline_requires_non_blocked_project_setting(db):
     service = create_story_asset_service()
 
     try:
-        service.save_asset_draft(
-            db,
-            project.id,
-            "outline",
-            StoryAssetSaveDTO(title="主线大纲", content_text="故事从这里开始"),
+        asyncio.run(
+            service.save_asset_draft(
+                async_db(db),
+                project.id,
+                "outline",
+                StoryAssetSaveDTO(title="主线大纲", content_text="故事从这里开始"),
+            )
         )
     except BusinessRuleError as exc:
         assert "项目设定未完成" in exc.message
@@ -76,19 +85,23 @@ def test_save_outline_requires_non_blocked_project_setting(db):
 def test_save_opening_plan_requires_approved_outline(db):
     project = create_project(db, project_setting=ready_project_setting())
     service = create_story_asset_service()
-    service.save_asset_draft(
-        db,
-        project.id,
-        "outline",
-        StoryAssetSaveDTO(title="主线大纲", content_text="大纲草稿"),
+    asyncio.run(
+        service.save_asset_draft(
+            async_db(db),
+            project.id,
+            "outline",
+            StoryAssetSaveDTO(title="主线大纲", content_text="大纲草稿"),
+        )
     )
 
     try:
-        service.save_asset_draft(
-            db,
-            project.id,
-            "opening_plan",
-            StoryAssetSaveDTO(title="开篇设计", content_text="前三章策略"),
+        asyncio.run(
+            service.save_asset_draft(
+                async_db(db),
+                project.id,
+                "opening_plan",
+                StoryAssetSaveDTO(title="开篇设计", content_text="前三章策略"),
+            )
         )
     except BusinessRuleError as exc:
         assert "outline 必须先确认" in exc.message
@@ -137,11 +150,13 @@ def test_outline_change_marks_opening_plan_and_early_chapters_stale(db):
         version_number=1,
     )
 
-    result = service.save_asset_draft(
-        db,
-        project.id,
-        "outline",
-        StoryAssetSaveDTO(title="大纲", content_text="新大纲"),
+    result = asyncio.run(
+        service.save_asset_draft(
+            async_db(db),
+            project.id,
+            "outline",
+            StoryAssetSaveDTO(title="大纲", content_text="新大纲"),
+        )
     )
 
     db.refresh(opening_plan)
@@ -193,11 +208,13 @@ def test_opening_plan_change_marks_chapter_tasks_stale(db):
         version_number=1,
     )
 
-    service.save_asset_draft(
-        db,
-        project.id,
-        "opening_plan",
-        StoryAssetSaveDTO(title="开篇设计", content_text="新的前三章策略"),
+    asyncio.run(
+        service.save_asset_draft(
+            async_db(db),
+            project.id,
+            "opening_plan",
+            StoryAssetSaveDTO(title="开篇设计", content_text="新的前三章策略"),
+        )
     )
 
     db.refresh(chapter_task)

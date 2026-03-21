@@ -3,167 +3,177 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.content.models import Content, ContentVersion
 from app.modules.project.service import ProjectService
 from app.modules.workflow.models import ChapterTask
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 
+from .chapter_store import require_approved_asset
 from .dto import AssetType, StoryAssetDTO, StoryAssetSaveDTO
 
 STALE_FROM_OUTLINE = frozenset({"opening_plan", "chapter"})
 STALE_FROM_OPENING_PLAN = frozenset({"chapter"})
+STALE_TRIGGER_ASSET_TYPES = frozenset({"outline", "opening_plan"})
 
 
 class StoryAssetService:
     def __init__(self, project_service: ProjectService) -> None:
         self.project_service = project_service
 
-    def get_asset(
+    async def get_asset(
         self,
-        db: Session,
+        db: AsyncSession,
         project_id: uuid.UUID,
         asset_type: AssetType,
         *,
         owner_id: uuid.UUID | None = None,
     ) -> StoryAssetDTO:
-        self.project_service.require_project(db, project_id, owner_id=owner_id)
-        content = self._require_asset(db, project_id, asset_type)
+        await self.project_service.require_project(db, project_id, owner_id=owner_id)
+        content = await self._require_asset(db, project_id, asset_type)
         return self._to_dto(content)
 
-    def save_asset_draft(
+    async def save_asset_draft(
         self,
-        db: Session,
+        db: AsyncSession,
         project_id: uuid.UUID,
         asset_type: AssetType,
         payload: StoryAssetSaveDTO,
         *,
         owner_id: uuid.UUID | None = None,
     ) -> StoryAssetDTO:
-        project = self.project_service.require_project(db, project_id, owner_id=owner_id)
+        project = await self.project_service.require_project(
+            db,
+            project_id,
+            owner_id=owner_id,
+            load_contents=True,
+        )
         self.project_service.ensure_setting_allows_preparation(project)
         if asset_type == "opening_plan":
-            self._require_approved_asset(db, project_id, "outline")
-        content = self._get_asset(db, project_id, asset_type)
+            await require_approved_asset(db, project_id, "outline")
+        content = await self._get_asset(db, project_id, asset_type)
         if content is None:
             content = Content(
                 project_id=project.id,
                 content_type=asset_type,
                 title=payload.title,
                 status="draft",
+                versions=[],
             )
             db.add(content)
-            db.flush()
+            await db.flush()
         self._append_new_version(content, payload)
-        self._mark_stale_dependencies(db, project, asset_type)
-        db.commit()
-        db.refresh(content)
+        await self._mark_stale_dependencies(db, project.id, project.contents, asset_type)
+        await db.commit()
         return self._to_dto(content)
 
-    def approve_asset(
+    async def approve_asset(
         self,
-        db: Session,
+        db: AsyncSession,
         project_id: uuid.UUID,
         asset_type: AssetType,
         *,
         owner_id: uuid.UUID | None = None,
     ) -> StoryAssetDTO:
-        project = self.project_service.require_project(db, project_id, owner_id=owner_id)
+        project = await self.project_service.require_project(db, project_id, owner_id=owner_id)
         self.project_service.ensure_setting_allows_preparation(project)
         if asset_type == "opening_plan":
-            self._require_approved_asset(db, project_id, "outline")
-        content = self._require_asset(db, project_id, asset_type)
-        current_version = self._current_version(content)
-        if current_version is None:
+            await require_approved_asset(db, project_id, "outline")
+        content = await self._require_asset(db, project_id, asset_type)
+        if self._current_version(content) is None:
             raise BusinessRuleError(f"{asset_type} 缺少当前版本，无法确认")
         content.status = "approved"
         db.add(content)
-        db.commit()
-        db.refresh(content)
+        await db.commit()
         return self._to_dto(content)
 
-    def _get_asset(
+    async def _get_asset(
         self,
-        db: Session,
+        db: AsyncSession,
         project_id: uuid.UUID,
         asset_type: AssetType,
     ) -> Content | None:
-        return (
-            db.query(Content)
-            .filter(
+        statement = (
+            select(Content)
+            .options(selectinload(Content.versions))
+            .where(
                 Content.project_id == project_id,
                 Content.content_type == asset_type,
             )
-            .one_or_none()
         )
+        return await db.scalar(statement)
 
-    def _require_asset(
+    async def _require_asset(
         self,
-        db: Session,
+        db: AsyncSession,
         project_id: uuid.UUID,
         asset_type: AssetType,
     ) -> Content:
-        content = self._get_asset(db, project_id, asset_type)
+        content = await self._get_asset(db, project_id, asset_type)
         if content is None:
             raise NotFoundError(f"{asset_type} not found for project {project_id}")
         return content
 
-    def _require_approved_asset(
+    async def _mark_stale_dependencies(
         self,
-        db: Session,
+        db: AsyncSession,
         project_id: uuid.UUID,
+        contents: list[Content],
         asset_type: AssetType,
-    ) -> Content:
-        content = self._get_asset(db, project_id, asset_type)
-        if content is None:
-            raise BusinessRuleError(f"{asset_type} 必须先确认后才能继续")
-        if content.status != "approved":
-            raise BusinessRuleError(f"{asset_type} 必须先确认后才能继续")
-        return content
+    ) -> None:
+        self._mark_downstream_stale(contents, asset_type)
+        if asset_type in STALE_TRIGGER_ASSET_TYPES:
+            await self._mark_chapter_tasks_stale(db, project_id)
 
     def _append_new_version(
         self,
         content: Content,
         payload: StoryAssetSaveDTO,
     ) -> None:
-        for version in content.versions:
-            if version.is_current:
-                version.is_current = False
-        version = ContentVersion(
-            content_id=content.id,
-            version_number=self._next_version_number(content),
-            content_text=payload.content_text,
-            created_by=payload.created_by,
-            change_source=payload.change_source,
-            change_summary=payload.change_summary,
-            is_current=True,
-            word_count=self._count_text_units(payload.content_text),
-        )
+        self._clear_current_version(content)
         content.title = payload.title
         content.status = "draft"
         content.last_edited_at = datetime.now(timezone.utc)
-        content.versions.append(version)
+        content.versions.append(
+            ContentVersion(
+                content_id=content.id,
+                version_number=self._next_version_number(content),
+                content_text=payload.content_text,
+                created_by=payload.created_by,
+                change_source=payload.change_source,
+                change_summary=payload.change_summary,
+                is_current=True,
+                word_count=self._count_text_units(payload.content_text),
+            )
+        )
 
-    def _mark_stale_dependencies(
+    def _clear_current_version(self, content: Content) -> None:
+        for version in content.versions:
+            if version.is_current:
+                version.is_current = False
+
+    def _mark_downstream_stale(
         self,
-        db: Session,
-        project,
+        contents: list[Content],
         asset_type: AssetType,
     ) -> None:
-        self._mark_downstream_stale(project, asset_type)
-        if asset_type in {"outline", "opening_plan"}:
-            self._mark_chapter_tasks_stale(db, project.id)
-
-    def _mark_downstream_stale(self, project, asset_type: AssetType) -> None:
-        for content in project.contents:
+        for content in contents:
             if content.status != "approved":
                 continue
             if self._should_mark_stale(content, asset_type):
                 content.status = "stale"
 
-    def _mark_chapter_tasks_stale(self, db: Session, project_id: uuid.UUID) -> None:
-        for task in db.query(ChapterTask).filter(ChapterTask.project_id == project_id).all():
+    async def _mark_chapter_tasks_stale(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+    ) -> None:
+        statement = select(ChapterTask).where(ChapterTask.project_id == project_id)
+        tasks = (await db.scalars(statement)).all()
+        for task in tasks:
             if task.status != "stale":
                 task.status = "stale"
 

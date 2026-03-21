@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { CredentialCenter } from "@/features/settings/components/credential-center";
 import { getErrorMessage } from "@/lib/api/client";
 import { createProject, deleteProject, listProjects, restoreProject } from "@/lib/api/projects";
+import { listTemplates } from "@/lib/api/templates";
 
 export function LobbyPage() {
   const queryClient = useQueryClient();
@@ -18,12 +19,30 @@ export function LobbyPage() {
   const [searchText, setSearchText] = useState("");
   const deferredSearchText = useDeferredValue(searchText);
   const [projectName, setProjectName] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const projectsQuery = useQuery({
     queryKey: ["projects", showRecycleBin],
     queryFn: () => listProjects(showRecycleBin),
   });
+  const templatesQuery = useQuery({
+    queryKey: ["templates"],
+    queryFn: listTemplates,
+  });
+
+  useEffect(() => {
+    const templates = templatesQuery.data ?? [];
+    if (templates.length === 0) {
+      return;
+    }
+    if (selectedTemplateId && templates.some((template) => template.id === selectedTemplateId)) {
+      return;
+    }
+    startTransition(() => {
+      setSelectedTemplateId(templates[0].id);
+    });
+  }, [selectedTemplateId, templatesQuery.data]);
 
   const filteredProjects = useMemo(() => {
     const keyword = deferredSearchText.trim().toLowerCase();
@@ -34,6 +53,12 @@ export function LobbyPage() {
       project.name.toLowerCase().includes(keyword),
     );
   }, [deferredSearchText, projectsQuery.data]);
+  const templateNameById = useMemo(
+    () => new Map((templatesQuery.data ?? []).map((template) => [template.id, template.name])),
+    [templatesQuery.data],
+  );
+  const selectedTemplate =
+    templatesQuery.data?.find((template) => template.id === selectedTemplateId) ?? null;
 
   const refreshProjects = () =>
     queryClient.invalidateQueries({
@@ -41,14 +66,27 @@ export function LobbyPage() {
     });
 
   const createMutation = useMutation({
-    mutationFn: () => createProject({ name: projectName }),
+    mutationFn: () =>
+      createProject({
+        name: projectName.trim(),
+        template_id: selectedTemplateId || null,
+      }),
     onSuccess: () => {
       setProjectName("");
+      if (templatesQuery.data?.length) {
+        setSelectedTemplateId(templatesQuery.data[0].id);
+      } else {
+        setSelectedTemplateId("");
+      }
       setFeedback("项目已创建。");
       refreshProjects();
     },
     onError: (error) => setFeedback(getErrorMessage(error)),
   });
+  const canSubmit =
+    projectName.trim().length > 0 &&
+    !createMutation.isPending &&
+    (templatesQuery.data?.length ? Boolean(selectedTemplateId) : true);
 
   const actionMutation = useMutation({
     mutationFn: async ({
@@ -118,6 +156,55 @@ export function LobbyPage() {
             </label>
 
             <label className="block">
+              <span className="label-text">创作模板</span>
+              <select
+                className="ink-input"
+                disabled={templatesQuery.isLoading || templatesQuery.data?.length === 0}
+                value={selectedTemplateId}
+                onChange={(event) => setSelectedTemplateId(event.target.value)}
+              >
+                {templatesQuery.isLoading ? (
+                  <option value="">模板加载中...</option>
+                ) : null}
+                {!templatesQuery.isLoading && (templatesQuery.data?.length ?? 0) === 0 ? (
+                  <option value="">当前无可用模板，将创建基础项目</option>
+                ) : null}
+                {(templatesQuery.data ?? []).map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                    {template.genre ? ` · ${template.genre}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {selectedTemplate ? (
+              <div className="rounded-3xl border border-[rgba(19,19,18,0.08)] bg-[rgba(255,255,255,0.54)] px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="font-serif text-base font-semibold">{selectedTemplate.name}</p>
+                    <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                      {selectedTemplate.description ?? "当前模板未提供额外说明。"}
+                    </p>
+                  </div>
+                  <span className="text-xs uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                    {selectedTemplate.genre ?? "通用"}
+                  </span>
+                </div>
+                <dl className="mt-4 grid gap-2 text-sm text-[var(--text-secondary)]">
+                  <div className="flex justify-between gap-4">
+                    <dt>默认工作流</dt>
+                    <dd>{selectedTemplate.workflow_id ?? "未配置"}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt>节点数量</dt>
+                    <dd>{selectedTemplate.node_count}</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
+
+            <label className="block">
               <span className="label-text">快速搜索</span>
               <input
                 className="ink-input"
@@ -127,13 +214,19 @@ export function LobbyPage() {
               />
             </label>
 
+            {templatesQuery.error ? (
+              <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+                {getErrorMessage(templatesQuery.error)}
+              </div>
+            ) : null}
+
             {feedback ? (
               <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
                 {feedback}
               </div>
             ) : null}
 
-            <button className="ink-button w-full" disabled={createMutation.isPending} type="submit">
+            <button className="ink-button w-full" disabled={!canSubmit} type="submit">
               {createMutation.isPending ? "创建中..." : "创建项目"}
             </button>
           </form>
@@ -184,6 +277,14 @@ export function LobbyPage() {
                       <div className="flex justify-between gap-4">
                         <dt>系统凭证池</dt>
                         <dd>{project.allow_system_credential_pool ? "开启" : "关闭"}</dd>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <dt>模板</dt>
+                        <dd>
+                          {project.template_id
+                            ? (templateNameById.get(project.template_id) ?? "模板未同步")
+                            : "基础项目"}
+                        </dd>
                       </div>
                       <div className="flex justify-between gap-4">
                         <dt>更新时间</dt>

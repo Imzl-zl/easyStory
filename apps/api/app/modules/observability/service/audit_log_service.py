@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.observability.models import AuditLog
 
@@ -13,7 +13,7 @@ AUDIT_ENTITY_PROJECT = "project"
 class AuditLogService:
     def record(
         self,
-        db: Session,
+        db: AsyncSession,
         *,
         actor_user_id: uuid.UUID | None,
         event_type: str,

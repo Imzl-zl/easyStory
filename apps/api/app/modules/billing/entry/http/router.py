@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.billing.service import (
     BillingQueryService,
@@ -14,12 +14,12 @@ from app.modules.billing.service import (
 from app.modules.billing.service.dto import UsageType
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
-from app.shared.db import get_db_session
+from app.shared.db import get_async_db_session
 
 router = APIRouter(tags=["billing"])
 
 
-def get_billing_query_service() -> BillingQueryService:
+async def get_billing_query_service() -> BillingQueryService:
     return create_billing_query_service()
 
 
@@ -27,13 +27,13 @@ def get_billing_query_service() -> BillingQueryService:
     "/api/v1/workflows/{workflow_id}/billing/summary",
     response_model=WorkflowBillingSummaryDTO,
 )
-def get_workflow_billing_summary(
+async def get_workflow_billing_summary(
     workflow_id: uuid.UUID,
     billing_query_service: BillingQueryService = Depends(get_billing_query_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> WorkflowBillingSummaryDTO:
-    return billing_query_service.get_workflow_summary(
+    return await billing_query_service.get_workflow_summary(
         db,
         workflow_id,
         owner_id=current_user.id,
@@ -44,15 +44,15 @@ def get_workflow_billing_summary(
     "/api/v1/workflows/{workflow_id}/billing/token-usages",
     response_model=list[TokenUsageViewDTO],
 )
-def list_workflow_token_usages(
+async def list_workflow_token_usages(
     workflow_id: uuid.UUID,
     usage_type: UsageType | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=200),
     billing_query_service: BillingQueryService = Depends(get_billing_query_service),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_async_db_session),
 ) -> list[TokenUsageViewDTO]:
-    return billing_query_service.list_workflow_token_usages(
+    return await billing_query_service.list_workflow_token_usages(
         db,
         workflow_id,
         owner_id=current_user.id,

@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.main import create_app
-from app.modules import model_registry as _model_registry  # noqa: F401
 from app.modules.content.models import Content, ContentVersion
 from app.modules.user.service import TokenService
 from app.modules.workflow.models import WorkflowExecution
-from app.shared.db import Base
+from tests.unit.async_api_support import (
+    build_sqlite_session_factories,
+    cleanup_sqlite_session_factories,
+    started_async_client,
+)
 from tests.unit.models.helpers import (
     create_chapter_task,
     create_project,
@@ -52,38 +52,46 @@ DEFAULT_WORKFLOW_SNAPSHOT = {
 }
 
 
-def test_regenerate_chapter_tasks_replaces_active_workflow_plan(monkeypatch) -> None:
+async def test_regenerate_chapter_tasks_replaces_active_workflow_plan(
+    monkeypatch,
+    tmp_path,
+) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="chapter-task-api-regenerate")
+    )
     project_id, owner_id, workflow_id = _seed_project_with_active_workflow(
         session_factory,
         ready_assets=True,
     )
-    client = TestClient(create_app(session_factory=session_factory))
+    app = create_app(
+        async_session_factory=async_session_factory,
+    )
 
     try:
-        response = client.post(
-            f"/api/v1/projects/{project_id}/chapter-tasks/regenerate",
-            json={
-                "chapters": [
-                    {
-                        "chapter_number": 1,
-                        "title": "第一章 逃亡夜",
-                        "brief": "主角连夜出逃并暴露追兵",
-                        "key_characters": ["林渊", "执法长老"],
-                        "key_events": ["夜逃", "追捕"],
-                    },
-                    {
-                        "chapter_number": 2,
-                        "title": "第二章 山门截杀",
-                        "brief": "主角在山门外首次反杀",
-                        "key_characters": ["林渊"],
-                        "key_events": ["伏击", "反杀"],
-                    },
-                ]
-            },
-            headers=_auth_headers(owner_id),
-        )
+        async with started_async_client(app) as client:
+            response = await client.post(
+                f"/api/v1/projects/{project_id}/chapter-tasks/regenerate",
+                json={
+                    "chapters": [
+                        {
+                            "chapter_number": 1,
+                            "title": "第一章 逃亡夜",
+                            "brief": "主角连夜出逃并暴露追兵",
+                            "key_characters": ["林渊", "执法长老"],
+                            "key_events": ["夜逃", "追捕"],
+                        },
+                        {
+                            "chapter_number": 2,
+                            "title": "第二章 山门截杀",
+                            "brief": "主角在山门外首次反杀",
+                            "key_characters": ["林渊"],
+                            "key_events": ["伏击", "反杀"],
+                        },
+                    ]
+                },
+                headers=_auth_headers(owner_id),
+            )
 
         assert response.status_code == 200
         body = response.json()
@@ -96,77 +104,89 @@ def test_regenerate_chapter_tasks_replaces_active_workflow_plan(monkeypatch) -> 
             assert workflow is not None
             assert workflow.current_node_id == "chapter_gen"
     finally:
-        client.close()
-        Base.metadata.drop_all(engine)
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_regenerate_chapter_tasks_requires_ready_assets(monkeypatch) -> None:
+async def test_regenerate_chapter_tasks_requires_ready_assets(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="chapter-task-api-assets")
+    )
     project_id, owner_id, _workflow_id = _seed_project_with_active_workflow(
         session_factory,
         ready_assets=False,
     )
-    client = TestClient(create_app(session_factory=session_factory))
+    app = create_app(
+        async_session_factory=async_session_factory,
+    )
 
     try:
-        response = client.post(
-            f"/api/v1/projects/{project_id}/chapter-tasks/regenerate",
-            json={
-                "chapters": [
-                    {
-                        "chapter_number": 1,
-                        "title": "第一章",
-                        "brief": "章节计划",
-                    }
-                ]
-            },
-            headers=_auth_headers(owner_id),
-        )
+        async with started_async_client(app) as client:
+            response = await client.post(
+                f"/api/v1/projects/{project_id}/chapter-tasks/regenerate",
+                json={
+                    "chapters": [
+                        {
+                            "chapter_number": 1,
+                            "title": "第一章",
+                            "brief": "章节计划",
+                        }
+                    ]
+                },
+                headers=_auth_headers(owner_id),
+            )
 
         assert response.status_code == 422
         assert "大纲必须先确认后才能重建章节计划" in response.json()["detail"]
     finally:
-        client.close()
-        Base.metadata.drop_all(engine)
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_list_chapter_tasks_returns_workflow_scoped_tasks(monkeypatch) -> None:
+async def test_list_chapter_tasks_returns_workflow_scoped_tasks(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="chapter-task-api-list")
+    )
     _project_id, owner_id, workflow_id = _seed_project_with_tasks(session_factory)
-    client = TestClient(create_app(session_factory=session_factory))
+    app = create_app(
+        async_session_factory=async_session_factory,
+    )
 
     try:
-        response = client.get(
-            f"/api/v1/workflows/{workflow_id}/chapter-tasks",
-            headers=_auth_headers(owner_id),
-        )
+        async with started_async_client(app) as client:
+            response = await client.get(
+                f"/api/v1/workflows/{workflow_id}/chapter-tasks",
+                headers=_auth_headers(owner_id),
+            )
 
         assert response.status_code == 200
         body = response.json()
         assert [item["chapter_number"] for item in body] == [1, 2]
         assert body[0]["title"] == "第一章"
     finally:
-        client.close()
-        Base.metadata.drop_all(engine)
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_update_chapter_task_allows_pending_task(monkeypatch) -> None:
+async def test_update_chapter_task_allows_pending_task(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="chapter-task-api-update")
+    )
     _project_id, owner_id, workflow_id = _seed_project_with_tasks(session_factory)
-    client = TestClient(create_app(session_factory=session_factory))
+    app = create_app(
+        async_session_factory=async_session_factory,
+    )
 
     try:
-        response = client.put(
-            f"/api/v1/workflows/{workflow_id}/chapter-tasks/2",
-            json={
-                "brief": "主角在山门外首次反杀并夺得线索",
-                "key_events": ["伏击", "反杀", "夺线索"],
-            },
-            headers=_auth_headers(owner_id),
-        )
+        async with started_async_client(app) as client:
+            response = await client.put(
+                f"/api/v1/workflows/{workflow_id}/chapter-tasks/2",
+                json={
+                    "brief": "主角在山门外首次反杀并夺得线索",
+                    "key_events": ["伏击", "反杀", "夺线索"],
+                },
+                headers=_auth_headers(owner_id),
+            )
 
         assert response.status_code == 200
         body = response.json()
@@ -174,42 +194,34 @@ def test_update_chapter_task_allows_pending_task(monkeypatch) -> None:
         assert body["brief"] == "主角在山门外首次反杀并夺得线索"
         assert body["key_events"] == ["伏击", "反杀", "夺线索"]
     finally:
-        client.close()
-        Base.metadata.drop_all(engine)
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_update_chapter_task_rejects_completed_task(monkeypatch) -> None:
+async def test_update_chapter_task_rejects_completed_task(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="chapter-task-api-completed")
+    )
     _project_id, owner_id, workflow_id = _seed_project_with_tasks(
         session_factory,
         completed_chapter=2,
     )
-    client = TestClient(create_app(session_factory=session_factory))
+    app = create_app(
+        async_session_factory=async_session_factory,
+    )
 
     try:
-        response = client.put(
-            f"/api/v1/workflows/{workflow_id}/chapter-tasks/2",
-            json={"brief": "不应允许修改"},
-            headers=_auth_headers(owner_id),
-        )
+        async with started_async_client(app) as client:
+            response = await client.put(
+                f"/api/v1/workflows/{workflow_id}/chapter-tasks/2",
+                json={"brief": "不应允许修改"},
+                headers=_auth_headers(owner_id),
+            )
 
         assert response.status_code == 422
         assert "不允许编辑" in response.json()["detail"]
     finally:
-        client.close()
-        Base.metadata.drop_all(engine)
-
-
-def _build_session_factory() -> tuple[sessionmaker[Session], object]:
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    session_factory = sessionmaker(engine, expire_on_commit=False, class_=Session)
-    return session_factory, engine
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
 def _seed_project_with_active_workflow(
@@ -290,6 +302,7 @@ def _create_asset(
             content_id=content.id,
             version_number=1,
             content_text=f"{title}内容",
+            is_current=True,
         )
     )
     session.commit()

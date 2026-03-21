@@ -5,8 +5,8 @@ from typing import Callable
 
 from app.shared.runtime import ModelPricing
 
-from .billing_service import BillingService
 from .billing_query_service import BillingQueryService
+from .billing_service import BillingService
 
 
 def create_billing_service(

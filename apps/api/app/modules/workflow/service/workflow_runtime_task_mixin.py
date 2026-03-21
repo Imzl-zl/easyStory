@@ -1,16 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
 from app.shared.runtime.errors import BusinessRuleError
 
-from .workflow_runtime_shared import (
-    ChapterSplitPayload,
-)
+from .workflow_runtime_shared import ChapterSplitPayload
 from .workflow_task_runtime_support import ensure_task_can_continue, find_next_actionable_task
 
 
@@ -44,11 +44,16 @@ class WorkflowRuntimeTaskMixin:
         except json.JSONDecodeError as exc:
             raise BusinessRuleError("LLM 输出不是合法 JSON") from exc
 
-    def _replace_chapter_tasks(self, db: Session, workflow: WorkflowExecution, chapters) -> None:
-        db.query(ChapterTask).filter(ChapterTask.workflow_execution_id == workflow.id).delete(
-            synchronize_session=False
+    async def _replace_chapter_tasks(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        chapters,
+    ) -> None:
+        await db.execute(
+            delete(ChapterTask).where(ChapterTask.workflow_execution_id == workflow.id)
         )
-        db.flush()
+        await db.flush()
         for chapter in chapters:
             db.add(
                 ChapterTask(
@@ -63,16 +68,22 @@ class WorkflowRuntimeTaskMixin:
                 )
             )
 
-    def _next_actionable_task(self, db: Session, workflow: WorkflowExecution) -> ChapterTask | None:
-        return find_next_actionable_task(db, workflow.id)
+    async def _next_actionable_task(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+    ) -> ChapterTask | None:
+        return await find_next_actionable_task(db, workflow.id)
 
-    def _ensure_task_can_continue(self, db: Session, task: ChapterTask) -> None:
-        ensure_task_can_continue(db, task)
+    async def _ensure_task_can_continue(
+        self,
+        db: AsyncSession,
+        task: ChapterTask,
+    ) -> None:
+        await ensure_task_can_continue(db, task)
 
     def _hash_payload(self, payload: dict[str, Any]) -> str:
         raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
-        import hashlib
-
         return hashlib.sha256(raw).hexdigest()
 
     def _stringify_value(self, value: Any) -> str:

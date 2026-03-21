@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
 
 from .workflow_runtime_shared import ReviewCycleOutcome
 
 
 class WorkflowRuntimeChapterCandidateMixin:
-    def _persist_chapter_candidate(
+    async def _persist_chapter_candidate(
         self,
-        db,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         task: ChapterTask,
         context_snapshot_hash: str,
@@ -18,7 +20,7 @@ class WorkflowRuntimeChapterCandidateMixin:
     ) -> tuple[uuid.UUID | None, uuid.UUID | None, int | None]:
         if review_outcome.resolution == "skip":
             return None, None, None
-        content, version = self._save_review_candidate(
+        content, version = await self._save_review_candidate(
             db,
             workflow.project_id,
             task.chapter_number,
@@ -29,9 +31,9 @@ class WorkflowRuntimeChapterCandidateMixin:
         task.content_id = content.id
         return content.id, version.id, version.word_count
 
-    def _save_review_candidate(
+    async def _save_review_candidate(
         self,
-        db,
+        db: AsyncSession,
         project_id,
         chapter_number: int,
         title: str,
@@ -39,7 +41,7 @@ class WorkflowRuntimeChapterCandidateMixin:
         context_snapshot_hash: str,
     ):
         if review_outcome.content_source == "generated":
-            return self.chapter_content_service.save_generated_draft(
+            return await self.chapter_content_service.save_generated_draft(
                 db,
                 project_id,
                 chapter_number,
@@ -47,7 +49,7 @@ class WorkflowRuntimeChapterCandidateMixin:
                 content_text=review_outcome.final_content,
                 context_snapshot_hash=context_snapshot_hash,
             )
-        return self.chapter_content_service.save_auto_fix_draft(
+        return await self.chapter_content_service.save_auto_fix_draft(
             db,
             project_id,
             chapter_number,

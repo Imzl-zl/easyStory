@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import bcrypt
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.user.models import User
 from app.shared.runtime.errors import BusinessRuleError, ConflictError, UnauthorizedError
@@ -17,8 +18,8 @@ class AuthService:
     def __init__(self, token_service: TokenService) -> None:
         self.token_service = token_service
 
-    def register(self, db: Session, payload: AuthRegisterDTO) -> AuthTokenDTO:
-        self._ensure_username_available(db, payload.username)
+    async def register(self, db: AsyncSession, payload: AuthRegisterDTO) -> AuthTokenDTO:
+        await self._ensure_username_available(db, payload.username)
         _ensure_password_bytes_limit(payload.password)
         user = User(
             username=payload.username,
@@ -27,33 +28,37 @@ class AuthService:
         )
         db.add(user)
         try:
-            db.commit()
+            await db.commit()
         except IntegrityError as exc:
-            db.rollback()
+            await db.rollback()
             raise ConflictError(f"Username already exists: {payload.username}") from exc
-        db.refresh(user)
+        await db.refresh(user)
         return self._build_auth_token(user)
 
-    def login(self, db: Session, payload: AuthLoginDTO) -> AuthTokenDTO:
-        user = self._require_active_user_by_username(db, payload.username)
+    async def login(self, db: AsyncSession, payload: AuthLoginDTO) -> AuthTokenDTO:
+        user = await self._require_active_user_by_username(db, payload.username)
         if not _verify_password(payload.password, user.hashed_password):
             raise UnauthorizedError("Invalid username or password")
         return self._build_auth_token(user)
 
-    def authenticate(self, db: Session, token: str) -> User:
+    async def authenticate(self, db: AsyncSession, token: str) -> User:
         user_id = self.token_service.read_user_id(token)
-        user = db.query(User).filter(User.id == user_id).one_or_none()
+        user = await db.scalar(select(User).where(User.id == user_id))
         if user is None or not user.is_active:
             raise UnauthorizedError("Invalid authentication credentials")
         return user
 
-    def _ensure_username_available(self, db: Session, username: str) -> None:
-        exists = db.query(User.id).filter(User.username == username).one_or_none()
+    async def _ensure_username_available(self, db: AsyncSession, username: str) -> None:
+        exists = await db.scalar(select(User.id).where(User.username == username))
         if exists is not None:
             raise ConflictError(f"Username already exists: {username}")
 
-    def _require_active_user_by_username(self, db: Session, username: str) -> User:
-        user = db.query(User).filter(User.username == username).one_or_none()
+    async def _require_active_user_by_username(
+        self,
+        db: AsyncSession,
+        username: str,
+    ) -> User:
+        user = await db.scalar(select(User).where(User.username == username))
         if user is None or not user.is_active:
             raise UnauthorizedError("Invalid username or password")
         return user

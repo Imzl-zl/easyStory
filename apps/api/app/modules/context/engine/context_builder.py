@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Collection
+from dataclasses import replace
 from fnmatch import fnmatchcase
-from typing import Any, Collection
+from typing import Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.config_registry.schemas.config_schemas import (
     ContextInjectionItem,
@@ -59,11 +61,11 @@ class ContextBuilder:
             merged[item.inject_type] = item
         return list(merged.values())
 
-    def build_context(
+    async def build_context(
         self,
         project_id,
         injection_rules: list[ContextInjectionItem],
-        db: Session,
+        db: AsyncSession,
         *,
         chapter_number: int | None = None,
         workflow_execution_id=None,
@@ -71,7 +73,7 @@ class ContextBuilder:
         budget_limit: int | None = None,
         referenced_variables: Collection[str] | None = None,
     ) -> tuple[dict[str, str], dict[str, Any]]:
-        sections = self._build_sections(
+        sections = await self._build_sections(
             project_id,
             injection_rules,
             db,
@@ -100,33 +102,35 @@ class ContextBuilder:
     def ensure_model_window(self, model: str, sections: list[ContextSection]) -> None:
         self.truncator.ensure_model_window(model, sections)
 
-    def _build_sections(
+    async def _build_sections(
         self,
         project_id,
         injection_rules: list[ContextInjectionItem],
-        db: Session,
+        db: AsyncSession,
         *,
         chapter_number: int | None,
         workflow_execution_id,
         model: str,
     ) -> list[ContextSection]:
-        return [
-            self._build_section(
-                project_id,
-                rule,
-                db,
-                chapter_number=chapter_number,
-                workflow_execution_id=workflow_execution_id,
-                model=model,
+        sections: list[ContextSection] = []
+        for rule in injection_rules:
+            sections.append(
+                await self._build_section(
+                    project_id,
+                    rule,
+                    db,
+                    chapter_number=chapter_number,
+                    workflow_execution_id=workflow_execution_id,
+                    model=model,
+                )
             )
-            for rule in injection_rules
-        ]
+        return sections
 
-    def _build_section(
+    async def _build_section(
         self,
         project_id,
         rule: ContextInjectionItem,
-        db: Session,
+        db: AsyncSession,
         *,
         chapter_number: int | None,
         workflow_execution_id,
@@ -134,7 +138,7 @@ class ContextBuilder:
     ) -> ContextSection:
         if rule.inject_type not in VARIABLE_NAMES:
             raise ContextBuilderError(f"Unsupported inject type: {rule.inject_type}")
-        content, status, metadata = self.source_loader.load_content(
+        content, status, metadata = await self.source_loader.load_content(
             project_id,
             rule.inject_type,
             db,
@@ -184,17 +188,25 @@ class ContextBuilder:
         referenced_variables: Collection[str],
     ) -> list[ContextSection]:
         referenced = set(referenced_variables)
-        for section in sections:
-            if section.status in {"missing", "not_applicable", "dropped"}:
-                continue
-            if section.variable_name in referenced:
-                continue
-            if section.token_count > 0:
-                section.original_tokens = section.original_tokens or section.token_count
-            section.content = ""
-            section.token_count = 0
-            section.status = "unused"
-        return sections
+        return [
+            section
+            if section.status in {"missing", "not_applicable", "dropped"}
+            or section.variable_name in referenced
+            else self._build_unused_section(section)
+            for section in sections
+        ]
+
+    def _build_unused_section(self, section: ContextSection) -> ContextSection:
+        original_tokens = section.original_tokens
+        if section.token_count > 0:
+            original_tokens = original_tokens or section.token_count
+        return replace(
+            section,
+            content="",
+            token_count=0,
+            status="unused",
+            original_tokens=original_tokens,
+        )
 
     def _total_tokens(self, sections: list[ContextSection]) -> int:
         return self.truncator.total_tokens(sections)

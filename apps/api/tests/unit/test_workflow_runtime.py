@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 import uuid
@@ -26,8 +27,9 @@ from app.modules.workflow.service import WorkflowRuntimeService, WorkflowService
 from app.modules.workflow.service.snapshot_support import (
     dump_config, freeze_agents, freeze_skills, freeze_workflow, resolve_start_node_id,
 )
-from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime import SkillTemplateRenderer, ToolProvider
+from app.shared.runtime.errors import ConfigurationError
+from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, create_template, create_user, ready_project_setting
 
 CONFIG_ROOT = Path(__file__).resolve().parents[4] / "config"
@@ -46,7 +48,7 @@ class RuntimeHarness:
 def test_runtime_chapter_split_persists_tasks_artifact_and_prompt_replay(db) -> None:
     harness = _build_runtime_harness(db)
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         chapter_tasks = _list_chapter_tasks(db, harness.workflow.id)
@@ -74,7 +76,7 @@ def test_runtime_chapter_split_persists_tasks_artifact_and_prompt_replay(db) -> 
 def test_runtime_manual_flow_generates_reviewed_chapters_and_exports(db) -> None:
     harness = _build_runtime_harness(db)
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
@@ -93,7 +95,7 @@ def test_runtime_manual_flow_generates_reviewed_chapters_and_exports(db) -> None
         ]
         assert [item.status for item in db.query(ReviewAction).all()] == ["passed"]
 
-        harness.chapter_content_service.approve_chapter(db, harness.project_id, 1)
+        asyncio.run(harness.chapter_content_service.approve_chapter(async_db(db), harness.project_id, 1))
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
         chapter_two = _require_chapter(db, harness.project_id, 2)
@@ -109,7 +111,7 @@ def test_runtime_manual_flow_generates_reviewed_chapters_and_exports(db) -> None
             "passed",
         ]
 
-        harness.chapter_content_service.approve_chapter(db, harness.project_id, 2)
+        asyncio.run(harness.chapter_content_service.approve_chapter(async_db(db), harness.project_id, 2))
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
         exports = db.query(Export).order_by(Export.format.asc()).all()
@@ -141,14 +143,14 @@ def test_runtime_manual_flow_generates_reviewed_chapters_and_exports(db) -> None
 def test_runtime_records_token_usage_for_generate_and_review_calls(db) -> None:
     harness = _build_runtime_harness(db)
     try:
-        harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+        asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
         db.commit()
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
-        harness.chapter_content_service.approve_chapter(db, harness.project_id, 1)
+        asyncio.run(harness.chapter_content_service.approve_chapter(async_db(db), harness.project_id, 1))
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
-        harness.chapter_content_service.approve_chapter(db, harness.project_id, 2)
+        asyncio.run(harness.chapter_content_service.approve_chapter(async_db(db), harness.project_id, 2))
         db.refresh(harness.workflow)
         _resume_and_run(db, harness)
 
@@ -178,7 +180,7 @@ def test_runtime_chapter_split_budget_skip_raises_explicit_error(db) -> None:
             ConfigurationError,
             match="chapter_split does not support budget.on_exceed=skip",
         ):
-            harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+            asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
 
         assert _list_chapter_tasks(db, harness.workflow.id) == []
         assert [item.status for item in _list_node_executions(db, harness.workflow.id)] == ["failed"]
@@ -228,7 +230,7 @@ def _build_runtime_harness(db: Session) -> RuntimeHarness:
     db.commit()
     db.refresh(workflow)
     return RuntimeHarness(
-        chapter_content_service=runtime_service.chapter_content_service,
+        chapter_content_service=create_chapter_content_service(),
         export_root=export_root,
         owner_id=owner.id,
         project_id=project.id,
@@ -311,7 +313,7 @@ def _list_token_usages(db: Session, project_id: uuid.UUID) -> list[TokenUsage]:
 
 def _resume_and_run(db: Session, harness: RuntimeHarness) -> None:
     harness.workflow_service.resume(harness.workflow)
-    harness.runtime_service.run(db, harness.workflow, owner_id=harness.owner_id)
+    asyncio.run(harness.runtime_service.run(async_db(db), harness.workflow, owner_id=harness.owner_id))
     db.commit()
     db.refresh(harness.workflow)
 
@@ -325,7 +327,7 @@ class _FakeCredentialService:
     def __init__(self) -> None:
         self.crypto = _FakeCrypto()
 
-    def resolve_active_credential(
+    async def resolve_active_credential(
         self,
         db: Session,
         *,
@@ -353,7 +355,7 @@ class _FakeCredentialService:
                 is_active=True,
             )
             db.add(credential)
-            db.flush()
+            await db.flush()
         return credential
 
 

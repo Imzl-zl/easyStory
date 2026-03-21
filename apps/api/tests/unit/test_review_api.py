@@ -2,23 +2,28 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from app.main import create_app
 from app.modules.review.models import ReviewAction
 from app.modules.workflow.models import NodeExecution
-from tests.unit.models.helpers import create_project, create_user, create_workflow
-from tests.unit.test_workflow_api import (
-    TEST_JWT_SECRET,
-    _auth_headers,
-    _build_runtime_client,
-    _build_session_factory,
+from tests.unit.async_api_support import (
+    build_sqlite_session_factories,
+    cleanup_sqlite_session_factories,
+    started_async_client,
 )
+from tests.unit.api_test_support import TEST_JWT_SECRET, auth_headers as _auth_headers
+from tests.unit.models.helpers import create_project, create_user, create_workflow
 
 
-def test_review_api_returns_workflow_summary_and_actions(monkeypatch) -> None:
+async def test_review_api_returns_workflow_summary_and_actions(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
-    client = _build_runtime_client(session_factory)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="review-api-summary")
+    )
 
     try:
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
         with session_factory() as session:
             owner = create_user(session)
             project = create_project(session, owner=owner)
@@ -55,29 +60,31 @@ def test_review_api_returns_workflow_summary_and_actions(monkeypatch) -> None:
             owner_id = owner.id
             node_execution_id = chapter_execution.id
 
-        headers = _auth_headers(owner_id)
-        summary_response = client.get(
-            f"/api/v1/workflows/{workflow_id}/reviews/summary",
-            headers=headers,
-        )
-        assert summary_response.status_code == 200
-        summary = summary_response.json()
-        assert summary["workflow_execution_id"] == str(workflow_id)
-        assert summary["reviewed_node_count"] == 1
-        assert summary["statuses"] == {"passed": 1, "failed": 1, "warning": 0}
-        assert summary["issues"] == {
-            "total": 1,
-            "critical": 1,
-            "major": 0,
-            "minor": 0,
-            "suggestion": 0,
-        }
+        async with started_async_client(app) as client:
+            headers = _auth_headers(owner_id)
+            summary_response = await client.get(
+                f"/api/v1/workflows/{workflow_id}/reviews/summary",
+                headers=headers,
+            )
+            assert summary_response.status_code == 200
+            summary = summary_response.json()
+            assert summary["workflow_execution_id"] == str(workflow_id)
+            assert summary["reviewed_node_count"] == 1
+            assert summary["statuses"] == {"passed": 1, "failed": 1, "warning": 0}
+            assert summary["issues"] == {
+                "total": 1,
+                "critical": 1,
+                "major": 0,
+                "minor": 0,
+                "suggestion": 0,
+            }
 
-        actions_response = client.get(
-            f"/api/v1/workflows/{workflow_id}/reviews/actions",
-            params={"node_execution_id": str(node_execution_id), "status": "failed"},
-            headers=headers,
-        )
+            actions_response = await client.get(
+                f"/api/v1/workflows/{workflow_id}/reviews/actions",
+                params={"node_execution_id": str(node_execution_id), "status": "failed"},
+                headers=headers,
+            )
+
         assert actions_response.status_code == 200
         actions = actions_response.json()
         assert len(actions) == 1
@@ -86,16 +93,19 @@ def test_review_api_returns_workflow_summary_and_actions(monkeypatch) -> None:
         assert actions[0]["issue_count"] == 1
         assert actions[0]["issues"][0]["severity"] == "critical"
     finally:
-        client.close()
-        engine.dispose()
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_review_api_hides_other_users_workflow(monkeypatch) -> None:
+async def test_review_api_hides_other_users_workflow(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
-    client = _build_runtime_client(session_factory)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="review-api-owner")
+    )
 
     try:
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
         with session_factory() as session:
             owner = create_user(session)
             project = create_project(session, owner=owner)
@@ -104,23 +114,31 @@ def test_review_api_hides_other_users_workflow(monkeypatch) -> None:
             workflow_id = workflow.id
             outsider_id = outsider.id
 
-        response = client.get(
-            f"/api/v1/workflows/{workflow_id}/reviews/summary",
-            headers=_auth_headers(outsider_id),
-        )
+        async with started_async_client(app) as client:
+            response = await client.get(
+                f"/api/v1/workflows/{workflow_id}/reviews/summary",
+                headers=_auth_headers(outsider_id),
+            )
+
         assert response.status_code == 404
         assert response.json()["code"] == "not_found"
     finally:
-        client.close()
-        engine.dispose()
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_review_api_rejects_node_execution_from_other_workflow(monkeypatch) -> None:
+async def test_review_api_rejects_node_execution_from_other_workflow(
+    monkeypatch,
+    tmp_path,
+) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
-    client = _build_runtime_client(session_factory)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="review-api-foreign-node")
+    )
 
     try:
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
         with session_factory() as session:
             owner = create_user(session)
             project = create_project(session, owner=owner)
@@ -136,24 +154,32 @@ def test_review_api_rejects_node_execution_from_other_workflow(monkeypatch) -> N
             workflow_id = workflow.id
             owner_id = owner.id
 
-        response = client.get(
-            f"/api/v1/workflows/{workflow_id}/reviews/actions",
-            params={"node_execution_id": str(foreign_execution.id)},
-            headers=_auth_headers(owner_id),
-        )
+        async with started_async_client(app) as client:
+            response = await client.get(
+                f"/api/v1/workflows/{workflow_id}/reviews/actions",
+                params={"node_execution_id": str(foreign_execution.id)},
+                headers=_auth_headers(owner_id),
+            )
+
         assert response.status_code == 404
         assert response.json()["code"] == "not_found"
     finally:
-        client.close()
-        engine.dispose()
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
-def test_review_api_returns_configuration_error_for_malformed_issues(monkeypatch) -> None:
+async def test_review_api_returns_configuration_error_for_malformed_issues(
+    monkeypatch,
+    tmp_path,
+) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    session_factory, engine = _build_session_factory()
-    client = _build_runtime_client(session_factory)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="review-api-bad-issues")
+    )
 
     try:
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
         with session_factory() as session:
             owner = create_user(session)
             project = create_project(session, owner=owner)
@@ -175,15 +201,16 @@ def test_review_api_returns_configuration_error_for_malformed_issues(monkeypatch
             workflow_id = workflow.id
             owner_id = owner.id
 
-        response = client.get(
-            f"/api/v1/workflows/{workflow_id}/reviews/summary",
-            headers=_auth_headers(owner_id),
-        )
+        async with started_async_client(app) as client:
+            response = await client.get(
+                f"/api/v1/workflows/{workflow_id}/reviews/summary",
+                headers=_auth_headers(owner_id),
+            )
+
         assert response.status_code == 500
         assert response.json()["code"] == "configuration_error"
     finally:
-        client.close()
-        engine.dispose()
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
 def _create_node_execution(

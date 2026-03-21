@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 import uuid
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.config_registry.schemas.config_schemas import (
     ContextInjectionItem,
     ModelConfig,
@@ -19,9 +21,9 @@ from .snapshot_support import load_skill_snapshot
 
 
 class WorkflowRuntimePromptMixin:
-    def _build_prompt_bundle(
+    async def _build_prompt_bundle(
         self,
-        db,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         workflow_config: WorkflowConfig,
         node: NodeConfig,
@@ -30,7 +32,7 @@ class WorkflowRuntimePromptMixin:
     ) -> dict[str, Any]:
         skill = load_skill_snapshot(workflow.skills_snapshot or {}, node.skill)
         model = self._resolve_model(workflow_config, node, skill)
-        prompt_variables, context_report = self._resolve_prompt_variables(
+        prompt_variables, context_report = await self._resolve_prompt_variables(
             db,
             workflow,
             workflow_config,
@@ -55,9 +57,9 @@ class WorkflowRuntimePromptMixin:
             },
         }
 
-    def _resolve_prompt_variables(
+    async def _resolve_prompt_variables(
         self,
-        db,
+        db: AsyncSession,
         workflow: WorkflowExecution,
         workflow_config: WorkflowConfig,
         node: NodeConfig,
@@ -69,7 +71,7 @@ class WorkflowRuntimePromptMixin:
         declared = skill.variables or skill.inputs
         rules = self._merge_rules(workflow_config, node, declared)
         referenced = self.template_renderer.referenced_variables(skill.prompt)
-        context_variables, context_report = self.context_builder.build_context(
+        context_variables, context_report = await self.context_builder.build_context(
             workflow.project_id,
             rules,
             db,
@@ -80,7 +82,7 @@ class WorkflowRuntimePromptMixin:
             referenced_variables=referenced,
         )
         prompt_variables = {
-            **self._project_setting_variables(db, workflow.project_id, declared),
+            **(await self._project_setting_variables(db, workflow.project_id, declared)),
             **context_variables,
         }
         missing = [
@@ -114,13 +116,13 @@ class WorkflowRuntimePromptMixin:
             )
         return merged
 
-    def _project_setting_variables(
+    async def _project_setting_variables(
         self,
-        db,
+        db: AsyncSession,
         project_id: uuid.UUID,
         declared: dict[str, Any],
     ) -> dict[str, str]:
-        project = db.get(Project, project_id)
+        project = await db.get(Project, project_id)
         setting = project.project_setting if project and project.project_setting else {}
         return {
             name: self._stringify_value(setting.get(name))
