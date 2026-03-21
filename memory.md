@@ -177,3 +177,10 @@
 - **Changes**：`ui-interaction-supplement.md` 已补充 `Credential` 能力矩阵，明确 `Review & Diff` 归属 `Engine` 的 workflow 子视图，不再写成 `Studio` 可直接承载审核数据面板。
 - **Changes**：`docs/README.md` 已把两份 UI 文档的索引描述更新为当前的 MVP 对齐定位。
 - **Insights**：`credential` 已有真实后端 CRUD/verify/enable/disable 能力，不能继续被文档误降级为占位；否则前端会把关键可用模块排除出 MVP。
+
+## [2026-03-21 | UI 文档 Web 体验增强完成]
+- **Events**：将 Gemini 建议中适合当前 Web MVP 的部分补充进 UI 文档，重点增强视觉与交互实现规则，而不扩展产品边界。
+- **Changes**：`ui-design.md` 已明确“大屏 Web 工作台”语义，补充静态宣纸噪点、湿墨/入纸状态反馈、折扇式侧板和 `Ink Pool` 动态响应规则。
+- **Changes**：`ui-interaction-supplement.md` 已补充对应实施约束，明确 `Version Panel` 只允许轻量折扇式开合、`running/completed` 用水墨反馈替代呼吸灯、`Ink Pool` 只跟 token/账单更新联动。
+- **Insights**：`stale` 目前只能保持单一视觉语言，不能被文档升级成轻重分级；当前后端和状态真值并没有这一层语义。
+- **Insights**：字体锐化不是当前 Web 写作体验的主抓手，真正优先级更高的是首行缩进、阅读行宽、行间距和正文稳定性。
