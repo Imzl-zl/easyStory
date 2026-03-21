@@ -44,8 +44,8 @@
 
 | 文档 | 说明 |
 |------|------|
-| [UI 设计规范](./ui/ui-design.md) | 视觉规格白皮书 |
-| [UI 交互补充](./ui/ui-interaction-supplement.md) | 缺失页面 + 交互缺口 |
+| [UI 设计规范](./ui/ui-design.md) | MVP 对齐后的工作台 IA 与视觉基线 |
+| [UI 交互补充](./ui/ui-interaction-supplement.md) | MVP 对齐后的交互规则、状态映射与边界态 |
 
 ### 实施计划（plans/）
 
