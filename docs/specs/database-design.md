@@ -498,7 +498,7 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | api_dialect | VARCHAR(50) | 接口类型：`openai_chat_completions / openai_responses / anthropic_messages / gemini_generate_content` |
 | display_name | VARCHAR(100) | 显示名称 |
 | encrypted_key | TEXT | AES-256-GCM 加密后的 API Key |
-| base_url | VARCHAR(500) | 自定义 endpoint（可选） |
+| base_url | VARCHAR(500) | 自定义 endpoint（可选；默认只允许公网 `https`，本地/私网需显式允许） |
 | default_model | VARCHAR(100) | 连接级默认模型名 |
 | is_active | BOOLEAN | 是否启用，默认 true |
 | last_verified_at | TIMESTAMP | 最后连通性测试通过时间 |

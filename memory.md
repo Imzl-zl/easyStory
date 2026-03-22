@@ -259,6 +259,15 @@
 - **Changes**：`app.main.create_app()` 已从 `@app.on_event("startup")` 收敛为 `FastAPI(..., lifespan=app_lifespan)`；新增 `tests/unit/test_app_lifespan.py` 验证 lifespan 启动阶段会完成 builtin template sync。
 - **Changes**：`tests/unit/client_helper.py` 已改为与 app lifespan 对齐的生命周期管理，避免在后续 async 迁移期间继续叠加错误的 startup/shutdown 语义偏差。
 
+## [2026-03-23 | 模型方言 follow-up 修复完成]
+- **Events**：完成模型连接方言化改造后的 follow-up 修复，收口 review 中确认成立的几项问题。
+- **Changes**：`credential` 模块已把可执行模型名解析真值统一到 `shared/runtime/llm_protocol.resolve_model_name`；verifier 与验证支持链路不再把 `default_model=None` 隐式转成空字符串，而是显式报“missing executable model name”。
+- **Changes**：`workflow runtime` 的 `chapter_split/chapter_gen` 生成路径改为复用 `_build_prompt_bundle()` 已解析的 `ModelCredential`，避免 `_build_prompt_bundle -> _call_llm` 双重凭证查询；同时在调用前先写好 `execution.input_data`，保证失败时也保留输入上下文。
+- **Changes**：`llm_protocol_requests._join_endpoint()` 已按 URL path 语义加固，避免自定义 full endpoint 或 `/v1`、`/v1beta` 基路径拼接出重复段；新增 endpoint 专项测试。
+- **Changes**：`context preview` 的模型解析边界已收紧为“仅在缺少显式 `model.name` 时才查询 credential 默认模型”，避免把“预览上下文”错误升级成“强依赖有效凭证”的链路。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_credential_service.py tests/unit/test_credential_verifier.py tests/unit/test_credential_api.py tests/unit/test_llm_tool_provider.py tests/unit/test_llm_tool_provider_endpoints.py tests/unit/test_workflow_runtime.py tests/unit/test_workflow_runtime_model_resolution.py tests/unit/test_context_preview_service.py tests/unit/test_context_preview_style_reference.py tests/unit/test_context_preview_rendered_prompt_service.py tests/unit/test_chapter_skill_chapter_summary.py` 通过，`47 passed`。
+
 ## [2026-03-22 | review 阻塞项修复完成]
 - **Events**：完成本轮 code review 暴露的两条真实阻塞问题与两条清理项修复，达到可提交状态。
 - **Changes**：`app/shared/db/session.py` 中 `get_async_session_factory()` 已收敛回同步 accessor，避免 `workflow` 默认 dispatcher 直接调用时拿到 coroutine；新增 `tests/unit/test_workflow_runtime_dispatcher.py` 锁定该回归。
@@ -1012,3 +1021,15 @@
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
 - **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_credential_service.py tests/unit/test_credential_api.py tests/unit/test_credential_verifier.py tests/unit/test_llm_tool_provider.py tests/unit/test_story_asset_generation_service.py tests/unit/test_workflow_runtime.py` 通过，`28 passed`。
 - **Validation**：`pnpm --dir apps/web lint`、`pnpm --dir apps/web exec tsc --noEmit` 通过。
+
+## [2026-03-23 | 模型连接审查问题修复完成]
+- **Events**：完成模型连接方言化改造后的审查修复，收口 `base_url` 安全边界、旧库 schema 升级路径、credential 更新语义和文档/依赖双真值。
+- **Changes**：新增 `shared/runtime/llm_endpoint_policy.py`，把自定义模型 endpoint 安全策略统一为“默认只允许公网 `https`；本地/私网地址需 `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS=true` 显式开启”；创建、更新、验证与运行时现都共用这条规则。
+- **Changes**：`credential_service_support.py` 现基于 `CredentialUpdateDTO.model_fields_set` 区分“未传字段”和“显式传 null”；`base_url` 支持显式清空回默认 endpoint，`api_dialect / display_name / api_key / default_model` 显式传 `null` 会直接报错，不再静默 no-op。
+- **Changes**：`shared/db/bootstrap.py` 已补最小 schema reconcile；旧库启动时会自动补 `model_credentials.api_dialect`、`model_credentials.default_model`，并将历史 `anthropic` 数据回填到 `anthropic_messages`，其它旧 provider 回填到 `openai_chat_completions`。
+- **Changes**：`shared/runtime/__init__.py` 改为惰性导出，修掉 `settings -> runtime -> llm tool provider` 的循环导入；`apps/api/pyproject.toml` 与 `uv.lock` 已移除 LiteLLM，计划/规格/README 已同步新口径。
+- **Insights**：模型 endpoint 安全策略必须同时落在“写入入口 + 运行时出口”；只校验 create/update 不足以挡住旧数据和手工写库绕过。
+- **Insights**：当前项目还没真正落 Alembic 迁移链时，`create_all` 之后补一层最小 schema reconcile 是比“要求用户删库”更合理的过渡方案。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_credential_service.py tests/unit/test_credential_service_updates.py tests/unit/test_credential_verifier.py tests/unit/test_llm_tool_provider.py tests/unit/test_settings.py tests/unit/test_db_bootstrap.py` 通过，`34 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv lock --offline`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web exec tsc --noEmit` 通过。

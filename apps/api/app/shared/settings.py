@@ -18,10 +18,14 @@ JWT_EXPIRE_HOURS_ENV = "EASYSTORY_JWT_EXPIRE_HOURS"
 CREDENTIAL_MASTER_KEY_ENV = "EASYSTORY_CREDENTIAL_MASTER_KEY"
 CORS_ALLOWED_ORIGINS_ENV = "EASYSTORY_CORS_ALLOWED_ORIGINS"
 CORS_ALLOWED_ORIGIN_REGEX_ENV = "EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX"
+ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV = "EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS"
 
 DEFAULT_JWT_EXPIRE_HOURS = 24
 DEFAULT_LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+DEFAULT_ALLOW_PRIVATE_MODEL_ENDPOINTS = False
 ENV_SETUP_HINT = "请参考 apps/api/.env.example 创建 apps/api/.env 并填写必需项。"
+TRUTHY_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
+FALSY_ENV_VALUES = frozenset({"0", "false", "no", "off"})
 
 
 def _parse_integer_env_value(value: Any, *, env_name: str) -> int:
@@ -35,6 +39,18 @@ def _parse_integer_env_value(value: Any, *, env_name: str) -> int:
         except ValueError as exc:
             raise ConfigurationError(f"Invalid integer for {env_name}: {value}") from exc
     raise ConfigurationError(f"Invalid integer for {env_name}: {value}")
+
+
+def _parse_boolean_env_value(value: Any, *, env_name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in TRUTHY_ENV_VALUES:
+            return True
+        if normalized in FALSY_ENV_VALUES:
+            return False
+    raise ConfigurationError(f"Invalid boolean for {env_name}: {value}")
 
 
 class EasyStorySettings(BaseSettings):
@@ -63,6 +79,10 @@ class EasyStorySettings(BaseSettings):
         default=DEFAULT_LOCAL_ORIGIN_REGEX,
         validation_alias=CORS_ALLOWED_ORIGIN_REGEX_ENV,
     )
+    allow_private_model_endpoints: bool = Field(
+        default=DEFAULT_ALLOW_PRIVATE_MODEL_ENDPOINTS,
+        validation_alias=ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV,
+    )
 
     @field_validator("jwt_expire_hours", mode="before")
     @classmethod
@@ -88,6 +108,11 @@ class EasyStorySettings(BaseSettings):
         raise ConfigurationError(
             f"{CORS_ALLOWED_ORIGINS_ENV} must be a comma-separated string or list"
         )
+
+    @field_validator("allow_private_model_endpoints", mode="before")
+    @classmethod
+    def parse_allow_private_model_endpoints(cls, value: Any) -> bool:
+        return _parse_boolean_env_value(value, env_name=ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV)
 
     def require_jwt_secret(self) -> str:
         if self.jwt_secret and self.jwt_secret.strip():

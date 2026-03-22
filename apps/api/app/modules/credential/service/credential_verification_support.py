@@ -30,7 +30,7 @@ async def verify_credential_record(
             api_key=api_key,
             base_url=credential.base_url,
             api_dialect=credential.api_dialect,
-            default_model=credential.default_model or "",
+            default_model=credential.default_model,
         )
     except Exception as exc:
         record_audit(

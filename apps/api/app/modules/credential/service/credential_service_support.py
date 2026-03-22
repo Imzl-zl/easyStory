@@ -6,7 +6,7 @@ from collections.abc import Callable
 from app.modules.credential.infrastructure import CredentialVerificationResult
 from app.modules.credential.models import ModelCredential
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_protocol import normalize_api_dialect
+from app.shared.runtime.llm_protocol import normalize_api_dialect, normalize_custom_base_url
 
 from .dto import CredentialUpdateDTO, CredentialVerifyResultDTO, CredentialViewDTO
 
@@ -65,8 +65,10 @@ def update_api_dialect(
     payload: CredentialUpdateDTO,
     changes: dict[str, str],
 ) -> None:
-    if payload.api_dialect is None:
+    if not _field_was_provided(payload, "api_dialect"):
         return
+    if payload.api_dialect is None:
+        raise ConfigurationError("api_dialect cannot be null")
     api_dialect = normalize_api_dialect(payload.api_dialect)
     if api_dialect == credential.api_dialect:
         return
@@ -80,8 +82,10 @@ def update_display_name(
     payload: CredentialUpdateDTO,
     changes: dict[str, str],
 ) -> None:
-    if payload.display_name is None:
+    if not _field_was_provided(payload, "display_name"):
         return
+    if payload.display_name is None:
+        raise ConfigurationError("display_name cannot be null")
     display_name = payload.display_name.strip()
     if display_name == credential.display_name:
         return
@@ -94,7 +98,7 @@ def update_base_url(
     payload: CredentialUpdateDTO,
     changes: dict[str, str],
 ) -> None:
-    if payload.base_url is None:
+    if not _field_was_provided(payload, "base_url"):
         return
     base_url = normalize_base_url(payload.base_url)
     if base_url == credential.base_url:
@@ -109,8 +113,10 @@ def update_default_model(
     payload: CredentialUpdateDTO,
     changes: dict[str, str],
 ) -> None:
-    if payload.default_model is None:
+    if not _field_was_provided(payload, "default_model"):
         return
+    if payload.default_model is None:
+        raise ConfigurationError("default_model cannot be null")
     default_model = normalize_default_model(payload.default_model)
     if default_model == credential.default_model:
         return
@@ -125,8 +131,10 @@ def rotate_api_key(
     encrypt_api_key: Callable[[str], str],
     changes: dict[str, str],
 ) -> None:
-    if payload.api_key is None:
+    if not _field_was_provided(payload, "api_key"):
         return
+    if payload.api_key is None:
+        raise ConfigurationError("api_key cannot be null")
     credential.encrypted_key = encrypt_api_key(payload.api_key)
     credential.last_verified_at = None
     changes["api_key"] = "rotated"
@@ -177,25 +185,11 @@ def normalize_default_model(default_model: str | None) -> str | None:
 
 
 def normalize_base_url(base_url: str | None) -> str | None:
-    if base_url is None:
-        return None
-    normalized = base_url.strip()
-    return normalized or None
+    return normalize_custom_base_url(base_url)
 
 
-def resolve_model_name(
-    *,
-    requested_model_name: str | None,
-    default_model: str | None,
-    provider: str,
-) -> str:
-    explicit = normalize_default_model(requested_model_name)
-    if explicit is not None:
-        return explicit
-    fallback = normalize_default_model(default_model)
-    if fallback is not None:
-        return fallback
-    raise ConfigurationError(f"Credential '{provider}' is missing executable model name")
+def _field_was_provided(payload: CredentialUpdateDTO, field_name: str) -> bool:
+    return field_name in payload.model_fields_set
 
 
 def mask_key(api_key: str) -> str:

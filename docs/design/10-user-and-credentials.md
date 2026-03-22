@@ -142,6 +142,7 @@ credential_security:
 
 - **存储**: API Key 使用 AES-256-GCM 加密后存入数据库，master key 从环境变量获取
 - **传输**: API 返回凭证信息时，Key 始终掩码显示（如 `sk-...xxxx`）
+- **Endpoint 边界**: 自定义 `base_url` 默认只允许公网 `https` endpoint；`localhost` / RFC1918 私网 / 其他本地地址默认拒绝，只有 `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS=true` 时才允许显式接入本地或私有模型网关
 - **审计**: MVP 记录凭证的 create / update / delete / verify / enable / disable 等安全事件
 - **派生**: 加密密钥通过 PBKDF2 从 master key 派生，非直接使用
 
@@ -175,6 +176,7 @@ credential_security:
 - 验证不再通过 `/models` 或探测式接口猜兼容；统一按用户显式选择的 `api_dialect` 发最小生成请求
 - 测试请求使用极小输出上限与固定短提示，避免产生实际费用
 - `default_model` 是验证请求的必需模型名，同时也是运行时 `model.name` 缺省时的连接级回退值
+- `base_url` 的安全策略在创建、更新、验证和运行时统一生效，避免旧数据绕过入口校验
 - 测试结果记录到 `last_verified_at`，用户可在 UI 查看凭证状态
 - 支持手动重新测试（"重新验证"按钮）
 - 凭证长时间未验证时，UI 可提示用户重新验证

@@ -8,6 +8,7 @@ import pytest
 from app.modules.credential.infrastructure import AsyncHttpCredentialVerifier
 from app.shared.runtime.errors import BusinessRuleError
 from app.shared.runtime.llm_protocol import HttpJsonResponse
+from app.shared.settings import ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV
 
 
 def test_verify_credential_uses_generation_probe_request() -> None:
@@ -70,3 +71,55 @@ def test_verify_credential_surfaces_connection_error() -> None:
                 default_model="gpt-4o-mini",
             )
         )
+
+
+def test_verify_credential_requires_executable_model_name() -> None:
+    verifier = AsyncHttpCredentialVerifier()
+
+    with pytest.raises(BusinessRuleError, match="missing executable model name"):
+        asyncio.run(
+            verifier.verify(
+                provider="openai",
+                api_key="test-key",
+                base_url=None,
+                api_dialect="openai_chat_completions",
+                default_model=None,
+            )
+        )
+
+
+def test_verify_credential_rejects_private_base_url_by_default() -> None:
+    verifier = AsyncHttpCredentialVerifier()
+
+    with pytest.raises(BusinessRuleError, match="Private or local model endpoints are disabled"):
+        asyncio.run(
+            verifier.verify(
+                provider="openai",
+                api_key="test-key",
+                base_url="http://127.0.0.1:11434/v1",
+                api_dialect="openai_chat_completions",
+                default_model="gpt-4o-mini",
+            )
+        )
+
+
+def test_verify_credential_allows_private_base_url_when_enabled(monkeypatch) -> None:
+    monkeypatch.setenv(ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV, "true")
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(status_code=200, json_body={"ok": True}, text="")
+
+    verifier = AsyncHttpCredentialVerifier(request_sender=request_sender)
+    asyncio.run(
+        verifier.verify(
+            provider="openai",
+            api_key="test-key",
+            base_url="http://127.0.0.1:11434/v1",
+            api_dialect="openai_chat_completions",
+            default_model="gpt-4o-mini",
+        )
+    )
+
+    assert captured["request"].url == "http://127.0.0.1:11434/v1/chat/completions"

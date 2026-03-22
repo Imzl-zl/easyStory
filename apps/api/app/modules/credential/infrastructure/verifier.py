@@ -32,7 +32,7 @@ class AsyncCredentialVerifier(Protocol):
         api_key: str,
         base_url: str | None,
         api_dialect: str,
-        default_model: str,
+        default_model: str | None,
     ) -> CredentialVerificationResult: ...
 
 
@@ -55,7 +55,7 @@ class AsyncHttpCredentialVerifier:
         api_key: str,
         base_url: str | None,
         api_dialect: str,
-        default_model: str,
+        default_model: str | None,
     ) -> CredentialVerificationResult:
         try:
             request = build_verification_request(

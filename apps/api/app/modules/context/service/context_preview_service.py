@@ -198,6 +198,8 @@ class ContextPreviewService:
         model = node.model or skill_model or workflow_model
         if model is None or not model.provider:
             raise ConfigurationError(f"Node {node.id} is missing executable model configuration")
+        if model.name:
+            return model
         resolved = await self._resolve_credential_service().resolve_active_credential_model(
             db,
             provider=model.provider,

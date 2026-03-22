@@ -13,6 +13,7 @@ from app.modules.config_registry.schemas.config_schemas import (
     WorkflowConfig,
 )
 from app.modules.context.engine.contracts import AUTO_INJECT_TYPES, VARIABLE_TO_INJECT_TYPE
+from app.modules.credential.models import ModelCredential
 from app.modules.project.models import Project
 from app.modules.workflow.models import WorkflowExecution
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
@@ -30,9 +31,16 @@ class WorkflowRuntimePromptMixin:
         *,
         owner_id: uuid.UUID,
         chapter_number: int | None,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], ModelCredential]:
         skill = load_skill_snapshot(workflow.skills_snapshot or {}, node.skill)
-        model = await self._resolve_model(db, workflow, workflow_config, node, skill, owner_id=owner_id)
+        model, credential = await self._resolve_model(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            skill,
+            owner_id=owner_id,
+        )
         prompt_variables, context_report = await self._resolve_prompt_variables(
             db,
             workflow,
@@ -43,20 +51,23 @@ class WorkflowRuntimePromptMixin:
             chapter_number=chapter_number,
         )
         prompt = self.template_renderer.render(skill.prompt, prompt_variables)
-        return {
-            "prompt": prompt,
-            "system_prompt": None,
-            "model": model,
-            "response_format": "json_object" if node.id == "chapter_split" else "text",
-            "context_snapshot_hash": self._hash_payload(prompt_variables),
-            "input_data": {
-                "skill_id": skill.id,
-                "model_name": model.name,
-                "provider": model.provider,
+        return (
+            {
                 "prompt": prompt,
-                "context_report": context_report,
+                "system_prompt": None,
+                "model": model,
+                "response_format": "json_object" if node.id == "chapter_split" else "text",
+                "context_snapshot_hash": self._hash_payload(prompt_variables),
+                "input_data": {
+                    "skill_id": skill.id,
+                    "model_name": model.name,
+                    "provider": model.provider,
+                    "prompt": prompt,
+                    "context_report": context_report,
+                },
             },
-        }
+            credential,
+        )
 
     async def _resolve_prompt_variables(
         self,
@@ -144,7 +155,7 @@ class WorkflowRuntimePromptMixin:
         skill: SkillConfig,
         *,
         owner_id: uuid.UUID,
-    ) -> ModelConfig:
+    ) -> tuple[ModelConfig, ModelCredential]:
         model = node.model or skill.model or workflow_config.model
         if model is None or not model.provider:
             raise ConfigurationError(f"Node {node.id} is missing executable model configuration")
@@ -155,4 +166,4 @@ class WorkflowRuntimePromptMixin:
             user_id=owner_id,
             project_id=workflow.project_id,
         )
-        return model.model_copy(update={"name": resolved.model_name})
+        return model.model_copy(update={"name": resolved.model_name}), resolved.credential

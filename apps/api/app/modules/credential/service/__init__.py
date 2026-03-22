@@ -6,7 +6,7 @@ from .dto import (
     CredentialVerifyResultDTO,
     CredentialViewDTO,
 )
-from .factory import create_credential_service
+from .factory import create_credential_resolution_service, create_credential_service
 
 __all__ = [
     "CREDENTIAL_DELETE_IN_USE_MESSAGE",
@@ -15,5 +15,6 @@ __all__ = [
     "CredentialUpdateDTO",
     "CredentialVerifyResultDTO",
     "CredentialViewDTO",
+    "create_credential_resolution_service",
     "create_credential_service",
 ]

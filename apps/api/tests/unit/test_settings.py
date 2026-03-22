@@ -4,6 +4,7 @@ import pytest
 
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.settings import (
+    ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV,
     CORS_ALLOWED_ORIGIN_REGEX_ENV,
     EasyStorySettings,
     JWT_EXPIRE_HOURS_ENV,
@@ -62,4 +63,19 @@ def test_settings_rejects_non_integer_expire_hours(monkeypatch) -> None:
     monkeypatch.setenv(JWT_EXPIRE_HOURS_ENV, "bad")
 
     with pytest.raises(ConfigurationError, match=JWT_EXPIRE_HOURS_ENV):
+        EasyStorySettings(_env_file=None)
+
+
+def test_settings_parses_private_endpoint_toggle(monkeypatch) -> None:
+    monkeypatch.setenv(ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV, "true")
+
+    settings = EasyStorySettings(_env_file=None)
+
+    assert settings.allow_private_model_endpoints is True
+
+
+def test_settings_rejects_invalid_private_endpoint_toggle(monkeypatch) -> None:
+    monkeypatch.setenv(ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV, "maybe")
+
+    with pytest.raises(ConfigurationError, match=ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV):
         EasyStorySettings(_env_file=None)

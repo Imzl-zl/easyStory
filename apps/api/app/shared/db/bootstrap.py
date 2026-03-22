@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import create_engine
-from sqlalchemy.engine import Engine
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
@@ -14,11 +14,18 @@ from .base import Base
 
 DEFAULT_DB_DIR = ".runtime"
 DEFAULT_DB_NAME = "easystory.db"
+MODEL_CREDENTIALS_TABLE = "model_credentials"
+API_DIALECT_COLUMN = "api_dialect"
+DEFAULT_MODEL_COLUMN = "default_model"
+OPENAI_CHAT_DIALECT = "openai_chat_completions"
+ANTHROPIC_MESSAGES_DIALECT = "anthropic_messages"
+ANTHROPIC_PROVIDER = "anthropic"
 
 
 def create_session_factory(database_url: str | None = None) -> sessionmaker[Session]:
     engine = create_database_engine(database_url)
-    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        _initialize_database(connection)
     return sessionmaker(bind=engine, expire_on_commit=False, class_=Session)
 
 
@@ -39,7 +46,7 @@ def create_async_database_engine(database_url: str | None = None) -> AsyncEngine
 
 async def initialize_async_database(engine: AsyncEngine) -> None:
     async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
+        await connection.run_sync(_initialize_database)
 
 
 def resolve_database_url(database_url: str | None = None) -> str:
@@ -90,3 +97,56 @@ def _async_engine_kwargs(database_url: str) -> dict:
 
 def _is_memory_sqlite(database_url: str) -> bool:
     return database_url in {"sqlite://", "sqlite:///:memory:"} or ":memory:" in database_url
+
+
+def _initialize_database(connection: Connection) -> None:
+    Base.metadata.create_all(connection)
+    _reconcile_model_credentials_schema(connection)
+
+
+def _reconcile_model_credentials_schema(connection: Connection) -> None:
+    inspector = inspect(connection)
+    if MODEL_CREDENTIALS_TABLE not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns(MODEL_CREDENTIALS_TABLE)}
+    _add_missing_model_credential_columns(connection, columns)
+    _backfill_model_credential_api_dialect(connection)
+
+
+def _add_missing_model_credential_columns(
+    connection: Connection,
+    columns: set[str],
+) -> None:
+    if API_DIALECT_COLUMN not in columns:
+        connection.execute(
+            text(f"ALTER TABLE {MODEL_CREDENTIALS_TABLE} ADD COLUMN {API_DIALECT_COLUMN} VARCHAR(50)")
+        )
+        columns.add(API_DIALECT_COLUMN)
+    if DEFAULT_MODEL_COLUMN not in columns:
+        connection.execute(
+            text(
+                f"ALTER TABLE {MODEL_CREDENTIALS_TABLE} "
+                f"ADD COLUMN {DEFAULT_MODEL_COLUMN} VARCHAR(100)"
+            )
+        )
+        columns.add(DEFAULT_MODEL_COLUMN)
+
+
+def _backfill_model_credential_api_dialect(connection: Connection) -> None:
+    connection.execute(
+        text(
+            f"""
+            UPDATE {MODEL_CREDENTIALS_TABLE}
+            SET {API_DIALECT_COLUMN} = CASE
+                WHEN lower(provider) = :anthropic_provider THEN :anthropic_dialect
+                ELSE :default_dialect
+            END
+            WHERE {API_DIALECT_COLUMN} IS NULL OR trim({API_DIALECT_COLUMN}) = ''
+            """
+        ),
+        {
+            "anthropic_provider": ANTHROPIC_PROVIDER,
+            "anthropic_dialect": ANTHROPIC_MESSAGES_DIALECT,
+            "default_dialect": OPENAI_CHAT_DIALECT,
+        },
+    )

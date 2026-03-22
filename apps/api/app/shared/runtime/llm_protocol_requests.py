@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
+from .llm_endpoint_policy import normalize_custom_base_url
 from .llm_protocol_types import (
     DEFAULT_BASE_URLS,
     JSON_OBJECT_RESPONSE_FORMAT,
@@ -161,14 +162,15 @@ def _merge_generation_params(
 def _join_endpoint(connection: LLMConnection, endpoint: str) -> str:
     base_url = _resolve_base_url(connection)
     normalized_base = base_url.rstrip("/")
-    normalized_endpoint = endpoint.lstrip("/")
-    if normalized_base.endswith(normalized_endpoint):
+    endpoint_path = "/" + endpoint.lstrip("/")
+    base_path = _resolve_base_path(normalized_base)
+    if base_path.endswith(endpoint_path):
         return normalized_base
-    if normalized_base.endswith("/v1") and normalized_endpoint.startswith("v1/"):
-        return f"{normalized_base}/{normalized_endpoint.removeprefix('v1/')}"
-    if normalized_base.endswith("/v1beta") and normalized_endpoint.startswith("v1beta/"):
-        return f"{normalized_base}/{normalized_endpoint.removeprefix('v1beta/')}"
-    return f"{normalized_base}/{normalized_endpoint}"
+    if base_path.endswith("/v1") and endpoint_path.startswith("/v1/"):
+        return f"{normalized_base}/{endpoint_path.removeprefix('/v1/')}"
+    if base_path.endswith("/v1beta") and endpoint_path.startswith("/v1beta/"):
+        return f"{normalized_base}/{endpoint_path.removeprefix('/v1beta/')}"
+    return f"{normalized_base}{endpoint_path}"
 
 
 def _build_gemini_endpoint(connection: LLMConnection, model_name: str) -> str:
@@ -180,9 +182,15 @@ def _build_gemini_endpoint(connection: LLMConnection, model_name: str) -> str:
 
 
 def _resolve_base_url(connection: LLMConnection) -> str:
-    if connection.base_url and connection.base_url.strip():
-        return connection.base_url.strip()
+    custom_base_url = normalize_custom_base_url(connection.base_url)
+    if custom_base_url is not None:
+        return custom_base_url
     return DEFAULT_BASE_URLS[normalize_api_dialect(connection.api_dialect)]
+
+
+def _resolve_base_path(base_url: str) -> str:
+    path = urlsplit(base_url).path.rstrip("/")
+    return path or "/"
 
 
 def _build_bearer_headers(api_key: str) -> dict[str, str]:

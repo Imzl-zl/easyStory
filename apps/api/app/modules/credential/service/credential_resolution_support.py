@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.credential.models import ModelCredential
 from app.modules.project.service import ProjectService
+from app.shared.runtime.llm_protocol import resolve_model_name
 
 from .credential_query_support import (
     OWNER_TYPE_PROJECT,
@@ -17,7 +18,6 @@ from .credential_query_support import (
 from .credential_service_support import (
     ResolvedCredentialModel,
     normalize_provider,
-    resolve_model_name,
 )
 
 
@@ -84,8 +84,8 @@ async def resolve_active_credential_model_record(
     return ResolvedCredentialModel(
         credential=credential,
         model_name=resolve_model_name(
-            requested_model_name=requested_model_name,
-            default_model=credential.default_model,
-            provider=credential.provider,
+            requested_model_name,
+            credential.default_model,
+            provider_label=credential.provider,
         ),
     )

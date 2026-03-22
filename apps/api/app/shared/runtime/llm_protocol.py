@@ -1,3 +1,4 @@
+from .llm_endpoint_policy import normalize_custom_base_url
 from .llm_protocol_requests import build_verification_request, prepare_generation_request
 from .llm_protocol_responses import parse_generation_response
 from .llm_protocol_types import (
@@ -31,6 +32,7 @@ __all__ = [
     "VERIFY_MODEL_REPLY",
     "build_verification_request",
     "normalize_api_dialect",
+    "normalize_custom_base_url",
     "parse_generation_response",
     "prepare_generation_request",
     "resolve_model_name",

@@ -89,6 +89,8 @@
   - `EASYSTORY_JWT_EXPIRE_HOURS`
   - `EASYSTORY_CORS_ALLOWED_ORIGINS`
   - `EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX`
+  - `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS`
+    默认只允许公网 `https` 模型 endpoint；只有确实需要访问本地 / 私网模型网关时才显式开启。
 
 ---
 
