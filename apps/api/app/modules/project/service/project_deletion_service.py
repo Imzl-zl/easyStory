@@ -18,7 +18,6 @@ from .project_deletion_support import (
     record_project_audit,
     restore_project_from_trash,
 )
-from .project_management_service import ProjectManagementService
 from .project_service import ProjectService
 
 
@@ -52,7 +51,7 @@ class ProjectDeletionService:
         db.add(project)
         await db.commit()
         await db.refresh(project)
-        return ProjectManagementService(self.project_service)._to_detail(project)
+        return ProjectDetailDTO.model_validate(project, from_attributes=True)
 
     async def restore_project(
         self,
@@ -78,7 +77,7 @@ class ProjectDeletionService:
         db.add(project)
         await db.commit()
         await db.refresh(project)
-        return ProjectManagementService(self.project_service)._to_detail(project)
+        return ProjectDetailDTO.model_validate(project, from_attributes=True)
 
     async def physical_delete_project(
         self,

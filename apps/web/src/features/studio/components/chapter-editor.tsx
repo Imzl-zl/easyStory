@@ -1,11 +1,15 @@
 "use client";
-
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ChapterImpactPanel } from "@/features/studio/components/chapter-impact-panel";
+import { ChapterStaleNotice } from "@/features/studio/components/chapter-stale-notice";
+import {
+  buildChapterMutationFeedback,
+  invalidateChapterQueries,
+} from "@/features/studio/components/chapter-editor-support";
 import { getErrorMessage } from "@/lib/api/client";
 import {
   approveChapter,
@@ -16,7 +20,7 @@ import {
   rollbackChapterVersion,
   saveChapter,
 } from "@/lib/api/content";
-
+import type { ChapterImpactSummary } from "@/lib/api/types";
 type ChapterEditorProps = {
   projectId: string;
   chapterNumber: number | null;
@@ -29,6 +33,15 @@ export function ChapterEditor({
   versionPanelOpen,
 }: ChapterEditorProps) {
   const hasChapter = chapterNumber !== null;
+  const [lastImpactState, setLastImpactState] = useState<{
+    chapterNumber: number | null;
+    impact: ChapterImpactSummary | null;
+    projectId: string;
+  }>({
+    projectId,
+    chapterNumber,
+    impact: null,
+  });
 
   const detailQuery = useQuery({
     queryKey: ["chapter-detail", projectId, chapterNumber],
@@ -43,6 +56,10 @@ export function ChapterEditor({
   const formKey = detailQuery.data
     ? `${detailQuery.data.content_id}:${detailQuery.data.current_version_number}`
     : `chapter-${chapterNumber}`;
+  const lastImpact =
+    lastImpactState.projectId === projectId && lastImpactState.chapterNumber === chapterNumber
+      ? lastImpactState.impact
+      : null;
 
   if (!hasChapter) {
     return (
@@ -60,6 +77,14 @@ export function ChapterEditor({
       detail={detailQuery.data}
       detailError={detailQuery.error}
       detailLoading={detailQuery.isLoading}
+      lastImpact={lastImpact}
+      onImpactChange={(impact) =>
+        setLastImpactState({
+          projectId,
+          chapterNumber,
+          impact,
+        })
+      }
       projectId={projectId}
       versionPanelOpen={versionPanelOpen}
       versions={versionsQuery.data}
@@ -73,6 +98,8 @@ function ChapterEditorForm({
   detail,
   detailLoading,
   detailError,
+  lastImpact,
+  onImpactChange,
   versionPanelOpen,
   versions,
 }: {
@@ -81,6 +108,8 @@ function ChapterEditorForm({
   detail?: Awaited<ReturnType<typeof getChapter>>;
   detailLoading: boolean;
   detailError: unknown;
+  lastImpact: ChapterImpactSummary | null;
+  onImpactChange: (impact: ChapterImpactSummary | null) => void;
   versionPanelOpen: boolean;
   versions?: Awaited<ReturnType<typeof listChapterVersions>>;
 }) {
@@ -90,12 +119,6 @@ function ChapterEditorForm({
   const [changeSummary, setChangeSummary] = useState(detail?.change_summary ?? "");
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["chapters", projectId] });
-    queryClient.invalidateQueries({ queryKey: ["chapter-detail", projectId, chapterNumber] });
-    queryClient.invalidateQueries({ queryKey: ["chapter-versions", projectId, chapterNumber] });
-  };
-
   const saveMutation = useMutation({
     mutationFn: () =>
       saveChapter(projectId, chapterNumber, {
@@ -103,18 +126,22 @@ function ChapterEditorForm({
         content_text: contentText,
         change_summary: changeSummary || undefined,
       }),
-    onSuccess: () => {
-      setFeedback("章节草稿已保存。");
-      refresh();
+    onSuccess: (result) => {
+      onImpactChange(result.impact);
+      setFeedback(buildChapterMutationFeedback("save", result.impact));
+      invalidateChapterQueries(queryClient, projectId, chapterNumber);
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) => {
+      onImpactChange(null);
+      setFeedback(getErrorMessage(error));
+    },
   });
 
   const approveMutation = useMutation({
     mutationFn: () => approveChapter(projectId, chapterNumber),
     onSuccess: () => {
       setFeedback("章节已确认。");
-      refresh();
+      invalidateChapterQueries(queryClient, projectId, chapterNumber);
     },
     onError: (error) => setFeedback(getErrorMessage(error)),
   });
@@ -137,11 +164,22 @@ function ChapterEditorForm({
       }
       return clearBestVersion(projectId, chapterNumber, versionNumber);
     },
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
+      if (variables.action === "rollback" && "impact" in result) {
+        onImpactChange(result.impact);
+        setFeedback(buildChapterMutationFeedback("rollback", result.impact));
+        invalidateChapterQueries(queryClient, projectId, chapterNumber);
+        return;
+      }
       setFeedback("版本面板已更新。");
-      refresh();
+      invalidateChapterQueries(queryClient, projectId, chapterNumber);
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error, variables) => {
+      if (variables.action === "rollback") {
+        onImpactChange(null);
+      }
+      setFeedback(getErrorMessage(error));
+    },
   });
 
   return (
@@ -194,6 +232,10 @@ function ChapterEditorForm({
               {feedback}
             </div>
           ) : null}
+          {detail?.status === "stale" ? (
+            <ChapterStaleNotice chapterNumber={chapterNumber} projectId={projectId} />
+          ) : null}
+          {lastImpact ? <ChapterImpactPanel impact={lastImpact} /> : null}
         </div>
       </SectionCard>
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from sqlalchemy import select
@@ -11,6 +10,7 @@ from app.modules.analysis.models import Analysis
 from app.modules.content.models import Content
 from app.modules.context.models import StoryFact
 from app.modules.project.models import Project
+from app.modules.project.schemas import ProjectSettingProjectionError, build_setting_projection
 from app.modules.workflow.models import ChapterTask
 
 from .contracts import (
@@ -19,11 +19,23 @@ from .contracts import (
     OPENING_PLAN_PRIORITY_CHAPTER_LIMIT,
 )
 from .errors import ContextBuilderError
+from .source_loader_support import (
+    CHAPTER_SUMMARY_MODE,
+    CHAPTER_SUMMARY_SEPARATOR,
+    DEFAULT_CHAPTER_SUMMARY_COUNT,
+    build_chapter_summaries,
+    dump_json,
+    ensure_style_reference_analysis_type,
+    format_chapter_context,
+    get_current_version_text,
+    render_story_bible,
+    render_style_reference,
+    select_style_reference_fields,
+)
 
 ContextPayload = tuple[str, str, dict[str, Any]]
 APPROVED_CONTENT_TYPES = frozenset({"outline", "opening_plan"})
 UNAVAILABLE_CHAPTER_TASK_STATUSES = frozenset({"stale", "skipped"})
-STYLE_REFERENCE_ANALYSIS_TYPE = "style"
 
 
 class ContextSourceLoader:
@@ -45,10 +57,15 @@ class ContextSourceLoader:
             return await self._load_single_content(project_id, db, "outline")
         if inject_type == "opening_plan":
             return await self._load_opening_plan(project_id, db, chapter_number)
+        if inject_type in {"world_setting", "character_profile"}:
+            return await self._load_setting_projection(project_id, db, inject_type)
         if inject_type == "chapter_task":
             return await self._load_chapter_task(project_id, db, workflow_execution_id, chapter_number)
         if inject_type == "previous_chapters":
             return await self._load_previous_chapters(project_id, db, chapter_number, count or 2)
+        if inject_type == "chapter_summary":
+            summary_count = count if count is not None else DEFAULT_CHAPTER_SUMMARY_COUNT
+            return await self._load_chapter_summary(project_id, db, chapter_number, summary_count)
         if inject_type == "story_bible":
             return await self._load_story_bible(project_id, db, chapter_number)
         if inject_type == "style_reference":
@@ -59,7 +76,31 @@ class ContextSourceLoader:
         project = await db.get(Project, project_id)
         if project is None or project.project_setting is None:
             return "", "missing", {}
-        return self._dump_json(project.project_setting), "included", {}
+        return dump_json(project.project_setting), "included", {}
+
+    async def _load_setting_projection(
+        self,
+        project_id,
+        db: AsyncSession,
+        inject_type: str,
+    ) -> ContextPayload:
+        project = await db.get(Project, project_id)
+        if project is None or project.project_setting is None:
+            return "", "missing", {}
+        content, metadata = self._build_setting_projection(project.project_setting, inject_type)
+        if not content:
+            return "", "missing", metadata
+        return content, "included", metadata
+
+    def _build_setting_projection(
+        self,
+        setting_payload: dict[str, Any],
+        inject_type: str,
+    ) -> tuple[str, dict[str, Any]]:
+        try:
+            return build_setting_projection(setting_payload, inject_type)
+        except ProjectSettingProjectionError as exc:
+            raise ContextBuilderError(str(exc)) from exc
 
     async def _load_single_content(
         self,
@@ -72,7 +113,7 @@ class ContextSourceLoader:
             return "", "missing", {}
         if not self._is_injectable_content(content_type, content):
             return "", "missing", {"content_status": content.status}
-        text = self._get_current_version_text(content)
+        text = get_current_version_text(content)
         if not text:
             return "", "missing", {}
         metadata: dict[str, Any] = {}
@@ -139,10 +180,30 @@ class ContextSourceLoader:
         chapters = await self._get_recent_chapters(db, project_id, chapter_number, count)
         if not chapters:
             return "", "not_applicable", {"chapters": []}
-        parts, numbers = self._format_chapter_context(chapters)
+        parts, numbers = format_chapter_context(chapters)
         if not parts:
             return "", "not_applicable", {"chapters": []}
         return CHAPTER_SEPARATOR.join(parts), "included", {"chapters": numbers}
+
+    async def _load_chapter_summary(
+        self,
+        project_id,
+        db: AsyncSession,
+        chapter_number: int | None,
+        count: int,
+    ) -> ContextPayload:
+        if chapter_number is None or chapter_number <= 1:
+            return "", "not_applicable", {"chapters": []}
+        chapters = await self._get_recent_chapters(db, project_id, chapter_number, count)
+        if not chapters:
+            return "", "not_applicable", {"chapters": []}
+        summaries, numbers = build_chapter_summaries(chapters)
+        if not summaries:
+            return "", "not_applicable", {"chapters": []}
+        return CHAPTER_SUMMARY_SEPARATOR.join(summaries), "included", {
+            "chapters": numbers,
+            "summary_mode": CHAPTER_SUMMARY_MODE,
+        }
 
     async def _get_recent_chapters(
         self,
@@ -165,20 +226,6 @@ class ContextSourceLoader:
         chapters = (await db.scalars(statement)).all()
         return sorted(chapters, key=lambda item: item.chapter_number or 0)
 
-    def _format_chapter_context(
-        self,
-        chapters: list[Content],
-    ) -> tuple[list[str], list[int]]:
-        parts: list[str] = []
-        numbers: list[int] = []
-        for chapter in chapters:
-            text = self._get_current_version_text(chapter)
-            if not text or chapter.chapter_number is None:
-                continue
-            numbers.append(chapter.chapter_number)
-            parts.append(f"第{chapter.chapter_number}章 {chapter.title}\n{text}")
-        return parts, numbers
-
     async def _load_story_bible(
         self,
         project_id,
@@ -197,7 +244,7 @@ class ContextSourceLoader:
         entries = (await db.scalars(statement)).all()
         if not entries:
             return "", "not_applicable", {"items_count": 0}
-        return self._render_story_bible(entries), "included", {"items_count": len(entries)}
+        return render_story_bible(entries), "included", {"items_count": len(entries)}
 
     async def _load_style_reference(
         self,
@@ -214,10 +261,10 @@ class ContextSourceLoader:
         )
         if analysis is None:
             raise ContextBuilderError(f"style_reference analysis not found: {analysis_id}")
-        self._ensure_style_reference_analysis_type(analysis)
-        selected = self._select_style_reference_fields(analysis.result, inject_fields)
+        ensure_style_reference_analysis_type(analysis)
+        selected = select_style_reference_fields(analysis.result, inject_fields)
         return (
-            self._render_style_reference(analysis, selected),
+            render_style_reference(analysis, selected),
             "included",
             {
                 "analysis_id": str(analysis.id),
@@ -225,47 +272,6 @@ class ContextSourceLoader:
                 "selected_fields": inject_fields,
             },
         )
-
-    def _render_story_bible(self, facts: list[StoryFact]) -> str:
-        grouped: dict[str, list[str]] = {}
-        for fact in facts:
-            grouped.setdefault(fact.fact_type, []).append(f"{fact.subject}：{fact.content}")
-        lines = []
-        for fact_type, items in grouped.items():
-            section = f"[{fact_type}]\n" + "\n".join(f"- {item}" for item in items)
-            lines.append(section)
-        return "\n\n".join(lines)
-
-    def _select_style_reference_fields(
-        self,
-        result: dict[str, Any],
-        inject_fields: list[str],
-    ) -> dict[str, Any]:
-        missing_fields = [field_name for field_name in inject_fields if field_name not in result]
-        if missing_fields:
-            missing = ", ".join(missing_fields)
-            raise ContextBuilderError(f"style_reference fields not found: {missing}")
-        return {field_name: result[field_name] for field_name in inject_fields}
-
-    def _ensure_style_reference_analysis_type(self, analysis: Analysis) -> None:
-        if analysis.analysis_type == STYLE_REFERENCE_ANALYSIS_TYPE:
-            return
-        raise ContextBuilderError(
-            f"style_reference requires style analysis: {analysis.id} ({analysis.analysis_type})"
-        )
-
-    def _render_style_reference(
-        self,
-        analysis: Analysis,
-        selected: dict[str, Any],
-    ) -> str:
-        lines = []
-        if analysis.source_title:
-            lines.append(f"来源标题：{analysis.source_title}")
-        lines.append(f"分析类型：{analysis.analysis_type}")
-        lines.append("风格参考：")
-        lines.append(self._dump_json(selected))
-        return "\n".join(lines)
 
     async def _get_project_content(
         self,
@@ -288,11 +294,4 @@ class ContextSourceLoader:
         content = await self._get_project_content(db, project_id, content_type)
         if content is None or content.status != "approved":
             return False
-        return bool(self._get_current_version_text(content))
-
-    def _get_current_version_text(self, content: Content) -> str | None:
-        versions = sorted(content.versions, key=lambda item: (item.is_current, item.version_number), reverse=True)
-        return versions[0].content_text if versions else None
-
-    def _dump_json(self, value: Any) -> str:
-        return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
+        return bool(get_current_version_text(content))

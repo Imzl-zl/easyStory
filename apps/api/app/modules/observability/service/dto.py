@@ -16,6 +16,16 @@ class ArtifactViewDTO(BaseModel):
     created_at: datetime
 
 
+class AuditLogViewDTO(BaseModel):
+    id: uuid.UUID
+    actor_user_id: uuid.UUID | None
+    event_type: str
+    entity_type: str
+    entity_id: uuid.UUID
+    details: dict[str, Any] | None
+    created_at: datetime
+
+
 class ReviewActionViewDTO(BaseModel):
     id: uuid.UUID
     agent_id: str

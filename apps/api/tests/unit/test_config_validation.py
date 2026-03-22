@@ -195,7 +195,18 @@ def test_repository_chapter_skill_uses_previous_content_variable() -> None:
 
 def test_context_injection_item_rejects_unsupported_type() -> None:
     with pytest.raises(ValidationError, match="Input should be"):
-        ContextInjectionItem.model_validate({"type": "chapter_summary"})
+        ContextInjectionItem.model_validate({"type": "chapter_list"})
+
+
+@pytest.mark.parametrize("inject_type", ["chapter_summary", "world_setting", "character_profile"])
+def test_context_injection_item_accepts_supported_projection_types(inject_type: str) -> None:
+    payload = {"type": inject_type}
+    if inject_type == "chapter_summary":
+        payload["count"] = 3
+
+    item = ContextInjectionItem.model_validate(payload)
+
+    assert item.inject_type == inject_type
 
 
 def test_context_injection_item_accepts_style_reference() -> None:

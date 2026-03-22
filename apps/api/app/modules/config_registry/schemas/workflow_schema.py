@@ -14,8 +14,11 @@ class ContextInjectionItem(StrictSchema):
         "project_setting",
         "outline",
         "opening_plan",
+        "world_setting",
+        "character_profile",
         "chapter_task",
         "previous_chapters",
+        "chapter_summary",
         "story_bible",
         "style_reference",
     ] = Field(alias="type")

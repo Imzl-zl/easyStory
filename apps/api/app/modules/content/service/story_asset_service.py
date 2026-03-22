@@ -13,16 +13,40 @@ from app.modules.workflow.models import ChapterTask
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 
 from .chapter_store import require_approved_asset
-from .dto import AssetType, StoryAssetDTO, StoryAssetSaveDTO, StoryAssetVersionDTO
-
-STALE_FROM_OUTLINE = frozenset({"opening_plan", "chapter"})
-STALE_FROM_OPENING_PLAN = frozenset({"chapter"})
-STALE_TRIGGER_ASSET_TYPES = frozenset({"outline", "opening_plan"})
+from .dto import (
+    AssetType,
+    StoryAssetDTO,
+    StoryAssetMutationDTO,
+    StoryAssetSaveDTO,
+    StoryAssetVersionDTO,
+)
+from .story_asset_service_support import (
+    STALE_TRIGGER_ASSET_TYPES,
+    build_story_asset_impact_summary,
+    build_story_asset_mutation,
+    mark_downstream_stale,
+)
+PREPARATION_ASSET_TITLES: dict[AssetType, str] = {
+    "outline": "大纲",
+    "opening_plan": "开篇设计",
+}
+SCAFFOLD_VERSION_TEXT = ""
+SCAFFOLD_VERSION_CHANGE_SUMMARY = "系统初始化前置资产骨架"
+SCAFFOLD_VERSION_CREATED_BY = "system"
+SCAFFOLD_VERSION_CHANGE_SOURCE = "import"
 
 
 class StoryAssetService:
     def __init__(self, project_service: ProjectService) -> None:
         self.project_service = project_service
+
+    async def scaffold_preparation_assets(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+    ) -> None:
+        for asset_type, title in PREPARATION_ASSET_TITLES.items():
+            db.add(self._build_scaffold_asset(project_id, asset_type, title))
 
     async def get_asset(
         self,
@@ -44,7 +68,7 @@ class StoryAssetService:
         payload: StoryAssetSaveDTO,
         *,
         owner_id: uuid.UUID | None = None,
-    ) -> StoryAssetDTO:
+    ) -> StoryAssetMutationDTO:
         project = await self.project_service.require_project(
             db,
             project_id,
@@ -66,9 +90,9 @@ class StoryAssetService:
             db.add(content)
             await db.flush()
         self._append_new_version(content, payload)
-        await self._mark_stale_dependencies(db, project.id, project.contents, asset_type)
+        impact = await self._mark_stale_dependencies(db, project.id, project.contents, asset_type)
         await db.commit()
-        return self._to_dto(content)
+        return build_story_asset_mutation(self._to_dto(content), impact)
 
     async def list_versions(
         self,
@@ -89,18 +113,17 @@ class StoryAssetService:
         asset_type: AssetType,
         *,
         owner_id: uuid.UUID | None = None,
-    ) -> StoryAssetDTO:
+    ) -> StoryAssetMutationDTO:
         project = await self.project_service.require_project(db, project_id, owner_id=owner_id)
         self.project_service.ensure_setting_allows_preparation(project)
         if asset_type == "opening_plan":
             await require_approved_asset(db, project_id, "outline")
         content = await self._require_asset(db, project_id, asset_type)
-        if self._current_version(content) is None:
-            raise BusinessRuleError(f"{asset_type} 缺少当前版本，无法确认")
+        self._require_approvable_version(asset_type, self._current_version(content))
         content.status = "approved"
         db.add(content)
         await db.commit()
-        return self._to_dto(content)
+        return build_story_asset_mutation(self._to_dto(content))
 
     async def _get_asset(
         self,
@@ -135,10 +158,16 @@ class StoryAssetService:
         project_id: uuid.UUID,
         contents: list[Content],
         asset_type: AssetType,
-    ) -> None:
-        self._mark_downstream_stale(contents, asset_type)
+    ):
+        content_impacts = mark_downstream_stale(contents, asset_type)
+        stale_chapter_task_count = 0
         if asset_type in STALE_TRIGGER_ASSET_TYPES:
-            await self._mark_chapter_tasks_stale(db, project_id)
+            stale_chapter_task_count = await self._mark_chapter_tasks_stale(db, project_id)
+        return build_story_asset_impact_summary(
+            asset_type,
+            content_impacts,
+            stale_chapter_task_count=stale_chapter_task_count,
+        )
 
     def _append_new_version(
         self,
@@ -162,6 +191,31 @@ class StoryAssetService:
             )
         )
 
+    def _build_scaffold_asset(
+        self,
+        project_id: uuid.UUID,
+        asset_type: AssetType,
+        title: str,
+    ) -> Content:
+        return Content(
+            project_id=project_id,
+            content_type=asset_type,
+            title=title,
+            status="draft",
+            versions=[self._build_scaffold_version()],
+        )
+
+    def _build_scaffold_version(self) -> ContentVersion:
+        return ContentVersion(
+            version_number=1,
+            content_text=SCAFFOLD_VERSION_TEXT,
+            created_by=SCAFFOLD_VERSION_CREATED_BY,
+            change_source=SCAFFOLD_VERSION_CHANGE_SOURCE,
+            change_summary=SCAFFOLD_VERSION_CHANGE_SUMMARY,
+            is_current=True,
+            word_count=0,
+        )
+
     def _clear_current_version(self, content: Content) -> None:
         for version in content.versions:
             if version.is_current:
@@ -182,21 +236,15 @@ class StoryAssetService:
         self,
         db: AsyncSession,
         project_id: uuid.UUID,
-    ) -> None:
+    ) -> int:
         statement = select(ChapterTask).where(ChapterTask.project_id == project_id)
         tasks = (await db.scalars(statement)).all()
+        stale_task_count = 0
         for task in tasks:
             if task.status != "stale":
                 task.status = "stale"
-
-    def _should_mark_stale(self, content: Content, asset_type: AssetType) -> bool:
-        if asset_type == "outline":
-            return content.content_type in STALE_FROM_OUTLINE
-        if content.content_type not in STALE_FROM_OPENING_PLAN:
-            return False
-        if content.chapter_number is None:
-            return False
-        return content.chapter_number <= 3
+                stale_task_count += 1
+        return stale_task_count
 
     def _next_version_number(self, content: Content) -> int:
         if not content.versions:
@@ -211,6 +259,16 @@ class StoryAssetService:
             if version.is_current:
                 return version
         return None
+
+    def _require_approvable_version(
+        self,
+        asset_type: AssetType,
+        version: ContentVersion | None,
+    ) -> None:
+        if version is None:
+            raise BusinessRuleError(f"{asset_type} 缺少当前版本，无法确认")
+        if self._count_text_units(version.content_text) == 0:
+            raise BusinessRuleError(f"{asset_type} 内容为空，无法确认")
 
     def _to_dto(self, content: Content) -> StoryAssetDTO:
         version = self._current_version(content)

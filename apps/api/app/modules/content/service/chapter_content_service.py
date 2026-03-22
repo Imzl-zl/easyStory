@@ -10,6 +10,7 @@ from app.modules.project.service import ProjectService
 from app.shared.runtime.errors import BusinessRuleError
 
 from .chapter_mutation_support import (
+    build_chapter_impact_summary,
     mark_active_chapter_task_completed,
     mark_downstream_chapters_stale,
 )
@@ -84,9 +85,9 @@ class ChapterContentService:
         await require_preparation_assets_ready(db, project.id, PREPARATION_ASSET_TYPES)
         content = await get_or_create_chapter(db, project, chapter_number, payload.title)
         append_chapter_version(content, payload)
-        mark_downstream_chapters_stale(project, chapter_number)
+        stale_chapter_count = mark_downstream_chapters_stale(project, chapter_number)
         await db.commit()
-        return to_detail(content)
+        return to_detail(content, impact=build_chapter_impact_summary(stale_chapter_count))
 
     async def approve_chapter(
         self,
@@ -197,9 +198,9 @@ class ChapterContentService:
             chapter_number=chapter_number,
             source_content_version_id=source_version.id,
         )
-        mark_downstream_chapters_stale(project, chapter_number)
+        stale_chapter_count = mark_downstream_chapters_stale(project, chapter_number)
         await db.commit()
-        return to_detail(content)
+        return to_detail(content, impact=build_chapter_impact_summary(stale_chapter_count))
 
     async def mark_best_version(
         self,

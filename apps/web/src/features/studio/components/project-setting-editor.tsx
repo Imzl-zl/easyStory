@@ -4,21 +4,26 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { SectionCard } from "@/components/ui/section-card";
+import { ProjectSettingImpactPanel } from "@/features/studio/components/project-setting-impact-panel";
+import {
+  buildSettingIssueSummary,
+  buildSettingSaveFeedback,
+  EMPTY_SETTING,
+  invalidateProjectSettingQueries,
+} from "@/features/studio/components/project-setting-editor-support";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getErrorMessage } from "@/lib/api/client";
 import { checkProjectSetting, updateProjectSetting } from "@/lib/api/projects";
-import type { ProjectSetting, SettingCompletenessResult } from "@/lib/api/types";
+import type {
+  ProjectSetting,
+  ProjectSettingImpactSummary,
+  SettingCompletenessResult,
+} from "@/lib/api/types";
 
 type ProjectSettingEditorProps = {
   projectId: string;
   initialSetting: ProjectSetting | null;
   completeness?: SettingCompletenessResult;
-};
-
-const EMPTY_SETTING: ProjectSetting = {
-  protagonist: {},
-  world_setting: {},
-  scale: {},
 };
 
 export function ProjectSettingEditor({
@@ -27,12 +32,22 @@ export function ProjectSettingEditor({
   completeness,
 }: ProjectSettingEditorProps) {
   const formKey = JSON.stringify(initialSetting ?? EMPTY_SETTING);
+  const [lastImpactState, setLastImpactState] = useState<{
+    impact: ProjectSettingImpactSummary | null;
+    projectId: string;
+  }>({
+    projectId,
+    impact: null,
+  });
+  const lastImpact = lastImpactState.projectId === projectId ? lastImpactState.impact : null;
 
   return (
     <ProjectSettingEditorForm
       key={formKey}
       completeness={completeness}
       initialSetting={initialSetting ?? EMPTY_SETTING}
+      lastImpact={lastImpact}
+      onImpactChange={(impact) => setLastImpactState({ projectId, impact })}
       projectId={projectId}
     />
   );
@@ -42,10 +57,14 @@ function ProjectSettingEditorForm({
   projectId,
   initialSetting,
   completeness,
+  lastImpact,
+  onImpactChange,
 }: {
   projectId: string;
   initialSetting: ProjectSetting;
   completeness?: SettingCompletenessResult;
+  lastImpact: ProjectSettingImpactSummary | null;
+  onImpactChange: (impact: ProjectSettingImpactSummary | null) => void;
 }) {
   const queryClient = useQueryClient();
   const [setting, setSetting] = useState<ProjectSetting>(initialSetting);
@@ -53,12 +72,15 @@ function ProjectSettingEditorForm({
 
   const saveMutation = useMutation({
     mutationFn: () => updateProjectSetting(projectId, setting),
-    onSuccess: () => {
-      setFeedback("项目设定已保存。");
-      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
-      queryClient.invalidateQueries({ queryKey: ["setting-check", projectId] });
+    onSuccess: (result) => {
+      onImpactChange(result.impact);
+      setFeedback(buildSettingSaveFeedback(result.impact));
+      invalidateProjectSettingQueries(queryClient, projectId, result.impact);
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) => {
+      onImpactChange(null);
+      setFeedback(getErrorMessage(error));
+    },
   });
 
   const checkMutation = useMutation({
@@ -66,14 +88,12 @@ function ProjectSettingEditorForm({
     onSuccess: (result) => {
       setFeedback(`完整度检查完成：${result.status}`);
       queryClient.setQueryData(["setting-check", projectId], result);
+      queryClient.invalidateQueries({ queryKey: ["project-preparation-status", projectId] });
     },
     onError: (error) => setFeedback(getErrorMessage(error)),
   });
 
-  const issueSummary =
-    completeness && completeness.issues.length > 0
-      ? completeness.issues.map((issue) => `${issue.field}: ${issue.message}`).join(" / ")
-      : "当前没有阻塞或警告项。";
+  const issueSummary = buildSettingIssueSummary(completeness);
 
   return (
     <SectionCard
@@ -257,6 +277,8 @@ function ProjectSettingEditorForm({
             {feedback}
           </div>
         ) : null}
+
+        {lastImpact ? <ProjectSettingImpactPanel impact={lastImpact} /> : null}
       </div>
     </SectionCard>
   );

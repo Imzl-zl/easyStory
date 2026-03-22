@@ -63,13 +63,16 @@ context_injection:
 | `project_setting` | `{{ project_setting }}` | 项目设定（结构化设定文档，可全文或摘要注入） |
 | `outline` | `{{ outline }}` | 大纲 |
 | `opening_plan` | `{{ opening_plan }}` | 开篇设计（前 1-3 章的阶段约束） |
+| `world_setting` | `{{ world_setting }}` | 从 `ProjectSetting.world_setting` 投影出的结构化世界观视图 |
+| `character_profile` | `{{ character_profile }}` | 从 `ProjectSetting.protagonist/key_supporting_roles` 投影出的人物设定视图 |
 | `chapter_task` | `{{ chapter_task }}` | 当前章节任务（来自 ChapterTask：title/brief/关键角色等） |
 | `previous_chapters` | `{{ previous_content }}` | 前 N 章，用 `\n\n---\n\n` 分隔 |
+| `chapter_summary` | `{{ chapter_summary }}` | 基于既有章节 current version 派生的轻量摘要视图，默认按最近章节聚合，不新增摘要真值表 |
 | `story_bible` | `{{ story_bible }}` | 事实库，按 fact_type 分组 |
 | `style_reference` | `{{ style_reference }}` | 基于 `analysis_id` + `inject_fields` 的显式风格参考，仅允许绑定 `analysis_type=style` 的分析记录；若目标分析不存在则直接报错 |
 
 以下类型仍属于设计预留，**当前 runtime 尚未实现**，不能直接写入现有 workflow 配置：
-`chapter_list`、`character_profile`、`world_setting`、`chapter_summary`、`writing_preferences`、`foreshadowing_reminder`、`custom`
+`chapter_list`、`writing_preferences`、`foreshadowing_reminder`、`custom`
 
 ### 前置创作资产的分层注入
 
@@ -182,12 +185,15 @@ ContextBuilder.build_context(..., referenced_variables=...)
 | project_setting | 1（最高） | 0 | 永不裁剪 |
 | chapter_task | 1 | 0 | 永不裁剪 |
 | opening_plan | 2 | 200 | 第 4 章后优先降级为摘要，再参与裁剪 |
+| world_setting | 2 | 0 | 从 `ProjectSetting.world_setting` 投影生成，预算紧张时允许整体丢弃 |
+| character_profile | 2 | 0 | 从 `ProjectSetting` 人物结构投影生成，预算紧张时允许整体丢弃 |
 | story_bible | 2 | 500 | 丢弃最早的事实 |
 | previous_chapters | 5 | 500 | 尾部截断 |
+| chapter_summary | 6 | 200 | 基于 current version excerpt 生成，尾部截断 |
 | style_reference | 7 | 0 | 默认最多 500 tokens，超出后先在 section 内裁剪 |
 | outline | 8（最低） | 200 | 尾部截断 |
 
-`writing_preferences`、`foreshadowing_reminder`、`chapter_summary` 等裁剪策略仍属于后续扩展设计，当前运行时未实现。
+`writing_preferences`、`foreshadowing_reminder` 等裁剪策略仍属于后续扩展设计，当前运行时未实现。
 
 ### 5.2 裁剪流程
 

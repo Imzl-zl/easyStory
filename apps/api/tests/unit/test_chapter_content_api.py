@@ -42,6 +42,7 @@ async def test_chapter_api_supports_save_history_rollback_and_best_version(monke
             )
             assert save_response.status_code == 200
             assert save_response.json()["current_version_number"] == 1
+            assert save_response.json()["impact"]["has_impact"] is False
 
             approve_response = await client.post(
                 f"/api/v1/projects/{project_id}/chapters/1/approve",
@@ -68,6 +69,7 @@ async def test_chapter_api_supports_save_history_rollback_and_best_version(monke
             )
             assert second_save.status_code == 200
             assert second_save.json()["current_version_number"] == 2
+            assert second_save.json()["impact"]["has_impact"] is False
 
             versions_response = await client.get(
                 f"/api/v1/projects/{project_id}/chapters/1/versions",
@@ -83,6 +85,7 @@ async def test_chapter_api_supports_save_history_rollback_and_best_version(monke
             assert rollback_response.status_code == 200
             assert rollback_response.json()["current_version_number"] == 3
             assert rollback_response.json()["content_text"].startswith("林渊连夜逃离宗门")
+            assert rollback_response.json()["impact"]["has_impact"] is False
 
             clear_best_response = await client.delete(
                 f"/api/v1/projects/{project_id}/chapters/1/versions/1/best",
@@ -153,6 +156,10 @@ async def test_chapter_api_editing_old_chapter_marks_later_chapters_stale(monkey
             )
             assert response.status_code == 200
             assert response.json()["status"] == "draft"
+            assert response.json()["impact"]["has_impact"] is True
+            assert response.json()["impact"]["total_affected_entries"] == 1
+            assert response.json()["impact"]["items"][0]["target"] == "chapter"
+            assert response.json()["impact"]["items"][0]["action"] == "mark_stale"
 
             downstream = await client.get(
                 f"/api/v1/projects/{project_id}/chapters/2",

@@ -23,6 +23,7 @@ from .credential_query_support import (
     OWNER_TYPE_PROJECT,
     OWNER_TYPE_SYSTEM,
     OWNER_TYPE_USER,
+    ensure_credential_is_deletable,
     ensure_unique_provider,
     find_active_credential,
     load_project_if_present,
@@ -159,6 +160,7 @@ class CredentialService:
             actor_user_id=actor_user_id,
             project_service=self.project_service,
         )
+        await ensure_credential_is_deletable(db, credential.id)
         record_audit(
             db,
             actor_user_id=actor_user_id,

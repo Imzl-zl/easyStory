@@ -5,6 +5,7 @@ import type {
   ChapterSummary,
   ChapterVersion,
   StoryAsset,
+  StoryAssetMutation,
   StoryAssetSavePayload,
 } from "@/lib/api/types";
 
@@ -13,14 +14,14 @@ export function getOutline(projectId: string) {
 }
 
 export function saveOutline(projectId: string, payload: StoryAssetSavePayload) {
-  return requestJson<StoryAsset>(`/api/v1/projects/${projectId}/outline`, {
+  return requestJson<StoryAssetMutation>(`/api/v1/projects/${projectId}/outline`, {
     method: "PUT",
     body: payload,
   });
 }
 
 export function approveOutline(projectId: string) {
-  return requestJson<StoryAsset>(`/api/v1/projects/${projectId}/outline/approve`, {
+  return requestJson<StoryAssetMutation>(`/api/v1/projects/${projectId}/outline/approve`, {
     method: "POST",
   });
 }
@@ -30,14 +31,14 @@ export function getOpeningPlan(projectId: string) {
 }
 
 export function saveOpeningPlan(projectId: string, payload: StoryAssetSavePayload) {
-  return requestJson<StoryAsset>(`/api/v1/projects/${projectId}/opening-plan`, {
+  return requestJson<StoryAssetMutation>(`/api/v1/projects/${projectId}/opening-plan`, {
     method: "PUT",
     body: payload,
   });
 }
 
 export function approveOpeningPlan(projectId: string) {
-  return requestJson<StoryAsset>(`/api/v1/projects/${projectId}/opening-plan/approve`, {
+  return requestJson<StoryAssetMutation>(`/api/v1/projects/${projectId}/opening-plan/approve`, {
     method: "POST",
   });
 }

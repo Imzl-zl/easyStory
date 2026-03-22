@@ -1,5 +1,7 @@
 import asyncio
 
+from app.modules.content.models import Content, ContentVersion
+
 from app.modules.project.service import ProjectService, ProjectSettingUpdateDTO
 from tests.unit.async_service_support import async_db
 
@@ -92,12 +94,39 @@ def test_update_project_setting_syncs_summary_and_marks_related_content_stale(db
 
     assert result.genre == "仙侠"
     assert result.target_words == 800000
+    assert result.impact.has_impact is True
+    assert result.impact.total_affected_entries == 4
+    assert [(item.target, item.count) for item in result.impact.items] == [
+        ("outline", 1),
+        ("opening_plan", 1),
+        ("chapter", 1),
+        ("chapter_tasks", 1),
+    ]
     assert project.genre == "仙侠"
     assert project.target_words == 800000
     assert outline.status == "stale"
     assert opening_plan.status == "stale"
     assert chapter.status == "stale"
     assert chapter_task.status == "stale"
+
+
+def test_update_project_setting_returns_empty_impact_when_value_is_unchanged(db):
+    project = create_project(
+        db,
+        project_setting=ready_project_setting(),
+    )
+
+    result = asyncio.run(
+        ProjectService().update_project_setting(
+            async_db(db),
+            project.id,
+            ProjectSettingUpdateDTO(project_setting=ready_project_setting()),
+        )
+    )
+
+    assert result.impact.has_impact is False
+    assert result.impact.total_affected_entries == 0
+    assert result.impact.items == []
 
 
 def test_check_setting_completeness_returns_blocked_and_warning_issues(db):
@@ -119,3 +148,96 @@ def test_check_setting_completeness_returns_blocked_and_warning_issues(db):
     assert issue_fields["world_setting"] == "blocked"
     assert issue_fields["tone"] == "warning"
     assert issue_fields["scale"] == "warning"
+
+
+def test_get_preparation_status_points_to_setting_when_project_is_incomplete(db):
+    project = create_project(
+        db,
+        project_setting={"genre": "玄幻"},
+    )
+
+    result = asyncio.run(ProjectService().get_preparation_status(async_db(db), project.id))
+
+    assert result.setting.status == "blocked"
+    assert result.outline.step_status == "not_started"
+    assert result.opening_plan.step_status == "not_started"
+    assert result.chapter_tasks.step_status == "not_started"
+    assert result.can_start_workflow is False
+    assert result.next_step == "setting"
+
+
+def test_get_preparation_status_identifies_workflow_gate_when_assets_ready(db):
+    project = create_project(
+        db,
+        project_setting=ready_project_setting(),
+    )
+    _create_story_asset(db, project.id, "outline", "approved", "主线大纲")
+    _create_story_asset(db, project.id, "opening_plan", "approved", "前三章开篇设计")
+
+    result = asyncio.run(ProjectService().get_preparation_status(async_db(db), project.id))
+
+    assert result.setting.status == "ready"
+    assert result.outline.step_status == "approved"
+    assert result.opening_plan.step_status == "approved"
+    assert result.chapter_tasks.step_status == "not_started"
+    assert result.can_start_workflow is True
+    assert result.next_step == "workflow"
+
+
+def test_get_preparation_status_flags_stale_tasks_under_active_workflow(db):
+    project = create_project(
+        db,
+        project_setting=ready_project_setting(),
+    )
+    workflow = create_workflow(
+        db,
+        project=project,
+        status="paused",
+        current_node_id="chapter_gen",
+    )
+    _create_story_asset(db, project.id, "outline", "approved", "主线大纲")
+    _create_story_asset(db, project.id, "opening_plan", "approved", "前三章开篇设计")
+    create_chapter_task(
+        db,
+        workflow=workflow,
+        chapter_number=1,
+        title="第一章",
+        brief="旧任务",
+        status="stale",
+    )
+
+    result = asyncio.run(ProjectService().get_preparation_status(async_db(db), project.id))
+
+    assert result.active_workflow is not None
+    assert result.active_workflow.execution_id == workflow.id
+    assert result.chapter_tasks.step_status == "stale"
+    assert result.chapter_tasks.counts.stale == 1
+    assert result.can_start_workflow is False
+    assert result.next_step == "chapter_tasks"
+
+
+def _create_story_asset(
+    db,
+    project_id,
+    content_type: str,
+    status: str,
+    content_text: str,
+) -> None:
+    content = Content(
+        project_id=project_id,
+        content_type=content_type,
+        title="大纲" if content_type == "outline" else "开篇设计",
+        chapter_number=None,
+        status=status,
+    )
+    db.add(content)
+    db.flush()
+    db.add(
+        ContentVersion(
+            content_id=content.id,
+            version_number=1,
+            content_text=content_text,
+            is_current=True,
+        )
+    )
+    db.commit()

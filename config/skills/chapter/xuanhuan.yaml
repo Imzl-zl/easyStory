@@ -26,12 +26,17 @@ skill:
     {{ previous_content }}
     {% endif %}
 
+    {% if chapter_summary %}
+    【近期摘要】
+    {{ chapter_summary }}
+    {% endif %}
+
     {% if story_bible %}
     【事实库】
     {{ story_bible }}
     {% endif %}
 
-    {% if not previous_content and not story_bible %}
+    {% if not previous_content and not chapter_summary and not story_bible %}
     【创作提示】
     这是故事的第一章或新的篇章起点，请优先建立世界观、明确主角处境并稳住基调。
     {% endif %}
@@ -52,6 +57,10 @@ skill:
       type: "string"
       required: true
     previous_content:
+      type: "string"
+      required: false
+      default: ""
+    chapter_summary:
       type: "string"
       required: false
       default: ""

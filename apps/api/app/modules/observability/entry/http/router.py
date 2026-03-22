@@ -11,9 +11,12 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.modules.observability.service import (
+    AuditLogQueryService,
+    AuditLogViewDTO,
     ExecutionLogViewDTO,
     NodeExecutionViewDTO,
     PromptReplayViewDTO,
+    create_audit_log_query_service,
     WorkflowObservabilityService,
     create_workflow_observability_service,
 )
@@ -26,6 +29,52 @@ router = APIRouter(tags=["observability"])
 
 async def get_workflow_observability_service() -> WorkflowObservabilityService:
     return create_workflow_observability_service()
+
+
+async def get_audit_log_query_service() -> AuditLogQueryService:
+    return create_audit_log_query_service()
+
+
+@router.get(
+    "/api/v1/projects/{project_id}/audit-logs",
+    response_model=list[AuditLogViewDTO],
+)
+async def list_project_audit_logs(
+    project_id: uuid.UUID,
+    event_type: str | None = Query(default=None, max_length=50),
+    limit: int = Query(default=100, ge=1, le=200),
+    audit_log_query_service: AuditLogQueryService = Depends(get_audit_log_query_service),
+    current_user: User = Depends(get_current_user),
+    db=Depends(get_async_db_session),
+) -> list[AuditLogViewDTO]:
+    return await audit_log_query_service.list_project_audit_logs(
+        db,
+        project_id,
+        owner_id=current_user.id,
+        event_type=event_type,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/api/v1/credentials/{credential_id}/audit-logs",
+    response_model=list[AuditLogViewDTO],
+)
+async def list_credential_audit_logs(
+    credential_id: uuid.UUID,
+    event_type: str | None = Query(default=None, max_length=50),
+    limit: int = Query(default=100, ge=1, le=200),
+    audit_log_query_service: AuditLogQueryService = Depends(get_audit_log_query_service),
+    current_user: User = Depends(get_current_user),
+    db=Depends(get_async_db_session),
+) -> list[AuditLogViewDTO]:
+    return await audit_log_query_service.list_credential_audit_logs(
+        db,
+        credential_id,
+        owner_id=current_user.id,
+        event_type=event_type,
+        limit=limit,
+    )
 
 
 @router.get(

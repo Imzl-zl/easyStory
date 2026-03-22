@@ -224,6 +224,33 @@ async def test_update_chapter_task_rejects_completed_task(monkeypatch, tmp_path)
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
+async def test_update_chapter_task_rejects_stale_task(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="chapter-task-api-stale")
+    )
+    _project_id, owner_id, workflow_id = _seed_project_with_tasks(
+        session_factory,
+        stale_chapter=2,
+    )
+    app = create_app(
+        async_session_factory=async_session_factory,
+    )
+
+    try:
+        async with started_async_client(app) as client:
+            response = await client.put(
+                f"/api/v1/workflows/{workflow_id}/chapter-tasks/2",
+                json={"brief": "不应允许直接编辑 stale 任务"},
+                headers=_auth_headers(owner_id),
+            )
+
+        assert response.status_code == 422
+        assert "必须先重建章节计划" in response.json()["detail"]
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
 def _seed_project_with_active_workflow(
     session_factory: sessionmaker[Session],
     *,
@@ -256,6 +283,7 @@ def _seed_project_with_tasks(
     session_factory: sessionmaker[Session],
     *,
     completed_chapter: int | None = None,
+    stale_chapter: int | None = None,
 ) -> tuple[str, uuid.UUID, str]:
     project_id, owner_id, workflow_id = _seed_project_with_active_workflow(
         session_factory,
@@ -278,7 +306,7 @@ def _seed_project_with_tasks(
             chapter_number=2,
             title="第二章",
             brief="第二章摘要",
-            status="completed" if completed_chapter == 2 else "pending",
+            status="completed" if completed_chapter == 2 else "stale" if stale_chapter == 2 else "pending",
         )
     return project_id, owner_id, workflow_id
 

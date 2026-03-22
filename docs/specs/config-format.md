@@ -195,11 +195,12 @@ skill:
       required: true
       description: "小说题材"
       enum: ["玄幻", "都市", "科幻", "言情"]
-    protagonist:
+    character_profile:
       type: "string"
       required: true
+      description: "人物设定投影视图"
       min_length: 2
-      max_length: 500
+      max_length: 1200
     target_chapters:
       type: "integer"
       required: false
@@ -598,13 +599,20 @@ workflow:
 | `project_setting` | 项目设定（结构化设定文档） | - |
 | `outline` | 大纲 | - |
 | `opening_plan` | 开篇设计（前 1-3 章的阶段约束） | - |
+| `world_setting` | 基于 `ProjectSetting.world_setting` 的结构化投影视图 | - |
+| `character_profile` | 基于 `ProjectSetting.protagonist/key_supporting_roles` 的人物设定投影视图 | - |
 | `chapter_task` | 当前章节任务（来自 ChapterTask） | - |
 | `previous_chapters` | 前 N 章 | `count` |
+| `chapter_summary` | 基于 `chapter` 当前版本派生的轻量摘要视图 | `count` |
 | `story_bible` | Story Bible 事实库 | - |
 | `style_reference` | 基于分析结果的风格参考，仅允许引用 `analysis_type=style` 的记录；目标分析缺失时会直接报错；当前 runtime 默认最多 500 tokens，超出会先在 section 内裁剪并在上下文报告中暴露原始 token | `analysis_id`、`inject_fields` |
 
 以下类型仍属扩展预留，**当前 schema 会直接拒绝**，不能写入现有 workflow 配置：
-`chapter_list`、`character_profile`、`world_setting`、`chapter_summary`、`writing_preferences`、`foreshadowing_reminder`、`custom`
+`chapter_list`、`writing_preferences`、`foreshadowing_reminder`、`custom`
+
+> `chapter_summary` 当前实现采用 deterministic excerpt：直接基于既有 `chapter` 的 current version 生成轻量摘要视图，不新建摘要表，也不引入 LLM 自动摘要链路。
+>
+> `world_setting` 与 `character_profile` 当前实现也采用 deterministic projection：直接从 `ProjectSetting` 投影生成，不新建世界观/角色主表。
 
 > `style_reference` 需要绑定项目内真实 `analysis_id`，且该记录必须是 `analysis_type=style`；若目标分析被删除或不属于当前项目，runtime 会直接报错而不是静默跳过。同时它属于体验型上下文，当前 runtime 默认会把单个 `style_reference` section 收敛到 500 tokens 以内，并在上下文报告中保留裁剪前后的 token 信息。因此更适合写入项目运行时 workflow snapshot 或用户显式保存的项目配置；不建议把仓库共享的内置 workflow YAML 固化为某个具体项目的分析 UUID。
 

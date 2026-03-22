@@ -11,6 +11,10 @@ ContentType = Literal["outline", "opening_plan", "chapter"]
 ContentStatus = Literal["draft", "approved", "stale", "archived"]
 ContentCreatedBy = Literal["system", "user", "ai_assist", "auto_fix", "ai_partial"]
 ContentChangeSource = Literal["user_edit", "ai_generate", "ai_fix", "import"]
+StoryAssetImpactAction = Literal["mark_stale"]
+StoryAssetImpactTarget = Literal["opening_plan", "chapter", "chapter_tasks"]
+ChapterImpactAction = Literal["mark_stale"]
+ChapterImpactTarget = Literal["chapter"]
 
 
 class StoryAssetSaveDTO(BaseModel):
@@ -23,6 +27,12 @@ class StoryAssetSaveDTO(BaseModel):
     change_source: ContentChangeSource = "user_edit"
 
 
+class StoryAssetGenerateDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    workflow_id: str | None = None
+
+
 class StoryAssetDTO(BaseModel):
     project_id: uuid.UUID
     content_id: uuid.UUID
@@ -31,6 +41,23 @@ class StoryAssetDTO(BaseModel):
     status: ContentStatus
     version_number: int
     content_text: str
+
+
+class StoryAssetImpactItemDTO(BaseModel):
+    target: StoryAssetImpactTarget
+    action: StoryAssetImpactAction
+    count: int = Field(ge=1)
+    message: str
+
+
+class StoryAssetImpactSummaryDTO(BaseModel):
+    has_impact: bool = False
+    total_affected_entries: int = 0
+    items: list[StoryAssetImpactItemDTO] = Field(default_factory=list)
+
+
+class StoryAssetMutationDTO(StoryAssetDTO):
+    impact: StoryAssetImpactSummaryDTO = Field(default_factory=StoryAssetImpactSummaryDTO)
 
 
 class StoryAssetVersionDTO(BaseModel):
@@ -59,6 +86,19 @@ class ChapterSaveDTO(BaseModel):
     )
 
 
+class ChapterImpactItemDTO(BaseModel):
+    target: ChapterImpactTarget
+    action: ChapterImpactAction
+    count: int = Field(ge=1)
+    message: str
+
+
+class ChapterImpactSummaryDTO(BaseModel):
+    has_impact: bool = False
+    total_affected_entries: int = 0
+    items: list[ChapterImpactItemDTO] = Field(default_factory=list)
+
+
 class ChapterSummaryDTO(BaseModel):
     project_id: uuid.UUID
     content_id: uuid.UUID
@@ -77,6 +117,7 @@ class ChapterDetailDTO(ChapterSummaryDTO):
     created_by: ContentCreatedBy
     change_source: ContentChangeSource
     context_snapshot_hash: str | None
+    impact: ChapterImpactSummaryDTO = Field(default_factory=ChapterImpactSummaryDTO)
 
 
 class ChapterVersionDTO(BaseModel):

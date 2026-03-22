@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from sqlalchemy import select
 
+from app.modules.content.models import Content
 from app.modules.project.service import (
     ProjectCreateDTO,
     ProjectUpdateDTO,
@@ -72,3 +74,33 @@ def test_project_management_service_hides_other_users_projects(db) -> None:
 
     with pytest.raises(NotFoundError):
         asyncio.run(service.get_project(async_db(db), project.id, owner_id=outsider.id))
+
+
+def test_project_management_service_scaffolds_preparation_assets_on_create(db) -> None:
+    owner = create_user(db)
+    service = create_project_management_service()
+
+    created = asyncio.run(
+        service.create_project(
+            async_db(db),
+            ProjectCreateDTO(name="带骨架项目"),
+            owner_id=owner.id,
+        )
+    )
+
+    contents = (
+        db.execute(
+            select(Content)
+            .where(Content.project_id == created.id)
+            .order_by(Content.content_type.asc())
+        )
+        .scalars()
+        .all()
+    )
+
+    assert [content.content_type for content in contents] == ["opening_plan", "outline"]
+    assert [content.title for content in contents] == ["开篇设计", "大纲"]
+    assert all(content.status == "draft" for content in contents)
+    assert all(len(content.versions) == 1 for content in contents)
+    assert all(content.versions[0].version_number == 1 for content in contents)
+    assert all(content.versions[0].content_text == "" for content in contents)

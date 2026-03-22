@@ -12,8 +12,8 @@ skill:
     【题材】
     {{ genre }}
 
-    【主角】
-    {{ protagonist }}
+    【人物设定】
+    {{ character_profile }}
 
     【世界观】
     {{ world_setting }}
@@ -27,7 +27,7 @@ skill:
     genre:
       type: "string"
       required: true
-    protagonist:
+    character_profile:
       type: "string"
       required: true
     world_setting:

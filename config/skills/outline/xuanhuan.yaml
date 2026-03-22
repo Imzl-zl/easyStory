@@ -10,7 +10,7 @@ skill:
     你是资深玄幻小说作家。
 
     【题材】{{ genre }}
-    【主角】{{ protagonist }}
+    【人物设定】{{ character_profile }}
     【世界观】{{ world_setting }}
 
     生成包含开端、发展、高潮、结局的大纲。
@@ -20,10 +20,10 @@ skill:
       type: "string"
       required: true
       description: "小说题材"
-    protagonist:
+    character_profile:
       type: "string"
       required: true
-      description: "主角设定"
+      description: "人物设定投影视图"
     world_setting:
       type: "string"
       required: true

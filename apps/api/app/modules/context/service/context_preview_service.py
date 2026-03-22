@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 import uuid
 
@@ -22,7 +23,7 @@ from app.shared.runtime.errors import BusinessRuleError, ConfigurationError, Not
 
 from .dto import ContextPreviewDTO, ContextPreviewRequestDTO
 
-CHAPTER_NUMBER_REQUIRED_TYPES = frozenset({"chapter_task", "previous_chapters"})
+CHAPTER_NUMBER_REQUIRED_TYPES = frozenset({"chapter_task", "previous_chapters", "chapter_summary"})
 
 
 class ContextPreviewService:
@@ -187,4 +188,6 @@ class ContextPreviewService:
     def _stringify_value(self, value: Any) -> str:
         if value is None:
             return ""
-        return str(value)
+        if isinstance(value, str):
+            return value
+        return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)

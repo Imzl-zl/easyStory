@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,10 +13,18 @@ from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 from .dto import ProjectCreateDTO, ProjectDetailDTO, ProjectSummaryDTO, ProjectUpdateDTO
 from .project_service import ProjectService
 
+if TYPE_CHECKING:
+    from app.modules.content.service import StoryAssetService
+
 
 class ProjectManagementService:
-    def __init__(self, project_service: ProjectService) -> None:
+    def __init__(
+        self,
+        project_service: ProjectService,
+        story_asset_service: StoryAssetService,
+    ) -> None:
         self.project_service = project_service
+        self.story_asset_service = story_asset_service
 
     async def create_project(
         self,
@@ -32,6 +41,8 @@ class ProjectManagementService:
             allow_system_credential_pool=payload.allow_system_credential_pool,
         )
         db.add(project)
+        await db.flush()
+        await self.story_asset_service.scaffold_preparation_assets(db, project.id)
         await db.commit()
         await db.refresh(project)
         return self._to_detail(project)

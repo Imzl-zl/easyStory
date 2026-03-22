@@ -57,6 +57,15 @@ export type ChapterTaskDraft = {
   key_events?: string[];
 };
 
+export type ChapterTaskStatus =
+  | "pending"
+  | "generating"
+  | "completed"
+  | "failed"
+  | "skipped"
+  | "stale"
+  | "interrupted";
+
 export type ChapterTaskUpdatePayload = {
   title?: string;
   brief?: string;
@@ -73,7 +82,7 @@ export type ChapterTaskView = {
   brief: string;
   key_characters: string[];
   key_events: string[];
-  status: string;
+  status: ChapterTaskStatus;
   content_id: string | null;
 };
 

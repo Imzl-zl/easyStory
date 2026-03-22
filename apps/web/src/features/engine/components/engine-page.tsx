@@ -12,12 +12,13 @@ import { EngineBlock } from "@/features/engine/components/engine-block";
 import { EngineContextPanel } from "@/features/engine/components/engine-context-panel";
 import { EngineLogsPanel } from "@/features/engine/components/engine-logs-panel";
 import { EngineReviewPanel } from "@/features/engine/components/engine-review-panel";
+import { EngineTaskPanel } from "@/features/engine/components/engine-task-panel";
 import { getWorkflowBillingSummary, listWorkflowTokenUsages } from "@/lib/api/billing";
 import { getErrorMessage } from "@/lib/api/client";
 import { createWorkflowExports, listProjectExports } from "@/lib/api/export";
 import { listWorkflowExecutions, listWorkflowLogs, listPromptReplays } from "@/lib/api/observability";
 import { getWorkflowReviewSummary, listWorkflowReviewActions } from "@/lib/api/review";
-import { getWorkflow, listChapterTasks, pauseWorkflow, resumeWorkflow, startWorkflow, cancelWorkflow } from "@/lib/api/workflow";
+import { getWorkflow, pauseWorkflow, resumeWorkflow, startWorkflow, cancelWorkflow } from "@/lib/api/workflow";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import { EngineExportPanel } from "@/features/engine/components/engine-export-panel";
 import { resolveEngineWorkflowControls, shouldPollWorkflow } from "@/features/engine/components/engine-workflow-controls";
@@ -58,11 +59,6 @@ export function EnginePage({ projectId }: EnginePageProps) {
   });
   const workflowControls = resolveEngineWorkflowControls(workflowQuery.data);
   const hasWorkflow = Boolean(workflowId && workflowQuery.data);
-  const chapterTasksQuery = useQuery({
-    queryKey: ["workflow-tasks", workflowId],
-    queryFn: () => listChapterTasks(workflowId),
-    enabled: hasWorkflow,
-  });
   const reviewsQuery = useQuery({
     queryKey: ["workflow-reviews", workflowId],
     queryFn: () => Promise.all([getWorkflowReviewSummary(workflowId), listWorkflowReviewActions(workflowId)]),
@@ -204,7 +200,11 @@ export function EnginePage({ projectId }: EnginePageProps) {
             ) : null}
             {tab === "tasks" ? (
               <EngineBlock title="章节任务">
-                {chapterTasksQuery.data?.length ? <CodeBlock value={chapterTasksQuery.data} /> : <EmptyState title="没有章节任务" description="当前工作流尚未生成章节任务。" />}
+                <EngineTaskPanel
+                  key={workflowId || "workflow-empty"}
+                  projectId={projectId}
+                  workflow={workflowQuery.data}
+                />
               </EngineBlock>
             ) : null}
             {tab === "reviews" ? (

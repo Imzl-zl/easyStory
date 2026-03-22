@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from app.modules.observability.service import AuditLogService, create_audit_log_service
 from app.shared.runtime import EXPORT_ROOT_DIR
@@ -8,6 +9,9 @@ from app.shared.runtime import EXPORT_ROOT_DIR
 from .project_deletion_service import ProjectDeletionService
 from .project_management_service import ProjectManagementService
 from .project_service import ProjectService
+
+if TYPE_CHECKING:
+    from app.modules.content.service import StoryAssetService
 
 
 def create_project_service() -> ProjectService:
@@ -21,8 +25,17 @@ def _default_export_root() -> Path:
 def create_project_management_service(
     *,
     project_service: ProjectService | None = None,
+    story_asset_service: StoryAssetService | None = None,
 ) -> ProjectManagementService:
-    return ProjectManagementService(project_service=project_service or create_project_service())
+    project_service_instance = project_service or create_project_service()
+    if story_asset_service is None:
+        from app.modules.content.service import create_story_asset_service
+
+        story_asset_service = create_story_asset_service(project_service=project_service_instance)
+    return ProjectManagementService(
+        project_service=project_service_instance,
+        story_asset_service=story_asset_service,
+    )
 
 
 def create_project_deletion_service(

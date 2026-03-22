@@ -5,7 +5,13 @@ from datetime import datetime, timezone
 from app.modules.content.models import Content, ContentVersion
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 
-from .dto import ChapterDetailDTO, ChapterSaveDTO, ChapterSummaryDTO, ChapterVersionDTO
+from .dto import (
+    ChapterDetailDTO,
+    ChapterImpactSummaryDTO,
+    ChapterSaveDTO,
+    ChapterSummaryDTO,
+    ChapterVersionDTO,
+)
 
 CHAPTER_TYPE = "chapter"
 PREPARATION_ASSET_TYPES = ("outline", "opening_plan")
@@ -104,7 +110,11 @@ def to_summary(content: Content) -> ChapterSummaryDTO:
     )
 
 
-def to_detail(content: Content) -> ChapterDetailDTO:
+def to_detail(
+    content: Content,
+    *,
+    impact: ChapterImpactSummaryDTO | None = None,
+) -> ChapterDetailDTO:
     version = require_current_version(content)
     summary = to_summary(content)
     return ChapterDetailDTO(
@@ -114,6 +124,7 @@ def to_detail(content: Content) -> ChapterDetailDTO:
         created_by=version.created_by,
         change_source=version.change_source,
         context_snapshot_hash=version.context_snapshot_hash,
+        impact=impact or ChapterImpactSummaryDTO(),
     )
 
 

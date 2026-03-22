@@ -773,3 +773,231 @@
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
 - **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_workflow_app_service.py tests/unit/test_workflow_query_api.py` 通过，`6 passed`。
 - **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_analysis_service.py tests/unit/test_analysis_api.py tests/unit/test_analysis_query_service.py tests/unit/test_analysis_latest_query_service.py tests/unit/test_analysis_latest_api.py tests/unit/test_analysis_update_api.py tests/unit/test_analysis_delete_service.py tests/unit/test_analysis_delete_api.py tests/unit/test_context_preview_service.py tests/unit/test_context_builder_style_reference.py tests/unit/test_context_preview_style_reference.py tests/unit/test_context_preview_rendered_prompt_service.py tests/unit/test_context_preview_rendered_prompt_api.py tests/unit/test_context_api.py tests/unit/test_story_asset_service.py tests/unit/test_story_asset_query_service.py tests/unit/test_story_asset_query_api.py tests/unit/test_story_bible_query_service.py tests/unit/test_story_bible_query_api.py tests/unit/test_billing_query_service.py tests/unit/test_billing_project_query_service.py tests/unit/test_billing_api.py tests/unit/test_billing_project_query_api.py tests/unit/test_review_query_service.py tests/unit/test_review_summary_query_service.py tests/unit/test_review_api.py tests/unit/test_review_summary_api.py tests/unit/test_export_service.py tests/unit/test_export_query_service.py tests/unit/test_export_api.py tests/unit/test_export_query_api.py tests/unit/test_workflow_app_service.py tests/unit/test_workflow_query_api.py tests/unit/test_workflow_observability_service.py tests/unit/test_workflow_observability_query_service.py tests/unit/test_workflow_observability_api.py tests/unit/test_workflow_observability_query_api.py` 通过，`113 passed`。
+
+## [2026-03-22 | Project audit log 查询收口完成]
+- **Events**：继续稳步推进后端，把 `project` 生命周期的关键管理事件从“只写 audit log 不可读”收口到最小查询闭环。
+- **Changes**：`observability` 模块已新增 `AuditLogViewDTO`、`AuditLogQueryService` 与 `audit_log_query_support.py`；HTTP 层新增 `GET /api/v1/projects/{project_id}/audit-logs`，支持 `event_type / limit` 过滤。
+- **Changes**：当前查询只读取 `entity_type=project` 的现有审计真值，不改 `credential` 的审计写入逻辑，也不把 `AuditLog` 扩成“所有用户动作全量留痕”。
+- **Changes**：project audit 查询的 owner 校验刻意允许 soft-deleted project 被 owner 继续读取；因此 query service 没有复用默认“隐藏已删除项目”的口径，而是在 `observability` 内直接做 project owner 查询。
+- **Insights**：如果沿用默认 `require_project(include_deleted=False)`，project 一旦进回收站，owner 反而看不到刚写下的 `project_delete` 审计事件；这会让项目生命周期审计在最需要的时候失效。
+- **Insights**：`event_type` 过滤保持 debug-first；纯空白字符串会显式报 `event_type filter cannot be blank`，不做 silent trim-ignore。
+- **Insights**：实现过程中暴露出一次包级循环依赖风险：`observability` query service 若依赖 `project.service` 包入口，会触发 `project -> observability` 既有依赖环。最终改成在 `observability` 内直接做 project owner 查询，避免把 query 面做成新的循环导火索。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_project_audit_log_service.py tests/unit/test_project_audit_log_api.py tests/unit/test_project_api.py tests/unit/test_project_deletion_service.py tests/unit/test_workflow_observability_query_api.py tests/unit/test_workflow_observability_query_service.py` 通过，`15 passed`。
+
+## [2026-03-22 | project physical delete credential cleanup 修复完成]
+- **Events**：继续沿后端 correctness 缺口推进，修复 `project` 物理删除遗漏清理 `project-owned credential` 与其审计日志的问题。
+- **Changes**：`build_project_cleanup_statements()` 已新增 `project credential` 子查询，按 `owner_type=project && owner_id=project.id` 精确定位要清理的 `ModelCredential`。
+- **Changes**：删除顺序已补齐为：先删命中该 project graph 或命中 project credential 的 `TokenUsage`，再删 `entity_type=model_credential` 且 `entity_id in project_credential_ids` 的审计日志，最后删 `ModelCredential`；`system` credential 不受影响。
+- **Changes**：新增 `apps/api/tests/unit/project_deletion_seed_support.py` 作为测试 seed 支撑文件；`test_project_deletion_service.py` 与 `test_project_deletion_transaction.py` 已改为复用该 helper，主测试文件重新压回 300 行内。
+- **Changes**：新的 deletion seed 现在会同时创建一个 `project credential`、一个 `system credential` 和一条 `model_credential` 审计日志，并让 `TokenUsage.credential_id` 绑定到 `project credential`，真实覆盖这次删除顺序。
+- **Insights**：这不是“顺手增强项”，而是实际 correctness 问题。因为 `ModelCredential` 没有直接 project FK，原本的 project physical delete 会留下孤儿 credential 与 credential audit log，尤其对安全数据来说不可接受。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_project_deletion_service.py tests/unit/test_project_deletion_transaction.py tests/unit/test_project_api.py` 通过，`9 passed`。
+
+## [2026-03-22 | Credential audit log 查询收口完成]
+- **Events**：继续稳步推进后端，把 `credential` 模块里“只写不读”的安全审计补成最小查询闭环。
+- **Changes**：`observability` 模块已新增 credential audit query support，`AuditLogQueryService` 新增 `list_credential_audit_logs()`；HTTP 层新增 `GET /api/v1/credentials/{credential_id}/audit-logs`，支持 `event_type / limit` 过滤。
+- **Changes**：当前只读取现有 `entity_type=model_credential` 的审计真值，不改动 credential 写服务的 create/update/delete/verify/enable/disable 审计写入逻辑，也不新造第二套 DTO。
+- **Changes**：新增 `test_credential_audit_log_service.py` 与 `test_credential_audit_log_api.py`，覆盖 user credential、soft-deleted project credential、空白过滤、越权访问与 system credential 隐藏。
+- **Insights**：owner 校验不能直接复用 `require_actor_credential()`，因为它沿用默认 project 查询口径，会把 soft-deleted project 隐藏掉。最终改成在 `observability` 内直接按 `ModelCredential.owner_type/owner_id` 与 `Project.owner_id` 显式校验，从而保证项目进回收站后，owner 仍能读取 project credential 审计。
+- **Insights**：`system` credential 当前继续保持“只写不经用户 API 可读”的边界；这轮没有把系统级安全审计暴露给普通用户。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_credential_audit_log_service.py tests/unit/test_credential_audit_log_api.py tests/unit/test_credential_service.py tests/unit/test_credential_api.py` 通过，`15 passed`。
+
+## [2026-03-22 | credential delete 使用保护完成]
+- **Events**：继续沿 credential 生命周期做 correctness 收口，修复“已被使用的 credential 删除时只会抛数据库外键错误”的问题。
+- **Changes**：`credential_query_support.py` 已新增 `ensure_credential_is_deletable()` 与 `CREDENTIAL_DELETE_IN_USE_MESSAGE`；`CredentialService.delete_credential()` 现在会在删除前检查是否存在 `TokenUsage.credential_id == credential.id` 的历史引用。
+- **Changes**：当前删除语义已收紧为：未被 usage 引用的 credential 仍可正常删除并写入 `credential_delete` 审计；已被 usage 引用的 credential 返回显式 `BusinessRuleError`，不再把数据库层 `IntegrityError` 直接暴露给用户。
+- **Changes**：新增 `test_credential_delete_service.py` 与 `test_credential_delete_api.py`，覆盖未使用 credential 删除成功、已使用 credential 删除被拒绝、审计写入和 API `422` 响应。
+- **Insights**：这轮没有去级联删除 `TokenUsage`，也没有把 `ModelCredential` 改成软删除。原因是 `TokenUsage` 是 billing/历史真值，普通删除凭证不应篡改既有计费记录；正确修复是让业务层明确拒绝“删除已使用凭证”。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_credential_delete_service.py tests/unit/test_credential_delete_api.py tests/unit/test_credential_service.py tests/unit/test_credential_api.py` 通过，`15 passed`。
+
+## [2026-03-22 | project 默认前置资产 scaffold 完成]
+- **Events**：继续稳步推进前置创作资产主链路，把“新项目默认存在 Outline 与 OpeningPlan 两个明确关口”真正落到项目创建阶段。
+- **Changes**：`ProjectManagementService.create_project()` 现在会在同一事务里先 `flush()` 新项目，再调用 `StoryAssetService.scaffold_preparation_assets()`，默认创建两条 draft `Content`：`outline` 和 `opening_plan`。
+- **Changes**：新 scaffold 资产都会带一条空白初始 `ContentVersion`，因此新项目创建后可直接通过现有 `GET /api/v1/projects/{project_id}/outline` 与 `/opening-plan` 读取，不再返回 “asset not found”。
+- **Changes**：`StoryAssetService.approve_asset()` 已补空白确认保护；当前版本即使存在，只要内容为空白，就会显式抛 `BusinessRuleError("{asset_type} 内容为空，无法确认")`，防止空 scaffold 版本被误确认。
+- **Changes**：新增/扩展 `test_project_management_service.py`、`test_project_api.py`、`test_story_asset_service.py`，覆盖项目创建后默认 scaffold、API 默认读回，以及空白 scaffold 禁止确认。
+- **Insights**：这轮刻意保持模块边界为“project 编排、content 落库”；`project` 没有直接 import `Content/ContentVersion` 去写表，而是通过 `StoryAssetService` 公开能力完成 scaffold，避免跨模块直接操作持久化细节。
+- **Insights**：实现过程中暴露出一处旧耦合：`ProjectDeletionService` 之前会临时构造 `ProjectManagementService` 只为复用 `_to_detail()`。由于 management service 现在新增了 story asset 依赖，这种耦合立即变成真实回归；本轮已顺手改为 deletion service 直接 `ProjectDetailDTO.model_validate(...)`，把映射责任收回本模块。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_project_management_service.py tests/unit/test_project_api.py tests/unit/test_story_asset_service.py` 通过，`15 passed`。
+
+## [2026-03-22 | Story asset generate 闭环完成]
+- **Events**：继续稳步推进前置创作资产主链路，把 `outline` / `opening_plan` 从“只能 scaffold 和保存草稿”收口到可真实调用模型生成的 preparation 闭环。
+- **Changes**：`content` 模块已新增 `StoryAssetGenerateDTO` 与 `StoryAssetGenerationService`；生成路径会解析项目模板 workflow 或显式 `workflow_id`、加载目标 skill、渲染 prompt、解析启用 credential、调用 LLM，并最终统一回流到 `StoryAssetService.save_asset_draft()` 落库。
+- **Changes**：HTTP 层已新增 story asset generate 子路由，并把 `content` 主 router 拆分为 chapter 路由 + story asset 子路由，避免继续把所有前置资产接口堆在同一文件里。
+- **Changes**：`opening_plan` 生成前现在会显式要求项目已有确认态 `outline`；变量解析不复用 workflow context injection，而是只按 skill 声明字段从 `ProjectSetting` 与既有 story asset 真值读取，避免 `outline` 节点自引用。
+- **Insights**：这轮没有把 preparation generate 硬塞进现有 `workflow runtime`。原因是 runtime 的 billing、prompt replay、execution 记录都围绕 `workflow_execution` 设计，而 `outline/opening_plan` 生成发生在正式工作流启动前；先独立成 service 更符合当前边界。
+- **Insights**：当前 generate 闭环已经打通，但本轮刻意不补 preparation 阶段的 billing / prompt replay；这是范围控制，不是 fallback。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_story_asset_generation_service.py tests/unit/test_story_asset_generation_api.py tests/unit/test_story_asset_service.py` 通过，`13 passed`。
+
+## [2026-03-22 | preparation -> workflow API 回归补齐]
+- **Events**：在 story asset generate 闭环完成后，继续沿前置创作资产主链路做系统级自检，补上从设定完整度检查到 workflow start 的 API 回归。
+- **Changes**：新增 `apps/api/tests/unit/test_preparation_workflow_chain_api.py`，独立覆盖两条关键链路：`opening_plan` 仅生成 draft 时 `POST /workflows/start` 必须继续被确认关口拦下；以及 `setting -> outline generate/approve -> opening_plan generate/approve -> workflow start` 的完整成功路径。
+- **Changes**：新测试复用了 `build_runtime_app()` 的 fake workflow runtime，同时单独 override `get_story_asset_generation_service` 注入 `FakeToolProvider`；这样既能走真实 FastAPI 装配与依赖图，又不会引入外部 LLM 不确定性。
+- **Insights**：这轮没有修改生产实现，说明当前 `story asset generate`、审批关口与 `workflow start -> chapter_split` 的串联已经足够稳定；新增测试的价值在于把这条系统级链路正式锁住，避免后续回归。
+- **Insights**：回归里专门补了“opening_plan draft 不能放行 workflow”这条断言，因为 generate 闭环引入后，系统最容易出现的误用就是把“已生成草稿”误当成“已确认前置资产”。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_preparation_workflow_chain_api.py tests/unit/test_story_asset_generation_api.py tests/unit/test_workflow_api.py` 通过，`12 passed`。
+
+## [2026-03-22 | preparation status summary 查询面收口完成]
+- **Events**：继续沿前置创作资产主链路推进，为创作准备区补上项目级状态汇总读接口，避免前端继续自行拼 `setting/outline/opening_plan/chapter_tasks/workflow` 多个接口。
+- **Changes**：`project` 模块已新增 `ProjectPreparationStatusDTO` 及相关子 DTO；HTTP 层新增 `GET /api/v1/projects/{project_id}/preparation/status`。
+- **Changes**：该接口统一返回 `setting completeness`、`outline`、`opening_plan`、`chapter_tasks`、`active_workflow`、`can_start_workflow`、`next_step` 与 `next_step_detail`，给创作准备区直接消费单一状态真值。
+- **Changes**：`outline/opening_plan` 的汇总状态新增 `step_status` 归一化：对空 scaffold 或缺失资产显式返回 `not_started`，从而避免把“系统默认建好的空 draft”误当成用户已经写过的草稿。
+- **Insights**：这轮把查询面放在 `project` 模块而不是 `content` 或 `workflow`，因为它本质上是“项目级创作准备总览”，不是某个单一资产或单次 workflow 的内部详情；集中聚合更符合 UI 使用面，也能避免前端形成第二套状态机。
+- **Insights**：`chapter_tasks` 汇总优先读取 active workflow，没有 active workflow 时再回看最近一次 workflow；这样既能反映当前运行态，也能在 workflow 结束后保留最近一版章节计划的状态，不必让前端自己猜要看哪次 execution。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_project_service.py tests/unit/test_project_api.py tests/unit/test_preparation_status_api.py` 通过，`12 passed`。
+
+## [2026-03-22 | Studio preparation status 面板接入完成]
+- **Events**：继续沿前置创作资产主链路推进，把后端 `preparation status summary` 正式接入 `Studio`，让创作准备区直接展示统一状态总览。
+- **Changes**：`apps/web/src/lib/api/contracts/base.ts` 已新增 `ProjectPreparationStatus`、`PreparationAssetStatus`、`PreparationChapterTaskStatus`、`WorkflowExecutionSummary` 等前端 contract；`apps/web/src/lib/api/projects.ts` 已新增 `getProjectPreparationStatus(projectId)`。
+- **Changes**：新增 `apps/web/src/features/studio/components/preparation-status-panel.tsx`，统一展示 `setting / outline / opening_plan / chapter_tasks / active_workflow / next_step`，不再让 `Studio` 自己拼多接口状态。
+- **Changes**：`apps/web/src/features/studio/components/studio-page.tsx` 已接入 preparation status 面板；`project-setting-editor.tsx` 与 `story-asset-editor.tsx` 在保存、检查、确认成功后会 `invalidateQueries(["project-preparation-status", projectId])`，保持状态面板同步刷新。
+- **Changes**：`apps/web/src/components/ui/status-badge.tsx` 已补 preparation 相关 badge key，避免状态面板出现未映射样式。
+- **Insights**：这轮刻意只做只读状态面板，不把“启动 workflow”按钮和更多动作硬塞进同一次实现；先确保 Studio 有统一状态真值，再逐步补动作入口，边界更清晰。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+- **Validation**：`pnpm --dir apps/web lint` 通过。
+
+## [2026-03-22 | ProjectSetting impact summary 收口完成]
+- **Events**：继续稳步推进后端，把“设定修改后检测影响范围并提示用户”的缺口补到 `project` 模块更新接口，避免前端只能看到 stale 结果、却不知道这次修改实际影响了什么。
+- **Changes**：`project` 模块已新增 `ProjectSettingImpactItemDTO` 与 `ProjectSettingImpactSummaryDTO`；`PUT /api/v1/projects/{project_id}/setting` 的响应现在会在设定快照上附带 `impact` 字段。
+- **Changes**：`ProjectService.update_project_setting()` 现在会在执行真实 stale 传播时统计受影响范围，并返回 `outline / opening_plan / chapter / chapter_tasks` 的 `mark_stale` 摘要；无实际变更时会返回空 impact。
+- **Changes**：`project_service_support.py` 已新增 impact summary 构造、章节任务计数和资产状态解析 helper；`project_service.py` 主文件已压到 300 行以内，避免继续堆逻辑。
+- **Insights**：这轮刻意只返回“实际发生的 stale 影响摘要”，不伪造自动替换或人工复核分类；当前系统还没有这些处理能力，先把真实影响暴露出来更符合 debug-first。
+- **Insights**：前端现阶段还没有消费新的 `impact` 字段，因此本轮没有反向改 Studio 交互；保持后端 additive 兼容，后续再逐步接 UI 提示即可。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_project_service.py tests/unit/test_project_api.py` 通过，`11 passed`。
+
+## [2026-03-22 | ProjectSetting impact UI 接入完成]
+- **Events**：继续沿同一条主链路推进，把后端 `ProjectSetting impact summary` 正式接入 `Studio` 设定编辑区，补齐“检测影响范围并提示用户”的前端闭环。
+- **Changes**：`apps/web/src/lib/api/contracts/project.ts` 已新增 project/content 相关 contract，并补齐 `ProjectSettingImpactSummary`、`ProjectSettingImpactItem` 与 `ProjectSettingSnapshot.impact`；`apps/web/src/lib/api/contracts/base.ts` 已收敛回基础 contract，`types.ts` 已同步导出新文件。
+- **Changes**：新增 `apps/web/src/features/studio/components/project-setting-impact-panel.tsx`，在设定保存成功后显示“最近一次保存影响”；当前会明确展示 `outline / opening_plan / chapter / chapter_tasks` 哪些被标记为 `stale`。
+- **Changes**：`project-setting-editor.tsx` 已在保存成功后保存并展示 `impact`，同时按 impact 精准刷新 `story-asset` 与 `chapters` query，不再只刷新 `project / setting-check / preparation-status`。
+- **Insights**：这轮刻意把 impact 提示定义成“最近一次保存影响”，避免用户在继续编辑但尚未再次保存时误以为提示代表当前未保存草稿的即时分析结果。
+- **Insights**：`base.ts` 之前已经超过 300 行，本轮顺手把 project/content contract 拆出到 `project.ts`；这样后续继续补 Studio 相关类型时，不会再把基础 contract 文件继续堆大。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+- **Validation**：`pnpm --dir apps/web lint` 通过。
+
+## [2026-03-22 | Story asset impact summary 闭环完成]
+- **Events**：继续沿前置创作资产主链路推进，把 `outline / opening_plan` 保存与确认后的 impact summary 正式补到后端与 Studio 编辑区，避免用户只看到“保存成功”却不知道哪些下游内容已失效。
+- **Changes**：`content` 模块已新增 `StoryAssetImpactItemDTO`、`StoryAssetImpactSummaryDTO`、`StoryAssetMutationDTO`；`save/generate/approve` 三类 mutation 响应现在都保留原 `StoryAsset` 根字段，并追加 `impact`，保持 API additive 兼容。
+- **Changes**：新增 `apps/api/app/modules/content/service/story_asset_service_support.py`，将 downstream stale 判断、impact item 构造和消息格式化从 `StoryAssetService` 中拆出；`story_asset_service.py` 主文件已压回 300 行以内。
+- **Changes**：`StoryAssetService.save_asset_draft()` 现在会返回真实 stale 传播摘要；`approve_asset()` 则显式返回空 impact，清楚表达“确认不会传播下游 stale”的当前规则。`StoryAssetGenerationService` 与 story asset router 已同步 mutation 返回类型。
+- **Changes**：Studio 已新增 `story-asset-impact-panel.tsx` 与 `story-asset-editor-support.ts`；保存或确认 `outline / opening_plan` 后，会展示“最近一次操作影响”，并按 impact 精准刷新 `opening_plan`、`chapters`、`project-preparation-status`。
+- **Insights**：这轮没有把 story asset mutation 响应改成嵌套 `{ asset, impact }`，而是采用 `StoryAssetMutationDTO extends StoryAssetDTO`；原因是对外返回保持 additive，更不容易打断已有前端读取。
+- **Insights**：`opening_plan` 变更只会影响前 1-3 章确认态正文；本轮测试已把这条规则和 `chapter_tasks` stale 计数一起锁住，避免后续误把全量章节都标 stale。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_story_asset_service.py tests/unit/test_story_asset_generation_service.py tests/unit/test_story_asset_generation_api.py` 通过，`14 passed`。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit`、`pnpm --dir apps/web lint` 通过。
+
+## [2026-03-22 | Engine 章节任务面板接入完成]
+- **Events**：继续沿主链路推进，把已落地的 chapter task API 正式接入 Engine `tasks` tab，补齐“章节任务列表 / 编辑任务草稿 / 覆盖式重建”的前端闭环。
+- **Changes**：新增 `apps/web/src/features/engine/components/engine-task-panel.tsx`、`engine-task-form-panels.tsx`、`engine-task-support.ts`，将任务列表、状态展示、单条任务编辑和重建表单从 `engine-page.tsx` 中拆出，避免主页面继续膨胀。
+- **Changes**：`Engine` 的 tasks tab 已不再显示原始 JSON，而是展示结构化任务卡片；每条任务会显示章节号、标题、状态和摘要，并支持选择后编辑标题 / 摘要 / 关键角色 / 关键事件。
+- **Changes**：任务重建面板已接入现有 `POST /api/v1/projects/{project_id}/chapter-tasks/regenerate`；支持从当前计划载入、从空白新建、追加章节，并在提交前明确提示“会覆盖当前活跃 workflow 的章节计划”。
+- **Changes**：前端已补 `ChapterTaskStatus` contract，并按 UI 规则区分 `generating` 的两种语义：`content_id` 为空时显示“生成中”，存在时显示“待确认”；`stale` 任务会给强警示而不是普通提示。
+- **Insights**：`chapter-tasks/regenerate` 后端是按“项目当前活跃 workflow”生效，而不是按任意已载入 workflow id 修改；这轮已把该限制前置到 UI，在 `created / running / paused` 之外显式禁用重建，避免误操作。
+- **Insights**：当前 TypeScript 目标库不支持 `toSorted()`；这轮已改回拷贝后 `sort()`，不依赖升级 `lib` 或额外 polyfill。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+- **Validation**：`pnpm --dir apps/web lint` 通过。
+
+## [2026-03-22 | context chapter_summary 注入能力完成]
+- **Events**：继续稳步推进后端 `context` 模块，补齐设计文档中预留的 `chapter_summary` 注入类型，缩小“主链路已完整但扩展上下文能力未齐”的差距。
+- **Changes**：`workflow_schema.ContextInjectionItem` 已支持 `chapter_summary`；`context.engine.contracts` 已补齐变量映射、auto inject 类型和 section 优先级，正式把它纳入 runtime 支持面。
+- **Changes**：`ContextSourceLoader` 已新增 `chapter_summary` 加载逻辑：直接从既有 `chapter` 的 current version 派生 deterministic excerpt 摘要，返回 `chapters` 和 `summary_mode=current_version_excerpt` 报告字段，不新增摘要表，也不引入 LLM 自动摘要。
+- **Changes**：`ContextPreviewService` 已把 `chapter_summary` 纳入 `chapter_number` 必需类型集合；新增 `test_config_validation.py`、`test_context_builder_loading.py`、`test_context_preview_service.py`、`test_context_api.py` 的定向覆盖，验证 schema、builder、service、API 四层行为。
+- **Insights**：这轮最关键的边界是保持正文真值仍然只在 `contents + content_versions`；`chapter_summary` 只是运行时视图，不是新主数据，否则后面一定会出现摘要和正文漂移的双真值问题。
+- **Insights**：当前 built-in workflow 还没有默认把 `chapter_summary` 接进 `chapter_gen`，但 runtime/schema/preview 已可用；后续是否默认启用，应结合实际 prompt 预算和生成效果再推进，不必在这一轮把语义和配置一起硬绑。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_config_validation.py tests/unit/test_context_builder_loading.py tests/unit/test_context_preview_service.py tests/unit/test_context_api.py` 通过，`35 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+
+## [2026-03-22 | context setting projection 注入能力完成]
+- **Events**：继续稳步推进 `context` 模块，补齐设计文档里明确要求从 `ProjectSetting` 投影的 `world_setting` 与 `character_profile` 注入能力，并顺手收口超 300 行的 source loader。
+- **Changes**：`workflow_schema.ContextInjectionItem`、`context.engine.contracts` 已支持 `world_setting` 与 `character_profile`；两者现在进入正式 schema、auto inject、变量映射和 section policy，不再只是“文档说有，runtime 没开”。
+- **Changes**：新增 `apps/api/app/modules/context/engine/source_loader_support.py`，把 `ProjectSetting` 投影、chapter summary 构造、story bible/style reference 渲染等纯 helper 从 `source_loader.py` 拆出；`source_loader.py` 已压到 `299` 行，重新回到项目文件大小约束内。
+- **Changes**：`ContextSourceLoader` 对 `world_setting` 与 `character_profile` 已改为 deterministic projection：`world_setting` 直接投影 `ProjectSetting.world_setting`，`character_profile` 直接投影 `ProjectSetting.protagonist/key_supporting_roles`，不新增世界观/角色主表，也不引入 LLM 摘要。
+- **Changes**：`ContextPreviewService._stringify_value()` 已与 runtime 对齐为 JSON 序列化语义，避免 preview 对非字符串 `ProjectSetting` 变量继续走 Python `str(dict)`，造成“预览与实际运行不一致”的双语义。
+- **Changes**：新增/扩展 `test_config_validation.py`、`test_context_builder_loading.py`、`test_context_preview_service.py`、`test_context_api.py`，覆盖 `world_setting` 自动注入到声明它的技能，以及 `character_profile` 请求级 `extra_inject` 预览链路。
+- **Insights**：这轮继续坚持同一条边界：`ProjectSetting` 才是设定真值源，`world_setting / character_profile` 只是上下文视图；如果后续再把这些投影落成独立主数据，系统就会重新引入双真值风险。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_config_validation.py tests/unit/test_context_builder_loading.py tests/unit/test_context_preview_service.py tests/unit/test_context_api.py` 通过，`41 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+
+## [2026-03-22 | built-in skill 变量语义收口完成]
+- **Events**：继续沿“语义清晰、数据一致”的方向推进，把内置 `outline/opening_plan` skill 的人物变量从原始 `protagonist` 收敛到正式 `character_profile` inject type。
+- **Changes**：`config/skills/outline/xuanhuan.yaml` 与 `config/skills/opening_plan/xuanhuan.yaml` 现在统一声明 `character_profile`，并把 Prompt 标签从“主角”改为“人物设定”；`world_setting` 继续走正式投影视图。
+- **Changes**：`test_context_preview_service.py` 已把 built-in `opening_plan` 的 `world_setting + character_profile` 自动注入锁进回归测试；原 request-level `character_profile` 覆盖改为挂在 `chapter` skill 上，避免 built-in 默认注入后出现假覆盖。
+- **Changes**：`test_context_preview_rendered_prompt_api.py` 新增 `outline` 节点 API 预览回归，验证 built-in skill 会自动拿到 `character_profile` 与 `world_setting` 并进入 rendered prompt。
+- **Changes**：`docs/design/06-creative-setup.md` 与 `docs/specs/config-format.md` 已同步，明确 built-in `outline/opening_plan` 优先消费 `character_profile/world_setting` 投影视图，而不是继续把 `protagonist` 原始字段拼成另一套 Prompt 语义。
+- **Insights**：这一轮故意没有改 runtime 的旧 `protagonist` 兼容路径；这样既能让新 built-in skill 对齐正式 inject type，也不会打断旧 workflow snapshot 的恢复与运行。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_context_preview_service.py tests/unit/test_context_preview_rendered_prompt_api.py tests/unit/test_config_validation.py` 通过，`29 passed`。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_context_api.py` 通过，`7 passed`。
+
+## [2026-03-22 | built-in chapter skill 接入 chapter_summary 完成]
+- **Events**：继续沿上下文分层策略推进，把已实现的 `chapter_summary` 正式接入内置 `chapter` skill，并同步修正因此失真的 request-level 预览测试。
+- **Changes**：`config/skills/chapter/xuanhuan.yaml` 已新增 `chapter_summary` 变量和“近期摘要”可选区块；首章创作提示条件也已收紧为 `previous_content / chapter_summary / story_bible` 都为空时才出现。
+- **Changes**：`test_context_preview_service.py` 与 `test_context_api.py` 里的 request-level `chapter_summary` 覆盖，已改为通过 `outline` skill + prompt override 验证 `extra_inject`；不再借用 built-in `chapter` skill，避免自动注入后形成假覆盖。
+- **Changes**：新增 `tests/unit/test_chapter_skill_chapter_summary.py`，锁住 built-in `chapter` skill 的两条关键语义：后续章节会自动拿到 `chapter_summary`，首章则只保留空默认值并在 context report 中标记 `not_applicable`。
+- **Changes**：`docs/design/19-pre-writing-assets.md` 已同步，明确 built-in `chapter` skill 可以同时消费 `previous_chapters` 与 `chapter_summary`，后者只是轻量补充视图，不替代正文真值。
+- **Insights**：这轮暴露了 preview 变量解析的一条真实语义：可选变量即使上下文 `not_applicable`，也会因默认值机制以空字符串进入 `preview.variables`。测试应锁这个事实，而不是假设变量键不存在。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_context_preview_service.py tests/unit/test_context_api.py tests/unit/test_chapter_skill_chapter_summary.py` 通过，`15 passed`。
+
+## [2026-03-22 | chapter mutation impact summary 完成]
+- **Events**：继续沿 `content` 模块推进，把章节保存/回滚后的 downstream stale 影响摘要正式暴露给 mutation 响应，补齐“标记 + 提示”的后端闭环。
+- **Changes**：`ChapterDetailDTO` 已新增 `impact` 字段；`save_chapter_draft()` 与 `rollback_version()` 现在会基于真实被标记为 `stale` 的后续已确认章节数，返回 `has_impact / total_affected_entries / items`。
+- **Changes**：`chapter_mutation_support.py` 已新增章节 impact summary builder；`mark_downstream_chapters_stale()` 现返回实际影响数量，但仍只处理 `approved -> stale`，不改变正文真值边界。
+- **Changes**：新增 `tests/unit/test_chapter_content_mutation_impact.py`，并扩展 `test_chapter_content_api.py`，覆盖 save/rollback 的非空 impact 与“无实际影响时返回空摘要”语义；前端 `ChapterDetail` contract 也已同步补上 `impact` 字段。
+- **Insights**：此前系统已经会真实标记下游章节 `stale`，缺口不在状态传播，而在 mutation 调用方看不到这次编辑到底波及了哪些章节；本轮补的是显式反馈，不是新增第二套状态机。
+- **Insights**：这轮刻意没有把 impact 绑定到 `approve_chapter()`；因为 downstream stale 发生在新版本落地时，确认动作本身不再额外制造影响，保持语义单一更清晰。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_chapter_content_service.py tests/unit/test_chapter_content_mutation_impact.py tests/unit/test_chapter_content_api.py` 通过，`15 passed`。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+
+## [2026-03-22 | Studio chapter impact 面板接入完成]
+- **Events**：继续沿章节编辑链路推进，把后端已返回的 `chapter impact summary` 正式接入 Studio，补齐用户可见的“标记 + 提示”前端闭环。
+- **Changes**：新增 `apps/web/src/features/studio/components/chapter-impact-panel.tsx` 与 `chapter-editor-support.ts`；章节 impact 现在有独立面板与统一 feedback / query invalidation helper，不再把影响提示硬塞进普通 toast 文案。
+- **Changes**：`chapter-editor.tsx` 已在保存草稿与回滚版本成功后展示 impact panel；无实际影响时也会显示“无下游影响”的明确文案。
+- **Changes**：章节编辑区的最近一次 impact 改为由 `ChapterEditor` 父层按 `projectId + chapterNumber` 持有 keyed state，而不是挂在详情 query 或用 effect 强制清空；这样版本刷新后不会丢失最新影响，切换章节时也不会串章。
+- **Insights**：这轮没有把 `approve_chapter`、`markBestVersion`、`clearBestVersion` 也纳入 impact 面板驱动，因为它们不产生新的 downstream stale；继续只让真正改变正文版本的 mutation 驱动 impact，语义更稳定。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+- **Validation**：`pnpm --dir apps/web lint` 通过。
+
+## [2026-03-22 | Studio stale 章节引导层完成]
+- **Events**：继续沿章节 stale 闭环推进，把 `Studio` 中“看到 stale 状态但不知道下一步”的缺口补成可操作引导。
+- **Changes**：新增 `apps/web/src/features/studio/components/studio-page-support.ts` 与 `studio-stale-chapter-panel.tsx`；章节页在没有显式 `chapter` 参数时，现在会优先落到第一章 stale，并在侧栏显示 stale 汇总与快捷入口。
+- **Changes**：侧栏 stale 面板当前提供两条明确路径：直接聚焦第一章 stale 进行逐章复核，或跳到 `/engine?tab=tasks` 处理章节任务计划；不在本轮发明新的“自动处理”按钮。
+- **Changes**：新增 `apps/web/src/features/studio/components/chapter-stale-notice.tsx`；打开 stale 章节时，编辑器会明确提示“复核后可直接确认恢复 approved，若需整体调整则去 Engine tasks 处理”。
+- **Insights**：这轮没有新增新的 stale 状态或忽略标记；仍然坚持现有规则，只把已经存在的确认路径和任务处理路径解释清楚，避免 UI 再制造第二套流程语义。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+- **Validation**：`pnpm --dir apps/web lint` 通过。
+
+## [2026-03-22 | review 问题收口修复完成]
+- **Events**：完成最近一轮审查中 4 条已确认问题的真实修复，覆盖 `story asset generate` 变量解析、`stale chapter task` 编辑语义、Studio impact 面板状态保持和 stale CTA 跳转一致性。
+- **Changes**：新增 `apps/api/app/modules/project/schemas/projections.py`，把 `character_profile / world_setting` 投影视图收回到 `project` 边界；`StoryAssetGenerationService` 与 `ContextSourceLoader` 现在共用同一份 setting projection helper，不再出现一个链路使用正式投影视图、另一个链路继续读取旧字段名的双轨。
+- **Changes**：`chapter_task_support.py` 现在会显式拒绝编辑 `stale` 任务，并返回“必须先重建章节计划后才能编辑”；前端 `Engine task` 列表和编辑器也已同步禁用 stale 编辑入口与保存动作，避免 UI 和后端语义冲突。
+- **Changes**：`ProjectSettingEditor` 与 `StoryAssetEditor` 的最近一次 impact 已改为父层 keyed state，refetch/remount 后仍保留当前项目/资产上下文下的最近一次影响提示；`ChapterEditor` 的既有模式没有再发散成第二套状态管理。
+- **Changes**：`StudioStaleChapterPanel` 与 `ChapterStaleNotice` 现在会先读取 `project-preparation-status` 解析 `workflow_execution_id` 再生成 Engine 跳转；如果当前无法定位 workflow，就退回通用 Engine 入口并明确提示“先载入 workflow”，不再给误导性 `tasks` 直链。
+- **Insights**：`ProjectSetting` 真值既然已经确定，投影视图逻辑就应由 `project` 边界统一提供；如果继续让 `context` 和 `content` 各自维护一套 `character_profile / world_setting` 解析，后面 Prompt 语义迟早再次漂移。
+- **Insights**：`stale chapter task` 的设计语义不是“普通警告下仍可微调”，而是“必须先重建章节计划”；这条规则必须同时落在 workflow service、Engine CTA 和 Studio 引导层上，才算闭环。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_story_asset_generation_service.py tests/unit/test_story_asset_generation_api.py tests/unit/test_chapter_task_api.py tests/unit/test_context_builder_loading.py` 通过，`18 passed`。
+- **Validation**：`pnpm --dir apps/web lint`、`pnpm --dir apps/web exec tsc --noEmit` 通过。
+
+## [2026-03-22 | review follow-up 修复完成]
+- **Events**：完成上一轮审查追加发现的 3 条问题修复，覆盖 `story asset generate` 的正式变量映射、Engine workflow 切换状态串写，以及 Studio stale CTA 的加载竞态。
+- **Changes**：`project.schemas.projections.py` 已新增 `resolve_setting_variable()`，把 `project_setting` 全量上下文、`character_profile/world_setting` 投影视图和 `target_words -> scale.target_words` 这类 direct mapping 收到同一处；`StoryAssetGenerationService` 已改为统一走这条 setting variable resolver。
+- **Changes**：`test_story_asset_generation_service.py` 已新增 direct/full-context 回归，验证前置资产生成链路现在能正确消费 `target_words` 与 `project_setting`，不再只支持根字段直取。
+- **Changes**：`EnginePage` 的 tasks tab 已按 `workflowId` 为 `EngineTaskPanel` 加 key，切换 workflow 时会 remount 任务面板，本地 `selectedTask/editor/draftRows/feedback` 不再串到新 workflow。
+- **Changes**：`StudioStaleChapterPanel` 与 `ChapterStaleNotice` 现在会在 `project-preparation-status` 仍在加载、尚未解析出 workflow 时显示禁用按钮“正在解析 workflow...”，等解析完成后再给正确链接，消除了首屏先落错误 `/engine` 链接的竞态窗口。
+- **Insights**：前置资产生成不应该只做“当前 built-in skill 恰好用到哪些字段”的硬编码；正式设计已经定义了设定到 Skill 变量的映射边界，生成服务就应支持 direct mapping、projection 和 full context 三类来源。
+- **Insights**：对于“切换主标识后需要整块丢弃本地交互状态”的 UI，优先用 keyed remount，比在子组件里补 `useEffect` 式重置更清晰，也更不容易漏状态。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_story_asset_generation_service.py` 通过，`4 passed`。
+- **Validation**：`pnpm --dir apps/web lint`、`pnpm --dir apps/web exec tsc --noEmit` 通过。

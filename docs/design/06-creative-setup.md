@@ -86,14 +86,14 @@
 setting_to_skill_mapping:
   direct:
     genre: "genre"
-    protagonist.name: "protagonist_name"
-    protagonist.background: "protagonist"
-    world_setting.name: "world_setting"
     scale.target_words: "target_words"
-  composite:
-    character_summary: "{{ protagonist.name }}，{{ protagonist.background }}，性格{{ protagonist.personality }}"
+  projections:
+    protagonist/key_supporting_roles: "character_profile"
+    world_setting: "world_setting"
   full_context: true  # 完整设定作为 {{ project_setting }} 注入
 ```
+
+其中内置 `outline/opening_plan` skill 当前优先消费 `character_profile` 与 `world_setting` 这类投影视图，而不是继续直接把 `protagonist` 原始字段拼成另一套 Prompt 语义。
 
 ---
 

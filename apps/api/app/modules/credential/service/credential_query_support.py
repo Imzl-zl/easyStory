@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.billing.models import TokenUsage
 from app.modules.credential.models import ModelCredential
 from app.modules.project.models import Project
 from app.modules.project.service import ProjectService
@@ -14,6 +15,9 @@ from app.shared.runtime.errors import BusinessRuleError, ConflictError, NotFound
 OWNER_TYPE_SYSTEM = "system"
 OWNER_TYPE_USER = "user"
 OWNER_TYPE_PROJECT = "project"
+CREDENTIAL_DELETE_IN_USE_MESSAGE = (
+    "Credential cannot be deleted because token usage history exists"
+)
 
 
 @dataclass(frozen=True)
@@ -105,6 +109,17 @@ async def find_active_credential(
     if owner_id is not None:
         owner_statement = statement.where(ModelCredential.owner_id == owner_id)
     return await db.scalar(owner_statement)
+
+
+async def ensure_credential_is_deletable(
+    db: AsyncSession,
+    credential_id: uuid.UUID,
+) -> None:
+    usage_id = await db.scalar(
+        select(TokenUsage.id).where(TokenUsage.credential_id == credential_id).limit(1)
+    )
+    if usage_id is not None:
+        raise BusinessRuleError(CREDENTIAL_DELETE_IN_USE_MESSAGE)
 
 
 def scope_statement(scope: CredentialScope) -> Select[tuple[ModelCredential]]:

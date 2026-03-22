@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.project.service import (
+    ProjectPreparationStatusDTO,
     ProjectCreateDTO,
     ProjectDeletionService,
     ProjectDetailDTO,
@@ -181,6 +182,23 @@ async def check_project_setting_completeness(
     db: AsyncSession = Depends(get_async_db_session),
 ) -> SettingCompletenessResultDTO:
     return await project_service.check_setting_completeness(
+        db,
+        project_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.get(
+    "/{project_id}/preparation/status",
+    response_model=ProjectPreparationStatusDTO,
+)
+async def get_project_preparation_status(
+    project_id: uuid.UUID,
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> ProjectPreparationStatusDTO:
+    return await project_service.get_preparation_status(
         db,
         project_id,
         owner_id=current_user.id,

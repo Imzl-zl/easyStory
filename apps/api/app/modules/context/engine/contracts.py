@@ -7,8 +7,11 @@ VARIABLE_NAMES = {
     "project_setting": "project_setting",
     "outline": "outline",
     "opening_plan": "opening_plan",
+    "world_setting": "world_setting",
+    "character_profile": "character_profile",
     "chapter_task": "chapter_task",
     "previous_chapters": "previous_content",
+    "chapter_summary": "chapter_summary",
     "story_bible": "story_bible",
     "style_reference": "style_reference",
 }
@@ -18,8 +21,11 @@ AUTO_INJECT_TYPES = frozenset(
         "project_setting",
         "outline",
         "opening_plan",
+        "world_setting",
+        "character_profile",
         "chapter_task",
         "previous_chapters",
+        "chapter_summary",
         "story_bible",
     }
 )
@@ -27,8 +33,11 @@ SECTION_POLICIES = {
     "project_setting": (1, 0),
     "chapter_task": (1, 0),
     "opening_plan": (2, 200),
+    "world_setting": (2, 0),
+    "character_profile": (2, 0),
     "story_bible": (2, 500),
     "previous_chapters": (5, 500),
+    "chapter_summary": (6, 200),
     "style_reference": (7, 0),
     "outline": (8, 200),
 }

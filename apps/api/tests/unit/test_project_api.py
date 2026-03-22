@@ -8,7 +8,16 @@ from tests.unit.async_api_support import (
     started_async_client,
 )
 from tests.unit.api_test_support import TEST_JWT_SECRET, auth_headers as _auth_headers
-from tests.unit.models.helpers import create_project, create_template, create_user, ready_project_setting
+from tests.unit.models.helpers import (
+    create_chapter_task,
+    create_content,
+    create_content_version,
+    create_project,
+    create_template,
+    create_user,
+    create_workflow,
+    ready_project_setting,
+)
 
 
 async def test_project_api_manages_project_lifecycle(monkeypatch, tmp_path) -> None:
@@ -43,6 +52,25 @@ async def test_project_api_manages_project_lifecycle(monkeypatch, tmp_path) -> N
             project_id = created["id"]
             assert created["genre"] == "玄幻"
             assert created["template_id"] == str(template_id)
+
+            outline_response = await client.get(
+                f"/api/v1/projects/{project_id}/outline",
+                headers=_auth_headers(owner_id),
+            )
+            opening_plan_response = await client.get(
+                f"/api/v1/projects/{project_id}/opening-plan",
+                headers=_auth_headers(owner_id),
+            )
+            assert outline_response.status_code == 200
+            assert outline_response.json()["title"] == "大纲"
+            assert outline_response.json()["status"] == "draft"
+            assert outline_response.json()["version_number"] == 1
+            assert outline_response.json()["content_text"] == ""
+            assert opening_plan_response.status_code == 200
+            assert opening_plan_response.json()["title"] == "开篇设计"
+            assert opening_plan_response.json()["status"] == "draft"
+            assert opening_plan_response.json()["version_number"] == 1
+            assert opening_plan_response.json()["content_text"] == ""
 
             list_response = await client.get("/api/v1/projects", headers=_auth_headers(owner_id))
             assert list_response.status_code == 200
@@ -116,6 +144,98 @@ async def test_project_api_manages_project_lifecycle(monkeypatch, tmp_path) -> N
             )
             assert restored_detail.status_code == 200
             assert restored_detail.json()["name"] == "接口项目-更新"
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_project_setting_update_api_returns_impact_summary(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="project-api-setting-impact")
+    )
+
+    try:
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(
+                session,
+                owner=owner,
+                project_setting=ready_project_setting(),
+            )
+            workflow = create_workflow(session, project=project, status="paused")
+            outline = create_content(
+                session,
+                project=project,
+                content_type="outline",
+                title="大纲",
+                chapter_number=None,
+            )
+            outline.status = "approved"
+            opening_plan = create_content(
+                session,
+                project=project,
+                content_type="opening_plan",
+                title="开篇设计",
+                chapter_number=None,
+            )
+            opening_plan.status = "approved"
+            chapter = create_content(session, project=project, title="第一章")
+            chapter.status = "approved"
+            create_content_version(session, content=outline, content_text="旧大纲", version_number=1)
+            create_content_version(
+                session,
+                content=opening_plan,
+                content_text="旧开篇",
+                version_number=1,
+            )
+            create_chapter_task(
+                session,
+                workflow=workflow,
+                chapter_number=1,
+                title="第一章",
+                brief="旧章节计划",
+                status="pending",
+            )
+            session.commit()
+            owner_id = owner.id
+            project_id = project.id
+
+        async with started_async_client(app) as client:
+            response = await client.put(
+                f"/api/v1/projects/{project_id}/setting",
+                json={
+                    "project_setting": {
+                        "genre": "仙侠",
+                        "tone": "冷峻",
+                        "core_conflict": "主角在宗门追杀中求生",
+                        "protagonist": {
+                            "name": "林渊",
+                            "identity": "弃徒",
+                            "goal": "重返内门",
+                        },
+                        "world_setting": {
+                            "era_baseline": "宗门割据时代",
+                            "world_rules": "境界压制",
+                        },
+                    }
+                },
+                headers=_auth_headers(owner_id),
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["genre"] == "仙侠"
+        assert body["impact"]["has_impact"] is True
+        assert body["impact"]["total_affected_entries"] == 4
+        assert [(item["target"], item["count"]) for item in body["impact"]["items"]] == [
+            ("outline", 1),
+            ("opening_plan", 1),
+            ("chapter", 1),
+            ("chapter_tasks", 1),
+        ]
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 

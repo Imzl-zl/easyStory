@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from decimal import Decimal
-
 import pytest
 
 from app.modules.analysis.models import Analysis
@@ -21,14 +19,9 @@ from app.modules.project.service import (
 from app.modules.review.models import ReviewAction
 from app.modules.workflow.models import Artifact, ChapterTask, NodeExecution, WorkflowExecution
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
+from tests.unit.project_deletion_seed_support import seed_project_graph
 from tests.unit.async_service_support import async_db
-from tests.unit.models.helpers import (
-    create_content,
-    create_content_version,
-    create_project,
-    create_user,
-    create_workflow,
-)
+from tests.unit.models.helpers import create_project, create_user
 
 
 def test_project_deletion_service_soft_deletes_and_restores_projects(db, tmp_path) -> None:
@@ -87,7 +80,10 @@ def test_project_deletion_service_physically_deletes_all_related_project_data(
     tmp_path,
 ) -> None:
     export_root = tmp_path / "exports"
-    owner, project, related_ids, credential_id = _seed_project_graph(db, export_root=export_root)
+    owner, project, related_ids, credential_ids = seed_project_graph(
+        db,
+        export_root=export_root,
+    )
     service = create_project_deletion_service(export_root=export_root)
 
     asyncio.run(service.soft_delete_project(async_db(db), project.id, owner_id=owner.id))
@@ -109,7 +105,11 @@ def test_project_deletion_service_physically_deletes_all_related_project_data(
     assert db.get(ExecutionLog, related_ids["execution_log_id"]) is None
     assert db.get(PromptReplay, related_ids["prompt_replay_id"]) is None
     assert db.query(AuditLog).filter(AuditLog.entity_id == project.id).count() == 0
-    assert db.get(ModelCredential, credential_id) is not None
+    assert db.query(AuditLog).filter(
+        AuditLog.entity_id == credential_ids["project_credential_id"]
+    ).count() == 0
+    assert db.get(ModelCredential, credential_ids["project_credential_id"]) is None
+    assert db.get(ModelCredential, credential_ids["system_credential_id"]) is not None
     assert not (export_root / str(project.id)).exists()
 
 
@@ -125,135 +125,3 @@ def test_project_deletion_service_hides_other_users_projects(db, tmp_path) -> No
         asyncio.run(
             service.physical_delete_project(async_db(db), project.id, owner_id=outsider.id)
         )
-
-
-def _seed_project_graph(db, *, export_root):
-    owner = create_user(db)
-    project = create_project(db, owner=owner)
-    content = create_content(db, project=project)
-    version = create_content_version(db, content=content, content_text="章节正文")
-    workflow = create_workflow(db, project=project, status="paused")
-    credential = ModelCredential(
-        owner_type="system",
-        provider="openai",
-        display_name="project-delete-test",
-        encrypted_key="ciphertext",
-    )
-    db.add(credential)
-    db.commit()
-    db.refresh(credential)
-
-    node = NodeExecution(
-        workflow_execution_id=workflow.id,
-        node_id="chapter_gen",
-        node_type="generate",
-        sequence=0,
-        node_order=1,
-        status="completed",
-    )
-    db.add(node)
-    db.commit()
-    db.refresh(node)
-
-    export_file = export_root / str(project.id) / str(workflow.id) / "novel.md"
-    export_file.parent.mkdir(parents=True, exist_ok=True)
-    export_file.write_text("导出正文", encoding="utf-8")
-
-    analysis = Analysis(
-        project_id=project.id,
-        content_id=content.id,
-        analysis_type="plot",
-        result={"status": "ok"},
-    )
-    artifact = Artifact(
-        node_execution_id=node.id,
-        artifact_type="chapter_draft",
-        content_version_id=version.id,
-        payload={"chapter_number": 1},
-    )
-    review_action = ReviewAction(
-        node_execution_id=node.id,
-        agent_id="reviewer-1",
-        review_type="consistency",
-        status="approved",
-    )
-    chapter_task = ChapterTask(
-        project_id=project.id,
-        workflow_execution_id=workflow.id,
-        chapter_number=1,
-        title="第一章",
-        brief="章节摘要",
-        status="completed",
-        content_id=content.id,
-    )
-    story_fact = StoryFact(
-        project_id=project.id,
-        chapter_number=1,
-        source_content_version_id=version.id,
-        fact_type="character_state",
-        subject="林渊",
-        content="保持警惕",
-    )
-    export = Export(
-        project_id=project.id,
-        format="markdown",
-        filename=export_file.name,
-        file_path=export_file.relative_to(export_root).as_posix(),
-        file_size=export_file.stat().st_size,
-        config_snapshot={"workflow_id": str(workflow.id)},
-    )
-    token_usage = TokenUsage(
-        project_id=project.id,
-        node_execution_id=node.id,
-        credential_id=credential.id,
-        usage_type="generate",
-        model_name="gpt-4.1",
-        input_tokens=120,
-        output_tokens=240,
-        estimated_cost=Decimal("0.003000"),
-    )
-    execution_log = ExecutionLog(
-        workflow_execution_id=workflow.id,
-        node_execution_id=node.id,
-        level="INFO",
-        message="node completed",
-        details={"node_id": "chapter_gen"},
-    )
-    prompt_replay = PromptReplay(
-        node_execution_id=node.id,
-        replay_type="generate",
-        model_name="gpt-4.1",
-        prompt_text="生成章节",
-        response_text="完成",
-        input_tokens=120,
-        output_tokens=240,
-    )
-    db.add_all(
-        [
-            analysis,
-            artifact,
-            review_action,
-            chapter_task,
-            story_fact,
-            export,
-            token_usage,
-            execution_log,
-            prompt_replay,
-        ]
-    )
-    db.commit()
-    return owner, project, {
-        "analysis_id": analysis.id,
-        "artifact_id": artifact.id,
-        "chapter_task_id": chapter_task.id,
-        "content_id": content.id,
-        "content_version_id": version.id,
-        "execution_log_id": execution_log.id,
-        "export_id": export.id,
-        "node_id": node.id,
-        "prompt_replay_id": prompt_replay.id,
-        "review_action_id": review_action.id,
-        "story_fact_id": story_fact.id,
-        "token_usage_id": token_usage.id,
-        "workflow_id": workflow.id,
-    }, credential.id
