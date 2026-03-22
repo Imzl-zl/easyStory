@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.modules.export.service import EXPORT_ROOT_DIR
 from app.modules.observability.service import AuditLogService, create_audit_log_service
+from app.shared.runtime import EXPORT_ROOT_DIR
 
 from .project_deletion_service import ProjectDeletionService
 from .project_management_service import ProjectManagementService

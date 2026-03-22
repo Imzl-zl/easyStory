@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -11,11 +12,18 @@ from app.modules.content.models import Content, ContentVersion
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
 from app.modules.workflow.service import create_workflow_app_service, create_workflow_service
 from app.modules.workflow.service.dto import WorkflowStartDTO
+from app.shared.runtime.errors import NotFoundError
 from tests.unit.async_api_support import (
     build_sqlite_session_factories,
     cleanup_sqlite_session_factories,
 )
-from tests.unit.models.helpers import create_project, create_template, create_user, ready_project_setting
+from tests.unit.models.helpers import (
+    create_project,
+    create_template,
+    create_user,
+    create_workflow,
+    ready_project_setting,
+)
 
 CONFIG_ROOT = Path(__file__).resolve().parents[4] / "config"
 WORKFLOW_SNAPSHOT = {
@@ -32,6 +40,7 @@ WORKFLOW_SNAPSHOT = {
         }
     ],
 }
+WORKFLOW_QUERY_BASE_TIME = datetime(2026, 3, 22, 17, 0, tzinfo=UTC)
 
 
 async def test_start_workflow_recovers_paused_state_after_runtime_flush_failure(tmp_path) -> None:
@@ -109,6 +118,92 @@ async def test_resume_workflow_recovers_paused_state_after_runtime_flush_failure
             assert workflow.resume_from_node == "chapter_gen"
             assert workflow.snapshot["pending_actions"][0]["type"] == "runtime_error"
             assert session.query(ChapterTask).count() == 0
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_list_project_workflows_returns_latest_first_and_supports_status_filter(tmp_path) -> None:
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="workflow-app-query")
+    )
+    try:
+        with session_factory() as session:
+            owner, project = _create_ready_project(session)
+            running = create_workflow(
+                session,
+                project=project,
+                template_id=project.template_id,
+                status="running",
+                current_node_id="chapter_gen",
+                workflow_snapshot=WORKFLOW_SNAPSHOT,
+                created_at=WORKFLOW_QUERY_BASE_TIME,
+                updated_at=WORKFLOW_QUERY_BASE_TIME,
+                started_at=WORKFLOW_QUERY_BASE_TIME,
+            )
+            create_workflow(
+                session,
+                project=project,
+                template_id=project.template_id,
+                status="completed",
+                current_node_id="chapter_gen",
+                workflow_snapshot=WORKFLOW_SNAPSHOT,
+                created_at=WORKFLOW_QUERY_BASE_TIME + timedelta(minutes=1),
+                updated_at=WORKFLOW_QUERY_BASE_TIME + timedelta(minutes=4),
+                started_at=WORKFLOW_QUERY_BASE_TIME + timedelta(minutes=1),
+                completed_at=WORKFLOW_QUERY_BASE_TIME + timedelta(minutes=4),
+            )
+            owner_id = owner.id
+            project_id = project.id
+        service = _build_service(_FailingRuntimeService())
+
+        async with async_session_factory() as session:
+            all_workflows = await service.list_project_workflows(
+                session,
+                project_id,
+                owner_id=owner_id,
+            )
+            running_workflows = await service.list_project_workflows(
+                session,
+                project_id,
+                owner_id=owner_id,
+                status="running",
+            )
+
+        assert [item.status for item in all_workflows] == ["completed", "running"]
+        assert all_workflows[0].workflow_id == "workflow.xuanhuan_manual"
+        assert all_workflows[0].current_node_name == "生成章节"
+        assert [item.execution_id for item in running_workflows] == [running.id]
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_list_project_workflows_rejects_foreign_owner(tmp_path) -> None:
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="workflow-app-query-owner")
+    )
+    try:
+        with session_factory() as session:
+            owner, project = _create_ready_project(session)
+            outsider = create_user(session)
+            create_workflow(
+                session,
+                project=project,
+                template_id=project.template_id,
+                status="running",
+                current_node_id="chapter_gen",
+                workflow_snapshot=WORKFLOW_SNAPSHOT,
+            )
+            project_id = project.id
+            outsider_id = outsider.id
+        service = _build_service(_FailingRuntimeService())
+
+        async with async_session_factory() as session:
+            with pytest.raises(NotFoundError, match="Project not found"):
+                await service.list_project_workflows(
+                    session,
+                    project_id,
+                    owner_id=outsider_id,
+                )
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 

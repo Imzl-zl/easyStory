@@ -12,7 +12,7 @@ from app.modules.config_registry.schemas.config_schemas import (
     SkillConfig,
     WorkflowConfig,
 )
-from app.modules.context.engine.contracts import VARIABLE_TO_INJECT_TYPE
+from app.modules.context.engine.contracts import AUTO_INJECT_TYPES, VARIABLE_TO_INJECT_TYPE
 from app.modules.project.models import Project
 from app.modules.workflow.models import WorkflowExecution
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
@@ -107,7 +107,11 @@ class WorkflowRuntimePromptMixin:
         existing = {item.inject_type for item in merged}
         for name, schema in declared.items():
             inject_type = VARIABLE_TO_INJECT_TYPE.get(name)
-            if inject_type is None or inject_type in existing:
+            if (
+                inject_type is None
+                or inject_type in existing
+                or inject_type not in AUTO_INJECT_TYPES
+            ):
                 continue
             merged.append(
                 ContextInjectionItem.model_validate(

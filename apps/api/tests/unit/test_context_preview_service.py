@@ -43,6 +43,8 @@ def test_context_preview_service_returns_runtime_aligned_variables_and_report(db
     assert preview.variables["outline"] == "故事大纲"
     assert preview.variables["opening_plan"] == "前三章节奏规划"
     assert "主角初登场" in preview.variables["chapter_task"]
+    assert "故事大纲" in preview.rendered_prompt
+    assert "前三章节奏规划" in preview.rendered_prompt
     statuses = {item["type"]: item["status"] for item in preview.context_report["sections"]}
     assert statuses["previous_chapters"] == "not_applicable"
     assert statuses["story_bible"] == "not_applicable"

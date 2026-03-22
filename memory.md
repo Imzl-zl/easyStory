@@ -539,3 +539,237 @@
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
 - **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_review_executor.py tests/unit/test_billing_service.py tests/unit/test_workflow_runtime.py tests/unit/test_workflow_runtime_auto_fix.py` 通过，`26 passed`。
 - **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `301 passed`。
+
+## [2026-03-22 | billing summary 时间窗口与导出路径解耦完成]
+- **Events**：修复 `workflow billing summary` 的日级预算统计回归，并清理 `project -> export` 的跨模块常量耦合。
+- **Changes**：`WorkflowBillingSummaryDTO` 新增 `budget_recorded_at`、`budget_window_start_at`、`budget_window_end_at`；`BillingQueryService` 现在会以该 workflow 最近一次 `TokenUsage.created_at` 作为 `project_day / user_day` 的统计窗口锚点，无 usage 时才回退到 `now_factory`。
+- **Changes**：`billing_query_support.py` 已补 UTC 归一化，避免 SQLite 读回 naive datetime 时让 summary 响应继续漂移；`test_billing_query_service.py`、`test_billing_api.py` 已补对应断言，锁定新语义。
+- **Changes**：新增 `app/shared/runtime/storage_paths.py`；`export` 与 `project` 工厂现在都从共享运行时常量读取导出根目录，不再让 `project` 反向 import `app.modules.export.service`。
+- **Insights**：`workflow` 级总量和 `project_day/user_day` 日级总量如果不共享同一时间参考点，接口即使“当前能跑”也会在历史 workflow 查询场景里稳定制造歧义；summary 必须显式返回窗口时间，而不是让调用方猜测“今天”还是“执行当天”。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_billing_query_service.py tests/unit/test_billing_api.py tests/unit/test_project_deletion_service.py` 通过，`8 passed`。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q` 通过，当前全量结果为 `303 passed`。
+
+## [2026-03-22 | Engine billing 面板结构化收口完成]
+- **Events**：继续稳步推进 Web 工作台清晰度，把 Engine 的 billing tab 从原始 JSON 展示收口为结构化面板。
+- **Changes**：`apps/web/src/lib/api/contracts/engine.ts` 已为 `usage_by_type`、`budget_statuses` 补明确类型；不再继续用 `Array<Record<string, JsonValue>>` 吞掉 billing 语义。
+- **Changes**：新增 `engine-billing-format.ts` 与 `EngineBillingPanel`；billing tab 现在会明确展示预算参考点、日级统计窗口、预算状态、用途拆分和调用明细，而不是直接打印 summary/usages 原始对象。
+- **Changes**：`EnginePage` 已改为只负责 billing 查询与装配，把具体展示逻辑下沉到独立组件，避免继续膨胀成“大页里塞所有细节”的结构。
+- **Insights**：后端刚补完 `budget_recorded_at / budget_window_*` 后，如果前端仍然只展示 raw JSON，这个语义改动其实对用户不可见；工作台层必须把“按哪一天统计”直观呈现出来，才能真正消除歧义。
+- **Validation**：`pnpm --dir apps/web lint` 通过。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+- **Validation**：`pnpm --dir apps/web exec next build --webpack` 通过。
+
+## [2026-03-22 | Engine reviews 面板结构化收口完成]
+- **Events**：继续沿同一清理路径推进，把 Engine 的 reviews tab 从原始 JSON 展示收口为结构化审核面板。
+- **Changes**：`apps/web/src/lib/api/contracts/engine.ts` 已补齐 `WorkflowReviewStatusSummary`、`WorkflowReviewIssueSummary`、`WorkflowReviewTypeSummary`、`WorkflowReviewIssue` 等明确类型；不再继续用宽泛 `Record<string, JsonValue>` 表达 `review_types` 和 `issues`。
+- **Changes**：新增 `engine-review-format.ts` 与 `EngineReviewPanel`；reviews tab 现在会展示审核总览、类型拆分、reviewer 动作和问题详情，而不是直接打印 `{ summary, actions }`。
+- **Changes**：`EnginePage` 已把 reviews tab 的展示逻辑下沉到独立组件，`StatusBadge` 也补齐了 `passed` / `warning` 显式映射；顺手将 `engine-page.tsx` 压回 300 行内。
+- **Insights**：当后端 review DTO 已经稳定时，前端继续展示 raw JSON 会把“通过/警告/失败分布、问题严重度、reviewer 责任面”全部藏起来；结构化面板的价值不只是更好看，而是让排查路径真正可读。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+- **Validation**：`pnpm --dir apps/web lint` 通过。
+- **Validation**：`pnpm --dir apps/web exec next build --webpack` 通过。
+
+## [2026-03-22 | Engine logs 面板结构化收口完成]
+- **Events**：继续沿同一路径推进，把 Engine 的 logs tab 从原始 JSON 展示收口为结构化 observability 面板。
+- **Changes**：`apps/web/src/lib/api/contracts/engine.ts` 已补齐 `NodeExecutionStatus`、`ExecutionLogLevel`、`WorkflowArtifactView`、`ExecutionReviewActionView` 等明确类型；`NodeExecutionView.artifacts` 和 `review_actions` 不再继续使用宽泛 JSON 数组。
+- **Changes**：新增 `engine-logs-format.ts` 与 `EngineLogsPanel`；logs tab 现在会展示节点执行卡片、runtime 事件、错误信息和关键计数，而不是直接打印 `{ executions, logs }`。
+- **Changes**：`EnginePage` 已把 logs tab 的展示逻辑下沉到独立组件，并继续保持页面文件压在 300 行内。
+- **Insights**：observability 数据如果继续停留在 raw JSON，用户只能知道“系统有数据”，却很难一眼判断哪个节点失败、哪个节点只被跳过、错误发生在什么时候；结构化面板把排查路径真正显性化了。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+- **Validation**：`pnpm --dir apps/web lint` 通过。
+- **Validation**：`pnpm --dir apps/web exec next build --webpack` 通过。
+
+## [2026-03-22 | analysis 创建可追溯性加固完成]
+- **Events**：开始回到后端继续稳步完善，先收紧 `analysis` 模块的创建语义，保证分析记录保留最小可追溯来源。
+- **Changes**：`AnalysisCreateDTO` 现在会在 `content_id` 缺失时强制要求 `source_title`；同时会规范化 `source_title` 与 `generated_skill_key` 的空白输入，阻止空白 skill key 穿过 DTO 边界。
+- **Changes**：`AnalysisService.create_analysis()` 已在 `content_id` 存在且 `source_title` 为空时，自动用 `Content.title` 回填来源标题；这样即使调用方没显式传标题，分析记录也仍保留可读来源快照。
+- **Changes**：`test_analysis_service.py` 与 `test_analysis_api.py` 已补齐 DTO 校验、service 回填和 API `422` 断言，锁定上述语义。
+- **Insights**：`analysis` 当前还不是完整分析系统，但最小闭环至少要保证“事后还能看懂这条分析来自哪里”；否则 `source_title` 字段虽然存在，实际却可能稳定为空，等同于没有这个真值。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_analysis_service.py tests/unit/test_analysis_api.py` 通过，`11 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+
+## [2026-03-22 | analysis PATCH 更新闭环完成]
+- **Events**：继续沿 `analysis` 模块推进后端闭环，补上“用户确认/修正分析结果”所需的最小更新能力。
+- **Changes**：新增 `AnalysisUpdateDTO` 与 `AnalysisService.update_analysis()`，当前允许更新 `source_title`、`analysis_scope`、`result`、`suggestions`、`generated_skill_key`；`analysis_type`、`project_id`、`content_id` 仍保持不可变。
+- **Changes**：`AnalysisUpdateDTO` 会拒绝空 PATCH；`result` 若显式传入则不得为 `null` 或空对象；`generated_skill_key` 继续禁止空白字符串。
+- **Changes**：更新时若分析记录绑定了 `content_id`，清空 `source_title` 会自动回填 `Content.title`；若记录没有 `content_id`，则禁止把 `source_title` 清空，避免破坏最小可追溯性。
+- **Changes**：新增 `PATCH /api/v1/projects/{project_id}/analyses/{analysis_id}`，并补齐 `test_analysis_service.py`、`test_analysis_api.py`、`test_analysis_update_api.py` 对 PATCH 成功、owner 隔离、traceability 失败场景的覆盖；其中 PATCH API 用例已独立拆文件，避免测试文件继续超过 300 行。
+- **Insights**：这一步把设计文档里的“确认/修正分析结果”真正落到了后端可用接口上，同时仍然保持 `analysis` 记录不丢来源快照，不会因为后续修订把分析结果改成“无来源数据”。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_analysis_service.py tests/unit/test_analysis_api.py tests/unit/test_analysis_update_api.py` 通过，`17 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+
+## [2026-03-22 | analysis 删除闭环完成]
+- **Events**：继续沿 `analysis` 模块稳步补生命周期闭环，新增删除能力。
+- **Changes**：`AnalysisService.delete_analysis()` 已支持在 owner 作用域内物理删除分析记录，并复用现有 `project -> analysis` 的 `not_found` 校验口径。
+- **Changes**：新增 `DELETE /api/v1/projects/{project_id}/analyses/{analysis_id}`，返回 `204 No Content`。
+- **Changes**：新增 `test_analysis_delete_service.py` 与 `test_analysis_delete_api.py`，覆盖删除成功、删除后再次查询返回 `404`、越权删除返回 `404`。
+- **Insights**：当前生产代码中尚未发现其他真实 `analysis_id` 外键依赖，因此先补最小物理删除是安全且收益高的；这样 `analysis` 至少具备完整基础生命周期，不再停留在“只能增改查、不能清理”的半闭环状态。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_analysis_service.py tests/unit/test_analysis_api.py tests/unit/test_analysis_update_api.py tests/unit/test_analysis_delete_service.py tests/unit/test_analysis_delete_api.py` 通过，`21 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+
+## [2026-03-22 | style_reference 上下文注入支持完成]
+- **Events**：继续稳步推进后端，把 `analysis` 结果真正接到 `context` runtime 中，补齐 `style_reference` 注入能力。
+- **Changes**：`ContextInjectionItem` 已支持 `type=style_reference`，并新增 `analysis_id`、`inject_fields`；schema 会拒绝缺少这两个字段的 `style_reference` 配置，也会拒绝在其他注入类型上误带这两个字段。
+- **Changes**：`ContextSourceLoader` 已支持按 `project_id + analysis_id` 加载 `Analysis`，只注入显式选择的 `inject_fields`；请求不存在的分析字段会直接抛 `ContextBuilderError`，不做静默跳过。
+- **Changes**：`ContextBuilder`、`ContextPreviewService`、`WorkflowRuntimePromptMixin` 已接入 `style_reference`；同时新增“仅对零配置类型做自动变量映射”的限制，避免 Skill 模板引用 `{{ style_reference }}` 时被错误自动补成一个缺参注入项。
+- **Changes**：新增 `test_context_builder_style_reference.py` 与 `test_context_preview_style_reference.py`，并扩展 `test_config_validation.py`，覆盖 schema 校验、builder 加载、preview 显式注入与“引用但未配置时不崩溃”的回归。
+- **Changes**：`docs/specs/config-format.md` 与 `docs/design/02-context-injection.md` 已同步，把 `style_reference` 从“预留”升级为“当前 runtime 支持”。
+- **Insights**：这一步让 `analysis -> context` 的链路首次真正闭环；但 `style_reference` 不是零配置上下文，必须显式绑定 `analysis_id + inject_fields`，否则就会把项目级运行时数据误混进共享 workflow 模板或自动映射路径里。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_config_validation.py tests/unit/test_context_builder_loading.py tests/unit/test_context_builder_style_reference.py tests/unit/test_context_preview_service.py tests/unit/test_context_preview_style_reference.py tests/unit/test_context_api.py` 通过，`33 passed`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+
+## [2026-03-22 | analysis skill key 查询闭环完成]
+- **Events**：继续沿 `analysis -> context` 使用面收口，在现有分析生命周期基础上补齐按 `generated_skill_key` 定位记录的查询能力。
+- **Changes**：`AnalysisService.list_analyses()` 与 `GET /api/v1/projects/{project_id}/analyses` 已支持 `generated_skill_key` 过滤；查询值会先做 trim，若传入纯空白值则显式抛 `BusinessRuleError`，不做静默忽略。
+- **Changes**：新增 `test_analysis_query_service.py`，把 query 相关断言从 `test_analysis_service.py` 拆出，覆盖列表/详情基础闭环、owner 隔离、skill key 过滤和空白值拒绝，同时把原服务测试文件压回 300 行以内。
+- **Changes**：`test_analysis_api.py` 已补齐 `generated_skill_key` 过滤与空白值拒绝断言；上轮 `style_reference` 任务目录中的 `TODO.csv` 第 2 行错列也已修正，恢复任务真值文件一致性。
+- **Insights**：`style_reference` 仍然要求显式 `analysis_id`，但没有一个可按 skill key 稳定收敛分析记录的查询面时，调用方就只能全量列表再自行筛选；先补这个小查询闭环，能以最低耦合把 `analysis -> context` 的实际可用性往前推一步。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_analysis_service.py tests/unit/test_analysis_query_service.py tests/unit/test_analysis_api.py tests/unit/test_analysis_update_api.py tests/unit/test_analysis_delete_service.py tests/unit/test_analysis_delete_api.py` 通过，`25 passed`。
+
+## [2026-03-22 | style_reference analysis_type 语义约束完成]
+- **Events**：继续沿 `analysis -> context` 边界做小步收口，补上 `style_reference` 的分析类型语义约束。
+- **Changes**：`ContextSourceLoader._load_style_reference()` 现在会显式要求目标分析记录的 `analysis_type == "style"`；若绑定到 `plot/structure/...` 等非文风分析，会直接抛 `ContextBuilderError`，不再把错误类型的分析误当成风格参考注入。
+- **Changes**：`test_context_builder_style_reference.py` 与 `test_context_preview_style_reference.py` 已补齐非 `style` 分析记录的失败路径断言，锁定新的 runtime 口径，同时保持正常 style 注入路径不回退。
+- **Changes**：`docs/design/02-context-injection.md` 与 `docs/specs/config-format.md` 已同步说明：`style_reference` 只能绑定 `analysis_type=style` 的记录。
+- **Insights**：此前 `style_reference` 只校验“analysis 记录存在”，这会让调用方在配置层面成功绑定一条语义上完全不对的分析；把类型约束下沉到 runtime，可以最小成本避免 `analysis -> context` 链路出现“数据存在但含义错位”的隐性 bug。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_context_builder_style_reference.py tests/unit/test_context_preview_style_reference.py tests/unit/test_context_builder_loading.py tests/unit/test_context_preview_service.py tests/unit/test_context_api.py` 通过，`17 passed`。
+
+## [2026-03-22 | context-preview 请求级显式注入完成]
+- **Events**：继续沿 `analysis -> context` 的实际使用面推进，让 `context-preview` 能在不修改 workflow snapshot 的情况下直接试跑显式上下文注入。
+- **Changes**：`ContextPreviewRequestDTO` 已新增 `extra_inject`；`ContextPreviewService` 会把它作为单次预览请求的最高优先级覆盖项合并进上下文规则，但不会回写 workflow 配置真值。
+- **Changes**：这使 `style_reference` 可以直接通过预览请求携带 `analysis_id + inject_fields` 试跑，而无需先把分析引用写回 workflow snapshot；若 snapshot 中已存在同类型注入，请求级注入会显式覆盖它。
+- **Changes**：`test_context_preview_style_reference.py` 已补齐服务层的请求级注入与覆盖断言，`test_context_api.py` 已补齐 API 回归测试。
+- **Insights**：此前即使 `style_reference` runtime 已可用，调用方若想先试一条 analysis 引用，仍然必须先改 snapshot；这会把“只想预览一次”的动作变成配置写操作。把显式注入能力下沉到 preview 请求，可以最小成本提升 `analysis -> context` 链路的可试用性，同时保持真值源不变。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_context_preview_service.py tests/unit/test_context_preview_style_reference.py tests/unit/test_context_api.py` 通过，`12 passed`。
+
+## [2026-03-22 | style_reference 缺失 analysis 显式报错完成]
+- **Events**：继续沿 `analysis -> context` 边界收紧显式绑定语义，修复 `style_reference` 在目标分析已不存在时仍被静默跳过的问题。
+- **Changes**：`ContextSourceLoader._load_style_reference()` 现在在 `analysis_id` 找不到目标记录时会直接抛 `ContextBuilderError`，不再返回 `status=missing`。
+- **Changes**：`test_context_builder_style_reference.py`、`test_context_preview_style_reference.py` 与 `test_context_api.py` 已补齐 builder / preview service / API 三层的缺失 analysis 失败断言，锁定新口径。
+- **Changes**：`docs/design/02-context-injection.md` 与 `docs/specs/config-format.md` 已同步说明：`style_reference` 若引用到已删除或不存在的分析，会直接报错。
+- **Insights**：`style_reference` 的 `analysis_id` 是显式配置，不是“有就注入、没有就算了”的弱依赖；此前把这类坏配置吞成 optional missing，会让 workflow/preview 看似成功，但上下文其实悄悄丢失。把它改成硬失败后，问题会在最靠近根因的位置暴露出来。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_context_builder_style_reference.py tests/unit/test_context_preview_style_reference.py tests/unit/test_context_api.py` 通过，`15 passed`。
+
+## [2026-03-22 | analysis latest 查询闭环完成]
+- **Events**：继续沿 `analysis -> context` 使用面稳步推进，补上“按现有过滤条件直接取最新一条 analysis”的后端查询能力。
+- **Changes**：`AnalysisService` 已新增 `get_latest_analysis()`，并把 `analysis_type / content_id / generated_skill_key` 过滤逻辑收敛到共享 helper；空白 `generated_skill_key` 仍显式报错，找不到记录时显式返回 `NotFoundError`。
+- **Changes**：新增 `GET /api/v1/projects/{project_id}/analyses/latest`，支持上述三个查询参数；静态 `/latest` 路由已放在 `/{analysis_id}` 之前，避免把 `latest` 误解析成 UUID 路径参数。
+- **Changes**：新增 `test_analysis_latest_query_service.py` 与 `test_analysis_latest_api.py`，覆盖最新记录命中、组合过滤、无匹配 `404`、空白 skill key `422`；同时保持原 `test_analysis_query_service.py` 与 `test_analysis_api.py` 文件大小不超过 300 行。
+- **Insights**：`style_reference` 仍然要求显式 `analysis_id`，但调用方现在至少可以先按 `analysis_type`、`content_id`、`generated_skill_key` 直接拿到“最新一条候选分析”，不再需要 `list -> 取第 1 条` 这层样板查询。这个查询面仍然保持 debug-first：没有匹配就报错，不做 silent fallback。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_analysis_query_service.py tests/unit/test_analysis_latest_query_service.py tests/unit/test_analysis_api.py tests/unit/test_analysis_latest_api.py` 通过，`16 passed`。
+
+## [2026-03-22 | context-preview rendered prompt 收口完成]
+- **Events**：继续沿 `analysis -> context` 使用面推进，把 `context-preview` 从“只返回变量和报告”收口为“直接返回最终渲染 prompt”的可用预览接口。
+- **Changes**：`ContextPreviewDTO` 已新增 `rendered_prompt`；`ContextPreviewService` 现在会在 preview 阶段直接用 `SkillTemplateRenderer` 渲染最终 prompt，并保持 `variables + context_report` 继续返回。
+- **Changes**：若模板引用了未提供变量，preview 现在会显式抛 `ConfigurationError("Context preview prompt render failed: ...")`；例如模板显式写了 `{{ style_reference }}` 但 workflow / request 没提供对应注入时，预览会直接失败，不再把这种坏配置藏起来。
+- **Changes**：新增 `test_context_preview_rendered_prompt_service.py` 与 `test_context_preview_rendered_prompt_api.py`，并扩展 `test_context_preview_service.py`、`test_context_preview_style_reference.py`、`test_context_api.py` 断言 rendered prompt 内容；同时同步 `apps/web/src/lib/api/contracts/engine.ts`，为共享 API contract 增加 `rendered_prompt` 字段。
+- **Insights**：这一步让 `style_reference` 的试跑路径更直接了：调用方不再需要自己拿 `variables` 再手工套模板，就能看到真正发送给模型的 prompt；同时 preview 也更贴近 runtime，模板缺变量的问题会在预览期提前暴露。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_context_preview_service.py tests/unit/test_context_preview_style_reference.py tests/unit/test_context_preview_rendered_prompt_service.py tests/unit/test_context_api.py tests/unit/test_context_preview_rendered_prompt_api.py` 通过，`16 passed`。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+
+## [2026-03-22 | Engine context 面板结构化收口完成]
+- **Events**：继续把 Web 工作台从 raw JSON 面板收口为可读界面，这轮完成了 Engine 的 context tab。
+- **Changes**：`apps/web/src/lib/api/contracts/engine.ts` 已补齐 `ContextPreviewRequest.extra_inject`，并为 `ContextPreview.context_report` 收敛出更明确的 section 结构类型；这样前端终于能完整表达后端已经支持的 request-level 显式注入能力。
+- **Changes**：新增 `apps/web/src/features/engine/components/engine-context-panel.tsx` 与 `engine-context-format.ts`；context tab 现在会结构化展示 rendered prompt、引用变量、token 预算、section 状态和变量快照，而不是直接打印整块 preview JSON。
+- **Changes**：`EngineContextPanel` 已支持在工作台中直接输入 `extra_inject` JSON，用来试跑 `style_reference` 等显式上下文；`engine-page.tsx` 则回到只负责 tab 装配，文件大小压回 300 行以内。
+- **Insights**：后端即使已经返回 `rendered_prompt`，如果工作台仍然只显示 raw JSON，这条能力对用户仍然几乎不可见。把 context tab 收口成结构化面板后，`style_reference` 的试跑路径才真正闭环：用户能直接看到“请求传了什么、最终 prompt 长什么样、哪段上下文被注入或裁掉”。
+- **Validation**：`pnpm --dir apps/web lint` 通过。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+
+## [2026-03-22 | Engine context style selector 收口完成]
+- **Events**：继续沿 `analysis -> context` 使用面稳步推进，把 Engine context 里的 `style_reference` 试跑从“手填 analysis_id”收口为可选 helper。
+- **Changes**：`apps/web/src/lib/api/analysis.ts` 的 `listAnalyses()` 已接上 `generatedSkillKey` 查询参数，前端现在可以直接复用后端已有的 style analysis 过滤能力。
+- **Changes**：新增 `apps/web/src/features/engine/components/engine-context-style-reference-helper.tsx` 与 `engine-context-request-support.ts`；helper 支持输入 `generated_skill_key`、选择 style analysis、填写 `inject_fields`，并把 `style_reference` 显式写回 `extra_inject` JSON。
+- **Changes**：`EngineContextPanel` 已接入该 helper，并通过 `onApply` 回写 `extraInjectText`；当前仍保持 debug-first 语义，`extra_inject` 坏 JSON 或空 `inject_fields` 会直接报错，不做 silent fallback。
+- **Insights**：这一步没有把 `style_reference` 改成“自动猜最新分析”的隐式行为，仍然要求用户显式选择一条 analysis；helper 只是把 request-level 组装样板从手工 JSON 改成更稳定的 UI 操作，避免继续在工作台里硬敲 `analysis_id`。
+- **Validation**：`pnpm --dir apps/web exec tsc --noEmit` 通过。
+- **Validation**：`pnpm --dir apps/web lint` 通过。
+
+## [2026-03-22 | style_reference token cap 收口完成]
+- **Events**：继续稳步完善后端，在 `analysis -> context -> workflow/preview` 链路上补齐 `style_reference` 的体验型上下文预算约束。
+- **Changes**：`apps/api/app/modules/context/engine/contracts.py` 已新增 `STYLE_REFERENCE_MAX_TOKENS = 500` 与 `SECTION_TOKEN_CAPS`；`ContextBuilder._build_section()` 现会在 section 生成后统一走 `ContextTruncator.apply_section_token_cap()`。
+- **Changes**：当 `style_reference` 超过 500 tokens 时，runtime 会先在 section 内裁剪，而不是等到总预算裁剪阶段才被动处理；`context_report` 现在会显式暴露 `token_cap`、`original_tokens` 与 `status=truncated`。
+- **Changes**：新增超长 style analysis 场景断言到 `test_context_builder_style_reference.py` 与 `test_context_preview_rendered_prompt_service.py`；同时同步 `docs/design/02-context-injection.md` 与 `docs/specs/config-format.md`，把 `style_reference` 的默认 cap 正式写回设计/规格真值。
+- **Insights**：`style_reference` 已经不是“未来扩展中的预留概念”，而是现行 runtime 的体验型上下文。既然已经落地，就不应继续无限占用预算；把 cap 放在 `ContextBuilder -> Truncator` 交界层最稳，既避免膨胀 `source_loader.py`，也让 workflow runtime 和 context preview 共用同一份收口语义。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_context_builder_style_reference.py tests/unit/test_context_preview_style_reference.py tests/unit/test_context_preview_rendered_prompt_service.py` 通过，`13 passed`。
+
+## [2026-03-22 | Story Bible 查询面收口完成]
+- **Events**：继续稳步推进后端，在 `context` 模块里把 Story Bible 的读取面从“只有粗粒度列表”收口为更可接 UI/调试面的查询接口。
+- **Changes**：`StoryBibleService` 已新增 `get_fact()`；`list_facts()` 现支持 `chapter_number` 与 `source_content_version_id` 精确过滤，不再只能靠 `visible_at_chapter` 做上界筛选。
+- **Changes**：HTTP 层新增 `GET /api/v1/projects/{project_id}/story-bible/{fact_id}`，并把 `GET /story-bible` 的查询参数扩到 `chapter_number` / `source_content_version_id`；实现继续复用 `story_fact_statement()` 和 `story_facts` 单一真值，没有再造第二套读取逻辑。
+- **Changes**：新增 `test_story_bible_query_service.py` 与 `test_story_bible_query_api.py`，覆盖单条详情、chapter/source version 过滤和 owner 隔离，同时保持原 `test_story_bible_service.py` / `test_story_bible_api.py` 文件不继续膨胀。
+- **Insights**：Story Bible 现阶段最缺的不是更多写接口，而是“能精确看到哪一版章节产出了哪条事实”。先把查询面收口，能直接提升前端接入、版本回滚排查和事实冲突处理时的可观测性，而且不会把当前写入语义搅乱。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_story_bible_service.py tests/unit/test_story_bible_query_service.py tests/unit/test_story_bible_api.py tests/unit/test_story_bible_query_api.py` 通过，`12 passed`。
+
+## [2026-03-22 | Observability 查询过滤收口完成]
+- **Events**：继续稳步推进后端，把 `observability` 从“只能粗粒度看执行记录”收口到更适合调试和 UI 消费的节点级查询面。
+- **Changes**：`WorkflowObservabilityService` 现支持 `list_node_executions(node_id, status)`、`list_execution_logs(node_execution_id)`、`list_execution_logs_since(node_execution_id)` 与 `list_prompt_replays(replay_type)`；SSE `events` 端点复用了同一套过滤语义。
+- **Changes**：为避免服务文件继续膨胀，新建 `workflow_observability_support.py` 下沉 query statement helper；同时新增 `test_workflow_observability_query_service.py` 与 `test_workflow_observability_query_api.py`，覆盖过滤、SSE 和坏 scope 校验，不再把旧测试文件继续堆大。
+- **Changes**：`docs/specs/architecture.md` 已同步修正 `style_reference` 状态，把它从“未来规划项”改回当前已实现的 context 注入类型，避免正式规格与运行时真值冲突。
+- **Insights**：这轮刻意没有按 `ExecutionLog.details.node_id` 去做 JSON 过滤，而是继续绑定 `node_execution_id` 这类现有关系真值；这样跨数据库更稳，也避免 workflow 级日志被模糊匹配进节点日志查询。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_workflow_observability_service.py tests/unit/test_workflow_observability_api.py tests/unit/test_workflow_observability_query_service.py tests/unit/test_workflow_observability_query_api.py` 通过，`10 passed`。
+
+## [2026-03-22 | Export 单条详情查询收口完成]
+- **Events**：继续稳步推进后端，把 `export` 从“列表/创建/下载”扩到最小完整读取面，补上单条详情查询。
+- **Changes**：新增 `ExportDetailDTO`，返回 `config_snapshot` 与 `updated_at`；`ExportService` 已新增 `get_export()` 与 `to_detail_dto()`，沿用现有 owner 校验和 `NotFoundError` 语义。
+- **Changes**：HTTP 层新增 `GET /api/v1/exports/{export_id}`；同时新增 `test_export_query_service.py` 与 `test_export_query_api.py`，覆盖详情查询成功场景与 owner 隔离，不继续把旧 `test_export_service.py` / `test_export_api.py` 堆大。
+- **Insights**：这轮没有把详情路由做成项目级 `/projects/{project_id}/exports/{export_id}`，而是与现有下载路由保持同一资源层级；这样更贴合当前 `export_id` 已经是独立资源标识的实现现实，也避免重复 path 约束。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_export_service.py tests/unit/test_export_api.py tests/unit/test_export_query_service.py tests/unit/test_export_query_api.py` 通过，`9 passed`。
+
+## [2026-03-22 | Review summary 过滤收口完成]
+- **Events**：继续稳步推进后端，把 `review` 的读取面从“只能看 workflow 全量 summary”收口为可按节点和审核维度过滤的 summary 查询。
+- **Changes**：`GET /api/v1/workflows/{workflow_id}/reviews/summary` 已支持 `node_execution_id`、`review_type`、`status`；过滤语义与现有 `reviews/actions` 保持对齐，调用方不再需要先拉全量 actions 再自行聚合。
+- **Changes**：新增 `apps/api/app/modules/review/service/review_query_support.py`，把纯查询 helper 从 `review_query_service.py` 下沉出去，保持 `review` 模块内聚，不把聚合逻辑丢给调用方或 `observability`。
+- **Insights**：这轮没有补“单条 review action 详情”接口，因为 `actions` 已经返回足够完整的 issue 明细；当前更高价值的缺口是让 `summary` 具备与 actions 对称的过滤能力。
+- **Insights**：初版 scope 校验通过 `execution.workflow_execution` 触发 async lazy load，会在 async SQLAlchemy 下抛 `MissingGreenlet`；最终改成显式 `_require_owned_workflow()` 查询，避免依赖隐式 ORM 懒加载。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_review_query_service.py tests/unit/test_review_api.py tests/unit/test_review_summary_query_service.py tests/unit/test_review_summary_api.py` 通过，`12 passed`。
+
+## [2026-03-22 | Story Asset 版本历史查询收口完成]
+- **Events**：继续稳步推进后端，把 `content` 模块里 `outline` / `opening_plan` 的读取面从“只能看当前版本”收口到可直接读取版本历史。
+- **Changes**：新增 `StoryAssetVersionDTO` 与 `StoryAssetService.list_versions()`；HTTP 层新增 `GET /api/v1/projects/{project_id}/story-assets/{asset_type}/versions`，当前支持 `asset_type=outline|opening_plan`。
+- **Changes**：owner 校验继续复用 `ProjectService.require_project()`，asset 归属继续复用 `_require_asset()`；没有给 Story Asset 额外造第二套 scope 规则。
+- **Insights**：这轮没有分别新增 `/outline/versions` 与 `/opening-plan/versions`，而是收口成单一路由；原因是 `content` router 已接近 300 行，用通用 asset 路由更稳，也更利于后续继续扩 asset 查询面。
+- **Insights**：Story Asset 的版本真值本来就已经在 `ContentVersion` 里，当前缺的不是新模型，而是把现有版本数据通过 query surface 暴露出来；因此这轮只补读取面，不碰写入和 stale 传播逻辑。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_story_asset_service.py tests/unit/test_story_asset_query_service.py tests/unit/test_story_asset_query_api.py` 通过，`10 passed`。
+
+## [2026-03-22 | Workflow project 查询面收口完成]
+- **Events**：继续稳步推进后端，把 `workflow` 的读取面从“只能按 execution id 看 detail”收口到可按 `project_id` 查看 execution history。
+- **Changes**：新增 `WorkflowExecutionSummaryDTO` 与 `WorkflowExecutionStatus`；`WorkflowAppService` 已新增 `list_project_workflows()`，支持 `status` 过滤和按最近更新时间倒序返回。
+- **Changes**：HTTP 层新增 `GET /api/v1/projects/{project_id}/workflows`；`workflow` detail 继续沿用原有 `GET /api/v1/workflows/{workflow_id}`，没有把 project list 和 single detail 混成一套返回。
+- **Insights**：这轮没有直接复用 `WorkflowExecutionDTO` 做列表接口，而是专门补 summary DTO；原因是 detail DTO 自带 `nodes`，对 project history 列表过重，也会把 snapshot 细节泄漏到不需要的读取面。
+- **Insights**：`snapshot_support.py` 这轮收敛成“summary 映射 + detail 扩展”结构，后续如果再补 workflow 相关 query，可以继续沿用同一份 summary 真值，不必重复拼 `workflow_name/current_node_name/has_runtime_snapshot`。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_workflow_app_service.py tests/unit/test_workflow_query_api.py tests/unit/test_workflow_api.py` 通过，`14 passed`。
+
+## [2026-03-22 | Billing project usage 查询收口完成]
+- **Events**：继续稳步推进后端，把 `billing` 的读取面从“只能按 workflow 看 token usages”收口到 project 维度 usage history。
+- **Changes**：HTTP 层新增 `GET /api/v1/projects/{project_id}/billing/token-usages`，支持 `workflow_id / usage_type / model_name / limit` 过滤。
+- **Changes**：`TokenUsageViewDTO` 已显式新增 `workflow_execution_id`；workflow 级列表会回填当前 workflow id，project 级列表会从 `NodeExecution.workflow_execution_id` 一并带出所属 workflow。
+- **Changes**：`BillingQueryService` 已新增 `list_project_token_usages()`、`_project_usage_statement()`、`_require_owned_project()` 与 `_resolve_project_workflow_scope()`；owner 校验顺序为先 project、后 workflow，并要求 `workflow.project_id == project_id`。
+- **Insights**：这轮没有做 project 级 budget summary，因为同一 project 下可能有多个 workflow，直接聚合 summary 会混淆预算窗口和预算真值语义；当前只补 usage 历史读取面。
+- **Insights**：`model_name` 过滤保持 debug-first；纯空白字符串会显式报 `model_name filter cannot be blank`，不做 silent trim-ignore。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_billing_query_service.py tests/unit/test_billing_project_query_service.py tests/unit/test_billing_api.py tests/unit/test_billing_project_query_api.py` 通过，`9 passed`。
+
+## [2026-03-22 | workflow project history 自检排序修复完成]
+- **Events**：在继续推进前做后端自检时，发现 `GET /api/v1/projects/{project_id}/workflows` 的 history 排序在 SQLite 秒级时间戳碰撞时不稳定，会退化成按 UUID 顺序返回。
+- **Changes**：`WorkflowAppService.list_project_workflows()` 的排序已收紧为 `updated_at -> completed_at -> started_at -> created_at -> id`，并显式对 `completed_at/started_at` 使用 `nulls_last()`，降低同秒写入时的随机顺序问题。
+- **Changes**：`workflow` router 的 `limit` 参数已补 `Query(default=50, ge=1, le=200)`，避免项目级 history 查询继续接受无界或负值 limit。
+- **Changes**：`test_workflow_app_service.py` 与 `test_workflow_query_api.py` 已改为显式写入 `created_at/updated_at/started_at/completed_at` 测试数据，不再依赖 SQLite 的秒级默认时间戳碰运气。
+- **Insights**：这次暴露的问题不是 workflow 状态机本身，而是“最近更新时间倒序”在低精度时间戳下缺少稳定 tie-break；如果不补充业务时间字段，API 层 history 列表会出现偶发抖动。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_workflow_app_service.py tests/unit/test_workflow_query_api.py` 通过，`6 passed`。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_analysis_service.py tests/unit/test_analysis_api.py tests/unit/test_analysis_query_service.py tests/unit/test_analysis_latest_query_service.py tests/unit/test_analysis_latest_api.py tests/unit/test_analysis_update_api.py tests/unit/test_analysis_delete_service.py tests/unit/test_analysis_delete_api.py tests/unit/test_context_preview_service.py tests/unit/test_context_builder_style_reference.py tests/unit/test_context_preview_style_reference.py tests/unit/test_context_preview_rendered_prompt_service.py tests/unit/test_context_preview_rendered_prompt_api.py tests/unit/test_context_api.py tests/unit/test_story_asset_service.py tests/unit/test_story_asset_query_service.py tests/unit/test_story_asset_query_api.py tests/unit/test_story_bible_query_service.py tests/unit/test_story_bible_query_api.py tests/unit/test_billing_query_service.py tests/unit/test_billing_project_query_service.py tests/unit/test_billing_api.py tests/unit/test_billing_project_query_api.py tests/unit/test_review_query_service.py tests/unit/test_review_summary_query_service.py tests/unit/test_review_api.py tests/unit/test_review_summary_api.py tests/unit/test_export_service.py tests/unit/test_export_query_service.py tests/unit/test_export_api.py tests/unit/test_export_query_api.py tests/unit/test_workflow_app_service.py tests/unit/test_workflow_query_api.py tests/unit/test_workflow_observability_service.py tests/unit/test_workflow_observability_query_service.py tests/unit/test_workflow_observability_api.py tests/unit/test_workflow_observability_query_api.py` 通过，`113 passed`。

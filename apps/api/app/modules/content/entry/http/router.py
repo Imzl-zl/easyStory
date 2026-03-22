@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.content.service import (
+    AssetType,
     ChapterContentService,
     ChapterDetailDTO,
     ChapterSaveDTO,
@@ -14,6 +15,7 @@ from app.modules.content.service import (
     StoryAssetService,
     StoryAssetDTO,
     StoryAssetSaveDTO,
+    StoryAssetVersionDTO,
     create_chapter_content_service,
     create_story_asset_service,
 )
@@ -122,6 +124,22 @@ async def approve_opening_plan(
         db,
         project_id,
         "opening_plan",
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/story-assets/{asset_type}/versions", response_model=list[StoryAssetVersionDTO])
+async def list_story_asset_versions(
+    project_id: uuid.UUID,
+    asset_type: AssetType,
+    story_asset_service: StoryAssetService = Depends(get_story_asset_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> list[StoryAssetVersionDTO]:
+    return await story_asset_service.list_versions(
+        db,
+        project_id,
+        asset_type,
         owner_id=current_user.id,
     )
 

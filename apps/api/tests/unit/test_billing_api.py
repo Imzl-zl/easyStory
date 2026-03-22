@@ -98,6 +98,9 @@ async def test_billing_api_returns_workflow_summary_and_token_usages(
             assert summary["workflow_execution_id"] == str(workflow_id)
             assert summary["total_tokens"] == 200
             assert summary["on_exceed"] == "pause"
+            assert summary["budget_recorded_at"].startswith("2026-03-21T12:01:00")
+            assert summary["budget_window_start_at"].startswith("2026-03-21T00:00:00")
+            assert summary["budget_window_end_at"].startswith("2026-03-22T00:00:00")
             assert [item["usage_type"] for item in summary["usage_by_type"]] == [
                 "generate",
                 "review",

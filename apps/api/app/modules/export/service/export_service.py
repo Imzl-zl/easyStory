@@ -11,12 +11,13 @@ from app.modules.content.models import Content
 from app.modules.export.models import Export
 from app.modules.project.models import Project
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
+from app.shared.runtime import EXPORT_ROOT_DIR as SHARED_EXPORT_ROOT_DIR
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 
-from .dto import ExportViewDTO
+from .dto import ExportDetailDTO, ExportViewDTO
 from .export_file_support import cleanup_files, resolve_download_path, write_export_file
 
-EXPORT_ROOT_DIR = ".runtime/exports"
+EXPORT_ROOT_DIR = SHARED_EXPORT_ROOT_DIR
 EXPORTABLE_CONTENT_STATUSES = frozenset({"approved", "stale"})
 BLOCKING_TASK_STATUS_MESSAGES = {
     "pending": "第{chapter_number}章尚未完成，无法导出",
@@ -76,6 +77,15 @@ class ExportService:
         )
         return export, file_path
 
+    async def get_export(
+        self,
+        db: AsyncSession,
+        export_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+    ) -> Export:
+        return await self._require_owned_export(db, export_id, owner_id=owner_id)
+
     def to_view_dto(self, export: Export) -> ExportViewDTO:
         return ExportViewDTO(
             id=export.id,
@@ -84,6 +94,18 @@ class ExportService:
             filename=export.filename,
             file_size=export.file_size,
             created_at=export.created_at,
+        )
+
+    def to_detail_dto(self, export: Export) -> ExportDetailDTO:
+        return ExportDetailDTO(
+            id=export.id,
+            project_id=export.project_id,
+            format=export.format,
+            filename=export.filename,
+            file_size=export.file_size,
+            config_snapshot=export.config_snapshot,
+            created_at=export.created_at,
+            updated_at=export.updated_at,
         )
 
     async def export_workflow(

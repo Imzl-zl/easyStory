@@ -5,11 +5,10 @@ from decimal import Decimal
 import uuid
 from typing import Any
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from app.modules.observability.models import ExecutionLog, PromptReplay
+from app.modules.observability.models import ExecutionLog
 from app.modules.project.models import Project
 from app.modules.workflow.models import NodeExecution, WorkflowExecution
 from app.shared.runtime.errors import NotFoundError
@@ -21,8 +20,13 @@ from .dto import (
     PromptReplayViewDTO,
     ReviewActionViewDTO,
 )
-
-TERMINAL_WORKFLOW_STATUSES = frozenset({"completed", "failed", "cancelled"})
+from .workflow_observability_support import (
+    TERMINAL_WORKFLOW_STATUSES,
+    build_after_cursor,
+    build_execution_log_statement,
+    build_node_execution_statement,
+    build_prompt_replay_statement,
+)
 
 
 class WorkflowObservabilityService:
@@ -32,16 +36,14 @@ class WorkflowObservabilityService:
         workflow_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
+        node_id: str | None = None,
+        status: str | None = None,
     ) -> list[NodeExecutionViewDTO]:
         await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
-        statement = (
-            select(NodeExecution)
-            .options(
-                selectinload(NodeExecution.artifacts),
-                selectinload(NodeExecution.review_actions),
-            )
-            .where(NodeExecution.workflow_execution_id == workflow_id)
-            .order_by(NodeExecution.node_order.asc(), NodeExecution.sequence.asc())
+        statement = build_node_execution_statement(
+            workflow_id,
+            node_id=node_id,
+            status=status,
         )
         executions = (await db.scalars(statement)).all()
         return [self._to_node_execution_dto(item) for item in executions]
@@ -53,12 +55,20 @@ class WorkflowObservabilityService:
         *,
         owner_id: uuid.UUID,
         level: str | None = None,
+        node_execution_id: uuid.UUID | None = None,
         limit: int = 50,
     ) -> list[ExecutionLogViewDTO]:
-        await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
-        statement = select(ExecutionLog).where(ExecutionLog.workflow_execution_id == workflow_id)
-        if level is not None:
-            statement = statement.where(ExecutionLog.level == level)
+        await self.require_log_scope(
+            db,
+            workflow_id,
+            owner_id=owner_id,
+            node_execution_id=node_execution_id,
+        )
+        statement = build_execution_log_statement(
+            workflow_id,
+            level=level,
+            node_execution_id=node_execution_id,
+        )
         logs = (
             await db.scalars(
                 statement.order_by(ExecutionLog.created_at.desc(), ExecutionLog.id.desc()).limit(limit)
@@ -75,14 +85,22 @@ class WorkflowObservabilityService:
         after_created_at: datetime | None,
         after_id: uuid.UUID | None = None,
         level: str | None = None,
+        node_execution_id: uuid.UUID | None = None,
         limit: int = 100,
     ) -> list[ExecutionLogViewDTO]:
-        await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
-        statement = select(ExecutionLog).where(ExecutionLog.workflow_execution_id == workflow_id)
-        if level is not None:
-            statement = statement.where(ExecutionLog.level == level)
+        await self.require_log_scope(
+            db,
+            workflow_id,
+            owner_id=owner_id,
+            node_execution_id=node_execution_id,
+        )
+        statement = build_execution_log_statement(
+            workflow_id,
+            level=level,
+            node_execution_id=node_execution_id,
+        )
         if after_created_at is not None:
-            statement = statement.where(self._build_after_cursor(after_created_at, after_id))
+            statement = statement.where(build_after_cursor(after_created_at, after_id))
         logs = (
             await db.scalars(
                 statement.order_by(ExecutionLog.created_at.asc(), ExecutionLog.id.asc()).limit(limit)
@@ -100,6 +118,24 @@ class WorkflowObservabilityService:
         workflow = await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
         return workflow.status in TERMINAL_WORKFLOW_STATUSES
 
+    async def require_log_scope(
+        self,
+        db: AsyncSession,
+        workflow_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+        node_execution_id: uuid.UUID | None = None,
+    ) -> None:
+        if node_execution_id is None:
+            await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+            return
+        await self._require_owned_node_execution(
+            db,
+            workflow_id,
+            node_execution_id,
+            owner_id=owner_id,
+        )
+
     async def list_prompt_replays(
         self,
         db: AsyncSession,
@@ -107,6 +143,7 @@ class WorkflowObservabilityService:
         node_execution_id: uuid.UUID,
         *,
         owner_id: uuid.UUID,
+        replay_type: str | None = None,
     ) -> list[PromptReplayViewDTO]:
         await self._require_owned_node_execution(
             db,
@@ -114,10 +151,9 @@ class WorkflowObservabilityService:
             node_execution_id,
             owner_id=owner_id,
         )
-        statement = (
-            select(PromptReplay)
-            .where(PromptReplay.node_execution_id == node_execution_id)
-            .order_by(PromptReplay.created_at.asc())
+        statement = build_prompt_replay_statement(
+            node_execution_id,
+            replay_type=replay_type,
         )
         replays = (await db.scalars(statement)).all()
         return [PromptReplayViewDTO.model_validate(item, from_attributes=True) for item in replays]
@@ -162,21 +198,6 @@ class WorkflowObservabilityService:
         if execution is None:
             raise NotFoundError(f"Node execution not found: {node_execution_id}")
         return execution
-
-    def _build_after_cursor(
-        self,
-        after_created_at: datetime,
-        after_id: uuid.UUID | None,
-    ):
-        if after_id is None:
-            return ExecutionLog.created_at > after_created_at
-        return or_(
-            ExecutionLog.created_at > after_created_at,
-            and_(
-                ExecutionLog.created_at == after_created_at,
-                ExecutionLog.id > after_id,
-            ),
-        )
 
     def _to_node_execution_dto(self, execution: NodeExecution) -> NodeExecutionViewDTO:
         input_data = execution.input_data if isinstance(execution.input_data, dict) else {}

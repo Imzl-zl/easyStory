@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.modules.analysis.models import Analysis
 from app.modules.content.models import Content
 from app.modules.context.models import StoryFact
 from app.modules.project.models import Project
@@ -17,10 +18,12 @@ from .contracts import (
     OPENING_PLAN_DEGRADED_MAX_CHARS,
     OPENING_PLAN_PRIORITY_CHAPTER_LIMIT,
 )
+from .errors import ContextBuilderError
 
 ContextPayload = tuple[str, str, dict[str, Any]]
 APPROVED_CONTENT_TYPES = frozenset({"outline", "opening_plan"})
 UNAVAILABLE_CHAPTER_TASK_STATUSES = frozenset({"stale", "skipped"})
+STYLE_REFERENCE_ANALYSIS_TYPE = "style"
 
 
 class ContextSourceLoader:
@@ -33,6 +36,8 @@ class ContextSourceLoader:
         chapter_number: int | None,
         workflow_execution_id,
         count: int | None,
+        analysis_id,
+        inject_fields: list[str],
     ) -> ContextPayload:
         if inject_type == "project_setting":
             return await self._load_project_setting(project_id, db)
@@ -46,6 +51,8 @@ class ContextSourceLoader:
             return await self._load_previous_chapters(project_id, db, chapter_number, count or 2)
         if inject_type == "story_bible":
             return await self._load_story_bible(project_id, db, chapter_number)
+        if inject_type == "style_reference":
+            return await self._load_style_reference(project_id, db, analysis_id, inject_fields)
         raise ValueError(f"Unsupported inject type: {inject_type}")
 
     async def _load_project_setting(self, project_id, db: AsyncSession) -> ContextPayload:
@@ -192,6 +199,33 @@ class ContextSourceLoader:
             return "", "not_applicable", {"items_count": 0}
         return self._render_story_bible(entries), "included", {"items_count": len(entries)}
 
+    async def _load_style_reference(
+        self,
+        project_id,
+        db: AsyncSession,
+        analysis_id,
+        inject_fields: list[str],
+    ) -> ContextPayload:
+        analysis = await db.scalar(
+            select(Analysis).where(
+                Analysis.project_id == project_id,
+                Analysis.id == analysis_id,
+            )
+        )
+        if analysis is None:
+            raise ContextBuilderError(f"style_reference analysis not found: {analysis_id}")
+        self._ensure_style_reference_analysis_type(analysis)
+        selected = self._select_style_reference_fields(analysis.result, inject_fields)
+        return (
+            self._render_style_reference(analysis, selected),
+            "included",
+            {
+                "analysis_id": str(analysis.id),
+                "analysis_type": analysis.analysis_type,
+                "selected_fields": inject_fields,
+            },
+        )
+
     def _render_story_bible(self, facts: list[StoryFact]) -> str:
         grouped: dict[str, list[str]] = {}
         for fact in facts:
@@ -201,6 +235,37 @@ class ContextSourceLoader:
             section = f"[{fact_type}]\n" + "\n".join(f"- {item}" for item in items)
             lines.append(section)
         return "\n\n".join(lines)
+
+    def _select_style_reference_fields(
+        self,
+        result: dict[str, Any],
+        inject_fields: list[str],
+    ) -> dict[str, Any]:
+        missing_fields = [field_name for field_name in inject_fields if field_name not in result]
+        if missing_fields:
+            missing = ", ".join(missing_fields)
+            raise ContextBuilderError(f"style_reference fields not found: {missing}")
+        return {field_name: result[field_name] for field_name in inject_fields}
+
+    def _ensure_style_reference_analysis_type(self, analysis: Analysis) -> None:
+        if analysis.analysis_type == STYLE_REFERENCE_ANALYSIS_TYPE:
+            return
+        raise ContextBuilderError(
+            f"style_reference requires style analysis: {analysis.id} ({analysis.analysis_type})"
+        )
+
+    def _render_style_reference(
+        self,
+        analysis: Analysis,
+        selected: dict[str, Any],
+    ) -> str:
+        lines = []
+        if analysis.source_title:
+            lines.append(f"来源标题：{analysis.source_title}")
+        lines.append(f"分析类型：{analysis.analysis_type}")
+        lines.append("风格参考：")
+        lines.append(self._dump_json(selected))
+        return "\n".join(lines)
 
     async def _get_project_content(
         self,

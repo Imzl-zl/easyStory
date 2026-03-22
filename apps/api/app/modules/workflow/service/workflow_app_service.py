@@ -13,8 +13,19 @@ from app.modules.workflow.engine import InvalidTransitionError, WorkflowStateMac
 from app.modules.workflow.models import WorkflowExecution
 from app.shared.runtime.errors import BusinessRuleError, ConflictError, NotFoundError
 
-from .dto import WorkflowExecutionDTO, WorkflowPauseDTO, WorkflowStartDTO
-from .snapshot_support import build_runtime_snapshot, resolve_start_node_id, workflow_to_dto
+from .dto import (
+    WorkflowExecutionDTO,
+    WorkflowExecutionStatus,
+    WorkflowExecutionSummaryDTO,
+    WorkflowPauseDTO,
+    WorkflowStartDTO,
+)
+from .snapshot_support import (
+    build_runtime_snapshot,
+    resolve_start_node_id,
+    workflow_to_dto,
+    workflow_to_summary_dto,
+)
 from .workflow_app_runtime_support import RuntimeDispatchFn, WorkflowAppRuntimeSupportMixin
 from .workflow_app_service_base import PREPARATION_ASSET_LABELS, WorkflowAppServiceBase
 from .workflow_task_runtime_support import ensure_workflow_can_resume
@@ -142,6 +153,29 @@ class WorkflowAppService(WorkflowAppRuntimeSupportMixin, WorkflowAppServiceBase)
     ) -> WorkflowExecutionDTO:
         workflow = await self._require_workflow(db, workflow_id, owner_id=owner_id)
         return workflow_to_dto(workflow)
+
+    async def list_project_workflows(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+        status: WorkflowExecutionStatus | None = None,
+        limit: int = 50,
+    ) -> list[WorkflowExecutionSummaryDTO]:
+        await self.project_service.require_project(db, project_id, owner_id=owner_id)
+        statement = select(WorkflowExecution).where(WorkflowExecution.project_id == project_id)
+        if status is not None:
+            statement = statement.where(WorkflowExecution.status == status)
+        statement = statement.order_by(
+            WorkflowExecution.updated_at.desc(),
+            WorkflowExecution.completed_at.desc().nulls_last(),
+            WorkflowExecution.started_at.desc().nulls_last(),
+            WorkflowExecution.created_at.desc(),
+            WorkflowExecution.id.desc(),
+        ).limit(limit)
+        workflows = (await db.scalars(statement)).all()
+        return [workflow_to_summary_dto(item) for item in workflows]
 
     async def _ensure_preparation_assets_ready(
         self,

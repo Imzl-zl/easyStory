@@ -7,12 +7,15 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.modules.config_registry.schemas.config_schemas import ContextInjectionItem
+
 
 class ContextPreviewRequestDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     node_id: str
     chapter_number: int | None = Field(default=None, ge=1)
+    extra_inject: list[ContextInjectionItem] = Field(default_factory=list)
 
 
 class ContextPreviewDTO(BaseModel):
@@ -25,6 +28,7 @@ class ContextPreviewDTO(BaseModel):
     chapter_number: int | None
     referenced_variables: list[str]
     variables: dict[str, str]
+    rendered_prompt: str
     context_report: dict[str, Any]
 
 

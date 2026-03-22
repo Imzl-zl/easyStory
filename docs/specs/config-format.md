@@ -467,6 +467,12 @@ workflow:
             required: false
           - type: "story_bible"
             required: false
+          - type: "style_reference"  # 分析结果风格参考（项目级显式绑定）
+            analysis_id: "00000000-0000-0000-0000-000000000001"
+            inject_fields:
+              - "writing_style"
+              - "narrative_perspective"
+            required: false
   
   nodes:                              # 必填，节点列表
     - id: "outline"                   # 节点 ID
@@ -595,9 +601,12 @@ workflow:
 | `chapter_task` | 当前章节任务（来自 ChapterTask） | - |
 | `previous_chapters` | 前 N 章 | `count` |
 | `story_bible` | Story Bible 事实库 | - |
+| `style_reference` | 基于分析结果的风格参考，仅允许引用 `analysis_type=style` 的记录；目标分析缺失时会直接报错；当前 runtime 默认最多 500 tokens，超出会先在 section 内裁剪并在上下文报告中暴露原始 token | `analysis_id`、`inject_fields` |
 
 以下类型仍属扩展预留，**当前 schema 会直接拒绝**，不能写入现有 workflow 配置：
-`chapter_list`、`character_profile`、`world_setting`、`chapter_summary`、`style_reference`、`writing_preferences`、`foreshadowing_reminder`、`custom`
+`chapter_list`、`character_profile`、`world_setting`、`chapter_summary`、`writing_preferences`、`foreshadowing_reminder`、`custom`
+
+> `style_reference` 需要绑定项目内真实 `analysis_id`，且该记录必须是 `analysis_type=style`；若目标分析被删除或不属于当前项目，runtime 会直接报错而不是静默跳过。同时它属于体验型上下文，当前 runtime 默认会把单个 `style_reference` section 收敛到 500 tokens 以内，并在上下文报告中保留裁剪前后的 token 信息。因此更适合写入项目运行时 workflow snapshot 或用户显式保存的项目配置；不建议把仓库共享的内置 workflow YAML 固化为某个具体项目的分析 UUID。
 
 ---
 

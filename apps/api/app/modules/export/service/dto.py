@@ -17,3 +17,14 @@ class ExportViewDTO(BaseModel):
     filename: str
     file_size: int | None
     created_at: datetime
+
+
+class ExportDetailDTO(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    format: str
+    filename: str
+    file_size: int | None
+    config_snapshot: dict | None
+    created_at: datetime
+    updated_at: datetime

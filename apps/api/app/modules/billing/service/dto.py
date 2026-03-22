@@ -46,6 +46,7 @@ class BudgetCheckResultDTO:
 
 class TokenUsageViewDTO(BaseModel):
     id: uuid.UUID
+    workflow_execution_id: uuid.UUID | None
     node_execution_id: uuid.UUID | None
     usage_type: UsageType
     model_name: str
@@ -79,6 +80,9 @@ class WorkflowBillingSummaryDTO(BaseModel):
     project_id: uuid.UUID
     workflow_status: str
     on_exceed: Literal["pause", "skip", "fail"]
+    budget_recorded_at: datetime
+    budget_window_start_at: datetime
+    budget_window_end_at: datetime
     total_input_tokens: int
     total_output_tokens: int
     total_tokens: int

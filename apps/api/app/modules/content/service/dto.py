@@ -33,6 +33,17 @@ class StoryAssetDTO(BaseModel):
     content_text: str
 
 
+class StoryAssetVersionDTO(BaseModel):
+    version_number: int
+    content_text: str
+    created_by: ContentCreatedBy
+    change_source: ContentChangeSource
+    change_summary: str | None
+    word_count: int | None
+    is_current: bool
+    created_at: datetime
+
+
 class ChapterSaveDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

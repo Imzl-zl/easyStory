@@ -5,7 +5,7 @@ import logging
 import uuid
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.user.entry.http.dependencies import get_current_user
@@ -18,6 +18,8 @@ from app.modules.workflow.service import (
     ChapterTaskViewDTO,
     WorkflowAppService,
     WorkflowExecutionDTO,
+    WorkflowExecutionStatus,
+    WorkflowExecutionSummaryDTO,
     WorkflowPauseDTO,
     WorkflowStartDTO,
     create_chapter_task_service,
@@ -71,6 +73,27 @@ async def start_workflow(
         payload or WorkflowStartDTO(),
         owner_id=current_user.id,
         runtime_dispatcher=runtime_dispatcher,
+    )
+
+
+@router.get(
+    "/api/v1/projects/{project_id}/workflows",
+    response_model=list[WorkflowExecutionSummaryDTO],
+)
+async def list_project_workflows(
+    project_id: uuid.UUID,
+    status: WorkflowExecutionStatus | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    workflow_app_service: WorkflowAppService = Depends(get_workflow_app_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> list[WorkflowExecutionSummaryDTO]:
+    return await workflow_app_service.list_project_workflows(
+        db,
+        project_id,
+        owner_id=current_user.id,
+        status=status,
+        limit=limit,
     )
 
 

@@ -13,7 +13,7 @@ from app.modules.workflow.models import ChapterTask
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 
 from .chapter_store import require_approved_asset
-from .dto import AssetType, StoryAssetDTO, StoryAssetSaveDTO
+from .dto import AssetType, StoryAssetDTO, StoryAssetSaveDTO, StoryAssetVersionDTO
 
 STALE_FROM_OUTLINE = frozenset({"opening_plan", "chapter"})
 STALE_FROM_OPENING_PLAN = frozenset({"chapter"})
@@ -69,6 +69,18 @@ class StoryAssetService:
         await self._mark_stale_dependencies(db, project.id, project.contents, asset_type)
         await db.commit()
         return self._to_dto(content)
+
+    async def list_versions(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        asset_type: AssetType,
+        *,
+        owner_id: uuid.UUID | None = None,
+    ) -> list[StoryAssetVersionDTO]:
+        await self.project_service.require_project(db, project_id, owner_id=owner_id)
+        content = await self._require_asset(db, project_id, asset_type)
+        return [self._to_version_dto(version) for version in self._sorted_versions(content)]
 
     async def approve_asset(
         self,
@@ -191,8 +203,11 @@ class StoryAssetService:
             return 1
         return max(version.version_number for version in content.versions) + 1
 
+    def _sorted_versions(self, content: Content) -> list[ContentVersion]:
+        return sorted(content.versions, key=lambda item: item.version_number, reverse=True)
+
     def _current_version(self, content: Content) -> ContentVersion | None:
-        for version in sorted(content.versions, key=lambda item: item.version_number, reverse=True):
+        for version in self._sorted_versions(content):
             if version.is_current:
                 return version
         return None
@@ -209,6 +224,18 @@ class StoryAssetService:
             status=content.status,
             version_number=version.version_number,
             content_text=version.content_text,
+        )
+
+    def _to_version_dto(self, version: ContentVersion) -> StoryAssetVersionDTO:
+        return StoryAssetVersionDTO(
+            version_number=version.version_number,
+            content_text=version.content_text,
+            created_by=version.created_by,
+            change_source=version.change_source,
+            change_summary=version.change_summary,
+            word_count=version.word_count,
+            is_current=version.is_current,
+            created_at=version.created_at,
         )
 
     def _count_text_units(self, text: str) -> int:

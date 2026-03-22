@@ -27,6 +27,8 @@ def list_facts_statement(
     fact_type: StoryFactType | None,
     conflict_status: StoryFactConflictStatus | None,
     active_only: bool,
+    chapter_number: int | None,
+    source_content_version_id: uuid.UUID | None,
     visible_at_chapter: int | None,
     limit: int,
 ):
@@ -37,6 +39,10 @@ def list_facts_statement(
         statement = statement.where(StoryFact.conflict_status == conflict_status.value)
     if active_only:
         statement = statement.where(StoryFact.is_active.is_(True))
+    if chapter_number is not None:
+        statement = statement.where(StoryFact.chapter_number == chapter_number)
+    if source_content_version_id is not None:
+        statement = statement.where(StoryFact.source_content_version_id == source_content_version_id)
     if visible_at_chapter is not None:
         statement = statement.where(StoryFact.chapter_number <= visible_at_chapter)
     return statement.order_by(

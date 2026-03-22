@@ -11,6 +11,7 @@ from .dto import (
     ContentType,
     StoryAssetDTO,
     StoryAssetSaveDTO,
+    StoryAssetVersionDTO,
 )
 from .factory import (
     create_chapter_content_service,
@@ -31,6 +32,7 @@ __all__ = [
     "ContentType",
     "StoryAssetDTO",
     "StoryAssetSaveDTO",
+    "StoryAssetVersionDTO",
     "StoryAssetService",
     "create_chapter_content_service",
     "create_story_asset_service",

@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 import uuid
+from collections.abc import AsyncIterator
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -33,6 +34,8 @@ async def get_workflow_observability_service() -> WorkflowObservabilityService:
 )
 async def list_workflow_executions(
     workflow_id: uuid.UUID,
+    node_id: str | None = Query(default=None, min_length=1),
+    status: str | None = Query(default=None, min_length=1),
     observability_service: WorkflowObservabilityService = Depends(get_workflow_observability_service),
     current_user: User = Depends(get_current_user),
     db=Depends(get_async_db_session),
@@ -41,6 +44,8 @@ async def list_workflow_executions(
         db,
         workflow_id,
         owner_id=current_user.id,
+        node_id=node_id,
+        status=status,
     )
 
 
@@ -51,6 +56,7 @@ async def list_workflow_executions(
 async def list_workflow_logs(
     workflow_id: uuid.UUID,
     level: Literal["INFO", "WARNING", "ERROR"] | None = Query(default=None),
+    node_execution_id: uuid.UUID | None = Query(default=None),
     limit: int = Query(default=50, ge=1),
     observability_service: WorkflowObservabilityService = Depends(get_workflow_observability_service),
     current_user: User = Depends(get_current_user),
@@ -61,6 +67,7 @@ async def list_workflow_logs(
         workflow_id,
         owner_id=current_user.id,
         level=level,
+        node_execution_id=node_execution_id,
         limit=limit,
     )
 
@@ -70,6 +77,7 @@ async def stream_workflow_events(
     workflow_id: uuid.UUID,
     request: Request,
     level: Literal["INFO", "WARNING", "ERROR"] | None = Query(default=None),
+    node_execution_id: uuid.UUID | None = Query(default=None),
     timeout_seconds: int = Query(default=15, ge=1, le=300),
     poll_interval_ms: int = Query(default=500, ge=100, le=5000),
     observability_service: WorkflowObservabilityService = Depends(get_workflow_observability_service),
@@ -77,51 +85,27 @@ async def stream_workflow_events(
     session_factory: AsyncSessionFactory = Depends(get_async_session_factory),
 ) -> StreamingResponse:
     async with session_factory() as session:
-        await observability_service.is_workflow_terminal(
+        await observability_service.list_execution_logs(
             session,
             workflow_id,
             owner_id=current_user.id,
+            level=level,
+            node_execution_id=node_execution_id,
+            limit=1,
         )
 
-    async def event_stream():
-        deadline = time.monotonic() + timeout_seconds
-        last_created_at = None
-        last_log_id = None
-        while time.monotonic() < deadline:
-            if await request.is_disconnected():
-                break
-            async with session_factory() as session:
-                logs = await observability_service.list_execution_logs_since(
-                    session,
-                    workflow_id,
-                    owner_id=current_user.id,
-                    after_created_at=last_created_at,
-                    after_id=last_log_id,
-                    level=level,
-                )
-                is_terminal = await observability_service.is_workflow_terminal(
-                    session,
-                    workflow_id,
-                    owner_id=current_user.id,
-                )
-            if logs:
-                for log in logs:
-                    yield _format_sse_event(
-                        event="execution_log",
-                        data=log.model_dump(mode="json"),
-                        event_id=str(log.id),
-                    )
-                last_created_at = logs[-1].created_at
-                last_log_id = logs[-1].id
-                continue
-            yield ": keep-alive\n\n"
-            if is_terminal:
-                yield _format_sse_event(event="end", data={"workflow_id": str(workflow_id)})
-                break
-            await asyncio.sleep(poll_interval_ms / 1000)
-
     return StreamingResponse(
-        event_stream(),
+        _iter_workflow_events(
+            request=request,
+            workflow_id=workflow_id,
+            owner_id=current_user.id,
+            level=level,
+            node_execution_id=node_execution_id,
+            timeout_seconds=timeout_seconds,
+            poll_interval_ms=poll_interval_ms,
+            observability_service=observability_service,
+            session_factory=session_factory,
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -137,6 +121,7 @@ async def stream_workflow_events(
 async def list_prompt_replays(
     workflow_id: uuid.UUID,
     node_execution_id: uuid.UUID,
+    replay_type: str | None = Query(default=None, min_length=1),
     observability_service: WorkflowObservabilityService = Depends(get_workflow_observability_service),
     current_user: User = Depends(get_current_user),
     db=Depends(get_async_db_session),
@@ -146,7 +131,58 @@ async def list_prompt_replays(
         workflow_id,
         node_execution_id,
         owner_id=current_user.id,
+        replay_type=replay_type,
     )
+
+
+async def _iter_workflow_events(
+    *,
+    request: Request,
+    workflow_id: uuid.UUID,
+    owner_id: uuid.UUID,
+    level: Literal["INFO", "WARNING", "ERROR"] | None,
+    node_execution_id: uuid.UUID | None,
+    timeout_seconds: int,
+    poll_interval_ms: int,
+    observability_service: WorkflowObservabilityService,
+    session_factory: AsyncSessionFactory,
+) -> AsyncIterator[str]:
+    deadline = time.monotonic() + timeout_seconds
+    last_created_at = None
+    last_log_id = None
+    while time.monotonic() < deadline:
+        if await request.is_disconnected():
+            break
+        async with session_factory() as session:
+            logs = await observability_service.list_execution_logs_since(
+                session,
+                workflow_id,
+                owner_id=owner_id,
+                after_created_at=last_created_at,
+                after_id=last_log_id,
+                level=level,
+                node_execution_id=node_execution_id,
+            )
+            is_terminal = await observability_service.is_workflow_terminal(
+                session,
+                workflow_id,
+                owner_id=owner_id,
+            )
+        if logs:
+            for log in logs:
+                yield _format_sse_event(
+                    event="execution_log",
+                    data=log.model_dump(mode="json"),
+                    event_id=str(log.id),
+                )
+            last_created_at = logs[-1].created_at
+            last_log_id = logs[-1].id
+            continue
+        yield ": keep-alive\n\n"
+        if is_terminal:
+            yield _format_sse_event(event="end", data={"workflow_id": str(workflow_id)})
+            break
+        await asyncio.sleep(poll_interval_ms / 1000)
 
 
 def _format_sse_event(

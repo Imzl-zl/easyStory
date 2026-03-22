@@ -66,9 +66,10 @@ context_injection:
 | `chapter_task` | `{{ chapter_task }}` | 当前章节任务（来自 ChapterTask：title/brief/关键角色等） |
 | `previous_chapters` | `{{ previous_content }}` | 前 N 章，用 `\n\n---\n\n` 分隔 |
 | `story_bible` | `{{ story_bible }}` | 事实库，按 fact_type 分组 |
+| `style_reference` | `{{ style_reference }}` | 基于 `analysis_id` + `inject_fields` 的显式风格参考，仅允许绑定 `analysis_type=style` 的分析记录；若目标分析不存在则直接报错 |
 
 以下类型仍属于设计预留，**当前 runtime 尚未实现**，不能直接写入现有 workflow 配置：
-`chapter_list`、`character_profile`、`world_setting`、`chapter_summary`、`style_reference`、`writing_preferences`、`foreshadowing_reminder`、`custom`
+`chapter_list`、`character_profile`、`world_setting`、`chapter_summary`、`writing_preferences`、`foreshadowing_reminder`、`custom`
 
 ### 前置创作资产的分层注入
 
@@ -183,9 +184,10 @@ ContextBuilder.build_context(..., referenced_variables=...)
 | opening_plan | 2 | 200 | 第 4 章后优先降级为摘要，再参与裁剪 |
 | story_bible | 2 | 500 | 丢弃最早的事实 |
 | previous_chapters | 5 | 500 | 尾部截断 |
+| style_reference | 7 | 0 | 默认最多 500 tokens，超出后先在 section 内裁剪 |
 | outline | 8（最低） | 200 | 尾部截断 |
 
-`writing_preferences`、`foreshadowing_reminder`、`chapter_summary`、`style_reference` 等裁剪策略仍属于后续扩展设计，当前运行时未实现。
+`writing_preferences`、`foreshadowing_reminder`、`chapter_summary` 等裁剪策略仍属于后续扩展设计，当前运行时未实现。
 
 ### 5.2 裁剪流程
 
@@ -228,12 +230,12 @@ context_injection:
       style_reference: 7         # 最低，先裁
 ```
 
-### 5.4 体验型上下文预算规则（后续扩展）
+### 5.4 体验型上下文预算规则
 
 - `writing_preferences` 只注入 `is_active=true` 且 `confidence >= 0.7` 的偏好，或用户手动 pin 的偏好
 - `writing_preferences` 默认最多 5 条、总计不超过 300 tokens
 - `foreshadowing_reminder` 按“逾期 major → 进行中 major → 其他”排序，最多 5 条、总计不超过 300 tokens
-- `style_reference` 只允许注入用户显式选择的字段，默认不超过 500 tokens
+- `style_reference` 只允许注入用户显式选择的字段，当前 runtime 默认不超过 500 tokens；超出时会先在 section 内裁剪，并在上下文报告中暴露 `original_tokens`
 - 当预算紧张时，体验型上下文必须先被裁剪，不能挤占 `project_setting`、`chapter_task`、`story_bible` 的空间
 
 ---

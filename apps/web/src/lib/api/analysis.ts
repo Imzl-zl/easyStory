@@ -1,13 +1,23 @@
 import { requestJson } from "@/lib/api/client";
 import type { AnalysisCreatePayload, AnalysisDetail, AnalysisSummary, AnalysisType } from "@/lib/api/types";
 
-export function listAnalyses(projectId: string, options: { analysisType?: AnalysisType; contentId?: string } = {}) {
+export function listAnalyses(
+  projectId: string,
+  options: {
+    analysisType?: AnalysisType;
+    contentId?: string;
+    generatedSkillKey?: string;
+  } = {},
+) {
   const search = new URLSearchParams();
   if (options.analysisType) {
     search.set("analysis_type", options.analysisType);
   }
   if (options.contentId) {
     search.set("content_id", options.contentId);
+  }
+  if (options.generatedSkillKey) {
+    search.set("generated_skill_key", options.generatedSkillKey);
   }
   const suffix = search.size > 0 ? `?${search.toString()}` : "";
   return requestJson<AnalysisSummary[]>(`/api/v1/projects/${projectId}/analyses${suffix}`);

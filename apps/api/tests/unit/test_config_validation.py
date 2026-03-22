@@ -1,4 +1,5 @@
 import re
+import uuid
 from pathlib import Path
 
 import pytest
@@ -195,3 +196,36 @@ def test_repository_chapter_skill_uses_previous_content_variable() -> None:
 def test_context_injection_item_rejects_unsupported_type() -> None:
     with pytest.raises(ValidationError, match="Input should be"):
         ContextInjectionItem.model_validate({"type": "chapter_summary"})
+
+
+def test_context_injection_item_accepts_style_reference() -> None:
+    analysis_id = uuid.uuid4()
+
+    item = ContextInjectionItem.model_validate(
+        {
+            "type": "style_reference",
+            "analysis_id": str(analysis_id),
+            "inject_fields": [" writing_style ", "narrative_perspective"],
+        }
+    )
+
+    assert item.inject_type == "style_reference"
+    assert item.analysis_id == analysis_id
+    assert item.inject_fields == ["writing_style", "narrative_perspective"]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"type": "style_reference", "inject_fields": ["writing_style"]},
+        {"type": "style_reference", "analysis_id": str(uuid.uuid4())},
+        {
+            "type": "outline",
+            "analysis_id": str(uuid.uuid4()),
+            "inject_fields": ["writing_style"],
+        },
+    ],
+)
+def test_context_injection_item_validates_style_reference_shape(payload) -> None:
+    with pytest.raises(ValidationError):
+        ContextInjectionItem.model_validate(payload)

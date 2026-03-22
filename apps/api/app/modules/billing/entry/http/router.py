@@ -41,6 +41,31 @@ async def get_workflow_billing_summary(
 
 
 @router.get(
+    "/api/v1/projects/{project_id}/billing/token-usages",
+    response_model=list[TokenUsageViewDTO],
+)
+async def list_project_token_usages(
+    project_id: uuid.UUID,
+    workflow_id: uuid.UUID | None = Query(default=None),
+    usage_type: UsageType | None = Query(default=None),
+    model_name: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=100, ge=1, le=200),
+    billing_query_service: BillingQueryService = Depends(get_billing_query_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> list[TokenUsageViewDTO]:
+    return await billing_query_service.list_project_token_usages(
+        db,
+        project_id,
+        owner_id=current_user.id,
+        workflow_id=workflow_id,
+        usage_type=usage_type,
+        model_name=model_name,
+        limit=limit,
+    )
+
+
+@router.get(
     "/api/v1/workflows/{workflow_id}/billing/token-usages",
     response_model=list[TokenUsageViewDTO],
 )
