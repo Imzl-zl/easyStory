@@ -38,6 +38,7 @@ class WorkflowRuntimeExecuteMixin:
                 workflow,
                 workflow_config,
                 node,
+                owner_id=owner_id,
                 chapter_number=None,
             )
             execution.input_data = prompt_bundle["input_data"]
@@ -147,6 +148,7 @@ class WorkflowRuntimeExecuteMixin:
             workflow,
             workflow_config,
             node,
+            owner_id=owner_id,
             chapter_number=task.chapter_number,
         )
         prompt_bundle["input_data"]["chapter_task_id"] = str(task.id)

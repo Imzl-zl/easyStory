@@ -626,8 +626,8 @@ workflow:
 
 ```yaml
 model:
-  provider: "anthropic"             # openai/anthropic/deepseek/...
-  name: "claude-sonnet-4-20250514"  # 具体模型名
+  provider: "anthropic"             # 凭证渠道键 / Provider Key
+  name: "claude-sonnet-4-20250514"  # 可选；未填时回退到凭证 default_model
   required_capabilities:            # 可选，能力要求
     - "streaming"
     - "json_schema_output"
@@ -650,7 +650,7 @@ model:
 节点级 model > Skill 级 model > 工作流级 model > 项目级默认 model > 全局默认 model
 ```
 
-> `provider` 用于选择凭证（项目级 > 用户级 > 系统级默认凭证池[仅显式允许]），`name` 用于选择具体模型。
+> `provider` 用于选择凭证（项目级 > 用户级 > 系统级默认凭证池[仅显式允许]），`name` 优先选择具体模型；未显式填写时，运行时回退到所解析凭证上的 `default_model`。HTTP 协议由凭证的 `api_dialect` 决定，而不是由 `provider` 猜测。
 
 ---
 

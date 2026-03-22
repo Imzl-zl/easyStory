@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.config_registry.schemas.config_schemas import ContextInjectionItem, ModelConfig, NodeConfig
 from app.modules.context.engine import ContextBuilder
 from app.modules.context.engine.contracts import AUTO_INJECT_TYPES, VARIABLE_TO_INJECT_TYPE
+from app.modules.credential.service import CredentialService
 from app.modules.project.models import Project
 from app.modules.workflow.models import WorkflowExecution
 from app.modules.workflow.service.snapshot_support import (
@@ -32,9 +33,12 @@ class ContextPreviewService:
         *,
         context_builder: ContextBuilder,
         template_renderer: SkillTemplateRenderer,
+        credential_service_factory,
     ) -> None:
         self.context_builder = context_builder
         self.template_renderer = template_renderer
+        self.credential_service_factory = credential_service_factory
+        self._credential_service: CredentialService | None = None
 
     async def preview_workflow_context(
         self,
@@ -50,7 +54,14 @@ class ContextPreviewService:
         if node.node_type != "generate":
             raise BusinessRuleError(f"节点不支持上下文预览: {node.id}")
         skill = load_skill_snapshot(workflow.skills_snapshot or {}, node.skill)
-        model = self._resolve_model(workflow_config.model, node, skill.model)
+        model = await self._resolve_model(
+            db,
+            workflow,
+            workflow_config.model,
+            node,
+            skill.model,
+            owner_id=owner_id,
+        )
         declared = skill.variables or skill.inputs
         rules = self._merge_rules(workflow_config, node, declared, payload.extra_inject)
         self._ensure_chapter_number_if_needed(rules, payload, node)
@@ -174,16 +185,32 @@ class ContextPreviewService:
             if name not in VARIABLE_TO_INJECT_TYPE and name in setting
         }
 
-    def _resolve_model(
+    async def _resolve_model(
         self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
         workflow_model: ModelConfig | None,
         node: NodeConfig,
         skill_model: ModelConfig | None,
+        *,
+        owner_id: uuid.UUID,
     ) -> ModelConfig:
         model = node.model or skill_model or workflow_model
-        if model is None or not model.name or not model.provider:
+        if model is None or not model.provider:
             raise ConfigurationError(f"Node {node.id} is missing executable model configuration")
-        return model
+        resolved = await self._resolve_credential_service().resolve_active_credential_model(
+            db,
+            provider=model.provider,
+            requested_model_name=model.name,
+            user_id=owner_id,
+            project_id=workflow.project_id,
+        )
+        return model.model_copy(update={"name": resolved.model_name})
+
+    def _resolve_credential_service(self) -> CredentialService:
+        if self._credential_service is None:
+            self._credential_service = self.credential_service_factory()
+        return self._credential_service
 
     def _stringify_value(self, value: Any) -> str:
         if value is None:

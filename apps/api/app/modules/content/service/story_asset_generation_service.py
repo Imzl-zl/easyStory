@@ -155,7 +155,7 @@ class StoryAssetGenerationService:
         skill: SkillConfig,
     ) -> ModelConfig:
         model = node.model or skill.model or workflow_config.model
-        if model is None or not model.name or not model.provider:
+        if model is None or not model.provider:
             raise ConfigurationError(f"Node {node.id} is missing executable model configuration")
         return model
 
@@ -249,7 +249,9 @@ class StoryAssetGenerationService:
                 "model": model.model_dump(mode="json", exclude_none=True),
                 "credential": {
                     "api_key": credential_service.crypto.decrypt(credential.encrypted_key),
+                    "api_dialect": credential.api_dialect,
                     "base_url": credential.base_url,
+                    "default_model": credential.default_model,
                 },
                 "response_format": "text",
             },

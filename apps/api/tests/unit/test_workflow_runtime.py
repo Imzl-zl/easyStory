@@ -18,6 +18,7 @@ from app.modules.content.models import Content, ContentVersion
 from app.modules.content.service import create_chapter_content_service
 from app.modules.context.engine import create_context_builder
 from app.modules.credential.models import ModelCredential
+from app.modules.credential.service.credential_service_support import ResolvedCredentialModel
 from app.modules.export.models import Export
 from app.modules.export.service import ExportService
 from app.modules.observability.models import PromptReplay
@@ -350,19 +351,42 @@ class _FakeCredentialService:
                 owner_type="user",
                 owner_id=user_id,
                 provider=provider,
+                api_dialect="openai_chat_completions",
                 display_name=f"{provider}-fake",
                 encrypted_key=f"{provider}-fake-key",
+                default_model="gpt-4o-mini",
                 is_active=True,
             )
             db.add(credential)
             await db.flush()
         return credential
 
+    async def resolve_active_credential_model(
+        self,
+        db: Session,
+        *,
+        provider: str,
+        requested_model_name: str | None,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID | None = None,
+    ) -> ResolvedCredentialModel:
+        credential = await self.resolve_active_credential(
+            db,
+            provider=provider,
+            user_id=user_id,
+            project_id=project_id,
+        )
+        return ResolvedCredentialModel(
+            credential=credential,
+            model_name=requested_model_name or credential.default_model or "gpt-4o-mini",
+        )
+
 
 class _FakeToolProvider(ToolProvider):
     async def execute(self, tool_name: str, params: dict) -> dict:
         assert tool_name == "llm.generate"
         prompt = params["prompt"]
+        model_name = params["model"].get("name") or params["credential"].get("default_model")
         if "请拆分出可执行的章节任务列表" in prompt:
             return {
                 "content": json.dumps(
@@ -386,6 +410,7 @@ class _FakeToolProvider(ToolProvider):
                     },
                     ensure_ascii=False,
                 ),
+                "model_name": model_name,
                 "input_tokens": 10,
                 "output_tokens": 20,
                 "total_tokens": 30,
@@ -402,6 +427,7 @@ class _FakeToolProvider(ToolProvider):
                     "execution_time_ms": 1,
                     "tokens_used": 10,
                 },
+                "model_name": model_name,
                 "input_tokens": 8,
                 "output_tokens": 8,
                 "total_tokens": 16,
@@ -409,12 +435,14 @@ class _FakeToolProvider(ToolProvider):
         if "第二章 山门截杀" in prompt:
             return {
                 "content": "第二章正文：山门外的反杀正式展开。",
+                "model_name": model_name,
                 "input_tokens": 15,
                 "output_tokens": 40,
                 "total_tokens": 55,
             }
         return {
             "content": "第一章正文：林渊在夜色中踏上逃亡之路。",
+            "model_name": model_name,
             "input_tokens": 12,
             "output_tokens": 36,
             "total_tokens": 48,

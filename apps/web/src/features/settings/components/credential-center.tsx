@@ -14,25 +14,59 @@ import {
   verifyCredential,
 } from "@/lib/api/credential";
 import { getErrorMessage } from "@/lib/api/client";
+import type { CredentialApiDialect } from "@/lib/api/types";
 
 type CredentialCenterProps = {
   projectId?: string;
 };
 
+const API_DIALECT_OPTIONS: Array<{
+  value: CredentialApiDialect;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "openai_chat_completions",
+    label: "OpenAI Chat Completions",
+    description: "POST /v1/chat/completions",
+  },
+  {
+    value: "openai_responses",
+    label: "OpenAI Responses",
+    description: "POST /v1/responses",
+  },
+  {
+    value: "anthropic_messages",
+    label: "Anthropic Messages",
+    description: "POST /v1/messages",
+  },
+  {
+    value: "gemini_generate_content",
+    label: "Gemini Generate Content",
+    description: "POST /v1beta/models/{model}:generateContent",
+  },
+];
+
+function getApiDialectLabel(value: CredentialApiDialect) {
+  return API_DIALECT_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
 export function CredentialCenter({ projectId }: CredentialCenterProps) {
   const queryClient = useQueryClient();
+  const ownerType = projectId ? "project" : "user";
   const [formState, setFormState] = useState({
-    ownerType: projectId ? "project" : "user",
     provider: "",
+    apiDialect: "openai_chat_completions" as CredentialApiDialect,
     displayName: "",
     apiKey: "",
     baseUrl: "",
+    defaultModel: "",
   });
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const query = useQuery({
     queryKey: ["credentials", projectId ?? "user"],
-    queryFn: () => listCredentials(projectId ? "project" : "user", projectId),
+    queryFn: () => listCredentials(ownerType, projectId),
   });
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["credentials"] });
@@ -40,22 +74,25 @@ export function CredentialCenter({ projectId }: CredentialCenterProps) {
   const createMutation = useMutation({
     mutationFn: () =>
       createCredential({
-        owner_type: formState.ownerType as "user" | "project",
+        owner_type: ownerType,
         project_id: projectId ?? null,
         provider: formState.provider,
+        api_dialect: formState.apiDialect,
         display_name: formState.displayName,
         api_key: formState.apiKey,
         base_url: formState.baseUrl || null,
+        default_model: formState.defaultModel,
       }),
     onSuccess: () => {
       setFeedback("凭证已创建。");
-      setFormState((current) => ({
-        ...current,
+      setFormState({
         provider: "",
+        apiDialect: "openai_chat_completions",
         displayName: "",
         apiKey: "",
         baseUrl: "",
-      }));
+        defaultModel: "",
+      });
       refresh();
     },
     onError: (error) => setFeedback(getErrorMessage(error)),
@@ -90,7 +127,7 @@ export function CredentialCenter({ projectId }: CredentialCenterProps) {
   return (
     <SectionCard
       title="Credential Center"
-      description="当前 MVP 已支持用户级和项目级模型凭证管理、验证与启停。"
+      description="当前已支持用户级和项目级模型连接管理，可显式选择接口类型、Base URL 与默认模型。"
     >
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">
@@ -115,10 +152,13 @@ export function CredentialCenter({ projectId }: CredentialCenterProps) {
                     />
                   </div>
                   <p className="text-sm text-[var(--text-secondary)]">
-                    {credential.provider} · {credential.masked_key}
+                    渠道键：{credential.provider} · 接口：{getApiDialectLabel(credential.api_dialect)}
+                  </p>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    默认模型：{credential.default_model ?? "未配置"} · Key：{credential.masked_key}
                   </p>
                   <p className="text-xs text-[var(--text-secondary)]">
-                    最近验证：{credential.last_verified_at ?? "未验证"}
+                    Base URL：{credential.base_url ?? "官方默认"} · 最近验证：{credential.last_verified_at ?? "未验证"}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -165,20 +205,41 @@ export function CredentialCenter({ projectId }: CredentialCenterProps) {
           <div className="space-y-1">
             <h3 className="font-serif text-lg font-semibold">新增凭证</h3>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              所有失败会直接透出后端原因，不做静默降级。
+              所有失败会直接透出后端原因，不做静默降级。`provider` 仅作为渠道键，真正请求协议由接口类型决定。
             </p>
           </div>
 
           <label className="block">
-            <span className="label-text">Provider</span>
+            <span className="label-text">渠道键 / Provider Key</span>
             <input
               className="ink-input"
               required
+              placeholder="openai / openrouter / volcengine / my-proxy"
               value={formState.provider}
               onChange={(event) =>
                 setFormState((current) => ({ ...current, provider: event.target.value }))
               }
             />
+          </label>
+
+          <label className="block">
+            <span className="label-text">接口类型</span>
+            <select
+              className="ink-input"
+              value={formState.apiDialect}
+              onChange={(event) =>
+                setFormState((current) => ({
+                  ...current,
+                  apiDialect: event.target.value as CredentialApiDialect,
+                }))
+              }
+            >
+              {API_DIALECT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label} · {option.description}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="block">
@@ -198,6 +259,8 @@ export function CredentialCenter({ projectId }: CredentialCenterProps) {
             <input
               className="ink-input"
               required
+              type="password"
+              autoComplete="new-password"
               value={formState.apiKey}
               onChange={(event) =>
                 setFormState((current) => ({ ...current, apiKey: event.target.value }))
@@ -209,9 +272,24 @@ export function CredentialCenter({ projectId }: CredentialCenterProps) {
             <span className="label-text">Base URL</span>
             <input
               className="ink-input"
+              placeholder="https://api.openai.com"
+              type="url"
               value={formState.baseUrl}
               onChange={(event) =>
                 setFormState((current) => ({ ...current, baseUrl: event.target.value }))
+              }
+            />
+          </label>
+
+          <label className="block">
+            <span className="label-text">默认模型</span>
+            <input
+              className="ink-input"
+              required
+              placeholder="gpt-4o-mini / claude-sonnet-4-20250514 / gemini-2.5-pro"
+              value={formState.defaultModel}
+              onChange={(event) =>
+                setFormState((current) => ({ ...current, defaultModel: event.target.value }))
               }
             />
           </label>

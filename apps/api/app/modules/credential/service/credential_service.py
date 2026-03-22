@@ -20,19 +20,25 @@ from .dto import (
     CredentialViewDTO,
 )
 from .credential_query_support import (
-    OWNER_TYPE_PROJECT,
-    OWNER_TYPE_SYSTEM,
-    OWNER_TYPE_USER,
     ensure_credential_is_deletable,
     ensure_unique_provider,
-    find_active_credential,
-    load_project_if_present,
     require_actor_credential,
     resolve_actor_scope,
     scope_statement,
 )
 from .credential_mutation_support import record_audit, set_active_state
-from .credential_service_support import apply_update_payload, normalize_base_url, normalize_provider, to_verify_result, to_view
+from .credential_resolution_support import (
+    resolve_active_credential_model_record,
+    resolve_active_credential_record,
+)
+from .credential_service_support import (
+    ResolvedCredentialModel,
+    apply_update_payload,
+    build_credential,
+    normalize_provider,
+    to_view,
+)
+from .credential_verification_support import verify_credential_record
 
 AUDIT_CREATE = "credential_create"
 AUDIT_UPDATE = "credential_update"
@@ -90,14 +96,15 @@ class CredentialService:
         )
         provider = normalize_provider(payload.provider)
         await ensure_unique_provider(db, scope=scope, provider=provider)
-        credential = ModelCredential(
+        credential = build_credential(
             owner_type=scope.owner_type,
             owner_id=scope.owner_id,
             provider=provider,
-            display_name=payload.display_name.strip(),
+            api_dialect=payload.api_dialect,
+            display_name=payload.display_name,
             encrypted_key=self.crypto.encrypt(payload.api_key),
-            base_url=normalize_base_url(payload.base_url),
-            is_active=True,
+            base_url=payload.base_url,
+            default_model=payload.default_model,
         )
         db.add(credential)
         await db.flush()
@@ -221,37 +228,15 @@ class CredentialService:
             actor_user_id=actor_user_id,
             project_service=self.project_service,
         )
-        api_key = self.crypto.decrypt(credential.encrypted_key)
-        try:
-            result = await self.verifier.verify(
-                provider=credential.provider,
-                api_key=api_key,
-                base_url=credential.base_url,
-            )
-        except Exception as exc:
-            record_audit(
-                db,
-                actor_user_id=actor_user_id,
-                event_type=AUDIT_VERIFY,
-                credential=credential,
-                details={"status": "failed", "error": str(exc)},
-                audit_log_service=self.audit_log_service,
-            )
-            await db.commit()
-            raise
-        credential.last_verified_at = result.verified_at
-        record_audit(
+        return await verify_credential_record(
             db,
+            credential=credential,
+            verifier=self.verifier,
+            decrypt_api_key=self.crypto.decrypt,
             actor_user_id=actor_user_id,
             event_type=AUDIT_VERIFY,
-            credential=credential,
-            details={"status": "verified"},
             audit_log_service=self.audit_log_service,
         )
-        db.add(credential)
-        await db.commit()
-        await db.refresh(credential)
-        return to_verify_result(credential, result)
 
     async def resolve_active_credential(
         self,
@@ -261,37 +246,34 @@ class CredentialService:
         user_id: uuid.UUID,
         project_id: uuid.UUID | None = None,
     ) -> ModelCredential:
-        normalized_provider = normalize_provider(provider)
-        project = await load_project_if_present(
-            db,
-            project_id,
-            owner_id=user_id,
-            project_service=self.project_service,
-        )
-        if project is not None:
-            project_credential = await find_active_credential(
+        try:
+            return await resolve_active_credential_record(
                 db,
-                owner_type=OWNER_TYPE_PROJECT,
-                owner_id=project.id,
-                provider=normalized_provider,
+                provider=provider,
+                user_id=user_id,
+                project_id=project_id,
+                project_service=self.project_service,
             )
-            if project_credential is not None:
-                return project_credential
-        user_credential = await find_active_credential(
-            db,
-            owner_type=OWNER_TYPE_USER,
-            owner_id=user_id,
-            provider=normalized_provider,
-        )
-        if user_credential is not None:
-            return user_credential
-        if project is not None and project.allow_system_credential_pool:
-            system_credential = await find_active_credential(
+        except LookupError as exc:
+            raise NotFoundError(f"Credential not found for provider: {exc.args[0]}") from exc
+
+    async def resolve_active_credential_model(
+        self,
+        db: AsyncSession,
+        *,
+        provider: str,
+        requested_model_name: str | None,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID | None = None,
+    ) -> ResolvedCredentialModel:
+        try:
+            return await resolve_active_credential_model_record(
                 db,
-                owner_type=OWNER_TYPE_SYSTEM,
-                owner_id=None,
-                provider=normalized_provider,
+                provider=provider,
+                requested_model_name=requested_model_name,
+                user_id=user_id,
+                project_id=project_id,
+                project_service=self.project_service,
             )
-            if system_credential is not None:
-                return system_credential
-        raise NotFoundError(f"Credential not found for provider: {normalized_provider}")
+        except LookupError as exc:
+            raise NotFoundError(f"Credential not found for provider: {exc.args[0]}") from exc

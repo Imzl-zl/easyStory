@@ -17,6 +17,8 @@ from tests.unit.api_test_support import TEST_JWT_SECRET, auth_headers as _auth_h
 from tests.unit.models.helpers import create_user
 
 TEST_MASTER_KEY = "credential-master-key-for-tests"
+OPENAI_DIALECT = "openai_chat_completions"
+OPENAI_MODEL = "gpt-4o-mini"
 
 
 class FakeVerifier:
@@ -26,8 +28,14 @@ class FakeVerifier:
         provider: str,
         api_key: str,
         base_url: str | None,
+        api_dialect: str,
+        default_model: str,
     ) -> CredentialVerificationResult:
-        del provider, api_key, base_url
+        assert provider == "openai"
+        assert api_key == "sk-secret-1234"
+        assert base_url is None
+        assert api_dialect == OPENAI_DIALECT
+        assert default_model == OPENAI_MODEL
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
             message="Credential verified",
@@ -59,12 +67,15 @@ async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> 
                     "provider": "openai",
                     "display_name": "我的 OpenAI",
                     "api_key": "sk-secret-1234",
+                    "default_model": OPENAI_MODEL,
                 },
                 headers=headers,
             )
             assert create_response.status_code == 200
             payload = create_response.json()
             assert payload["provider"] == "openai"
+            assert payload["api_dialect"] == OPENAI_DIALECT
+            assert payload["default_model"] == OPENAI_MODEL
             assert payload["masked_key"] == "sk-...1234"
 
             list_response = await client.get("/api/v1/credentials", headers=headers)
@@ -105,6 +116,7 @@ async def test_credentials_api_hides_other_users_project(monkeypatch, tmp_path) 
                     "provider": "openai",
                     "display_name": "项目 Key",
                     "api_key": "sk-secret-1234",
+                    "default_model": OPENAI_MODEL,
                 },
                 headers=_auth_headers(outsider_id),
             )
@@ -139,6 +151,7 @@ async def test_credentials_api_returns_configuration_error_when_master_key_missi
                     "provider": "openai",
                     "display_name": "我的 OpenAI",
                     "api_key": "sk-secret-1234",
+                    "default_model": OPENAI_MODEL,
                 },
                 headers=_auth_headers(owner_id),
             )

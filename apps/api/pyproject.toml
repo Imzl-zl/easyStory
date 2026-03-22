@@ -13,6 +13,7 @@ dependencies = [
     "python-dotenv>=1,<2",
     "pyyaml>=6,<7",
     "jinja2>=3.1,<4",
+    "httpx>=0.28",
     "litellm>=1,<2",
     "langgraph>=1,<2",
     "python-jose[cryptography]>=3.3,<4",
@@ -26,7 +27,6 @@ dev = [
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",
     "ruff>=0.8",
-    "httpx>=0.28",
 ]
 
 [build-system]

@@ -28,10 +28,11 @@ class WorkflowRuntimePromptMixin:
         workflow_config: WorkflowConfig,
         node: NodeConfig,
         *,
+        owner_id: uuid.UUID,
         chapter_number: int | None,
     ) -> dict[str, Any]:
         skill = load_skill_snapshot(workflow.skills_snapshot or {}, node.skill)
-        model = self._resolve_model(workflow_config, node, skill)
+        model = await self._resolve_model(db, workflow, workflow_config, node, skill, owner_id=owner_id)
         prompt_variables, context_report = await self._resolve_prompt_variables(
             db,
             workflow,
@@ -134,13 +135,24 @@ class WorkflowRuntimePromptMixin:
             if name not in VARIABLE_TO_INJECT_TYPE and name in setting
         }
 
-    def _resolve_model(
+    async def _resolve_model(
         self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
         workflow_config: WorkflowConfig,
         node: NodeConfig,
         skill: SkillConfig,
+        *,
+        owner_id: uuid.UUID,
     ) -> ModelConfig:
         model = node.model or skill.model or workflow_config.model
-        if model is None or not model.name or not model.provider:
+        if model is None or not model.provider:
             raise ConfigurationError(f"Node {node.id} is missing executable model configuration")
-        return model
+        resolved = await self._resolve_credential_service().resolve_active_credential_model(
+            db,
+            provider=model.provider,
+            requested_model_name=model.name,
+            user_id=owner_id,
+            project_id=workflow.project_id,
+        )
+        return model.model_copy(update={"name": resolved.model_name})

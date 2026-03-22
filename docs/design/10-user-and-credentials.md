@@ -82,7 +82,7 @@ Project 新增 `owner_id`（FK → users.id），与 User 为多对一关系。
 
 ### 4.1 ModelCredential 存储模型
 
-凭证表记录 API Key 的加密存储，支持三级作用域（system/user/project）、供应商标识、自定义 endpoint 和连通性验证时间。
+凭证表记录 API Key 的加密存储，支持三级作用域（system/user/project）、渠道键、显式接口类型、自定义 endpoint、默认模型和连通性验证时间。
 
 > → 数据模型详见 [数据库设计](../specs/database-design.md) § model_credentials
 
@@ -92,9 +92,11 @@ Project 新增 `owner_id`（FK → users.id），与 User 为多对一关系。
 |------|------|
 | `owner_type` | 凭证归属类型：system（系统级）/ user（用户级）/ project（项目级） |
 | `owner_id` | 归属 ID，system 级时可为 None |
-| `provider` | 模型供应商标识 |
+| `provider` | 渠道键 / Provider Key，用于按作用域解析凭证，不再隐式决定 HTTP 协议 |
+| `api_dialect` | 接口类型，当前支持 `openai_chat_completions / openai_responses / anthropic_messages / gemini_generate_content` |
 | `encrypted_key` | AES-256-GCM 加密后的 API Key，明文永不落盘 |
 | `base_url` | 可选，用于自定义 API endpoint（如代理、私有部署） |
+| `default_model` | 连接级默认模型名，用于连通性验证和运行时 `model.name` 缺省回退 |
 | `last_verified_at` | 最后一次连通性测试通过时间 |
 
 ---
@@ -158,7 +160,7 @@ credential_security:
 用户添加/修改 API Key 后:
   |
   v
-系统发送一个最小请求（如 "Hi", max_tokens=1）
+系统按所选 `api_dialect` 发送一个最小生成请求
   |
   v
 验证结果:
@@ -170,7 +172,9 @@ credential_security:
 
 ### 7.2 设计要点
 
-- 测试请求使用最小参数（`max_tokens=1`），避免产生实际费用
+- 验证不再通过 `/models` 或探测式接口猜兼容；统一按用户显式选择的 `api_dialect` 发最小生成请求
+- 测试请求使用极小输出上限与固定短提示，避免产生实际费用
+- `default_model` 是验证请求的必需模型名，同时也是运行时 `model.name` 缺省时的连接级回退值
 - 测试结果记录到 `last_verified_at`，用户可在 UI 查看凭证状态
 - 支持手动重新测试（"重新验证"按钮）
 - 凭证长时间未验证时，UI 可提示用户重新验证

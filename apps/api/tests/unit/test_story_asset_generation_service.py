@@ -238,8 +238,10 @@ def _create_anthropic_credential(db, owner_id):
         owner_type="user",
         owner_id=owner_id,
         provider="anthropic",
+        api_dialect="anthropic_messages",
         display_name="Anthropic",
         encrypted_key=crypto.encrypt("sk-anthropic-test"),
+        default_model="claude-sonnet-4-20250514",
         is_active=True,
     )
     db.add(credential)

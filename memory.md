@@ -1001,3 +1001,14 @@
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
 - **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_story_asset_generation_service.py` 通过，`4 passed`。
 - **Validation**：`pnpm --dir apps/web lint`、`pnpm --dir apps/web exec tsc --noEmit` 通过。
+
+## [2026-03-22 | 模型连接方言化改造完成]
+- **Events**：完成自定义模型连接重构，把“`provider` 猜协议”正式改成“`provider + api_dialect + base_url + default_model`”显式连接模型。
+- **Changes**：新增 `shared/runtime/llm_protocol_types.py`、`llm_protocol_requests.py`、`llm_protocol_responses.py`、`llm_protocol.py`；`LLMToolProvider` 现在通过项目内 HTTP 方言适配层直接支持 `openai_chat_completions`、`openai_responses`、`anthropic_messages`、`gemini_generate_content` 四类接口。
+- **Changes**：`ModelCredential`、credential DTO、service、verifier 与前端 `Credential Center` 已同步补齐 `api_dialect / default_model`；验证逻辑改为最小生成请求，不再请求 `/models` 或靠 `provider` 做隐式兼容判断。
+- **Changes**：`workflow runtime`、`context preview`、`story asset generation` 已支持从凭证 `default_model` 回填 `model.name`；`credential_service.py` 已继续拆分，回到 300 行以内。
+- **Changes**：正式规格已同步更新到 `docs/design/10-user-and-credentials.md`、`docs/specs/database-design.md`、`docs/specs/config-format.md`、`docs/design/16-mcp-architecture.md`、`docs/specs/architecture.md`、`docs/specs/tech-stack.md`。
+- **Insights**：`provider` 现在应被视为“渠道键 / 凭证解析键”，不是品牌、协议、网关三者混合概念；真正的 HTTP 协议由 `api_dialect` 决定，模型缺省回退由 `default_model` 决定。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_credential_service.py tests/unit/test_credential_api.py tests/unit/test_credential_verifier.py tests/unit/test_llm_tool_provider.py tests/unit/test_story_asset_generation_service.py tests/unit/test_workflow_runtime.py` 通过，`28 passed`。
+- **Validation**：`pnpm --dir apps/web lint`、`pnpm --dir apps/web exec tsc --noEmit` 通过。

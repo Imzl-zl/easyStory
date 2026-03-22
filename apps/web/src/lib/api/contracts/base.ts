@@ -59,15 +59,22 @@ export type TemplateDetail = TemplateSummary & {
 };
 
 export type CredentialOwnerType = "system" | "user" | "project";
+export type CredentialApiDialect =
+  | "openai_chat_completions"
+  | "openai_responses"
+  | "anthropic_messages"
+  | "gemini_generate_content";
 
 export type CredentialView = {
   id: string;
   owner_type: CredentialOwnerType;
   owner_id: string | null;
   provider: string;
+  api_dialect: CredentialApiDialect;
   display_name: string;
   masked_key: string;
   base_url: string | null;
+  default_model: string | null;
   is_active: boolean;
   last_verified_at: string | null;
 };
@@ -76,9 +83,11 @@ export type CredentialCreatePayload = {
   owner_type: CredentialOwnerType;
   project_id?: string | null;
   provider: string;
+  api_dialect: CredentialApiDialect;
   display_name: string;
   api_key: string;
   base_url?: string | null;
+  default_model: string;
 };
 
 export type CredentialVerifyResult = {

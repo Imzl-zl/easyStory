@@ -45,7 +45,7 @@ Agent 通过 ToolProvider 抽象层调用 LLM，不直接依赖具体的 LLM 库
 
 | 实现 | 阶段 | 说明 |
 |------|------|------|
-| LLMToolProvider | MVP | 直接调用 LLM 生成（通过 LiteLLM） |
+| LLMToolProvider | MVP | 通过项目内 LLM HTTP 方言适配层直连主流接口 |
 | MCPToolProvider | 第二阶段 | 通过 MCP 协议调用外部工具 |
 
 ToolProvider 接口提供两个方法：
@@ -103,7 +103,7 @@ PluginRegistry 接口：
 | 约束 | 说明 | 违反后果 |
 |------|------|---------|
 | Service 层不依赖 HTTP | 入参/返回用 DTO | MCP Server 无法复用 |
-| Agent 通过 ToolProvider | 不直接 import litellm | 无法插入 MCP 工具 |
+| Agent 通过 ToolProvider | 不直接依赖具体模型 SDK/方言细节 | 无法插入 MCP 工具 |
 | Hook 通过 PluginRegistry | 不硬编码 action type | 无法增加新类型 |
 | 内容操作通过 Service 层 | Router 不直接操作 DB | MCP 无法复用逻辑 |
 | 认证在入口层处理 | Service 不检查 HTTP header | MCP 用不同认证 |
@@ -131,7 +131,7 @@ PluginRegistry 接口：
                       ▼
 ┌─────────────────────────────────────────────────────┐
 │           Infrastructure Layer (基础设施)              │
-│  Database │ LiteLLM │ FileSystem │ ConfigLoader      │
+│  Database │ LLM HTTP Dialect Adapter │ FileSystem │ ConfigLoader │
 └─────────────────────────────────────────────────────┘
 ```
 

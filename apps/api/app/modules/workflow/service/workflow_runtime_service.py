@@ -187,7 +187,9 @@ class WorkflowRuntimeService(
                 "model": model.model_dump(mode="json", exclude_none=True),
                 "credential": {
                     "api_key": credential_service.crypto.decrypt(credential.encrypted_key),
+                    "api_dialect": credential.api_dialect,
                     "base_url": credential.base_url,
+                    "default_model": credential.default_model,
                 },
                 "response_format": prompt_bundle["response_format"],
             },
@@ -200,7 +202,7 @@ class WorkflowRuntimeService(
             node_execution_id=node_execution_id,
             credential_id=credential.id,
             usage_type=usage_type,
-            model_name=model.name or "",
+            model_name=raw_output.get("model_name") or "",
             input_tokens=raw_output.get("input_tokens"),
             output_tokens=raw_output.get("output_tokens"),
             budget_config=workflow_config.budget,

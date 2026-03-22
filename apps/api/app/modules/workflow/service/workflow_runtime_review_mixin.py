@@ -155,7 +155,7 @@ class WorkflowRuntimeReviewMixin:
         skill = load_skill_snapshot(workflow.skills_snapshot or {}, reviewer.skills[0])
         prompt = self.template_renderer.render(skill.prompt, {"content": content})
         model = reviewer.model or skill.model
-        if model is None or not model.name or not model.provider:
+        if model is None or not model.provider:
             raise ConfigurationError(f"Reviewer {reviewer.id} is missing model configuration")
         raw_output = await self._call_llm(
             db,
