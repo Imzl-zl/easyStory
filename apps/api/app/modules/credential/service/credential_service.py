@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.credential.infrastructure import (
     AsyncCredentialVerifier,
-    CredentialCrypto,
+    CredentialCipher,
 )
 from app.modules.credential.models import ModelCredential
 from app.modules.observability.service import AuditLogService
@@ -51,7 +51,7 @@ AUDIT_DISABLE = "credential_disable"
 class CredentialService:
     def __init__(
         self,
-        crypto: CredentialCrypto,
+        crypto: CredentialCipher,
         verifier: AsyncCredentialVerifier,
         audit_log_service: AuditLogService,
         project_service: ProjectService,

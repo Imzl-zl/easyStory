@@ -1,4 +1,4 @@
-from .crypto import CREDENTIAL_MASTER_KEY_ENV, CredentialCrypto
+from .crypto import CREDENTIAL_MASTER_KEY_ENV, CredentialCipher, CredentialCrypto
 from .verifier import (
     AsyncCredentialVerifier,
     AsyncHttpCredentialVerifier,
@@ -9,6 +9,7 @@ __all__ = [
     "AsyncCredentialVerifier",
     "AsyncHttpCredentialVerifier",
     "CREDENTIAL_MASTER_KEY_ENV",
+    "CredentialCipher",
     "CredentialCrypto",
     "CredentialVerificationResult",
 ]

@@ -18,7 +18,9 @@
       "Bash(cd:*)",
       "WebSearch",
       "Bash(where python:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(git diff:*)",
+      "Bash(uv run:*)"
     ]
   }
 }

@@ -1033,3 +1033,11 @@
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
 - **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_credential_service.py tests/unit/test_credential_service_updates.py tests/unit/test_credential_verifier.py tests/unit/test_llm_tool_provider.py tests/unit/test_settings.py tests/unit/test_db_bootstrap.py` 通过，`34 passed`。
 - **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv lock --offline`、`pnpm --dir apps/web lint`、`pnpm --dir apps/web exec tsc --noEmit` 通过。
+
+## [2026-03-23 | credential service 协议类型收口完成]
+- **Events**：完成凭证解析轻量工厂的 follow-up 修复，消除 `CredentialService` 对 concrete crypto/verifier 类型的多余耦合。
+- **Changes**：`credential.infrastructure.crypto` 新增 `CredentialCipher` Protocol；`CredentialService` 与 `create_credential_service()` 现在依赖 `CredentialCipher / AsyncCredentialVerifier` 协议，而不是要求 `CredentialCrypto / AsyncHttpCredentialVerifier` concrete class。
+- **Changes**：`create_credential_resolution_service()` 的 `_UnsupportedCredentialCrypto` / `_UnsupportedCredentialVerifier` 现已与服务构造签名对齐；凭证相关测试中的 fake verifier 也同步收口到 `default_model: str | None`。
+- **Insights**：这类“只用到少量方法”的服务依赖，应该直接依赖协议契约；否则工厂层迟早会被迫塞入伪 concrete class，类型语义会越来越别扭。
+- **Validation**：`cd apps/api && env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m ruff check app tests` 通过。
+- **Validation**：`cd apps/api && timeout 60s env UV_CACHE_DIR=/tmp/uv-cache UV_PYTHON_INSTALL_DIR=/tmp/uv-python uv run --extra dev python -m pytest -q tests/unit/test_credential_service.py tests/unit/test_credential_service_updates.py tests/unit/test_credential_api.py tests/unit/test_credential_verifier.py tests/unit/test_context_preview_service.py` 通过，`27 passed`。

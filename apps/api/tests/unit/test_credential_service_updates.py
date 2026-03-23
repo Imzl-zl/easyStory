@@ -29,7 +29,7 @@ class FakeVerifier:
         api_key: str,
         base_url: str | None,
         api_dialect: str,
-        default_model: str,
+        default_model: str | None,
     ) -> CredentialVerificationResult:
         assert provider
         assert api_key
