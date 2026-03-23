@@ -7,10 +7,11 @@ from app.modules.config_registry.schemas import ModelConfig, SchemaField, SkillC
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError, NotFoundError
 
 from .query_dto import SkillConfigUpdateDTO
+from .write_validation_support import validate_config_model
 
 
 def build_skill_config(payload: SkillConfigUpdateDTO) -> SkillConfig:
-    return SkillConfig.model_validate(payload.model_dump(by_alias=True))
+    return validate_config_model(SkillConfig, payload.model_dump(by_alias=True))
 
 
 def ensure_matching_skill_id(path_skill_id: str, payload_skill_id: str) -> None:

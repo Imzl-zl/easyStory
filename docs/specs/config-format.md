@@ -5,7 +5,7 @@
 | 文档类型 | 技术规范 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-14 |
-| 更新时间 | 2026-03-21 |
+| 更新时间 | 2026-03-23 |
 | 关联文档 | [系统架构设计](./architecture.md)、[数据库设计](./database-design.md) |
 
 ---
@@ -25,6 +25,8 @@
 │   ├── chapter/                   # 章节类
 │   │   └── *.yaml
 │   ├── character/                 # 人物类
+│   │   └── *.yaml
+│   ├── project_setting/           # 项目设定提取/整理类
 │   │   └── *.yaml
 │   ├── world_setting/             # 世界观类
 │   │   └── *.yaml
@@ -236,6 +238,7 @@ skill:
 | `opening_plan` | 开篇设计生成 | `skill.opening_plan.*` |
 | `chapter` | 章节生成 | `skill.chapter.*` |
 | `character` | 人物设定 | `skill.character.*` |
+| `project_setting` | 项目设定提取/整理 | `skill.project_setting.*` |
 | `world_setting` | 世界观设定 | `skill.world_setting.*` |
 | `review` | 审核 | `skill.review.*` |
 

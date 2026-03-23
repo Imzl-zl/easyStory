@@ -34,7 +34,9 @@
 - `content` 章节服务入口：`apps/api/app/modules/content/service/chapter_content_service.py`
 - `workflow` 控制面服务入口：`apps/api/app/modules/workflow/service/workflow_app_service.py`
 - `config_registry` agent 写回服务入口：`apps/api/app/modules/config_registry/service/agent_write_service.py`
+- `config_registry` hook 写回服务入口：`apps/api/app/modules/config_registry/service/hook_write_service.py`
 - `config_registry` skill 写回服务入口：`apps/api/app/modules/config_registry/service/skill_write_service.py`
+- `config_registry` workflow 写回服务入口：`apps/api/app/modules/config_registry/service/workflow_write_service.py`
 - `config_registry` 管理 API 除 JWT 外，还要求 `EASYSTORY_CONFIG_ADMIN_USERNAMES` 命中当前用户名；默认空列表即全部拒绝
 - `create_app()` 当前对外部注入的 `async_session_factory` 只挂载到 `app.state` 并继续执行 settings/template startup；只有内部自行创建 session factory 时才负责启动期建库，并通过 `initialize_async_database()` 走 Alembic。测试若需要同步 seed，会在 app 外部单独创建 sync `session_factory`
 - 文件型 SQLite 测试 helper `build_sqlite_session_factories()` 已改为先调用 `initialize_database(sync_url)`；正式 schema 真值与测试建库入口保持一致
@@ -57,8 +59,18 @@
 - 对被大量模块直接导入的 schema/contract 文件（如 config_registry），优先按职责拆子文件，保留原聚合文件作为兼容导出层；不为压行数立刻做全仓 import 路径迁移。
 - `config_registry` 首轮管理 API 先做只读 summary DTO；`prompt` / `system_prompt` 等重字段不通过列表接口直出，写回 YAML 后置到独立闭环。
 - `config_registry` agent detail/update 已补齐：API 对外字段保持 `agent_type` / `skill_ids` 语义，内部再映射回 YAML `type` / `skills`
+- `config_registry` hook detail/update 已补齐：API 对外使用 `action.action_type`，内部再映射回 YAML `action.type`
+- `config_registry` workflow detail/update 已补齐：API 对外使用 `node_type` / `skill_id` / `reviewer_ids` / `fix_skill_id` / `inject_type` 语义，内部再映射回 YAML `type` / `skill` / `reviewers` / `fix_skill` / `type`
+- `config_registry` detail/update DTO 现统一基于 strict DTO：未知字段直接失败，不再静默忽略 extra keys
 - `config_registry` skill 写回已补齐：先在临时复制的 `config/` 根目录完成整仓 `ConfigLoader` 校验，再原子替换真实 YAML；失败时不污染目标文件。
 - staged skill 校验失败属于客户端输入问题，当前统一返回 `422 business_rule_error`，不再走 `ConfigurationError -> 500`
+- `config_registry` 的 `build_*_config()` 现统一把 schema `ValidationError` 收口成 `422 business_rule_error`；例如 reviewer agent 非法 `output_schema`、generate node 缺 skill、hook action config 非法
+- `template` 自定义模板写入只接收语义字段（`name/description/genre/workflow_id/guided_questions`）；`template_nodes` 必须由后端根据 `workflow_id` 自动展开，不能让前端提交第二份节点真值。built-in 模板保持只读，模板名称全局唯一，避免与 built-in 同名后被同步逻辑误吸收。
+- `project incubator` draft 能力归属 `project` 模块：模板只提供题材和引导问题快照，`ProjectSetting` 草稿由 `project` 服务生成；已声明但未支持映射的变量返回 `unmapped_answers`，未声明变量或空白回答直接 `422 business_rule_error`
+- `template.guided_questions.variable` 现在在模板边界做规范化存储；`core_conflict` 是规范字段名，历史 `conflict` 会显式归一化到 `core_conflict`
+- `quick template` 一键建项目应继续归属 `project incubator` 编排层：先生成 `ProjectSetting` 草稿，再复用 `ProjectManagementService.create_project()` 持久化；不要复制项目创建与前置资产 scaffold 逻辑
+- incubator 响应现在直接返回 `setting_completeness`，并复用 `project` 模块既有完整度规则；当前内建模板问题集仍不足以直接达到 `ready`
+- `free-text setting` draft 也继续归属 `project incubator`：请求必须显式传 `provider`，可选传 `model_name`；自由文本先通过 `skill.project_setting.conversation_extract` 提取成 `ProjectSetting` 草稿，再复用 `evaluate_project_setting()` 生成 `setting_completeness` 与 `follow_up_questions`；skill 配置只保留生成参数，不锁死 provider/model，预创建阶段也不走 system credential pool
 
 ## Pitfalls
 

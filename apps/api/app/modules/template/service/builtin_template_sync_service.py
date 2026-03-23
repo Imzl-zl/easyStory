@@ -9,14 +9,13 @@ from sqlalchemy.orm import selectinload
 from app.modules.config_registry import ConfigLoader
 from app.modules.template.models import Template, TemplateNode
 
-from .builtin_catalog import (
-    BUILTIN_TEMPLATE_SPECS,
-    DEFAULT_TEMPLATE_NODE_X_GAP,
-    DEFAULT_TEMPLATE_NODE_Y,
-    BuiltinTemplateSpec,
+from .builtin_catalog import BUILTIN_TEMPLATE_SPECS, BuiltinTemplateSpec
+from .dto import TemplateGuidedQuestionDTO
+from .template_write_support import (
+    build_template_config,
+    build_template_node_payloads,
+    replace_template_nodes,
 )
-
-EMPTY_TEMPLATE_NODE_SKILL_ID = ""
 
 
 class BuiltinTemplateSyncService:
@@ -34,7 +33,7 @@ class BuiltinTemplateSyncService:
         changed = False
         for spec in BUILTIN_TEMPLATE_SPECS:
             expected_config = self._build_template_config(spec)
-            expected_nodes = self._build_node_payloads(spec.workflow_id)
+            expected_nodes = build_template_node_payloads(self.config_loader, spec.workflow_id)
             template = existing_by_key.get(spec.template_key) or existing_by_name.get(spec.name)
             if template is None:
                 db.add(
@@ -84,33 +83,18 @@ class BuiltinTemplateSyncService:
         template.is_builtin = True
         template.nodes.clear()
         await db.flush()
-        template.nodes = [TemplateNode(**payload) for payload in expected_nodes]
+        replace_template_nodes(template, expected_nodes)
         return True
 
     def _build_template_config(self, spec: BuiltinTemplateSpec) -> dict[str, Any]:
-        return {
-            "template_key": spec.template_key,
-            "workflow_id": spec.workflow_id,
-            "guided_questions": [
-                {"question": question, "variable": variable}
+        return build_template_config(
+            spec.workflow_id,
+            [
+                TemplateGuidedQuestionDTO(question=question, variable=variable)
                 for question, variable in spec.guided_questions
             ],
-        }
-
-    def _build_node_payloads(self, workflow_id: str) -> list[dict[str, Any]]:
-        workflow = self.config_loader.load_workflow(workflow_id)
-        return [
-            {
-                "node_order": index,
-                "node_type": node.node_type,
-                "skill_id": _normalize_skill_id(node.skill),
-                "config": _build_node_config(node.model_dump(by_alias=True, exclude_none=True)),
-                "position_x": index * DEFAULT_TEMPLATE_NODE_X_GAP,
-                "position_y": DEFAULT_TEMPLATE_NODE_Y,
-                "ui_config": {"label": node.name},
-            }
-            for index, node in enumerate(workflow.nodes)
-        ]
+            template_key=spec.template_key,
+        )
 
     def _serialize_node(self, node: TemplateNode) -> dict[str, Any]:
         return {
@@ -130,22 +114,6 @@ def _builtin_templates_statement():
         .options(selectinload(Template.nodes))
         .where(Template.is_builtin.is_(True))
     )
-
-
-def _build_node_config(raw_config: dict[str, Any]) -> dict[str, Any]:
-    node_config = dict(raw_config)
-    node_config.pop("type", None)
-    node_config.pop("skill", None)
-    return node_config
-
-
-def _normalize_skill_id(skill_id: str | None) -> str:
-    if skill_id is None:
-        return EMPTY_TEMPLATE_NODE_SKILL_ID
-    normalized = skill_id.strip()
-    if not normalized:
-        return EMPTY_TEMPLATE_NODE_SKILL_ID
-    return normalized
 
 
 def _extract_template_key(config: dict[str, Any] | None) -> str | None:

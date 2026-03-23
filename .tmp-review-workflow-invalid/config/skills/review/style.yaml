@@ -1,0 +1,33 @@
+skill:
+  id: "skill.review.style"
+  name: "文风审核"
+  version: "1.0.0"
+  description: "为 reviewer 提供文风审核维度"
+  category: "review"
+  tags: ["审核", "文风"]
+
+  prompt: |
+    你需要检查以下内容的文风一致性、表达重复和突兀跳转。
+
+    【内容】
+    {{ content }}
+
+    输出一个严格符合 ReviewResult 的 JSON 对象：
+    - reviewer_id="agent.style_checker"
+    - reviewer_name="文风检查员"
+    - status 只能是 passed / failed / warning
+    - score 使用 0-100
+    - issues 中每条问题必须包含 category、severity、description
+
+  variables:
+    content:
+      type: "string"
+      required: true
+
+  model:
+    provider: "openai"
+    name: "gpt-4o"
+    required_capabilities:
+      - "json_schema_output"
+    temperature: 0.2
+    max_tokens: 1200

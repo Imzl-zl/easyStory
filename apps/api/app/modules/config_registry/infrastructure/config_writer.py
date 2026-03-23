@@ -9,7 +9,9 @@ import yaml
 TEMP_CONFIG_ROOT_NAME = "config"
 TEMP_FILE_SUFFIX = ".tmp"
 YAML_ROOT_KEY_AGENT = "agent"
+YAML_ROOT_KEY_HOOK = "hook"
 YAML_ROOT_KEY_SKILL = "skill"
+YAML_ROOT_KEY_WORKFLOW = "workflow"
 
 
 class _ConfigDumper(yaml.SafeDumper):

@@ -24,8 +24,11 @@ def test_repository_config_loads() -> None:
     loader = ConfigLoader(CONFIG_ROOT)
 
     workflow = loader.load_workflow("workflow.xuanhuan_manual")
+    project_setting_skill = loader.load_skill("skill.project_setting.conversation_extract")
 
     assert "skill.chapter.xuanhuan" in [item.id for item in loader.list_skills()]
+    assert project_setting_skill.category == "project_setting"
+    assert "conversation_text" in project_setting_skill.variables
     assert workflow.settings.default_fix_skill == "skill.fix.xuanhuan"
     assert workflow.context_injection is not None
     assert workflow.context_injection.default_inject[0].inject_type == "project_setting"

@@ -28,6 +28,9 @@ async def test_config_registry_query_service_lists_repository_configs() -> None:
     assert skill.model is not None
     assert skill.model.provider == "anthropic"
     assert skill.model.name == "claude-sonnet-4-20250514"
+    incubator_skill = _get_by_id(skills, "skill.project_setting.conversation_extract")
+    assert incubator_skill.category == "project_setting"
+    assert incubator_skill.input_keys == ["conversation_text"]
 
     agent = _get_by_id(agents, "agent.style_checker")
     assert agent.agent_type == "reviewer"
@@ -64,6 +67,37 @@ async def test_config_registry_query_service_reads_agent_detail() -> None:
     assert agent.skill_ids == ["skill.review.style"]
     assert agent.system_prompt.startswith("你是一位专业的小说文风审核专家")
     assert agent.output_schema is None
+
+
+async def test_config_registry_query_service_reads_hook_detail() -> None:
+    service = create_config_registry_query_service(config_loader=ConfigLoader(CONFIG_ROOT))
+
+    hook = await service.get_hook("hook.auto_save")
+
+    assert hook.trigger.event == "after_generate"
+    assert hook.trigger.node_types == ["generate"]
+    assert hook.action.action_type == "script"
+    assert hook.action.config["function"] == "auto_save_content"
+    assert hook.retry is None
+
+
+async def test_config_registry_query_service_reads_workflow_detail() -> None:
+    service = create_config_registry_query_service(config_loader=ConfigLoader(CONFIG_ROOT))
+
+    workflow = await service.get_workflow("workflow.xuanhuan_manual")
+
+    assert workflow.settings.default_fix_skill == "skill.fix.xuanhuan"
+    assert workflow.context_injection is not None
+    assert workflow.context_injection.default_inject[0].inject_type == "project_setting"
+    chapter_node = _get_by_id(workflow.nodes, "chapter_gen")
+    assert chapter_node.node_type == "generate"
+    assert chapter_node.skill_id == "skill.chapter.xuanhuan"
+    assert chapter_node.reviewer_ids == ["agent.style_checker"]
+    assert chapter_node.loop.enabled is True
+    assert chapter_node.loop.pause is not None
+    assert chapter_node.loop.pause.strategy == "every"
+    export_node = _get_by_id(workflow.nodes, "export")
+    assert export_node.formats == ["txt", "markdown"]
 
 
 def _get_by_id(items, config_id: str):

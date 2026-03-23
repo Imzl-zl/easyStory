@@ -36,6 +36,9 @@
   ↓ 生成结构化设定文档
 ```
 
+> MVP 后端当前先收口为“提交聚合后的自由文本 -> 生成结构化 `ProjectSetting` 草稿 -> 返回完整度与追问建议”。
+> 真正的多轮对话状态与追问编排由上层交互组织；后端不再维护第二套会话真值。
+
 ---
 
 ## 3. 结构化设定输出
@@ -234,9 +237,9 @@ template:
     - question: "故事发生在什么世界?"
       variable: "world_setting"
     - question: "主要冲突是什么?"
-      variable: "conflict"
+      variable: "core_conflict"
 ```
 
 ---
 
-*最后更新: 2026-03-19*
+*最后更新: 2026-03-23*

@@ -7,16 +7,24 @@ from app.modules.config_registry.service import (
     AgentConfigSummaryDTO,
     AgentConfigUpdateDTO,
     ConfigRegistryAgentWriteService,
+    ConfigRegistryHookWriteService,
     ConfigRegistryQueryService,
     ConfigRegistrySkillWriteService,
+    ConfigRegistryWorkflowWriteService,
+    HookConfigDetailDTO,
     HookConfigSummaryDTO,
+    HookConfigUpdateDTO,
     SkillConfigDetailDTO,
     SkillConfigSummaryDTO,
     SkillConfigUpdateDTO,
+    WorkflowConfigDetailDTO,
     WorkflowConfigSummaryDTO,
+    WorkflowConfigUpdateDTO,
     create_config_registry_agent_write_service,
+    create_config_registry_hook_write_service,
     create_config_registry_query_service,
     create_config_registry_skill_write_service,
+    create_config_registry_workflow_write_service,
 )
 from app.modules.user.entry.http.dependencies import require_config_admin
 
@@ -35,8 +43,16 @@ async def get_config_registry_agent_write_service() -> ConfigRegistryAgentWriteS
     return create_config_registry_agent_write_service()
 
 
+async def get_config_registry_hook_write_service() -> ConfigRegistryHookWriteService:
+    return create_config_registry_hook_write_service()
+
+
 async def get_config_registry_skill_write_service() -> ConfigRegistrySkillWriteService:
     return create_config_registry_skill_write_service()
+
+
+async def get_config_registry_workflow_write_service() -> ConfigRegistryWorkflowWriteService:
+    return create_config_registry_workflow_write_service()
 
 
 @router.get("/skills", response_model=list[SkillConfigSummaryDTO])
@@ -108,6 +124,27 @@ async def list_hooks(
     return await config_registry_query_service.list_hooks()
 
 
+@router.get("/hooks/{hook_id}", response_model=HookConfigDetailDTO)
+async def get_hook(
+    hook_id: str,
+    config_registry_query_service: ConfigRegistryQueryService = Depends(
+        get_config_registry_query_service
+    ),
+) -> HookConfigDetailDTO:
+    return await config_registry_query_service.get_hook(hook_id)
+
+
+@router.put("/hooks/{hook_id}", response_model=HookConfigDetailDTO)
+async def update_hook(
+    hook_id: str,
+    payload: HookConfigUpdateDTO,
+    config_registry_hook_write_service: ConfigRegistryHookWriteService = Depends(
+        get_config_registry_hook_write_service
+    ),
+) -> HookConfigDetailDTO:
+    return await config_registry_hook_write_service.update_hook(hook_id, payload)
+
+
 @router.get("/workflows", response_model=list[WorkflowConfigSummaryDTO])
 async def list_workflows(
     config_registry_query_service: ConfigRegistryQueryService = Depends(
@@ -115,3 +152,24 @@ async def list_workflows(
     ),
 ) -> list[WorkflowConfigSummaryDTO]:
     return await config_registry_query_service.list_workflows()
+
+
+@router.get("/workflows/{workflow_id}", response_model=WorkflowConfigDetailDTO)
+async def get_workflow(
+    workflow_id: str,
+    config_registry_query_service: ConfigRegistryQueryService = Depends(
+        get_config_registry_query_service
+    ),
+) -> WorkflowConfigDetailDTO:
+    return await config_registry_query_service.get_workflow(workflow_id)
+
+
+@router.put("/workflows/{workflow_id}", response_model=WorkflowConfigDetailDTO)
+async def update_workflow(
+    workflow_id: str,
+    payload: WorkflowConfigUpdateDTO,
+    config_registry_workflow_write_service: ConfigRegistryWorkflowWriteService = Depends(
+        get_config_registry_workflow_write_service
+    ),
+) -> WorkflowConfigDetailDTO:
+    return await config_registry_workflow_write_service.update_workflow(workflow_id, payload)

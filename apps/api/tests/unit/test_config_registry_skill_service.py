@@ -75,6 +75,35 @@ async def test_config_registry_skill_write_service_rejects_invalid_prompt_withou
     assert source_path.read_text(encoding="utf-8") == original_text
 
 
+async def test_config_registry_skill_write_service_rejects_mixed_variables_and_inputs(
+    tmp_path,
+) -> None:
+    temp_root = _copy_config_root(tmp_path)
+    loader = ConfigLoader(temp_root)
+    query_service = create_config_registry_query_service(config_loader=loader)
+    write_service = create_config_registry_skill_write_service(config_loader=loader)
+    source_path = loader.get_source_path(TARGET_SKILL_ID)
+    original_text = source_path.read_text(encoding="utf-8")
+    detail = await query_service.get_skill(TARGET_SKILL_ID)
+
+    payload = SkillConfigUpdateDTO(
+        **{
+            **detail.model_dump(by_alias=True),
+            "inputs": {
+                "content": {
+                    "type": "string",
+                    "required": True,
+                }
+            },
+        }
+    )
+
+    with pytest.raises(BusinessRuleError, match="variables and inputs/outputs are mutually exclusive"):
+        await write_service.update_skill(TARGET_SKILL_ID, payload)
+
+    assert source_path.read_text(encoding="utf-8") == original_text
+
+
 def _copy_config_root(tmp_path: Path) -> Path:
     temp_root = tmp_path / "config"
     shutil.copytree(CONFIG_ROOT, temp_root)

@@ -1,0 +1,92 @@
+workflow:
+  id: "workflow.xuanhuan_manual"
+  name: "玄幻小说手动创作"
+  version: "1.0.0"
+  description: "手动模式玄幻小说创作流程，覆盖设定、大纲、开篇设计、章节任务拆分、章节循环和导出"
+  mode: "manual"
+
+  settings:
+    auto_proceed: false
+    auto_review: false
+    auto_fix: false
+    save_on_step: true
+    default_pass_rule: "no_critical"
+    default_fix_skill: "skill.fix.xuanhuan"
+
+  context_injection:
+    enabled: true
+    default_inject:
+      - type: "project_setting"
+        required: true
+      - type: "outline"
+        required: true
+    rules:
+      - node_pattern: "chapter_gen"
+        inject:
+          - type: "opening_plan"
+            required: true
+          - type: "chapter_task"
+            required: true
+          - type: "previous_chapters"
+            count: 2
+            required: false
+          - type: "story_bible"
+            required: false
+
+  nodes:
+    - id: "outline"
+      name: "生成大纲"
+      type: "generate"
+      skill: "skill.outline.xuanhuan"
+      hooks:
+        after:
+          - "hook.auto_save"
+      auto_review: false
+      auto_proceed: false
+
+    - id: "opening_plan"
+      name: "生成开篇设计"
+      type: "generate"
+      skill: "skill.opening_plan.xuanhuan"
+      depends_on: ["outline"]
+      hooks:
+        after:
+          - "hook.auto_save"
+      auto_review: false
+      auto_proceed: false
+
+    - id: "chapter_split"
+      name: "拆分章节任务"
+      type: "generate"
+      skill: "skill.chapter_split.default"
+      depends_on: ["outline", "opening_plan"]
+      auto_review: false
+      auto_proceed: false
+
+    - id: "chapter_gen"
+      name: "生成章节"
+      type: "generate"
+      skill: "skill.chapter.xuanhuan"
+      depends_on: ["chapter_split"]
+      hooks:
+        after:
+          - "hook.auto_save"
+      loop:
+        enabled: true
+        count_from: "chapter_split"
+        item_var: "chapter_index"
+        pause:
+          strategy: "every"
+      auto_review: true
+      reviewers:
+        - "agent.style_checker"
+      auto_fix: false
+      auto_proceed: false
+
+    - id: "export"
+      name: "导出成稿"
+      type: "export"
+      depends_on: ["chapter_gen"]
+      formats:
+        - "txt"
+        - "markdown"

@@ -3,23 +3,31 @@ from __future__ import annotations
 from app.modules.config_registry import ConfigLoader
 
 from .agent_write_support import require_agent
+from .hook_write_support import require_hook
 from .query_dto import (
     AgentConfigDetailDTO,
     AgentConfigSummaryDTO,
+    HookConfigDetailDTO,
     HookConfigSummaryDTO,
     SkillConfigDetailDTO,
     SkillConfigSummaryDTO,
+    WorkflowConfigDetailDTO,
     WorkflowConfigSummaryDTO,
 )
 from .query_support import (
     to_agent_detail,
     to_agent_summary,
+    to_hook_detail,
     to_hook_summary,
     to_skill_detail,
     to_skill_summary,
+)
+from .workflow_query_support import (
+    to_workflow_detail,
     to_workflow_summary,
 )
 from .skill_write_support import require_skill
+from .workflow_write_support import require_workflow
 
 
 class ConfigRegistryQueryService:
@@ -50,6 +58,12 @@ class ConfigRegistryQueryService:
         )
         return [to_hook_summary(hook) for hook in hooks]
 
+    async def get_hook(self, hook_id: str) -> HookConfigDetailDTO:
+        return to_hook_detail(require_hook(self.config_loader, hook_id))
+
     async def list_workflows(self) -> list[WorkflowConfigSummaryDTO]:
         workflows = sorted(self.config_loader.list_workflows(), key=lambda item: (item.name, item.id))
         return [to_workflow_summary(workflow) for workflow in workflows]
+
+    async def get_workflow(self, workflow_id: str) -> WorkflowConfigDetailDTO:
+        return to_workflow_detail(require_workflow(self.config_loader, workflow_id))

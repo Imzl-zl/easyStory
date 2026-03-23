@@ -8,13 +8,14 @@ from app.modules.config_registry.schemas import AgentConfig, ModelConfig
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError, NotFoundError
 
 from .query_dto import AgentConfigUpdateDTO
+from .write_validation_support import validate_config_model
 
 
 def build_agent_config(payload: AgentConfigUpdateDTO) -> AgentConfig:
     document = payload.model_dump()
     document["type"] = document.pop("agent_type")
     document["skills"] = document.pop("skill_ids")
-    return AgentConfig.model_validate(document)
+    return validate_config_model(AgentConfig, document)
 
 
 def ensure_matching_agent_id(path_agent_id: str, payload_agent_id: str) -> None:

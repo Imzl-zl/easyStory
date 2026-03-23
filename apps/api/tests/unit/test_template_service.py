@@ -10,12 +10,18 @@ from app.modules.template.models import Template, TemplateNode
 from app.modules.template.service import (
     create_builtin_template_sync_service,
     create_template_query_service,
+    create_template_write_service,
+    TemplateCreateDTO,
+    TemplateGuidedQuestionDTO,
+    TemplateUpdateDTO,
 )
-from app.shared.runtime.errors import NotFoundError
+from app.modules.project.models import Project
+from app.shared.runtime.errors import BusinessRuleError, ConflictError, NotFoundError
 from tests.unit.async_api_support import (
     build_sqlite_session_factories,
     cleanup_sqlite_session_factories,
 )
+from tests.unit.models.helpers import create_user
 
 
 async def test_builtin_template_sync_is_idempotent_and_upgrades_legacy_builtin(tmp_path) -> None:
@@ -129,6 +135,187 @@ async def test_template_query_service_raises_not_found_for_missing_template(tmp_
         async with async_session_factory() as session:
             with pytest.raises(NotFoundError):
                 await query_service.get_template(session, template_id=_missing_template_id())
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_template_write_service_creates_custom_template_with_generated_nodes(tmp_path) -> None:
+    write_service = create_template_write_service()
+    _session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="template-write-create")
+    )
+
+    try:
+        async with async_session_factory() as session:
+            detail = await write_service.create_template(
+                session,
+                TemplateCreateDTO(
+                    name="自定义玄幻模板",
+                    description="带引导问题的自定义模板",
+                    genre="玄幻",
+                    workflow_id="workflow.xuanhuan_manual",
+                    guided_questions=[
+                        TemplateGuidedQuestionDTO(question="主角是谁?", variable="protagonist")
+                    ],
+                ),
+            )
+
+            assert detail.name == "自定义玄幻模板"
+            assert detail.is_builtin is False
+            assert detail.workflow_id == "workflow.xuanhuan_manual"
+            assert [question.variable for question in detail.guided_questions] == ["protagonist"]
+            assert [node.node_id for node in detail.nodes] == [
+                "outline",
+                "opening_plan",
+                "chapter_split",
+                "chapter_gen",
+                "export",
+            ]
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_template_write_service_rejects_duplicate_name_and_invalid_workflow(tmp_path) -> None:
+    sync_service = create_builtin_template_sync_service()
+    write_service = create_template_write_service()
+    _session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="template-write-rules")
+    )
+
+    try:
+        async with async_session_factory() as session:
+            await sync_service.sync_builtin_templates(session)
+
+        async with async_session_factory() as session:
+            with pytest.raises(ConflictError):
+                await write_service.create_template(
+                    session,
+                    TemplateCreateDTO(
+                        name="玄幻小说模板",
+                        workflow_id="workflow.xuanhuan_manual",
+                    ),
+                )
+
+            with pytest.raises(BusinessRuleError):
+                await write_service.create_template(
+                    session,
+                    TemplateCreateDTO(
+                        name="不存在的工作流模板",
+                        workflow_id="workflow.missing",
+                    ),
+                )
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_template_write_service_updates_custom_template_and_rebuilds_nodes(tmp_path) -> None:
+    write_service = create_template_write_service()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="template-write-update")
+    )
+
+    try:
+        with session_factory() as session:
+            template = Template(
+                name="旧模板",
+                description="旧描述",
+                genre="旧题材",
+                config={"workflow_id": "workflow.legacy"},
+                is_builtin=False,
+                nodes=[
+                    TemplateNode(
+                        node_order=0,
+                        node_type="generate",
+                        skill_id="skill.legacy",
+                        config={"id": "legacy", "name": "旧节点"},
+                        position_x=0,
+                        position_y=0,
+                        ui_config={"label": "旧节点"},
+                    )
+                ],
+            )
+            session.add(template)
+            session.commit()
+            session.refresh(template)
+            template_id = template.id
+
+        async with async_session_factory() as session:
+            detail = await write_service.update_template(
+                session,
+                template_id,
+                TemplateUpdateDTO(
+                    name="新模板",
+                    description="新描述",
+                    genre="玄幻",
+                    workflow_id="workflow.xuanhuan_manual",
+                    guided_questions=[
+                        TemplateGuidedQuestionDTO(
+                            question="  冲突是什么?  ",
+                            variable=" conflict ",
+                        )
+                    ],
+                ),
+            )
+
+            assert detail.name == "新模板"
+            assert detail.workflow_id == "workflow.xuanhuan_manual"
+            assert [question.question for question in detail.guided_questions] == ["冲突是什么?"]
+            assert [question.variable for question in detail.guided_questions] == [
+                "core_conflict"
+            ]
+            assert [node.node_id for node in detail.nodes] == [
+                "outline",
+                "opening_plan",
+                "chapter_split",
+                "chapter_gen",
+                "export",
+            ]
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_template_write_service_blocks_builtin_mutation_and_referenced_delete(tmp_path) -> None:
+    sync_service = create_builtin_template_sync_service()
+    write_service = create_template_write_service()
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="template-write-guard")
+    )
+
+    try:
+        async with async_session_factory() as session:
+            await sync_service.sync_builtin_templates(session)
+            builtin_templates = await create_template_query_service().list_templates(session)
+            builtin_template_id = builtin_templates[0].id
+
+            with pytest.raises(BusinessRuleError):
+                await write_service.update_template(
+                    session,
+                    builtin_template_id,
+                    TemplateUpdateDTO(
+                        name="不允许修改内建模板",
+                        workflow_id="workflow.xuanhuan_manual",
+                    ),
+                )
+
+            with pytest.raises(BusinessRuleError):
+                await write_service.delete_template(session, builtin_template_id)
+
+        with session_factory() as session:
+            custom_template = Template(
+                name="被引用模板",
+                config={"workflow_id": "workflow.xuanhuan_manual"},
+                is_builtin=False,
+            )
+            session.add(custom_template)
+            session.commit()
+            session.refresh(custom_template)
+            session.add(Project(name="引用模板的项目", owner_id=create_user(session).id, template_id=custom_template.id))
+            session.commit()
+            referenced_template_id = custom_template.id
+
+        async with async_session_factory() as session:
+            with pytest.raises(ConflictError):
+                await write_service.delete_template(session, referenced_template_id)
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 

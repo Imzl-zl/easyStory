@@ -1,0 +1,34 @@
+skill:
+  id: "skill.chapter_split.default"
+  name: "章节任务拆分"
+  version: "1.0.0"
+  description: "基于大纲与开篇设计拆分章节任务"
+  category: "chapter_split"
+  tags: ["章节", "拆分"]
+
+  prompt: |
+    你是小说章节规划助手。
+
+    【故事大纲】
+    {{ outline }}
+
+    【开篇设计】
+    {{ opening_plan }}
+
+    请拆分出可执行的章节任务列表。每章输出标题、摘要、关键人物、关键事件。
+
+  variables:
+    outline:
+      type: "string"
+      required: true
+    opening_plan:
+      type: "string"
+      required: true
+
+  model:
+    provider: "openai"
+    name: "gpt-4o"
+    required_capabilities:
+      - "json_schema_output"
+    temperature: 0.4
+    max_tokens: 3000
