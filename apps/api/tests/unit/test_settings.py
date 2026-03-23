@@ -5,6 +5,7 @@ import pytest
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.settings import (
     ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV,
+    CONFIG_ADMIN_USERNAMES_ENV,
     CORS_ALLOWED_ORIGIN_REGEX_ENV,
     EasyStorySettings,
     JWT_EXPIRE_HOURS_ENV,
@@ -72,6 +73,16 @@ def test_settings_parses_private_endpoint_toggle(monkeypatch) -> None:
     settings = EasyStorySettings(_env_file=None)
 
     assert settings.allow_private_model_endpoints is True
+
+
+def test_settings_parses_config_admin_usernames(monkeypatch) -> None:
+    monkeypatch.setenv(CONFIG_ADMIN_USERNAMES_ENV, "alice, bob, alice")
+
+    settings = EasyStorySettings(_env_file=None)
+
+    assert settings.config_admin_usernames == ["alice", "bob"]
+    assert settings.is_config_admin("alice") is True
+    assert settings.is_config_admin("carol") is False
 
 
 def test_settings_rejects_invalid_private_endpoint_toggle(monkeypatch) -> None:

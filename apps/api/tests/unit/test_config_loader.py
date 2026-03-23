@@ -76,6 +76,37 @@ skill:
         shutil.rmtree(temp_root, ignore_errors=True)
 
 
+def test_loader_rejects_duplicate_ids_across_config_types() -> None:
+    temp_root = _make_temp_config_root()
+    _write_yaml(
+        temp_root / "skills" / "shared.yaml",
+        """
+skill:
+  id: "config.shared"
+  name: "Shared Skill"
+  category: "outline"
+  prompt: "x"
+""",
+    )
+    _write_yaml(
+        temp_root / "agents" / "shared.yaml",
+        """
+agent:
+  id: "config.shared"
+  name: "Shared Agent"
+  type: "reviewer"
+  system_prompt: "x"
+  skills: []
+""",
+    )
+
+    try:
+        with pytest.raises(ConfigurationError, match="Duplicate config id 'config.shared'"):
+            ConfigLoader(temp_root)
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
+
 def test_loader_rejects_skill_prompt_with_undeclared_variables() -> None:
     temp_root = _make_temp_config_root()
     _write_yaml(

@@ -19,6 +19,7 @@
 
 - 后端标准验证命令：`cd apps/api && ruff check app tests && pytest -q`
 - 定向内容模块验证：`cd apps/api && pytest -q tests/unit/test_story_asset_service.py tests/unit/test_chapter_content_service.py tests/unit/test_chapter_content_api.py`
+- Alembic 基线验证：`cd apps/api && ./.venv/bin/alembic -c alembic.ini upgrade head`
 - 项目共享 skills 目录：`.codex/skills/`
 - 已安装项目共享 skills：
   - `react-best-practices`：用于 `apps/web` 的 React / Next.js 组件、状态、渲染与性能实践
@@ -27,11 +28,17 @@
   - `code-review-expert`：用于代码审查任务，优先找 bug、回归风险和缺失验证
   - `supabase-postgres-best-practices`：用于 PostgreSQL 约束、索引、锁和查询模式审查；只借鉴 Postgres 实践，不引入 Supabase 产品绑定
 - 根 API 路由装配：`apps/api/app/entry/http/router.py`
+- `config_registry` 路由入口：`apps/api/app/modules/config_registry/entry/http/router.py`
 - `content` 路由入口：`apps/api/app/modules/content/entry/http/router.py`
 - `workflow` 路由入口：`apps/api/app/modules/workflow/entry/http/router.py`
 - `content` 章节服务入口：`apps/api/app/modules/content/service/chapter_content_service.py`
 - `workflow` 控制面服务入口：`apps/api/app/modules/workflow/service/workflow_app_service.py`
-- `create_app()` 当前对外部注入的 `async_session_factory` 只挂载到 `app.state` 并继续执行 settings/template startup；只有内部自行创建 session factory 时才负责启动期建库。测试若需要同步 seed，会在 app 外部单独创建 sync `session_factory`
+- `config_registry` agent 写回服务入口：`apps/api/app/modules/config_registry/service/agent_write_service.py`
+- `config_registry` skill 写回服务入口：`apps/api/app/modules/config_registry/service/skill_write_service.py`
+- `config_registry` 管理 API 除 JWT 外，还要求 `EASYSTORY_CONFIG_ADMIN_USERNAMES` 命中当前用户名；默认空列表即全部拒绝
+- `create_app()` 当前对外部注入的 `async_session_factory` 只挂载到 `app.state` 并继续执行 settings/template startup；只有内部自行创建 session factory 时才负责启动期建库，并通过 `initialize_async_database()` 走 Alembic。测试若需要同步 seed，会在 app 外部单独创建 sync `session_factory`
+- 文件型 SQLite 测试 helper `build_sqlite_session_factories()` 已改为先调用 `initialize_database(sync_url)`；正式 schema 真值与测试建库入口保持一致
+- 程序化 Alembic 若需要命中 memory SQLite 或避免 URL 掩码/二次建库问题，应优先复用现有 `connection`（`Config.attributes["connection"]`），不要只传 `sqlalchemy.url`
 
 ## Patterns
 
@@ -48,6 +55,10 @@
 - async 语义审查时，不要误把基础设施事实命名当成待清理对象；`AsyncSessionFactory`、`create_async_session_factory`、`get_async_db_session`、`AsyncCredentialVerifier` 是真实底层边界，应保留。
 - 对混合 DB 编排和文件 I/O 的服务（如 export），优先把路径校验、文件写入/清理、文档渲染抽到 `*_support.py`；主服务只保留 owner 校验、装配和事务边界。
 - 对被大量模块直接导入的 schema/contract 文件（如 config_registry），优先按职责拆子文件，保留原聚合文件作为兼容导出层；不为压行数立刻做全仓 import 路径迁移。
+- `config_registry` 首轮管理 API 先做只读 summary DTO；`prompt` / `system_prompt` 等重字段不通过列表接口直出，写回 YAML 后置到独立闭环。
+- `config_registry` agent detail/update 已补齐：API 对外字段保持 `agent_type` / `skill_ids` 语义，内部再映射回 YAML `type` / `skills`
+- `config_registry` skill 写回已补齐：先在临时复制的 `config/` 根目录完成整仓 `ConfigLoader` 校验，再原子替换真实 YAML；失败时不污染目标文件。
+- staged skill 校验失败属于客户端输入问题，当前统一返回 `422 business_rule_error`，不再走 `ConfigurationError -> 500`
 
 ## Pitfalls
 
@@ -57,5 +68,6 @@
 - 工作区当前是脏的，包含用户已有未提交改动和本轮实现改动；不要回滚不属于当前任务的文件。
 - 涉及 DB 事务和文件系统副作用的删除/导出逻辑时，先完成 `commit`，再做不可回滚的文件删除或落盘清理；否则一旦事务失败，就会制造"数据库已回滚、文件却已经删掉"的双真值。
 - 当前项目不是"只有 docs 的空仓库"，`apps/api` 已有实装代码和通过的测试基线。
+- Alembic CLI 若不显式覆盖 `sqlalchemy.url`，默认会命中 `apps/api/.runtime/easystory.db`；做 baseline/autogenerate/临时验证时要用 `-x database_url=...` 或在 Config 里显式覆盖。
 - 默认沙箱内，任何命中 `aiosqlite` 的 async SQLite 验证都可能挂起；需在非沙箱环境执行，不是业务回归。
 - unified exec 进程数告警是工具层会话配额问题，不是仓库代码回归。

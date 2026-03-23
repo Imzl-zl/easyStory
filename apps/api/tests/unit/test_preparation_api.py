@@ -4,6 +4,7 @@ from contextlib import suppress
 from pathlib import Path
 import uuid
 
+from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.orm import Session, sessionmaker
@@ -41,6 +42,7 @@ async def test_create_app_bootstraps_database_schema(monkeypatch):
             )
             assert response.status_code == 404
             assert response.json()["code"] == "not_found"
+            assert "alembic_version" in inspect(sync_engine).get_table_names()
     finally:
         sync_engine.dispose()
         await async_engine.dispose()

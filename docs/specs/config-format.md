@@ -675,6 +675,7 @@ model:
 | `EASYSTORY_CORS_ALLOWED_ORIGINS` | 可选 | 空列表 | 逗号分隔 origin 白名单 |
 | `EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX` | 可选 | `^https?://(localhost|127\.0\.0\.1)(:\d+)?$` | CORS 正则白名单 |
 | `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS` | 可选 | `false` | 是否允许 `localhost` / 私网 IP 等本地模型 endpoint；默认只允许公网 `https` endpoint |
+| `EASYSTORY_CONFIG_ADMIN_USERNAMES` | 可选 | 空列表 | 逗号分隔的配置管理员用户名白名单；仅命中用户可访问 `/api/v1/config/*` |
 
 **校验与暴露规则**：
 
@@ -682,6 +683,7 @@ model:
 - `EASYSTORY_CREDENTIAL_MASTER_KEY` 保持按能力懒校验；只有真正触发凭证加密/解密路径时才显式报错。
 - `EASYSTORY_CORS_ALLOWED_ORIGINS` 接受逗号分隔字符串；解析失败视为配置错误。
 - 自定义模型 `base_url` 默认只允许公网 `https` endpoint；若确需访问本地 / 私网模型网关，必须显式设置 `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS=true`。
+- `EASYSTORY_CONFIG_ADMIN_USERNAMES` 为空时，`/api/v1/config/*` 管理接口默认全部拒绝；只有命中白名单的已认证用户才能读写配置。
 - 新增运行时环境变量时，必须同时更新 `app/shared/settings.py`、`apps/api/.env.example`、本规范与 `docs/README.md`。
 
 ### 8.2 YAML 配置注册表加载
@@ -697,7 +699,7 @@ model:
 6. 启动完成；当前不默认开启文件监听
 
 运行时：
-1. Web UI 或外部工具编辑 YAML
+1. Web UI、Config API 或外部工具编辑 YAML
 2. 显式调用 `ConfigLoader.reload()` 或重建 `ConfigLoader`
 3. 重新执行完整校验
 4. 替换内存注册表
@@ -720,4 +722,4 @@ model:
 
 *文档版本: 1.0.0*  
 *创建日期: 2026-03-14*  
-*更新日期: 2026-03-21*
+*更新日期: 2026-03-23*

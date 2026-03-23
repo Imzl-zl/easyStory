@@ -19,6 +19,7 @@ CREDENTIAL_MASTER_KEY_ENV = "EASYSTORY_CREDENTIAL_MASTER_KEY"
 CORS_ALLOWED_ORIGINS_ENV = "EASYSTORY_CORS_ALLOWED_ORIGINS"
 CORS_ALLOWED_ORIGIN_REGEX_ENV = "EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX"
 ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV = "EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS"
+CONFIG_ADMIN_USERNAMES_ENV = "EASYSTORY_CONFIG_ADMIN_USERNAMES"
 
 DEFAULT_JWT_EXPIRE_HOURS = 24
 DEFAULT_LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
@@ -53,6 +54,18 @@ def _parse_boolean_env_value(value: Any, *, env_name: str) -> bool:
     raise ConfigurationError(f"Invalid boolean for {env_name}: {value}")
 
 
+def _parse_string_list_env_value(value: Any, *, env_name: str) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        items = [item.strip() for item in value.split(",") if item.strip()]
+        return list(dict.fromkeys(items))
+    if isinstance(value, list):
+        items = [str(item).strip() for item in value if str(item).strip()]
+        return list(dict.fromkeys(items))
+    raise ConfigurationError(f"{env_name} must be a comma-separated string or list")
+
+
 class EasyStorySettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=API_ENV_FILE,
@@ -83,6 +96,10 @@ class EasyStorySettings(BaseSettings):
         default=DEFAULT_ALLOW_PRIVATE_MODEL_ENDPOINTS,
         validation_alias=ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV,
     )
+    config_admin_usernames: list[str] = Field(
+        default_factory=list,
+        validation_alias=CONFIG_ADMIN_USERNAMES_ENV,
+    )
 
     @field_validator("jwt_expire_hours", mode="before")
     @classmethod
@@ -99,20 +116,17 @@ class EasyStorySettings(BaseSettings):
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
     def parse_cors_allowed_origins(cls, value: Any) -> list[str]:
-        if value is None:
-            return []
-        if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
-        if isinstance(value, list):
-            return [str(item).strip() for item in value if str(item).strip()]
-        raise ConfigurationError(
-            f"{CORS_ALLOWED_ORIGINS_ENV} must be a comma-separated string or list"
-        )
+        return _parse_string_list_env_value(value, env_name=CORS_ALLOWED_ORIGINS_ENV)
 
     @field_validator("allow_private_model_endpoints", mode="before")
     @classmethod
     def parse_allow_private_model_endpoints(cls, value: Any) -> bool:
         return _parse_boolean_env_value(value, env_name=ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV)
+
+    @field_validator("config_admin_usernames", mode="before")
+    @classmethod
+    def parse_config_admin_usernames(cls, value: Any) -> list[str]:
+        return _parse_string_list_env_value(value, env_name=CONFIG_ADMIN_USERNAMES_ENV)
 
     def require_jwt_secret(self) -> str:
         if self.jwt_secret and self.jwt_secret.strip():
@@ -128,6 +142,9 @@ class EasyStorySettings(BaseSettings):
             "Missing required environment variable: "
             f"{CREDENTIAL_MASTER_KEY_ENV}. {ENV_SETUP_HINT}"
         )
+
+    def is_config_admin(self, username: str) -> bool:
+        return username in self.config_admin_usernames
 
 
 @lru_cache(maxsize=1)

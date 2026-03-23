@@ -79,6 +79,9 @@
 后端目标结构：
 
 ```text
+apps/api/
+  alembic/
+    versions/
 apps/api/app/
   entry/
   shared/
@@ -96,9 +99,11 @@ apps/api/app/
 
 必须遵守：
 
+- 数据库迁移资产统一放在 `apps/api/alembic/`
 - ORM 基类统一放在 `apps/api/app/shared/db/base.py`
 - ORM 模型统一放在 `apps/api/app/modules/<module>/models/`
 - `apps/api/app/modules/model_registry.py` 只负责 ORM 注册，不承载业务逻辑
+- `apps/api/app/shared/db/bootstrap.py` 只负责开发期初始化与遗留 schema reconcile；正式结构演进入口是 Alembic revision
 - 不再保留根级 `apps/api/app/models` 作为聚合层或兼容层
 - 不允许继续把业务代码放回根级 `service / engine / infrastructure / schemas`
 
@@ -120,7 +125,7 @@ apps/api/app/
   - 更新"关键决策"：新增仍有效的架构/设计决策；已失效的删除。
   - 更新"坑点"：新增仍需注意的；已解决的删除。
   - 更新"最近活跃窗口"：只保留最近 2~3 天，超出的删除。每条一句话，不展开细节。
-  - **硬限制**：写入后 ≤100 行。超出时优先压缩活跃窗口和已完成能力的措辞。
+  - **硬限制**：写入后 ≤120 行。超出时优先压缩活跃窗口和已完成能力的措辞。
 - **写入 `memory/archive/` 的规则**（追加到当月文件）：
   - 仅在有重要根因分析、调试洞察、踩坑记录时才写归档，不是每次都写。
   - 格式：`## [日期 | 标题]`，下列 Events / Changes / Insights，与旧格式一致。

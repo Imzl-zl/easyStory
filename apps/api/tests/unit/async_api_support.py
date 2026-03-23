@@ -11,7 +11,7 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.shared.db import Base
+from app.shared.db import initialize_database
 
 
 def build_sqlite_session_factories(
@@ -28,9 +28,8 @@ def build_sqlite_session_factories(
     database_path = tmp_path / f"{name}-{uuid.uuid4().hex}.db"
     sync_url = f"sqlite:///{database_path.as_posix()}"
     async_url = f"sqlite+aiosqlite:///{database_path.as_posix()}"
+    initialize_database(sync_url)
     sync_engine = create_engine(sync_url, connect_args={"check_same_thread": False})
-    Base.metadata.create_all(sync_engine)
-    sync_engine.dispose()
     async_engine = create_async_engine(async_url)
     sync_factory = sessionmaker(sync_engine, expire_on_commit=False, class_=Session)
     async_factory = async_sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)

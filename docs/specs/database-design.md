@@ -136,6 +136,8 @@ agents (Agent，智能体)
 >
 > 若分析结果落地为 Skill，业务记录应引用配置层的逻辑 `skill_id`，而不是配置缓存表的 UUID 主键，避免把缓存层误当主数据。
 
+> Schema 演进边界：正式数据库结构变更通过 `apps/api/alembic/` 下的 Alembic revision 管理；`shared/db/bootstrap.py` 仅保留开发期初始化与遗留库最小 reconcile，不再作为长期 schema 演进真值。
+
 **templates（Template，模板）**
 
 | 字段 | 类型 | 说明 |

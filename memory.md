@@ -25,11 +25,16 @@
 - Web 前端基座 + Engine/Studio 工作台（含 stale 章节引导层）
 - endpoint 安全策略（llm_endpoint_policy，写入 + 运行时双出口校验）
 - 旧库 schema reconcile（bootstrap 自动补 api_dialect/default_model 列）
+- Alembic 初始迁移基线（`apps/api/alembic/` + baseline revision + 升级校验）
+- DB 初始化链 Alembic 收口（owned startup / 文件型 SQLite helper 优先走 Alembic，旧库显式 bridge + stamp）
+- template 内建模板同步 + 查询 API（BuiltinTemplateSyncService / TemplateQueryService）
+- observability API 闭环（workflow logs / prompt replay / audit log）
+- config_registry 只读查询 API（`GET /api/v1/config/{skills|agents|hooks|workflows}`）
+- config_registry skill/agent 编辑写回 API（`GET/PUT /api/v1/config/{skills|agents}/{id}`，受 config admin 白名单保护，写回前先做 staged config 校验）
 
 ## 进行中 / 未完成
 
-- template 最小闭环（推进中）
-- observability 完整 API 闭环
+- config_registry hook/workflow 编辑能力
 - 前端更多页面和交互完善
 
 ## 关键决策（仍有效）
@@ -38,8 +43,13 @@
 - 投影视图（character_profile/world_setting）由 `project` 边界统一提供，不在 context/content 各自维护
 - stale chapter task 必须先重建章节计划，不可直接编辑；前后端同步强制
 - endpoint 安全策略必须同时落在写入入口和运行时出口
-- 当前项目未落 Alembic，create_all + 最小 schema reconcile 是过渡方案
+- 正式 schema 演进入口已切到 `apps/api/alembic/`；startup 和文件型 SQLite 测试库优先走 Alembic，pre-Alembic 旧库通过 `create_all + reconcile + stamp` 显式桥接接入
+- 程序化 Alembic 需要命中现有 memory SQLite 或带密码 URL 时，优先复用现有 `connection/engine`，不要退回字符串化 URL
 - service 文件超 300 行时，拆 `*_support.py`（查询/权限、状态变更、DTO 映射三类 helper）
+- config_registry 首轮管理 API 只暴露 summary DTO，不把 skill prompt / agent system_prompt 直接放进列表查询响应
+- config_registry detail/update API 对外优先暴露语义化字段名（如 `agent_type`、`skill_ids`），不要把 YAML alias 直接透传给前端
+- config_registry skill 写回必须先在临时复制的 `config/` 根目录做完整 `ConfigLoader` 校验，确认通过后再替换真实 YAML
+- config_registry 管理 API 必须走显式 `EASYSTORY_CONFIG_ADMIN_USERNAMES` 白名单；默认空列表拒绝全部访问
 
 ## 仍需注意的坑点
 
@@ -57,3 +67,10 @@
 - 完成方言化审查修复：base_url 安全边界、旧库 schema 升级、credential 更新语义收口
 - 完成 review follow-up：setting variable resolver 统一、Engine keyed remount、Studio stale CTA 竞态修复
 - 移除 LiteLLM 依赖，pyproject.toml / uv.lock 已同步
+- 建立 Alembic 初始迁移基线，并验证 upgrade head 与当前 ORM metadata 对齐
+- 完成 DB 初始化链 Alembic 收口：owned startup 与文件型 SQLite 测试库已优先走 Alembic，旧库保留 bridge + stamp 接入路径
+- 完成 DB 初始化链审查 follow-up：修复 masked DB URL 与 memory SQLite 第二 engine 回归，定向回归提升到 13 通过
+- 完成 config_registry 只读查询闭环：新增 query service、`/api/v1/config/*` 受保护端点与定向回归
+- 完成 config_registry skill 编辑写回闭环：新增 skill detail/update API、staged config 校验与失败不落盘回归
+- 完成 config_registry / Alembic 审查修复：补齐 config admin 授权、staged 校验 422、全局 ID 唯一性与 async sqlite 判定
+- 完成 config_registry agent 编辑写回闭环：新增 agent detail/update API、语义化 DTO 映射与 staged 回归
