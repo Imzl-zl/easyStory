@@ -347,5 +347,5 @@ Lab
 
 ---
 
-*文档版本：7.2.0*  
-*更新说明：补全 Template/Audit/Config Registry 子视图定义，新增水墨流组件规范（枯墨/润墨隐喻、朱砂印章、长卷滚动条）。*
+*文档版本：7.4.0*  
+*更新说明：同步 ui-interaction-supplement.md v2.4.0 更新，补全 Studio 面板体系、Export 预检、Lab 路由联动、Recycle Bin 枯墨美学、页面级状态矩阵。*
