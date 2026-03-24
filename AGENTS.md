@@ -2,7 +2,7 @@
 
 ## 0. 实施基线
 
-- 环境：Windows 11
+- 环境：Windows 11/ubuntu 24.04
 - Python：3.13
 - 后端技术栈：FastAPI、SQLAlchemy 2、Pydantic 2
 - 配置根目录：`config/`
