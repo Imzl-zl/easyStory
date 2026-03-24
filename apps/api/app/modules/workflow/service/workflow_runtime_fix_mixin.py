@@ -145,7 +145,7 @@ class WorkflowRuntimeFixMixin:
         return {"prompt": prompt, "system_prompt": None, "model": model, "response_format": "text"}
 
     def _validate_fix_model(self, model: ModelConfig | None) -> None:
-        if model is None or not model.name or not model.provider:
+        if model is None or not model.provider:
             raise ConfigurationError("Fix runtime is missing executable model configuration")
 
     def _resolve_max_fix_attempts(self, node: NodeConfig, workflow_config: WorkflowConfig) -> int:

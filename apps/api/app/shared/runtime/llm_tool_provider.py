@@ -4,13 +4,24 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from .errors import ConfigurationError
+from .llm_protocol import (
+    HttpJsonResponse,
+    LLMConnection,
+    LLMGenerateRequest,
+    PreparedLLMHttpRequest,
+    normalize_api_dialect,
+    parse_generation_response,
+    prepare_generation_request,
+    resolve_model_name,
+    send_json_http_request,
+)
 from .tool_provider import ToolProvider
 
 LLM_GENERATE_TOOL = "llm.generate"
 
 
-class CompletionCallable(Protocol):
-    async def __call__(self, **kwargs: Any) -> Any: ...
+class AsyncLlmRequestSender(Protocol):
+    async def __call__(self, request: PreparedLLMHttpRequest) -> HttpJsonResponse: ...
 
 
 @dataclass(frozen=True)
@@ -18,28 +29,39 @@ class LLMRequest:
     prompt: str
     model_name: str
     provider: str | None
-    api_key: str
-    base_url: str | None
     system_prompt: str | None
     response_format: str
     temperature: float | None
     max_tokens: int | None
+    top_p: float | None
+    stop: list[str] | None
+    connection: LLMConnection
 
 
 class LLMToolProvider(ToolProvider):
     def __init__(
         self,
         *,
-        completion_callable: CompletionCallable | None = None,
+        request_sender: AsyncLlmRequestSender | None = None,
     ) -> None:
-        self.completion_callable = completion_callable or _default_completion_callable
+        self.request_sender = request_sender or _default_request_sender
 
     async def execute(self, tool_name: str, params: dict[str, Any]) -> dict[str, Any]:
         if tool_name != LLM_GENERATE_TOOL:
             raise ConfigurationError(f"Unsupported tool: {tool_name}")
         request = _build_request(params)
-        response = await self.completion_callable(**_to_completion_payload(request))
-        return _normalize_response(response, request)
+        response = await self.request_sender(prepare_generation_request(_to_generate_request(request)))
+        if response.status_code >= 400:
+            raise ConfigurationError(_build_http_error_message(response))
+        normalized = parse_generation_response(request.connection.api_dialect, response.json_body or {})
+        return {
+            "content": normalized.content,
+            "model_name": request.model_name,
+            "provider": request.provider,
+            "input_tokens": normalized.input_tokens,
+            "output_tokens": normalized.output_tokens,
+            "total_tokens": normalized.total_tokens,
+        }
 
     def list_tools(self) -> list[str]:
         return [LLM_GENERATE_TOOL]
@@ -49,103 +71,56 @@ def _build_request(params: dict[str, Any]) -> LLMRequest:
     prompt = _require_non_empty_string(params.get("prompt"), "prompt")
     model = _require_dict(params.get("model"), "model")
     credential = _require_dict(params.get("credential"), "credential")
+    provider = _optional_string(model.get("provider"))
+    model_name = resolve_model_name(
+        requested_model_name=_optional_string(model.get("name")),
+        default_model=_optional_string(credential.get("default_model")),
+        provider_label=provider or "credential",
+    )
     return LLMRequest(
         prompt=prompt,
-        model_name=_require_non_empty_string(model.get("name"), "model.name"),
-        provider=_optional_string(model.get("provider")),
-        api_key=_require_non_empty_string(credential.get("api_key"), "credential.api_key"),
-        base_url=_optional_string(credential.get("base_url")),
+        model_name=model_name,
+        provider=provider,
         system_prompt=_optional_string(params.get("system_prompt")),
         response_format=_optional_string(params.get("response_format")) or "text",
         temperature=_optional_float(model.get("temperature")),
         max_tokens=_optional_int(model.get("max_tokens")),
+        top_p=_optional_float(model.get("top_p")),
+        stop=_optional_string_list(model.get("stop")),
+        connection=LLMConnection(
+            api_dialect=normalize_api_dialect(_optional_string(credential.get("api_dialect"))),
+            api_key=_require_non_empty_string(credential.get("api_key"), "credential.api_key"),
+            base_url=_optional_string(credential.get("base_url")),
+            default_model=_optional_string(credential.get("default_model")),
+        ),
     )
 
 
-def _to_completion_payload(request: LLMRequest) -> dict[str, Any]:
-    messages = []
-    if request.system_prompt:
-        messages.append({"role": "system", "content": request.system_prompt})
-    messages.append({"role": "user", "content": request.prompt})
-    payload: dict[str, Any] = {
-        "model": request.model_name,
-        "messages": messages,
-        "api_key": request.api_key,
-    }
-    if request.provider:
-        payload["custom_llm_provider"] = request.provider
-    if request.base_url:
-        payload["base_url"] = request.base_url
-    if request.temperature is not None:
-        payload["temperature"] = request.temperature
-    if request.max_tokens is not None:
-        payload["max_tokens"] = request.max_tokens
-    if request.response_format == "json_object":
-        payload["response_format"] = {"type": "json_object"}
-    return payload
+def _to_generate_request(request: LLMRequest) -> LLMGenerateRequest:
+    return LLMGenerateRequest(
+        connection=request.connection,
+        model_name=request.model_name,
+        prompt=request.prompt,
+        system_prompt=request.system_prompt,
+        response_format=request.response_format,
+        temperature=request.temperature,
+        max_tokens=request.max_tokens,
+        top_p=request.top_p,
+        stop=request.stop,
+    )
 
 
-def _normalize_response(response: Any, request: LLMRequest) -> dict[str, Any]:
-    usage = _extract_usage(response)
-    return {
-        "content": _extract_text(response),
-        "model_name": request.model_name,
-        "provider": request.provider,
-        "input_tokens": usage["input_tokens"],
-        "output_tokens": usage["output_tokens"],
-        "total_tokens": usage["total_tokens"],
-    }
-
-
-def _extract_text(response: Any) -> str:
-    choice = _extract_first_choice(response)
-    message = choice.get("message")
-    if not isinstance(message, dict):
-        raise ConfigurationError("LLM response is missing message content")
-    content = message.get("content")
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return "".join(
-            item.get("text", "")
-            for item in content
-            if isinstance(item, dict)
-        )
-    raise ConfigurationError("LLM response content must be string or list")
-
-
-def _extract_first_choice(response: Any) -> dict[str, Any]:
-    choices = response.get("choices") if isinstance(response, dict) else getattr(response, "choices", None)
-    if not isinstance(choices, list) or not choices:
-        raise ConfigurationError("LLM response is missing choices")
-    choice = choices[0]
-    if isinstance(choice, dict):
-        return choice
-    message = getattr(choice, "message", None)
-    return {"message": _message_to_dict(message)}
-
-
-def _message_to_dict(message: Any) -> dict[str, Any]:
-    if isinstance(message, dict):
-        return message
-    return {"content": getattr(message, "content", None)}
-
-
-def _extract_usage(response: Any) -> dict[str, int | None]:
-    raw_usage = response.get("usage") if isinstance(response, dict) else getattr(response, "usage", None)
-    if raw_usage is None:
-        return {"input_tokens": None, "output_tokens": None, "total_tokens": None}
-    if not isinstance(raw_usage, dict):
-        raw_usage = {
-            "prompt_tokens": getattr(raw_usage, "prompt_tokens", None),
-            "completion_tokens": getattr(raw_usage, "completion_tokens", None),
-            "total_tokens": getattr(raw_usage, "total_tokens", None),
-        }
-    return {
-        "input_tokens": _optional_int(raw_usage.get("prompt_tokens")),
-        "output_tokens": _optional_int(raw_usage.get("completion_tokens")),
-        "total_tokens": _optional_int(raw_usage.get("total_tokens")),
-    }
+def _build_http_error_message(response: HttpJsonResponse) -> str:
+    if response.json_body is not None:
+        error = response.json_body.get("error")
+        if isinstance(error, dict) and isinstance(error.get("message"), str):
+            return f"LLM request failed: HTTP {response.status_code} - {error['message']}"
+        if isinstance(error, str):
+            return f"LLM request failed: HTTP {response.status_code} - {error}"
+    suffix = response.text.strip()
+    if suffix:
+        return f"LLM request failed: HTTP {response.status_code} - {suffix}"
+    return f"LLM request failed: HTTP {response.status_code}"
 
 
 def _require_dict(value: Any, field_name: str) -> dict[str, Any]:
@@ -185,9 +160,17 @@ def _optional_int(value: Any) -> int | None:
     return value
 
 
-async def _default_completion_callable(**kwargs: Any) -> Any:
-    try:
-        from litellm import acompletion
-    except ImportError as exc:  # pragma: no cover
-        raise ConfigurationError("litellm is not installed") from exc
-    return await acompletion(**kwargs)
+def _optional_string_list(value: Any) -> list[str] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ConfigurationError("Expected string list value")
+    normalized: list[str] = []
+    for item in value:
+        normalized_item = _require_non_empty_string(item, "string_list_item")
+        normalized.append(normalized_item)
+    return normalized or None
+
+
+async def _default_request_sender(request: PreparedLLMHttpRequest) -> HttpJsonResponse:
+    return await send_json_http_request(request)

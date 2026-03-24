@@ -6,6 +6,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.config_registry.schemas.config_schemas import NodeConfig, WorkflowConfig
+from app.modules.credential.models import ModelCredential
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
 from app.shared.runtime.errors import BudgetExceededError, BusinessRuleError, ConfigurationError
 
@@ -33,11 +34,12 @@ class WorkflowRuntimeExecuteMixin:
         started_at = datetime.now(timezone.utc)
         budget_error: BudgetExceededError | None = None
         try:
-            prompt_bundle = await self._build_prompt_bundle(
+            prompt_bundle, credential = await self._build_prompt_bundle(
                 db,
                 workflow,
                 workflow_config,
                 node,
+                owner_id=owner_id,
                 chapter_number=None,
             )
             execution.input_data = prompt_bundle["input_data"]
@@ -50,6 +52,7 @@ class WorkflowRuntimeExecuteMixin:
                     owner_id=owner_id,
                     node_execution_id=execution.id,
                     usage_type="generate",
+                    credential=credential,
                 )
             except BudgetExceededError as exc:
                 budget_error = exc
@@ -97,14 +100,16 @@ class WorkflowRuntimeExecuteMixin:
         execution = await self._create_node_execution(db, workflow, node)
         started_at = datetime.now(timezone.utc)
         try:
-            prompt_bundle, raw_output, generated_content, generation_budget_error = await self._generate_chapter(
-                db,
-                workflow,
-                workflow_config,
-                node,
-                task,
-                execution,
-                owner_id=owner_id,
+            prompt_bundle, credential, raw_output, generated_content, generation_budget_error = (
+                await self._generate_chapter(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    task,
+                    execution,
+                    owner_id=owner_id,
+                )
             )
             self._record_prompt_replay(db, execution, prompt_bundle, raw_output)
             review_outcome = await self._resolve_review_outcome(
@@ -141,12 +146,13 @@ class WorkflowRuntimeExecuteMixin:
         execution,
         *,
         owner_id: uuid.UUID,
-    ) -> tuple[dict, dict, str, BudgetExceededError | None]:
-        prompt_bundle = await self._build_prompt_bundle(
+    ) -> tuple[dict, ModelCredential, dict, str, BudgetExceededError | None]:
+        prompt_bundle, credential = await self._build_prompt_bundle(
             db,
             workflow,
             workflow_config,
             node,
+            owner_id=owner_id,
             chapter_number=task.chapter_number,
         )
         prompt_bundle["input_data"]["chapter_task_id"] = str(task.id)
@@ -162,6 +168,7 @@ class WorkflowRuntimeExecuteMixin:
                 owner_id=owner_id,
                 node_execution_id=execution.id,
                 usage_type="generate",
+                credential=credential,
             )
         except BudgetExceededError as exc:
             budget_error = exc
@@ -169,7 +176,7 @@ class WorkflowRuntimeExecuteMixin:
         content = raw_output.get("content")
         if not isinstance(content, str):
             raise ConfigurationError("Chapter generate output must be plain text")
-        return prompt_bundle, raw_output, content, budget_error
+        return prompt_bundle, credential, raw_output, content, budget_error
 
     async def _resolve_review_outcome(
         self,

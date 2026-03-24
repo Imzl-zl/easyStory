@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.shared.runtime.llm_protocol import LlmApiDialect
+
 CredentialOwnerType = Literal["system", "user", "project"]
 
 
@@ -15,17 +17,21 @@ class CredentialCreateDTO(BaseModel):
     owner_type: CredentialOwnerType
     project_id: uuid.UUID | None = None
     provider: str = Field(min_length=1, max_length=50)
+    api_dialect: LlmApiDialect = "openai_chat_completions"
     display_name: str = Field(min_length=1, max_length=100)
     api_key: str = Field(min_length=1, max_length=500)
     base_url: str | None = Field(default=None, max_length=500)
+    default_model: str = Field(min_length=1, max_length=100)
 
 
 class CredentialUpdateDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    api_dialect: LlmApiDialect | None = None
     display_name: str | None = Field(default=None, min_length=1, max_length=100)
     api_key: str | None = Field(default=None, min_length=1, max_length=500)
     base_url: str | None = Field(default=None, max_length=500)
+    default_model: str | None = Field(default=None, min_length=1, max_length=100)
 
 
 class CredentialViewDTO(BaseModel):
@@ -33,9 +39,11 @@ class CredentialViewDTO(BaseModel):
     owner_type: CredentialOwnerType
     owner_id: uuid.UUID | None
     provider: str
+    api_dialect: LlmApiDialect
     display_name: str
     masked_key: str
     base_url: str | None
+    default_model: str | None
     is_active: bool
     last_verified_at: datetime | None
 

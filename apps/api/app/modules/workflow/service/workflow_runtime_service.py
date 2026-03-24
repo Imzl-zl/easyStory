@@ -10,6 +10,7 @@ from app.modules.billing.service import BillingService
 from app.modules.config_registry.schemas.config_schemas import NodeConfig, WorkflowConfig
 from app.modules.content.service import ChapterContentService
 from app.modules.context.engine import ContextBuilder
+from app.modules.credential.models import ModelCredential
 from app.modules.credential.service import CredentialService
 from app.modules.export.service import ExportService
 from app.modules.workflow.models import WorkflowExecution
@@ -170,15 +171,18 @@ class WorkflowRuntimeService(
         owner_id: uuid.UUID,
         node_execution_id: uuid.UUID | None,
         usage_type: str,
+        credential: ModelCredential | None = None,
     ) -> dict[str, Any]:
         model = prompt_bundle["model"]
         credential_service = self._resolve_credential_service()
-        credential = await credential_service.resolve_active_credential(
-            db,
-            provider=model.provider or "",
-            user_id=owner_id,
-            project_id=workflow.project_id,
-        )
+        resolved_credential = credential
+        if resolved_credential is None:
+            resolved_credential = await credential_service.resolve_active_credential(
+                db,
+                provider=model.provider or "",
+                user_id=owner_id,
+                project_id=workflow.project_id,
+            )
         raw_output = await self.tool_provider.execute(
             LLM_GENERATE_TOOL,
             {
@@ -186,8 +190,10 @@ class WorkflowRuntimeService(
                 "system_prompt": prompt_bundle["system_prompt"],
                 "model": model.model_dump(mode="json", exclude_none=True),
                 "credential": {
-                    "api_key": credential_service.crypto.decrypt(credential.encrypted_key),
-                    "base_url": credential.base_url,
+                    "api_key": credential_service.crypto.decrypt(resolved_credential.encrypted_key),
+                    "api_dialect": resolved_credential.api_dialect,
+                    "base_url": resolved_credential.base_url,
+                    "default_model": resolved_credential.default_model,
                 },
                 "response_format": prompt_bundle["response_format"],
             },
@@ -198,9 +204,9 @@ class WorkflowRuntimeService(
             project_id=workflow.project_id,
             user_id=owner_id,
             node_execution_id=node_execution_id,
-            credential_id=credential.id,
+            credential_id=resolved_credential.id,
             usage_type=usage_type,
-            model_name=model.name or "",
+            model_name=raw_output.get("model_name") or "",
             input_tokens=raw_output.get("input_tokens"),
             output_tokens=raw_output.get("output_tokens"),
             budget_config=workflow_config.budget,

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import uuid
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from .base_schema import StrictSchema
 from .model_schema import ModelConfig
@@ -13,12 +14,47 @@ class ContextInjectionItem(StrictSchema):
         "project_setting",
         "outline",
         "opening_plan",
+        "world_setting",
+        "character_profile",
         "chapter_task",
         "previous_chapters",
+        "chapter_summary",
         "story_bible",
+        "style_reference",
     ] = Field(alias="type")
     required: bool = False
     count: int | None = None
+    analysis_id: uuid.UUID | None = None
+    inject_fields: list[str] = Field(default_factory=list)
+
+    @field_validator("inject_fields")
+    @classmethod
+    def normalize_inject_fields(cls, value: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for item in value:
+            field_name = item.strip()
+            if not field_name:
+                raise ValueError("inject_fields cannot contain blank values")
+            if field_name not in normalized:
+                normalized.append(field_name)
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_inject_type_shape(self) -> "ContextInjectionItem":
+        is_style_reference = self.inject_type == "style_reference"
+        if is_style_reference:
+            if self.analysis_id is None:
+                raise ValueError("analysis_id is required when type is style_reference")
+            if not self.inject_fields:
+                raise ValueError("inject_fields is required when type is style_reference")
+            if self.count is not None:
+                raise ValueError("count is not supported when type is style_reference")
+            return self
+        if self.analysis_id is not None:
+            raise ValueError("analysis_id is only allowed when type is style_reference")
+        if self.inject_fields:
+            raise ValueError("inject_fields is only allowed when type is style_reference")
+        return self
 
 
 class ContextInjectionRule(StrictSchema):

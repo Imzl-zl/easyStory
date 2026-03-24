@@ -1,0 +1,70 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+
+import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  buildEngineTaskHref,
+  getEngineTaskCtaLabel,
+  resolvePreparationWorkflowId,
+} from "@/features/studio/components/studio-navigation-support";
+import { getProjectPreparationStatus } from "@/lib/api/projects";
+import type { ChapterSummary } from "@/lib/api/types";
+
+type StudioStaleChapterPanelProps = {
+  projectId: string;
+  staleChapters: ChapterSummary[];
+  onFocusChapter: (chapterNumber: number) => void;
+};
+
+export function StudioStaleChapterPanel({
+  projectId,
+  staleChapters,
+  onFocusChapter,
+}: StudioStaleChapterPanelProps) {
+  const firstStaleChapter = staleChapters[0];
+  const preparationQuery = useQuery({
+    queryKey: ["project-preparation-status", projectId],
+    queryFn: () => getProjectPreparationStatus(projectId),
+  });
+  const workflowId = resolvePreparationWorkflowId(preparationQuery.data);
+  const isWorkflowPending = preparationQuery.isLoading && workflowId === null;
+
+  return (
+    <section className="panel-muted space-y-4 rounded-[28px] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-2">
+          <p className="text-sm text-[var(--text-secondary)]">失效章节待处理</p>
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            当前有 {staleChapters.length} 个章节基于旧上下文，建议优先逐章复核；若需要整体调整章节计划，再进入 Engine 处理任务。
+          </p>
+        </div>
+        <StatusBadge status="stale" label={`${staleChapters.length} 章待复核`} />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button className="ink-button-secondary" onClick={() => onFocusChapter(firstStaleChapter.chapter_number)}>
+          优先处理第 {firstStaleChapter.chapter_number} 章
+        </button>
+        {isWorkflowPending ? (
+          <button className="ink-button-secondary" disabled>
+            正在解析 workflow...
+          </button>
+        ) : (
+          <Link
+            className="ink-button-secondary"
+            href={buildEngineTaskHref(projectId, workflowId)}
+          >
+            {getEngineTaskCtaLabel(workflowId)}
+          </Link>
+        )}
+      </div>
+      {!workflowId && !isWorkflowPending ? (
+        <p className="text-xs leading-5 text-[var(--text-secondary)]">
+          当前还没有可直接定位的 workflow，进入 Engine 后先载入当前 workflow，再决定是否重建章节计划。
+        </p>
+      ) : null}
+    </section>
+  );
+}

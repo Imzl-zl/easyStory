@@ -1,0 +1,80 @@
+skill:
+  id: "skill.project_setting.conversation_extract"
+  name: "创作设定结构化提取"
+  version: "1.0.0"
+  description: "将自由文本创作设定提取为 ProjectSetting 草稿"
+  category: "project_setting"
+  tags: ["设定", "孵化", "结构化"]
+
+  prompt: |
+    你是小说创作设定整理助手。
+
+    任务：把下面的自由文本创作设定，整理成一个严格符合 ProjectSetting schema 的 JSON 对象。
+
+    规则：
+    1. 只能提取用户明确提供或高度确定的信息，不要脑补未提及事实。
+    2. 未提及字段使用 null；列表字段使用 []。
+    3. `protagonist`、`world_setting`、`scale` 必须保持对象结构，不要写成字符串。
+    4. 禁止输出 schema 外字段，禁止附加解释、Markdown、代码块或额外文本。
+    5. 数值字段必须输出整数，例如 `target_words`、`target_chapters`。
+
+    ProjectSetting schema:
+    {
+      "genre": "string | null",
+      "sub_genre": "string | null",
+      "target_readers": "string | null",
+      "tone": "string | null",
+      "core_conflict": "string | null",
+      "plot_direction": "string | null",
+      "protagonist": {
+        "name": "string | null",
+        "identity": "string | null",
+        "initial_situation": "string | null",
+        "background": "string | null",
+        "personality": "string | null",
+        "goal": "string | null"
+      },
+      "key_supporting_roles": [
+        {
+          "name": "string | null",
+          "identity": "string | null",
+          "initial_situation": "string | null",
+          "background": "string | null",
+          "personality": "string | null",
+          "goal": "string | null"
+        }
+      ],
+      "world_setting": {
+        "name": "string | null",
+        "era_baseline": "string | null",
+        "world_rules": "string | null",
+        "power_system": "string | null",
+        "key_locations": ["string"]
+      },
+      "scale": {
+        "target_words": "integer | null",
+        "target_chapters": "integer | null",
+        "pacing": "string | null"
+      },
+      "special_requirements": "string | null"
+    }
+
+    如果原文只提到“主角是宗门弃徒”，应输出：
+    {"protagonist":{"identity":"宗门弃徒"}}
+
+    只输出 JSON 对象本身。
+
+    【自由文本创作设定】
+    {{ conversation_text }}
+
+  variables:
+    conversation_text:
+      type: "string"
+      required: true
+      description: "用户输入的自由文本创作设定"
+
+  model:
+    required_capabilities:
+      - "json_schema_output"
+    temperature: 0.2
+    max_tokens: 2000

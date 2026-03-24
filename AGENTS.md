@@ -73,11 +73,15 @@
 - `config`：Skills / Agents / Hooks / Workflows YAML
 - `docs`：需求、设计、规格、计划
 - `tools.md`：项目协作知识、常用命令、模式、坑点
-- `memory.md`：项目近期任务、决策、问题与当前状态日志
+- `memory.md`：项目当前状态快照与最近活跃窗口
+- `memory/archive/`：按月归档的完整历史日志
 
 后端目标结构：
 
 ```text
+apps/api/
+  alembic/
+    versions/
 apps/api/app/
   entry/
   shared/
@@ -95,9 +99,11 @@ apps/api/app/
 
 必须遵守：
 
+- 数据库迁移资产统一放在 `apps/api/alembic/`
 - ORM 基类统一放在 `apps/api/app/shared/db/base.py`
 - ORM 模型统一放在 `apps/api/app/modules/<module>/models/`
 - `apps/api/app/modules/model_registry.py` 只负责 ORM 注册，不承载业务逻辑
+- `apps/api/app/shared/db/bootstrap.py` 只负责开发期初始化与遗留 schema reconcile；正式结构演进入口是 Alembic revision
 - 不再保留根级 `apps/api/app/models` 作为聚合层或兼容层
 - 不允许继续把业务代码放回根级 `service / engine / infrastructure / schemas`
 
@@ -106,10 +112,27 @@ apps/api/app/
 - 开始任务前，优先检查项目根 `tools.md` 与 `memory.md` 是否存在；存在时先读，再进入大范围搜索或改动。
 - 只读取当前项目根的协作文件，不引入额外全局目录协议，不无目的批量加载。
 - `tools.md` 只记录可复用的项目协作知识、命令、模式和坑点；允许整理重写，但写入前必须先读。
-- `memory.md` 只记录本项目近期任务、关键决策、问题和当前状态；必须仅追加，禁止覆盖历史；写入前必须先读。
+- `memory.md` 是**当前状态快照 + 最近活跃窗口**，允许覆盖更新，目标 ≤100 行。
+  - 快照部分：已完成能力、进行中方向、关键决策、仍需注意的坑点。
+  - 活跃窗口：最近 2~3 天的关键变更摘要（一句话级别）。
+  - 过程细节不进 memory.md；代码变更历史看 git log，协作/调试/根因叙事进 `memory/archive/`。
+- `memory/archive/` 存放按月归档的协作历史（任务记录、根因分析、调试洞察），供调试回溯时按需读取，不在每次会话加载。
+- **写入时机**：完成一个完整功能/修复闭环后写入，不是每个小改动都写。会话结束前如有未写入的重要变更，也应写入。
+- **写入 `memory.md` 的规则**（整体覆盖，不是追加）：
+  - 更新"当前基线"：刷新验证基线和最后更新日期。
+  - 更新"已完成能力"：新闭环的能力加一行，一句话描述。
+  - 更新"进行中/未完成"：已完成的移走，新开的加上。
+  - 更新"关键决策"：新增仍有效的架构/设计决策；已失效的删除。
+  - 更新"坑点"：新增仍需注意的；已解决的删除。
+  - 更新"最近活跃窗口"：只保留最近 2~3 天，超出的删除。每条一句话，不展开细节。
+  - **硬限制**：写入后 ≤120 行。超出时优先压缩活跃窗口和已完成能力的措辞。
+- **写入 `memory/archive/` 的规则**（追加到当月文件）：
+  - 仅在有重要根因分析、调试洞察、踩坑记录时才写归档，不是每次都写。
+  - 格式：`## [日期 | 标题]`，下列 Events / Changes / Insights，与旧格式一致。
+  - 不记录 Validation 命令快照（git log 已有）。
+- 反复验证的稳定规律整理进 `tools.md` 或正式文档，不留在 `memory.md` 或归档中重复。
 - `tools.md` / `memory.md` 属于协作辅助，不是产品功能真值，不得与 `docs/specs`、`docs/design`、`docs/plans`、`config` 和当前代码冲突。
 - 发生冲突时，以正式设计、配置和当前代码为准；协作文件只负责帮助恢复上下文，不负责改写正式规则。
-- 完成任务、做出关键决策或解决关键问题后，应把必要信息追加到 `memory.md`；反复验证的稳定规律再整理进 `tools.md` 或正式文档。
 
 ## 7. 分层依赖规则
 
@@ -200,7 +223,6 @@ infrastructure -> domain models
 - 禁止一个业务概念在多个位置重复定义
 - 禁止修改正式设计后不更新本文件
 - 禁止把 `tools.md` / `memory.md` 当成正式设计替代品
-- 禁止静默覆盖 `memory.md` 历史记录
 - 禁止跨项目混写协作记忆
 
 ## 14. 维护原则

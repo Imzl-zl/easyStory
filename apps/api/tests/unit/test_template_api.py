@@ -63,3 +63,127 @@ async def test_template_api_requires_authentication(monkeypatch, tmp_path) -> No
             assert response.json()["code"] == "unauthorized"
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_template_api_supports_custom_template_crud(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="template-api-write")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
+        async with started_async_client(app) as client:
+            create_response = await client.post(
+                "/api/v1/templates",
+                headers=_auth_headers(owner_id),
+                json={
+                    "name": "自定义模板",
+                    "description": "用于 API 回归",
+                    "genre": "玄幻",
+                    "workflow_id": "workflow.xuanhuan_manual",
+                    "guided_questions": [
+                        {"question": "主角是谁?", "variable": "protagonist"}
+                    ],
+                },
+            )
+            assert create_response.status_code == 201
+            detail = create_response.json()
+            assert detail["name"] == "自定义模板"
+            assert detail["is_builtin"] is False
+            assert [node["node_id"] for node in detail["nodes"]] == [
+                "outline",
+                "opening_plan",
+                "chapter_split",
+                "chapter_gen",
+                "export",
+            ]
+
+            template_id = detail["id"]
+            update_response = await client.put(
+                f"/api/v1/templates/{template_id}",
+                headers=_auth_headers(owner_id),
+                json={
+                    "name": "自定义模板-v2",
+                    "description": "更新后的模板",
+                    "genre": "仙侠",
+                    "workflow_id": "workflow.xuanhuan_manual",
+                    "guided_questions": [
+                        {"question": "  核心冲突是什么?  ", "variable": " conflict "}
+                    ],
+                },
+            )
+            assert update_response.status_code == 200
+            updated = update_response.json()
+            assert updated["name"] == "自定义模板-v2"
+            assert [question["question"] for question in updated["guided_questions"]] == [
+                "核心冲突是什么?"
+            ]
+            assert [question["variable"] for question in updated["guided_questions"]] == [
+                "core_conflict"
+            ]
+
+            delete_response = await client.delete(
+                f"/api/v1/templates/{template_id}",
+                headers=_auth_headers(owner_id),
+            )
+            assert delete_response.status_code == 204
+
+            missing_response = await client.get(
+                f"/api/v1/templates/{template_id}",
+                headers=_auth_headers(owner_id),
+            )
+            assert missing_response.status_code == 404
+            assert missing_response.json()["code"] == "not_found"
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_template_api_rejects_builtin_mutation_and_duplicate_names(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="template-api-rules")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
+        async with started_async_client(app) as client:
+            list_response = await client.get("/api/v1/templates", headers=_auth_headers(owner_id))
+            builtin_template_id = list_response.json()[0]["id"]
+
+            duplicate_response = await client.post(
+                "/api/v1/templates",
+                headers=_auth_headers(owner_id),
+                json={
+                    "name": "玄幻小说模板",
+                    "workflow_id": "workflow.xuanhuan_manual",
+                },
+            )
+            assert duplicate_response.status_code == 409
+            assert duplicate_response.json()["code"] == "conflict"
+
+            builtin_update_response = await client.put(
+                f"/api/v1/templates/{builtin_template_id}",
+                headers=_auth_headers(owner_id),
+                json={
+                    "name": "内建模板不能修改",
+                    "workflow_id": "workflow.xuanhuan_manual",
+                },
+            )
+            assert builtin_update_response.status_code == 422
+            assert builtin_update_response.json()["code"] == "business_rule_error"
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)

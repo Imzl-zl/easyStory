@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.export.service import (
     ExportCreateDTO,
+    ExportDetailDTO,
     ExportService,
     ExportViewDTO,
     create_export_service,
@@ -53,6 +54,21 @@ async def create_workflow_exports(
         owner_id=current_user.id,
     )
     return [export_service.to_view_dto(item) for item in exports]
+
+
+@router.get("/api/v1/exports/{export_id}", response_model=ExportDetailDTO)
+async def get_export(
+    export_id: uuid.UUID,
+    export_service: ExportService = Depends(get_export_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> ExportDetailDTO:
+    export = await export_service.get_export(
+        db,
+        export_id,
+        owner_id=current_user.id,
+    )
+    return export_service.to_detail_dto(export)
 
 
 @router.get("/api/v1/exports/{export_id}/download")

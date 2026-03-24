@@ -11,119 +11,20 @@ from app.modules.content.service import (
     ChapterSaveDTO,
     ChapterSummaryDTO,
     ChapterVersionDTO,
-    StoryAssetService,
-    StoryAssetDTO,
-    StoryAssetSaveDTO,
     create_chapter_content_service,
-    create_story_asset_service,
 )
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
 from app.shared.db import get_async_db_session
 
+from .story_asset_router import router as story_asset_router
+
 router = APIRouter(prefix="/api/v1/projects/{project_id}", tags=["content"])
-
-
-def get_story_asset_service() -> StoryAssetService:
-    return create_story_asset_service()
+router.include_router(story_asset_router)
 
 
 def get_chapter_content_service() -> ChapterContentService:
     return create_chapter_content_service()
-
-
-@router.put("/outline", response_model=StoryAssetDTO)
-async def save_outline_draft(
-    project_id: uuid.UUID,
-    payload: StoryAssetSaveDTO,
-    story_asset_service: StoryAssetService = Depends(get_story_asset_service),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_db_session),
-) -> StoryAssetDTO:
-    return await story_asset_service.save_asset_draft(
-        db,
-        project_id,
-        "outline",
-        payload,
-        owner_id=current_user.id,
-    )
-
-
-@router.get("/outline", response_model=StoryAssetDTO)
-async def get_outline(
-    project_id: uuid.UUID,
-    story_asset_service: StoryAssetService = Depends(get_story_asset_service),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_db_session),
-) -> StoryAssetDTO:
-    return await story_asset_service.get_asset(
-        db,
-        project_id,
-        "outline",
-        owner_id=current_user.id,
-    )
-
-
-@router.post("/outline/approve", response_model=StoryAssetDTO)
-async def approve_outline(
-    project_id: uuid.UUID,
-    story_asset_service: StoryAssetService = Depends(get_story_asset_service),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_db_session),
-) -> StoryAssetDTO:
-    return await story_asset_service.approve_asset(
-        db,
-        project_id,
-        "outline",
-        owner_id=current_user.id,
-    )
-
-
-@router.put("/opening-plan", response_model=StoryAssetDTO)
-async def save_opening_plan_draft(
-    project_id: uuid.UUID,
-    payload: StoryAssetSaveDTO,
-    story_asset_service: StoryAssetService = Depends(get_story_asset_service),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_db_session),
-) -> StoryAssetDTO:
-    return await story_asset_service.save_asset_draft(
-        db,
-        project_id,
-        "opening_plan",
-        payload,
-        owner_id=current_user.id,
-    )
-
-
-@router.get("/opening-plan", response_model=StoryAssetDTO)
-async def get_opening_plan(
-    project_id: uuid.UUID,
-    story_asset_service: StoryAssetService = Depends(get_story_asset_service),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_db_session),
-) -> StoryAssetDTO:
-    return await story_asset_service.get_asset(
-        db,
-        project_id,
-        "opening_plan",
-        owner_id=current_user.id,
-    )
-
-
-@router.post("/opening-plan/approve", response_model=StoryAssetDTO)
-async def approve_opening_plan(
-    project_id: uuid.UUID,
-    story_asset_service: StoryAssetService = Depends(get_story_asset_service),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_db_session),
-) -> StoryAssetDTO:
-    return await story_asset_service.approve_asset(
-        db,
-        project_id,
-        "opening_plan",
-        owner_id=current_user.id,
-    )
 
 
 @router.get("/chapters", response_model=list[ChapterSummaryDTO])

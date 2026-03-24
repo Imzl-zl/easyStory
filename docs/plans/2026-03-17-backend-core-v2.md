@@ -6,9 +6,9 @@
 
 **Goal:** 实现 easyStory 的完整后端核心，包含数据模型、配置系统、工作流引擎、上下文注入、审核精修、成本控制和 API 层，完全对齐设计文档。
 
-**Architecture:** 分层架构（Entry → Service → Engine → Infrastructure），Service 层不依赖 HTTP（DTO 入参/返回），为 MCP 预留接入点。工作流通过 WorkflowStateMachine 管理状态转换，模板渲染使用 SandboxedEnvironment，LLM 调用通过 LiteLLM 统一接口。
+**Architecture:** 分层架构（Entry → Service → Engine → Infrastructure），Service 层不依赖 HTTP（DTO 入参/返回），为 MCP 预留接入点。工作流通过 WorkflowStateMachine 管理状态转换，模板渲染使用 SandboxedEnvironment，LLM 调用通过项目内 HTTP 方言适配层统一到 `openai_chat_completions / openai_responses / anthropic_messages / gemini_generate_content`。
 
-**Tech Stack:** Python 3.13.x, FastAPI 0.115+, SQLAlchemy 2.0 (async), Pydantic 2.x, LangGraph 1.x, LiteLLM 1.x, Jinja2 (Sandboxed), PyYAML, aiosqlite (dev) / asyncpg (prod)
+**Tech Stack:** Python 3.13.x, FastAPI 0.115+, SQLAlchemy 2.0 (async), Pydantic 2.x, LangGraph 1.x, Jinja2 (Sandboxed), PyYAML, httpx, aiosqlite (dev) / asyncpg (prod)
 
 **Source of Truth:** `docs/specs/` 和 `docs/design/` 目录下的设计文档。与本计划有冲突时，以设计文档为准。本版已吸收 2026-03-19 的设计边界对齐决策。
 
@@ -93,7 +93,6 @@ dependencies = [
     "pydantic-settings>=2.0",
     "pyyaml>=6.0",
     "jinja2>=3.1",
-    "litellm>=1.82",
     "langgraph>=0.2.70",
     "python-jose[cryptography]>=3.3",
     "passlib[bcrypt]>=1.7",
@@ -786,9 +785,11 @@ class ModelCredential(Base, TimestampMixin, UUIDMixin):
     owner_type: Mapped[str] = mapped_column(String(20))
     owner_id: Mapped[uuid.UUID | None] = mapped_column()
     provider: Mapped[str] = mapped_column(String(50))
+    api_dialect: Mapped[str] = mapped_column(String(50), default="openai_chat_completions")
     display_name: Mapped[str] = mapped_column(String(100))
     encrypted_key: Mapped[str] = mapped_column(Text)
     base_url: Mapped[str | None] = mapped_column(String(500))
+    default_model: Mapped[str | None] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 ```
@@ -1429,7 +1430,7 @@ async def test_parallel_review_partial_timeout():
 
 ### Task 13: LLM 服务 + MCP 预留抽象
 
-> 来源: 09-error-handling; tech-stack（LiteLLM）; 16-mcp-architecture
+> 来源: 09-error-handling; tech-stack（HTTP 方言适配层）; 16-mcp-architecture
 
 **Files:**
 - Create: `apps/api/app/engine/llm_service.py` — ToolProvider 接口 + LLMToolProvider（MVP 实现）
@@ -1486,7 +1487,7 @@ async def test_parallel_review_partial_timeout():
 - ContextBuilder：上下文注入（三层优先级）、裁剪算法（超预算时按优先级裁剪）、`opening_plan` 阶段注入、第 1 章特殊处理
 - ReviewExecutor：并行/串行审核、ReviewResult Schema 校验、聚合规则（all_pass/majority_pass/no_critical）
 - FixExecutor：精修策略选择（targeted/full_rewrite）、max_fix_attempts 计数、on_fix_fail 行为
-- LLM Service：通过 LiteLLM 调用（mock）、重试策略、显式启用的模型切换链
+- LLM Service：通过项目内 HTTP 方言适配层调用（mock）、重试策略、显式启用的模型切换链
 - WorkflowEngine：完整工作流执行（mock LLM）、章节循环、暂停/恢复、中断语义
 
 **通过标准：**

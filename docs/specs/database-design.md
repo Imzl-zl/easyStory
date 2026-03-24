@@ -136,6 +136,8 @@ agents (Agent，智能体)
 >
 > 若分析结果落地为 Skill，业务记录应引用配置层的逻辑 `skill_id`，而不是配置缓存表的 UUID 主键，避免把缓存层误当主数据。
 
+> Schema 演进边界：正式数据库结构变更通过 `apps/api/alembic/` 下的 Alembic revision 管理；`shared/db/bootstrap.py` 仅保留开发期初始化与遗留库最小 reconcile，不再作为长期 schema 演进真值。
+
 **templates（Template，模板）**
 
 | 字段 | 类型 | 说明 |
@@ -494,10 +496,12 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | id | UUID | 主键 |
 | owner_type | VARCHAR(20) | 归属类型：system/user/project |
 | owner_id | UUID | 归属 ID（system 级时可为 NULL） |
-| provider | VARCHAR(50) | 模型供应商：anthropic/openai/deepseek 等 |
+| provider | VARCHAR(50) | 渠道键 / Provider Key，用于按作用域解析凭证 |
+| api_dialect | VARCHAR(50) | 接口类型：`openai_chat_completions / openai_responses / anthropic_messages / gemini_generate_content` |
 | display_name | VARCHAR(100) | 显示名称 |
 | encrypted_key | TEXT | AES-256-GCM 加密后的 API Key |
-| base_url | VARCHAR(500) | 自定义 endpoint（可选） |
+| base_url | VARCHAR(500) | 自定义 endpoint（可选；默认只允许公网 `https`，本地/私网需显式允许） |
+| default_model | VARCHAR(100) | 连接级默认模型名 |
 | is_active | BOOLEAN | 是否启用，默认 true |
 | last_verified_at | TIMESTAMP | 最后连通性测试通过时间 |
 | created_at | TIMESTAMP | 创建时间 |

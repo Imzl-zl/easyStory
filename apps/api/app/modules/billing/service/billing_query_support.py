@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -14,9 +15,11 @@ from app.modules.billing.service.dto import (
 )
 from app.modules.config_registry.schemas.config_schemas import BudgetConfig
 from app.modules.workflow.models import WorkflowExecution
+from app.shared.runtime.errors import BusinessRuleError
 
 ZERO_TOKENS = 0
 ZERO_COST = Decimal("0")
+MODEL_NAME_BLANK_MESSAGE = "model_name filter cannot be blank"
 SUMMARY_USAGE_ORDER = {
     "generate": 0,
     "review": 1,
@@ -62,6 +65,15 @@ def load_budget_config(workflow: WorkflowExecution) -> BudgetConfig:
     return BudgetConfig.model_validate(snapshot.get("budget") or {})
 
 
+def resolve_budget_recorded_at(
+    usages: list[TokenUsage],
+    fallback: Callable[[], datetime],
+) -> datetime:
+    if not usages:
+        return normalize_utc_datetime(fallback())
+    return normalize_utc_datetime(max(usage.created_at for usage in usages))
+
+
 def build_budget_status(
     *,
     scope: str,
@@ -91,9 +103,14 @@ def to_budget_status_view(status: BudgetStatusDTO) -> BudgetStatusViewDTO:
     )
 
 
-def to_token_usage_view(usage: TokenUsage) -> TokenUsageViewDTO:
+def to_token_usage_view(
+    usage: TokenUsage,
+    *,
+    workflow_execution_id,
+) -> TokenUsageViewDTO:
     return TokenUsageViewDTO(
         id=usage.id,
+        workflow_execution_id=workflow_execution_id,
         node_execution_id=usage.node_execution_id,
         usage_type=usage.usage_type,  # type: ignore[arg-type]
         model_name=usage.model_name,
@@ -106,7 +123,8 @@ def to_token_usage_view(usage: TokenUsage) -> TokenUsageViewDTO:
 
 
 def day_window(recorded_at: datetime) -> tuple[datetime, datetime]:
-    start_at = recorded_at.astimezone(timezone.utc).replace(
+    normalized = normalize_utc_datetime(recorded_at)
+    start_at = normalized.replace(
         hour=0,
         minute=0,
         second=0,
@@ -117,3 +135,18 @@ def day_window(recorded_at: datetime) -> tuple[datetime, datetime]:
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def normalize_utc_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def normalize_model_name_filter(model_name: str | None) -> str | None:
+    if model_name is None:
+        return None
+    normalized = model_name.strip()
+    if not normalized:
+        raise BusinessRuleError(MODEL_NAME_BLANK_MESSAGE)
+    return normalized

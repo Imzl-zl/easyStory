@@ -24,8 +24,11 @@ def test_repository_config_loads() -> None:
     loader = ConfigLoader(CONFIG_ROOT)
 
     workflow = loader.load_workflow("workflow.xuanhuan_manual")
+    project_setting_skill = loader.load_skill("skill.project_setting.conversation_extract")
 
     assert "skill.chapter.xuanhuan" in [item.id for item in loader.list_skills()]
+    assert project_setting_skill.category == "project_setting"
+    assert "conversation_text" in project_setting_skill.variables
     assert workflow.settings.default_fix_skill == "skill.fix.xuanhuan"
     assert workflow.context_injection is not None
     assert workflow.context_injection.default_inject[0].inject_type == "project_setting"
@@ -71,6 +74,37 @@ skill:
 
     try:
         with pytest.raises(ConfigurationError, match="unexpected"):
+            ConfigLoader(temp_root)
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
+
+def test_loader_rejects_duplicate_ids_across_config_types() -> None:
+    temp_root = _make_temp_config_root()
+    _write_yaml(
+        temp_root / "skills" / "shared.yaml",
+        """
+skill:
+  id: "config.shared"
+  name: "Shared Skill"
+  category: "outline"
+  prompt: "x"
+""",
+    )
+    _write_yaml(
+        temp_root / "agents" / "shared.yaml",
+        """
+agent:
+  id: "config.shared"
+  name: "Shared Agent"
+  type: "reviewer"
+  system_prompt: "x"
+  skills: []
+""",
+    )
+
+    try:
+        with pytest.raises(ConfigurationError, match="Duplicate config id 'config.shared'"):
             ConfigLoader(temp_root)
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)

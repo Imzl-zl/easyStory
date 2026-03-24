@@ -31,6 +31,11 @@ class UnauthorizedError(BusinessError):
     code = "unauthorized"
 
 
+class ForbiddenError(BusinessError):
+    status_code = 403
+    code = "forbidden"
+
+
 class BusinessRuleError(BusinessError):
     status_code = 422
     code = "business_rule_error"

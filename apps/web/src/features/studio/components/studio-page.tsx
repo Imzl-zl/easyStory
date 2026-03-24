@@ -8,8 +8,14 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ChapterEditor } from "@/features/studio/components/chapter-editor";
+import { PreparationStatusPanel } from "@/features/studio/components/preparation-status-panel";
 import { ProjectSettingEditor } from "@/features/studio/components/project-setting-editor";
 import { StoryAssetEditor } from "@/features/studio/components/story-asset-editor";
+import { StudioStaleChapterPanel } from "@/features/studio/components/studio-stale-chapter-panel";
+import {
+  listStaleChapters,
+  resolveSelectedChapterNumber,
+} from "@/features/studio/components/studio-page-support";
 import { getErrorMessage } from "@/lib/api/client";
 import { listChapters } from "@/lib/api/content";
 import { checkProjectSetting, getProject } from "@/lib/api/projects";
@@ -47,13 +53,10 @@ export function StudioPage({ projectId }: StudioPageProps) {
     queryKey: ["chapters", projectId],
     queryFn: () => listChapters(projectId),
   });
+  const staleChapters = useMemo(() => listStaleChapters(chaptersQuery.data), [chaptersQuery.data]);
 
   const selectedChapterNumber = useMemo(() => {
-    const raw = searchParams.get("chapter");
-    if (raw) {
-      return Number(raw);
-    }
-    return chaptersQuery.data?.[0]?.chapter_number ?? null;
+    return resolveSelectedChapterNumber(chaptersQuery.data, searchParams.get("chapter"));
   }, [chaptersQuery.data, searchParams]);
 
   const updateParams = (patches: Record<string, string | null>) => {
@@ -127,7 +130,21 @@ export function StudioPage({ projectId }: StudioPageProps) {
               </button>
             ))}
           </div>
+          {staleChapters.length > 0 ? (
+            <StudioStaleChapterPanel
+              projectId={projectId}
+              staleChapters={staleChapters}
+              onFocusChapter={(chapterNumber) =>
+                updateParams({
+                  panel: "chapter",
+                  chapter: String(chapterNumber),
+                })
+              }
+            />
+          ) : null}
         </div>
+
+        <PreparationStatusPanel projectId={projectId} />
 
         <Link className="ink-button-secondary w-full justify-center" href={`/workspace/project/${projectId}/engine`}>
           前往 Engine

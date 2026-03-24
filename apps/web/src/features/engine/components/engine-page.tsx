@@ -7,23 +7,23 @@ import { CodeBlock } from "@/components/ui/code-block";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { EngineBillingPanel } from "@/features/engine/components/engine-billing-panel";
 import { EngineBlock } from "@/features/engine/components/engine-block";
+import { EngineContextPanel } from "@/features/engine/components/engine-context-panel";
+import { EngineLogsPanel } from "@/features/engine/components/engine-logs-panel";
+import { EngineReviewPanel } from "@/features/engine/components/engine-review-panel";
+import { EngineTaskPanel } from "@/features/engine/components/engine-task-panel";
 import { getWorkflowBillingSummary, listWorkflowTokenUsages } from "@/lib/api/billing";
 import { getErrorMessage } from "@/lib/api/client";
-import { previewWorkflowContext } from "@/lib/api/context";
 import { createWorkflowExports, listProjectExports } from "@/lib/api/export";
 import { listWorkflowExecutions, listWorkflowLogs, listPromptReplays } from "@/lib/api/observability";
 import { getWorkflowReviewSummary, listWorkflowReviewActions } from "@/lib/api/review";
-import { getWorkflow, listChapterTasks, pauseWorkflow, resumeWorkflow, startWorkflow, cancelWorkflow } from "@/lib/api/workflow";
+import { getWorkflow, pauseWorkflow, resumeWorkflow, startWorkflow, cancelWorkflow } from "@/lib/api/workflow";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import { EngineExportPanel } from "@/features/engine/components/engine-export-panel";
 import { resolveEngineWorkflowControls, shouldPollWorkflow } from "@/features/engine/components/engine-workflow-controls";
-
 const TABS = ["overview", "tasks", "reviews", "billing", "logs", "context", "replays"] as const;
-
-type EnginePageProps = {
-  projectId: string;
-};
+type EnginePageProps = { projectId: string };
 export function EnginePage({ projectId }: EnginePageProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -36,11 +36,8 @@ export function EnginePage({ projectId }: EnginePageProps) {
   const setLastWorkflow = useWorkspaceStore((state) => state.setLastWorkflow);
   const workflowId = searchParams.get("workflow") ?? lastWorkflowByProject[projectId] ?? "";
   const [workflowInput, setWorkflowInput] = useState(workflowId);
-  const [contextNodeId, setContextNodeId] = useState("");
-  const [contextChapter, setContextChapter] = useState("");
   const [selectedExecutionId, setSelectedExecutionId] = useState<string>("");
   const [feedback, setFeedback] = useState<string | null>(null);
-
   const setParams = (patches: Record<string, string | null>) => {
     startTransition(() => {
       const next = new URLSearchParams(searchParams.toString());
@@ -54,21 +51,14 @@ export function EnginePage({ projectId }: EnginePageProps) {
       router.replace(`${pathname}?${next.toString()}`);
     });
   };
-
   const workflowQuery = useQuery({
     queryKey: ["workflow", workflowId],
     queryFn: () => getWorkflow(workflowId),
     enabled: Boolean(workflowId),
     refetchInterval: (query) => (shouldPollWorkflow(query.state.data?.status) ? 5000 : false),
   });
-
   const workflowControls = resolveEngineWorkflowControls(workflowQuery.data);
   const hasWorkflow = Boolean(workflowId && workflowQuery.data);
-  const chapterTasksQuery = useQuery({
-    queryKey: ["workflow-tasks", workflowId],
-    queryFn: () => listChapterTasks(workflowId),
-    enabled: hasWorkflow,
-  });
   const reviewsQuery = useQuery({
     queryKey: ["workflow-reviews", workflowId],
     queryFn: () => Promise.all([getWorkflowReviewSummary(workflowId), listWorkflowReviewActions(workflowId)]),
@@ -95,7 +85,6 @@ export function EnginePage({ projectId }: EnginePageProps) {
     queryFn: () => listPromptReplays(workflowId, selectedExecutionId),
     enabled: hasWorkflow && tab === "replays" && Boolean(selectedExecutionId),
   });
-
   const actionMutation = useMutation({
     mutationFn: async (action: "start" | "pause" | "resume" | "cancel") => {
       if (action === "start") {
@@ -120,16 +109,6 @@ export function EnginePage({ projectId }: EnginePageProps) {
     },
     onError: (error) => setFeedback(getErrorMessage(error)),
   });
-
-  const contextMutation = useMutation({
-    mutationFn: () =>
-      previewWorkflowContext(workflowId, {
-        node_id: contextNodeId,
-        chapter_number: contextChapter ? Number(contextChapter) : undefined,
-      }),
-    onError: (error) => setFeedback(getErrorMessage(error)),
-  });
-
   const exportMutation = useMutation({
     mutationFn: () => createWorkflowExports(workflowId, { formats: ["txt", "markdown"] }),
     onSuccess: () => {
@@ -138,12 +117,16 @@ export function EnginePage({ projectId }: EnginePageProps) {
     },
     onError: (error) => setFeedback(getErrorMessage(error)),
   });
-
   const selectedExecution = useMemo(
     () => logsQuery.data?.[0].find((item) => item.id === selectedExecutionId) ?? null,
     [logsQuery.data, selectedExecutionId],
   );
-
+  const logExecutions = logsQuery.data?.[0] ?? [];
+  const executionLogs = logsQuery.data?.[1] ?? [];
+  const reviewSummary = reviewsQuery.data?.[0] ?? null;
+  const reviewActions = reviewsQuery.data?.[1] ?? [];
+  const billingSummary = billingQuery.data?.[0] ?? null;
+  const billingUsages = billingQuery.data?.[1] ?? [];
   return (
     <div className="space-y-6">
       <SectionCard
@@ -212,47 +195,55 @@ export function EnginePage({ projectId }: EnginePageProps) {
             </div>
             {tab === "overview" ? (
               <EngineBlock title="执行概览">
-                <CodeBlock value={logsQuery.data?.[0] ?? workflowQuery.data?.nodes ?? []} />
+                <CodeBlock value={logExecutions.length > 0 ? logExecutions : workflowQuery.data?.nodes ?? []} />
               </EngineBlock>
             ) : null}
             {tab === "tasks" ? (
               <EngineBlock title="章节任务">
-                {chapterTasksQuery.data?.length ? <CodeBlock value={chapterTasksQuery.data} /> : <EmptyState title="没有章节任务" description="当前工作流尚未生成章节任务。" />}
+                <EngineTaskPanel
+                  key={workflowId || "workflow-empty"}
+                  projectId={projectId}
+                  workflow={workflowQuery.data}
+                />
               </EngineBlock>
             ) : null}
             {tab === "reviews" ? (
               <EngineBlock title="审核摘要与动作">
-                <CodeBlock value={{ summary: reviewsQuery.data?.[0] ?? null, actions: reviewsQuery.data?.[1] ?? [] }} />
+                <EngineReviewPanel
+                  summary={reviewSummary}
+                  actions={reviewActions}
+                  isLoading={reviewsQuery.isPending}
+                  errorMessage={reviewsQuery.error ? getErrorMessage(reviewsQuery.error) : null}
+                />
               </EngineBlock>
             ) : null}
             {tab === "billing" ? (
               <EngineBlock title="账单摘要与 Token 使用">
-                <CodeBlock value={{ summary: billingQuery.data?.[0] ?? null, usages: billingQuery.data?.[1] ?? [] }} />
+                <EngineBillingPanel
+                  summary={billingSummary}
+                  usages={billingUsages}
+                  isLoading={billingQuery.isPending}
+                  errorMessage={billingQuery.error ? getErrorMessage(billingQuery.error) : null}
+                />
               </EngineBlock>
             ) : null}
             {tab === "logs" ? (
               <EngineBlock title="节点执行与日志">
-                <CodeBlock value={{ executions: logsQuery.data?.[0] ?? [], logs: logsQuery.data?.[1] ?? [] }} />
+                <EngineLogsPanel
+                  executions={logExecutions}
+                  logs={executionLogs}
+                  isLoading={logsQuery.isPending}
+                  errorMessage={logsQuery.error ? getErrorMessage(logsQuery.error) : null}
+                />
               </EngineBlock>
             ) : null}
             {tab === "context" ? (
               <EngineBlock title="上下文预览">
-                <div className="space-y-4">
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <label className="block space-y-2">
-                      <span className="label-text">node_id</span>
-                      <input className="ink-input" value={contextNodeId} onChange={(event) => setContextNodeId(event.target.value)} />
-                    </label>
-                    <label className="block space-y-2">
-                      <span className="label-text">chapter_number</span>
-                      <input className="ink-input" inputMode="numeric" value={contextChapter} onChange={(event) => setContextChapter(event.target.value)} />
-                    </label>
-                  </div>
-                  <button className="ink-button" disabled={contextMutation.isPending || !hasWorkflow} onClick={() => contextMutation.mutate()}>
-                    {contextMutation.isPending ? "预览中..." : "预览上下文"}
-                  </button>
-                  {contextMutation.data ? <CodeBlock value={contextMutation.data} /> : null}
-                </div>
+                <EngineContextPanel
+                  projectId={projectId}
+                  workflowId={workflowId}
+                  isWorkflowReady={hasWorkflow}
+                />
               </EngineBlock>
             ) : null}
             {tab === "replays" ? (

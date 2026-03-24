@@ -29,6 +29,9 @@ async def get_review_query_service() -> ReviewQueryService:
 )
 async def get_workflow_review_summary(
     workflow_id: uuid.UUID,
+    node_execution_id: uuid.UUID | None = Query(default=None),
+    review_type: str | None = Query(default=None, min_length=1),
+    status: ReviewStatus | None = Query(default=None),
     review_query_service: ReviewQueryService = Depends(get_review_query_service),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db_session),
@@ -37,6 +40,9 @@ async def get_workflow_review_summary(
         db,
         workflow_id,
         owner_id=current_user.id,
+        node_execution_id=node_execution_id,
+        review_type=review_type,
+        status=status,
     )
 
 

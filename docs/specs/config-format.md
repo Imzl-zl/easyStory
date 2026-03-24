@@ -5,7 +5,7 @@
 | 文档类型 | 技术规范 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-14 |
-| 更新时间 | 2026-03-21 |
+| 更新时间 | 2026-03-23 |
 | 关联文档 | [系统架构设计](./architecture.md)、[数据库设计](./database-design.md) |
 
 ---
@@ -25,6 +25,8 @@
 │   ├── chapter/                   # 章节类
 │   │   └── *.yaml
 │   ├── character/                 # 人物类
+│   │   └── *.yaml
+│   ├── project_setting/           # 项目设定提取/整理类
 │   │   └── *.yaml
 │   ├── world_setting/             # 世界观类
 │   │   └── *.yaml
@@ -195,11 +197,12 @@ skill:
       required: true
       description: "小说题材"
       enum: ["玄幻", "都市", "科幻", "言情"]
-    protagonist:
+    character_profile:
       type: "string"
       required: true
+      description: "人物设定投影视图"
       min_length: 2
-      max_length: 500
+      max_length: 1200
     target_chapters:
       type: "integer"
       required: false
@@ -235,6 +238,7 @@ skill:
 | `opening_plan` | 开篇设计生成 | `skill.opening_plan.*` |
 | `chapter` | 章节生成 | `skill.chapter.*` |
 | `character` | 人物设定 | `skill.character.*` |
+| `project_setting` | 项目设定提取/整理 | `skill.project_setting.*` |
 | `world_setting` | 世界观设定 | `skill.world_setting.*` |
 | `review` | 审核 | `skill.review.*` |
 
@@ -467,6 +471,12 @@ workflow:
             required: false
           - type: "story_bible"
             required: false
+          - type: "style_reference"  # 分析结果风格参考（项目级显式绑定）
+            analysis_id: "00000000-0000-0000-0000-000000000001"
+            inject_fields:
+              - "writing_style"
+              - "narrative_perspective"
+            required: false
   
   nodes:                              # 必填，节点列表
     - id: "outline"                   # 节点 ID
@@ -592,12 +602,22 @@ workflow:
 | `project_setting` | 项目设定（结构化设定文档） | - |
 | `outline` | 大纲 | - |
 | `opening_plan` | 开篇设计（前 1-3 章的阶段约束） | - |
+| `world_setting` | 基于 `ProjectSetting.world_setting` 的结构化投影视图 | - |
+| `character_profile` | 基于 `ProjectSetting.protagonist/key_supporting_roles` 的人物设定投影视图 | - |
 | `chapter_task` | 当前章节任务（来自 ChapterTask） | - |
 | `previous_chapters` | 前 N 章 | `count` |
+| `chapter_summary` | 基于 `chapter` 当前版本派生的轻量摘要视图 | `count` |
 | `story_bible` | Story Bible 事实库 | - |
+| `style_reference` | 基于分析结果的风格参考，仅允许引用 `analysis_type=style` 的记录；目标分析缺失时会直接报错；当前 runtime 默认最多 500 tokens，超出会先在 section 内裁剪并在上下文报告中暴露原始 token | `analysis_id`、`inject_fields` |
 
 以下类型仍属扩展预留，**当前 schema 会直接拒绝**，不能写入现有 workflow 配置：
-`chapter_list`、`character_profile`、`world_setting`、`chapter_summary`、`style_reference`、`writing_preferences`、`foreshadowing_reminder`、`custom`
+`chapter_list`、`writing_preferences`、`foreshadowing_reminder`、`custom`
+
+> `chapter_summary` 当前实现采用 deterministic excerpt：直接基于既有 `chapter` 的 current version 生成轻量摘要视图，不新建摘要表，也不引入 LLM 自动摘要链路。
+>
+> `world_setting` 与 `character_profile` 当前实现也采用 deterministic projection：直接从 `ProjectSetting` 投影生成，不新建世界观/角色主表。
+
+> `style_reference` 需要绑定项目内真实 `analysis_id`，且该记录必须是 `analysis_type=style`；若目标分析被删除或不属于当前项目，runtime 会直接报错而不是静默跳过。同时它属于体验型上下文，当前 runtime 默认会把单个 `style_reference` section 收敛到 500 tokens 以内，并在上下文报告中保留裁剪前后的 token 信息。因此更适合写入项目运行时 workflow snapshot 或用户显式保存的项目配置；不建议把仓库共享的内置 workflow YAML 固化为某个具体项目的分析 UUID。
 
 ---
 
@@ -609,8 +629,8 @@ workflow:
 
 ```yaml
 model:
-  provider: "anthropic"             # openai/anthropic/deepseek/...
-  name: "claude-sonnet-4-20250514"  # 具体模型名
+  provider: "anthropic"             # 凭证渠道键 / Provider Key
+  name: "claude-sonnet-4-20250514"  # 可选；未填时回退到凭证 default_model
   required_capabilities:            # 可选，能力要求
     - "streaming"
     - "json_schema_output"
@@ -633,7 +653,7 @@ model:
 节点级 model > Skill 级 model > 工作流级 model > 项目级默认 model > 全局默认 model
 ```
 
-> `provider` 用于选择凭证（项目级 > 用户级 > 系统级默认凭证池[仅显式允许]），`name` 用于选择具体模型。
+> `provider` 用于选择凭证（项目级 > 用户级 > 系统级默认凭证池[仅显式允许]），`name` 优先选择具体模型；未显式填写时，运行时回退到所解析凭证上的 `default_model`。HTTP 协议由凭证的 `api_dialect` 决定，而不是由 `provider` 猜测。
 
 ---
 
@@ -657,12 +677,16 @@ model:
 | `EASYSTORY_JWT_EXPIRE_HOURS` | 可选 | `24` | JWT 过期小时数，必须 `> 0` |
 | `EASYSTORY_CORS_ALLOWED_ORIGINS` | 可选 | 空列表 | 逗号分隔 origin 白名单 |
 | `EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX` | 可选 | `^https?://(localhost|127\.0\.0\.1)(:\d+)?$` | CORS 正则白名单 |
+| `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS` | 可选 | `false` | 是否允许 `localhost` / 私网 IP 等本地模型 endpoint；默认只允许公网 `https` endpoint |
+| `EASYSTORY_CONFIG_ADMIN_USERNAMES` | 可选 | 空列表 | 逗号分隔的配置管理员用户名白名单；仅命中用户可访问 `/api/v1/config/*` |
 
 **校验与暴露规则**：
 
 - `EASYSTORY_JWT_SECRET` 由 `validate_startup_settings()` 在 FastAPI 启动阶段强制校验；缺失时直接启动失败，不做 silent fallback。
 - `EASYSTORY_CREDENTIAL_MASTER_KEY` 保持按能力懒校验；只有真正触发凭证加密/解密路径时才显式报错。
 - `EASYSTORY_CORS_ALLOWED_ORIGINS` 接受逗号分隔字符串；解析失败视为配置错误。
+- 自定义模型 `base_url` 默认只允许公网 `https` endpoint；若确需访问本地 / 私网模型网关，必须显式设置 `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS=true`。
+- `EASYSTORY_CONFIG_ADMIN_USERNAMES` 为空时，`/api/v1/config/*` 管理接口默认全部拒绝；只有命中白名单的已认证用户才能读写配置。
 - 新增运行时环境变量时，必须同时更新 `app/shared/settings.py`、`apps/api/.env.example`、本规范与 `docs/README.md`。
 
 ### 8.2 YAML 配置注册表加载
@@ -678,7 +702,7 @@ model:
 6. 启动完成；当前不默认开启文件监听
 
 运行时：
-1. Web UI 或外部工具编辑 YAML
+1. Web UI、Config API 或外部工具编辑 YAML
 2. 显式调用 `ConfigLoader.reload()` 或重建 `ConfigLoader`
 3. 重新执行完整校验
 4. 替换内存注册表
@@ -701,4 +725,4 @@ model:
 
 *文档版本: 1.0.0*  
 *创建日期: 2026-03-14*  
-*更新日期: 2026-03-21*
+*更新日期: 2026-03-23*

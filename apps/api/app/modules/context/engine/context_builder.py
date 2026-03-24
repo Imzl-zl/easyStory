@@ -145,12 +145,14 @@ class ContextBuilder:
             chapter_number=chapter_number,
             workflow_execution_id=workflow_execution_id,
             count=rule.count,
+            analysis_id=rule.analysis_id,
+            inject_fields=rule.inject_fields,
         )
         if status == "missing" and rule.required:
             raise RequiredContextMissingError(rule.inject_type)
         priority, min_tokens = SECTION_POLICIES[rule.inject_type]
         token_count = self.token_counter.count(content, model) if content else 0
-        return ContextSection(
+        section = ContextSection(
             inject_type=rule.inject_type,
             variable_name=VARIABLE_NAMES[rule.inject_type],
             content=content,
@@ -161,6 +163,7 @@ class ContextBuilder:
             token_count=token_count,
             metadata=metadata,
         )
+        return self.truncator.apply_section_token_cap(section, model)
 
     def _build_result(
         self,

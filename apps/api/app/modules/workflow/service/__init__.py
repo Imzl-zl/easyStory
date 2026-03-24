@@ -12,7 +12,13 @@ from .chapter_task_dto import (
     ChapterTaskUpdateDTO,
     ChapterTaskViewDTO,
 )
-from .dto import WorkflowExecutionDTO, WorkflowPauseDTO, WorkflowStartDTO
+from .dto import (
+    WorkflowExecutionDTO,
+    WorkflowExecutionStatus,
+    WorkflowExecutionSummaryDTO,
+    WorkflowPauseDTO,
+    WorkflowStartDTO,
+)
 
 if TYPE_CHECKING:
     from .chapter_task_service import ChapterTaskService
@@ -46,6 +52,8 @@ __all__ = [
     "ChapterTaskViewDTO",
     "WorkflowAppService",
     "WorkflowExecutionDTO",
+    "WorkflowExecutionStatus",
+    "WorkflowExecutionSummaryDTO",
     "WorkflowPauseDTO",
     "WorkflowRuntimeService",
     "WorkflowService",

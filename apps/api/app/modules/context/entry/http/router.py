@@ -62,6 +62,8 @@ async def list_story_bible_facts(
     fact_type: StoryFactType | None = Query(default=None),
     conflict_status: StoryFactConflictStatus | None = Query(default=None),
     active_only: bool = Query(default=True),
+    chapter_number: int | None = Query(default=None, ge=1),
+    source_content_version_id: uuid.UUID | None = Query(default=None),
     visible_at_chapter: int | None = Query(default=None, ge=1),
     limit: int = Query(default=200, ge=1, le=200),
     story_bible_service: StoryBibleService = Depends(get_story_bible_service),
@@ -75,8 +77,29 @@ async def list_story_bible_facts(
         fact_type=fact_type,
         conflict_status=conflict_status,
         active_only=active_only,
+        chapter_number=chapter_number,
+        source_content_version_id=source_content_version_id,
         visible_at_chapter=visible_at_chapter,
         limit=limit,
+    )
+
+
+@router.get(
+    "/api/v1/projects/{project_id}/story-bible/{fact_id}",
+    response_model=StoryFactDTO,
+)
+async def get_story_bible_fact(
+    project_id: uuid.UUID,
+    fact_id: uuid.UUID,
+    story_bible_service: StoryBibleService = Depends(get_story_bible_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> StoryFactDTO:
+    return await story_bible_service.get_fact(
+        db,
+        project_id,
+        fact_id,
+        owner_id=current_user.id,
     )
 
 

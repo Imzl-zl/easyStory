@@ -12,7 +12,8 @@ from app.modules.config_registry.schemas.config_schemas import (
     SkillConfig,
     WorkflowConfig,
 )
-from app.modules.context.engine.contracts import VARIABLE_TO_INJECT_TYPE
+from app.modules.context.engine.contracts import AUTO_INJECT_TYPES, VARIABLE_TO_INJECT_TYPE
+from app.modules.credential.models import ModelCredential
 from app.modules.project.models import Project
 from app.modules.workflow.models import WorkflowExecution
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
@@ -28,10 +29,18 @@ class WorkflowRuntimePromptMixin:
         workflow_config: WorkflowConfig,
         node: NodeConfig,
         *,
+        owner_id: uuid.UUID,
         chapter_number: int | None,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], ModelCredential]:
         skill = load_skill_snapshot(workflow.skills_snapshot or {}, node.skill)
-        model = self._resolve_model(workflow_config, node, skill)
+        model, credential = await self._resolve_model(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            skill,
+            owner_id=owner_id,
+        )
         prompt_variables, context_report = await self._resolve_prompt_variables(
             db,
             workflow,
@@ -42,20 +51,23 @@ class WorkflowRuntimePromptMixin:
             chapter_number=chapter_number,
         )
         prompt = self.template_renderer.render(skill.prompt, prompt_variables)
-        return {
-            "prompt": prompt,
-            "system_prompt": None,
-            "model": model,
-            "response_format": "json_object" if node.id == "chapter_split" else "text",
-            "context_snapshot_hash": self._hash_payload(prompt_variables),
-            "input_data": {
-                "skill_id": skill.id,
-                "model_name": model.name,
-                "provider": model.provider,
+        return (
+            {
                 "prompt": prompt,
-                "context_report": context_report,
+                "system_prompt": None,
+                "model": model,
+                "response_format": "json_object" if node.id == "chapter_split" else "text",
+                "context_snapshot_hash": self._hash_payload(prompt_variables),
+                "input_data": {
+                    "skill_id": skill.id,
+                    "model_name": model.name,
+                    "provider": model.provider,
+                    "prompt": prompt,
+                    "context_report": context_report,
+                },
             },
-        }
+            credential,
+        )
 
     async def _resolve_prompt_variables(
         self,
@@ -107,7 +119,11 @@ class WorkflowRuntimePromptMixin:
         existing = {item.inject_type for item in merged}
         for name, schema in declared.items():
             inject_type = VARIABLE_TO_INJECT_TYPE.get(name)
-            if inject_type is None or inject_type in existing:
+            if (
+                inject_type is None
+                or inject_type in existing
+                or inject_type not in AUTO_INJECT_TYPES
+            ):
                 continue
             merged.append(
                 ContextInjectionItem.model_validate(
@@ -130,13 +146,24 @@ class WorkflowRuntimePromptMixin:
             if name not in VARIABLE_TO_INJECT_TYPE and name in setting
         }
 
-    def _resolve_model(
+    async def _resolve_model(
         self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
         workflow_config: WorkflowConfig,
         node: NodeConfig,
         skill: SkillConfig,
-    ) -> ModelConfig:
+        *,
+        owner_id: uuid.UUID,
+    ) -> tuple[ModelConfig, ModelCredential]:
         model = node.model or skill.model or workflow_config.model
-        if model is None or not model.name or not model.provider:
+        if model is None or not model.provider:
             raise ConfigurationError(f"Node {node.id} is missing executable model configuration")
-        return model
+        resolved = await self._resolve_credential_service().resolve_active_credential_model(
+            db,
+            provider=model.provider,
+            requested_model_name=model.name,
+            user_id=owner_id,
+            project_id=workflow.project_id,
+        )
+        return model.model_copy(update={"name": resolved.model_name}), resolved.credential

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import os
+from typing import Protocol
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -19,6 +20,12 @@ PBKDF2_ITERATIONS = 600_000
 SALT_BYTES = 16
 NONCE_BYTES = 12
 ENCRYPTION_PAYLOAD_VERSION = "v1"
+
+
+class CredentialCipher(Protocol):
+    def encrypt(self, plaintext: str) -> str: ...
+
+    def decrypt(self, encrypted_payload: str) -> str: ...
 
 
 class CredentialCrypto:

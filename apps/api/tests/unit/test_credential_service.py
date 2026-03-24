@@ -21,6 +21,8 @@ from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, create_user
 
 TEST_MASTER_KEY = "credential-master-key-for-tests"
+OPENAI_DIALECT = "openai_chat_completions"
+OPENAI_MODEL = "gpt-4o-mini"
 
 
 class FakeVerifier:
@@ -33,13 +35,30 @@ class FakeVerifier:
         provider: str,
         api_key: str,
         base_url: str | None,
+        api_dialect: str,
+        default_model: str | None,
     ) -> CredentialVerificationResult:
         assert provider
         assert api_key
+        assert base_url is None
+        assert api_dialect == OPENAI_DIALECT
+        assert default_model == OPENAI_MODEL
         return CredentialVerificationResult(
             verified_at=self.verified_at,
             message="Credential verified",
         )
+
+
+def _create_payload(**overrides) -> CredentialCreateDTO:
+    payload = {
+        "owner_type": "user",
+        "provider": "openai",
+        "display_name": "我的 OpenAI Key",
+        "api_key": "sk-secret-1234",
+        "default_model": OPENAI_MODEL,
+    }
+    payload.update(overrides)
+    return CredentialCreateDTO(**payload)
 
 
 def test_credential_crypto_round_trip(monkeypatch) -> None:
@@ -60,12 +79,7 @@ def test_create_user_credential_encrypts_and_audits(db, monkeypatch) -> None:
     result = asyncio.run(
         service.create_credential(
             async_db(db),
-            CredentialCreateDTO(
-                owner_type="user",
-                provider="OpenAI",
-                display_name="我的 OpenAI Key",
-                api_key="sk-secret-1234",
-            ),
+            _create_payload(provider="OpenAI"),
             actor_user_id=user.id,
         )
     )
@@ -75,6 +89,8 @@ def test_create_user_credential_encrypts_and_audits(db, monkeypatch) -> None:
 
     assert stored.encrypted_key != "sk-secret-1234"
     assert result.provider == "openai"
+    assert result.api_dialect == OPENAI_DIALECT
+    assert result.default_model == OPENAI_MODEL
     assert result.masked_key == "sk-...1234"
     assert audits[-1].event_type == "credential_create"
 
@@ -83,12 +99,7 @@ def test_create_duplicate_provider_in_same_scope_conflicts(db, monkeypatch) -> N
     monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
     user = create_user(db)
     service = create_credential_service(verifier=FakeVerifier())
-    payload = CredentialCreateDTO(
-        owner_type="user",
-        provider="openai",
-        display_name="OpenAI",
-        api_key="sk-first-1234",
-    )
+    payload = _create_payload(display_name="OpenAI", api_key="sk-first-1234")
     asyncio.run(service.create_credential(async_db(db), payload, actor_user_id=user.id))
 
     with pytest.raises(ConflictError):
@@ -104,18 +115,16 @@ def test_project_credential_requires_owned_project(db, monkeypatch) -> None:
 
     with pytest.raises(NotFoundError):
         asyncio.run(
-            service.create_credential(
-                async_db(db),
-                CredentialCreateDTO(
-                    owner_type="project",
-                    project_id=project.id,
-                    provider="openai",
-                    display_name="项目 Key",
-                    api_key="sk-secret-1234",
-                ),
-                actor_user_id=outsider.id,
+                service.create_credential(
+                    async_db(db),
+                    _create_payload(
+                        owner_type="project",
+                        project_id=project.id,
+                        display_name="项目 Key",
+                    ),
+                    actor_user_id=outsider.id,
+                )
             )
-        )
 
 
 def test_resolve_credential_prefers_project_then_user_then_system(db, monkeypatch) -> None:
@@ -128,22 +137,28 @@ def test_resolve_credential_prefers_project_then_user_then_system(db, monkeypatc
         owner_type="system",
         owner_id=None,
         provider="openai",
+        api_dialect=OPENAI_DIALECT,
         display_name="系统",
         encrypted_key=crypto.encrypt("sk-system-1234"),
+        default_model=OPENAI_MODEL,
     )
     user_credential = ModelCredential(
         owner_type="user",
         owner_id=user.id,
         provider="openai",
+        api_dialect=OPENAI_DIALECT,
         display_name="用户",
         encrypted_key=crypto.encrypt("sk-user-1234"),
+        default_model=OPENAI_MODEL,
     )
     project_credential = ModelCredential(
         owner_type="project",
         owner_id=project.id,
         provider="openai",
+        api_dialect=OPENAI_DIALECT,
         display_name="项目",
         encrypted_key=crypto.encrypt("sk-project-1234"),
+        default_model=OPENAI_MODEL,
     )
     db.add_all([system_credential, user_credential, project_credential])
     db.commit()
@@ -193,8 +208,10 @@ def test_system_pool_is_blocked_when_project_disallows(db, monkeypatch) -> None:
             owner_type="system",
             owner_id=None,
             provider="openai",
+            api_dialect=OPENAI_DIALECT,
             display_name="系统",
             encrypted_key=crypto.encrypt("sk-system-1234"),
+            default_model=OPENAI_MODEL,
         )
     )
     db.commit()
@@ -219,12 +236,7 @@ def test_verify_credential_updates_timestamp_and_audits(db, monkeypatch) -> None
     credential = asyncio.run(
         service.create_credential(
             async_db(db),
-            CredentialCreateDTO(
-                owner_type="user",
-                provider="openai",
-                display_name="OpenAI",
-                api_key="sk-secret-1234",
-            ),
+            _create_payload(display_name="OpenAI"),
             actor_user_id=user.id,
         )
     )
@@ -251,11 +263,10 @@ def test_update_and_disable_credential(db, monkeypatch) -> None:
     credential = asyncio.run(
         service.create_credential(
             async_db(db),
-            CredentialCreateDTO(
-                owner_type="user",
+            _create_payload(
                 provider="deepseek",
                 display_name="旧名字",
-                api_key="sk-secret-1234",
+                default_model="deepseek-chat",
             ),
             actor_user_id=user.id,
         )
@@ -265,7 +276,11 @@ def test_update_and_disable_credential(db, monkeypatch) -> None:
         service.update_credential(
             async_db(db),
             credential.id,
-            CredentialUpdateDTO(display_name="新名字", api_key="sk-updated-5678"),
+            CredentialUpdateDTO(
+                display_name="新名字",
+                api_key="sk-updated-5678",
+                default_model="deepseek-chat-v2",
+            ),
             actor_user_id=user.id,
         )
     )
@@ -278,5 +293,37 @@ def test_update_and_disable_credential(db, monkeypatch) -> None:
     )
 
     assert updated.display_name == "新名字"
+    assert updated.default_model == "deepseek-chat-v2"
     assert updated.masked_key == "sk-...5678"
     assert disabled.is_active is False
+
+
+def test_resolve_active_credential_model_falls_back_to_default_model(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    crypto = CredentialCrypto()
+    user = create_user(db)
+    db.add(
+        ModelCredential(
+            owner_type="user",
+            owner_id=user.id,
+            provider="openai",
+            api_dialect=OPENAI_DIALECT,
+            display_name="OpenAI",
+            encrypted_key=crypto.encrypt("sk-user-1234"),
+            default_model=OPENAI_MODEL,
+            is_active=True,
+        )
+    )
+    db.commit()
+    service = create_credential_service(verifier=FakeVerifier(), crypto=crypto)
+
+    resolved = asyncio.run(
+        service.resolve_active_credential_model(
+            async_db(db),
+            provider="openai",
+            requested_model_name=None,
+            user_id=user.id,
+        )
+    )
+
+    assert resolved.model_name == OPENAI_MODEL

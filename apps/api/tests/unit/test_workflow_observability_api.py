@@ -161,9 +161,10 @@ async def test_workflow_events_sse_uses_composite_cursor(monkeypatch, tmp_path) 
             after_created_at,
             after_id=None,
             level=None,
+            node_execution_id=None,
             limit=100,
         ):
-            del db, workflow_id, owner_id, level, limit
+            del db, workflow_id, owner_id, level, node_execution_id, limit
             self.calls.append((after_created_at, after_id))
             if len(self.calls) == 1:
                 return [self.first]
@@ -171,6 +172,19 @@ async def test_workflow_events_sse_uses_composite_cursor(monkeypatch, tmp_path) 
                 assert after_created_at == self.shared_created_at
                 assert after_id == self.first.id
                 return [self.second]
+            return []
+
+        async def list_execution_logs(
+            self,
+            db,
+            workflow_id,
+            *,
+            owner_id,
+            level=None,
+            node_execution_id=None,
+            limit=50,
+        ):
+            del db, workflow_id, owner_id, level, node_execution_id, limit
             return []
 
         async def is_workflow_terminal(self, db, workflow_id, *, owner_id):

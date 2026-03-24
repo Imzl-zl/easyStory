@@ -202,6 +202,7 @@ nodes:
 - `character_profile`、`world_setting` 从 `ProjectSetting` 投影，不单独维护第二份数据
 - `OpeningPlan` 默认在第 1-3 章作为高优先级阶段约束注入
 - 第 4 章以后，`OpeningPlan` 默认降级为按需引用，不继续长期占用高优先级预算
+- 内置 `chapter` skill 可以同时消费 `previous_chapters` 与 `chapter_summary`；其中 `chapter_summary` 只是轻量补充视图，预算紧张时应优先被裁掉，而不是替代正文真值
 - `ChapterTask` 是当前章节最高优先级执行指令，不应被 `OpeningPlan` 覆盖
 
 ### 5.3 为什么这样分层

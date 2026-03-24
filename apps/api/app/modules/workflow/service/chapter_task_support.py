@@ -9,7 +9,7 @@ PREPARATION_ASSET_LABELS = {
     "outline": "大纲",
     "opening_plan": "开篇设计",
 }
-EDITABLE_CHAPTER_TASK_STATUSES = frozenset({"pending", "generating", "failed", "stale", "interrupted"})
+EDITABLE_CHAPTER_TASK_STATUSES = frozenset({"pending", "generating", "failed", "interrupted"})
 
 
 def advance_workflow_after_regenerate(workflow: WorkflowExecution) -> None:
@@ -27,6 +27,8 @@ def advance_workflow_after_regenerate(workflow: WorkflowExecution) -> None:
 def ensure_task_editable(task: ChapterTask) -> None:
     from app.shared.runtime.errors import BusinessRuleError
 
+    if task.status == "stale":
+        raise BusinessRuleError("当前章节任务已 stale，必须先重建章节计划后才能编辑")
     if task.status not in EDITABLE_CHAPTER_TASK_STATUSES:
         raise BusinessRuleError(f"当前章节任务状态不允许编辑: {task.status}")
 

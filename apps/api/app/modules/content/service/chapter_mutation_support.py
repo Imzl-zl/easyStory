@@ -10,14 +10,17 @@ from app.modules.project.models import Project
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
 
 from .chapter_service_support import CHAPTER_TYPE
+from .dto import ChapterImpactItemDTO, ChapterImpactSummaryDTO
 
 WAITING_CONFIRM_TASK_STATUS = "generating"
 FAILED_TASK_STATUS = "failed"
 ACTIVE_WORKFLOW_STATUSES = ("running", "paused")
 FAILED_WORKFLOW_STATUSES = ("failed",)
+CHAPTER_IMPACT_TARGET = "chapter"
 
 
-def mark_downstream_chapters_stale(project: Project, chapter_number: int) -> None:
+def mark_downstream_chapters_stale(project: Project, chapter_number: int) -> int:
+    stale_count = 0
     for content in project.contents:
         if content.content_type != CHAPTER_TYPE:
             continue
@@ -25,6 +28,29 @@ def mark_downstream_chapters_stale(project: Project, chapter_number: int) -> Non
             continue
         if content.status == "approved":
             content.status = "stale"
+            stale_count += 1
+    return stale_count
+
+
+def build_chapter_impact_summary(stale_chapter_count: int) -> ChapterImpactSummaryDTO:
+    if stale_chapter_count == 0:
+        return ChapterImpactSummaryDTO()
+    return ChapterImpactSummaryDTO(
+        has_impact=True,
+        total_affected_entries=stale_chapter_count,
+        items=[
+            ChapterImpactItemDTO(
+                target=CHAPTER_IMPACT_TARGET,
+                action="mark_stale",
+                count=stale_chapter_count,
+                message=format_chapter_impact_message(stale_chapter_count),
+            )
+        ],
+    )
+
+
+def format_chapter_impact_message(count: int) -> str:
+    return f"{count} 个后续已确认章节已标记为 stale，需要按范围复核正文"
 
 
 async def mark_active_chapter_task_completed(

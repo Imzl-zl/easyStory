@@ -2,6 +2,7 @@ import { requestJson } from "@/lib/api/client";
 import type {
   ProjectCreatePayload,
   ProjectDetail,
+  ProjectPreparationStatus,
   ProjectSetting,
   ProjectSettingSnapshot,
   ProjectSummary,
@@ -48,4 +49,8 @@ export function checkProjectSetting(projectId: string) {
     `/api/v1/projects/${projectId}/setting/complete-check`,
     { method: "POST" },
   );
+}
+
+export function getProjectPreparationStatus(projectId: string) {
+  return requestJson<ProjectPreparationStatus>(`/api/v1/projects/${projectId}/preparation/status`);
 }

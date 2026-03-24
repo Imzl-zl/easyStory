@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .export_service import EXPORT_ROOT_DIR, ExportService
+from app.shared.runtime import EXPORT_ROOT_DIR
+
+from .export_service import ExportService
 
 
 def create_export_service(

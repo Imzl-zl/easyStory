@@ -6,6 +6,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { StoryAssetImpactPanel } from "@/features/studio/components/story-asset-impact-panel";
+import {
+  buildStoryAssetMutationFeedback,
+  invalidateStoryAssetQueries,
+} from "@/features/studio/components/story-asset-editor-support";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
 import {
   approveOpeningPlan,
@@ -15,6 +20,7 @@ import {
   saveOpeningPlan,
   saveOutline,
 } from "@/lib/api/content";
+import type { StoryAssetImpactSummary } from "@/lib/api/types";
 
 type StoryAssetEditorProps = {
   projectId: string;
@@ -22,12 +28,25 @@ type StoryAssetEditorProps = {
 };
 
 export function StoryAssetEditor({ projectId, assetType }: StoryAssetEditorProps) {
+  const [lastImpactState, setLastImpactState] = useState<{
+    assetType: "outline" | "opening_plan";
+    impact: StoryAssetImpactSummary | null;
+    projectId: string;
+  }>({
+    projectId,
+    assetType,
+    impact: null,
+  });
   const query = useQuery({
     queryKey: ["story-asset", projectId, assetType],
     queryFn: () => (assetType === "outline" ? getOutline(projectId) : getOpeningPlan(projectId)),
   });
   const isMissingAsset = query.error instanceof ApiError && query.error.status === 404;
   const formKey = query.data ? `${query.data.content_id}:${query.data.version_number}` : assetType;
+  const lastImpact =
+    lastImpactState.projectId === projectId && lastImpactState.assetType === assetType
+      ? lastImpactState.impact
+      : null;
 
   return (
     <StoryAssetEditorForm
@@ -35,6 +54,8 @@ export function StoryAssetEditor({ projectId, assetType }: StoryAssetEditorProps
       asset={query.data}
       assetType={assetType}
       isMissingAsset={isMissingAsset}
+      lastImpact={lastImpact}
+      onImpactChange={(impact) => setLastImpactState({ projectId, assetType, impact })}
       projectId={projectId}
       queryError={query.error}
       queryLoading={query.isLoading}
@@ -47,6 +68,8 @@ function StoryAssetEditorForm({
   assetType,
   asset,
   isMissingAsset,
+  lastImpact,
+  onImpactChange,
   queryLoading,
   queryError,
 }: {
@@ -54,6 +77,8 @@ function StoryAssetEditorForm({
   assetType: "outline" | "opening_plan";
   asset?: Awaited<ReturnType<typeof getOutline>>;
   isMissingAsset: boolean;
+  lastImpact: StoryAssetImpactSummary | null;
+  onImpactChange: (impact: StoryAssetImpactSummary | null) => void;
   queryLoading: boolean;
   queryError: unknown;
 }) {
@@ -70,21 +95,28 @@ function StoryAssetEditorForm({
         content_text: contentText,
         change_summary: changeSummary || undefined,
       }),
-    onSuccess: () => {
-      setFeedback("草稿已保存。");
-      queryClient.invalidateQueries({ queryKey: ["story-asset", projectId, assetType] });
-      queryClient.invalidateQueries({ queryKey: ["chapters", projectId] });
+    onSuccess: (result) => {
+      onImpactChange(result.impact);
+      setFeedback(buildStoryAssetMutationFeedback(assetType, "save", result.impact));
+      invalidateStoryAssetQueries(queryClient, projectId, assetType, result.impact);
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) => {
+      onImpactChange(null);
+      setFeedback(getErrorMessage(error));
+    },
   });
 
   const approveMutation = useMutation({
     mutationFn: () => (assetType === "outline" ? approveOutline : approveOpeningPlan)(projectId),
-    onSuccess: () => {
-      setFeedback("内容已确认。");
-      queryClient.invalidateQueries({ queryKey: ["story-asset", projectId, assetType] });
+    onSuccess: (result) => {
+      onImpactChange(result.impact);
+      setFeedback(buildStoryAssetMutationFeedback(assetType, "approve", result.impact));
+      invalidateStoryAssetQueries(queryClient, projectId, assetType, result.impact);
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) => {
+      onImpactChange(null);
+      setFeedback(getErrorMessage(error));
+    },
   });
 
   return (
@@ -142,6 +174,7 @@ function StoryAssetEditorForm({
             {feedback}
           </div>
         ) : null}
+        {lastImpact ? <StoryAssetImpactPanel assetType={assetType} impact={lastImpact} /> : null}
       </div>
     </SectionCard>
   );

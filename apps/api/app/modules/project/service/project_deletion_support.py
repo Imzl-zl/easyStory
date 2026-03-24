@@ -12,9 +12,14 @@ from app.modules.analysis.models import Analysis
 from app.modules.billing.models import TokenUsage
 from app.modules.content.models import Content, ContentVersion
 from app.modules.context.models import StoryFact
+from app.modules.credential.models import ModelCredential
 from app.modules.export.models import Export
 from app.modules.observability.models import AuditLog, ExecutionLog, PromptReplay
-from app.modules.observability.service import AUDIT_ENTITY_PROJECT, AuditLogService
+from app.modules.observability.service import (
+    AUDIT_ENTITY_MODEL_CREDENTIAL,
+    AUDIT_ENTITY_PROJECT,
+    AuditLogService,
+)
 from app.modules.project.models import Project
 from app.modules.review.models import ReviewAction
 from app.modules.workflow.models import Artifact, ChapterTask, NodeExecution, WorkflowExecution
@@ -22,6 +27,7 @@ from app.shared.runtime.errors import BusinessRuleError
 
 PROJECT_DELETE_EVENT = "project_delete"
 PROJECT_RESTORE_EVENT = "project_restore"
+PROJECT_CREDENTIAL_OWNER_TYPE = "project"
 PHYSICAL_DELETE_REQUIRES_SOFT_DELETE_MESSAGE = (
     "Project must be soft deleted before physical delete"
 )
@@ -35,6 +41,10 @@ def build_project_cleanup_statements(project_id: uuid.UUID) -> tuple:
         NodeExecution.workflow_execution_id.in_(workflow_ids)
     )
     content_ids = select(Content.id).where(Content.project_id == project_id)
+    project_credential_ids = select(ModelCredential.id).where(
+        ModelCredential.owner_type == PROJECT_CREDENTIAL_OWNER_TYPE,
+        ModelCredential.owner_id == project_id,
+    )
     return (
         delete(PromptReplay).where(PromptReplay.node_execution_id.in_(node_ids)),
         delete(ExecutionLog).where(
@@ -45,7 +55,12 @@ def build_project_cleanup_statements(project_id: uuid.UUID) -> tuple:
         ),
         delete(ReviewAction).where(ReviewAction.node_execution_id.in_(node_ids)),
         delete(Artifact).where(Artifact.node_execution_id.in_(node_ids)),
-        delete(TokenUsage).where(TokenUsage.project_id == project_id),
+        delete(TokenUsage).where(
+            or_(
+                TokenUsage.project_id == project_id,
+                TokenUsage.credential_id.in_(project_credential_ids),
+            )
+        ),
         delete(ChapterTask).where(ChapterTask.project_id == project_id),
         delete(StoryFact).where(StoryFact.project_id == project_id),
         delete(Export).where(Export.project_id == project_id),
@@ -53,11 +68,16 @@ def build_project_cleanup_statements(project_id: uuid.UUID) -> tuple:
             AuditLog.entity_type == AUDIT_ENTITY_PROJECT,
             AuditLog.entity_id == project_id,
         ),
+        delete(AuditLog).where(
+            AuditLog.entity_type == AUDIT_ENTITY_MODEL_CREDENTIAL,
+            AuditLog.entity_id.in_(project_credential_ids),
+        ),
         delete(ContentVersion).where(ContentVersion.content_id.in_(content_ids)),
         delete(Analysis).where(Analysis.project_id == project_id),
         delete(NodeExecution).where(NodeExecution.workflow_execution_id.in_(workflow_ids)),
         delete(WorkflowExecution).where(WorkflowExecution.project_id == project_id),
         delete(Content).where(Content.project_id == project_id),
+        delete(ModelCredential).where(ModelCredential.id.in_(project_credential_ids)),
     )
 
 

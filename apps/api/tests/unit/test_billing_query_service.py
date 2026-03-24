@@ -125,6 +125,9 @@ async def test_billing_query_service_returns_workflow_summary_and_filtered_usage
         assert summary.usage_by_type[0].call_count == 1
         assert summary.usage_by_type[0].total_tokens == 150
         assert summary.usage_by_type[1].estimated_cost == Decimal("0.005000")
+        assert summary.budget_recorded_at == FIXED_NOW
+        assert summary.budget_window_start_at == datetime(2026, 3, 21, 0, 0, tzinfo=UTC)
+        assert summary.budget_window_end_at == datetime(2026, 3, 22, 0, 0, tzinfo=UTC)
         assert {item.scope: item.used_tokens for item in summary.budget_statuses} == {
             "workflow": 200,
             "project_day": 200,

@@ -26,6 +26,8 @@ from .billing_query_support import (
     build_usage_breakdowns,
     day_window,
     load_budget_config,
+    normalize_model_name_filter,
+    resolve_budget_recorded_at,
     to_budget_status_view,
     to_token_usage_view,
     utc_now,
@@ -49,6 +51,8 @@ class BillingQueryService:
     ) -> WorkflowBillingSummaryDTO:
         workflow = await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
         usages = (await db.scalars(self._workflow_usage_statement(workflow.id))).all()
+        recorded_at = resolve_budget_recorded_at(usages, self.now_factory)
+        budget_window_start_at, budget_window_end_at = day_window(recorded_at)
         usage_by_type = build_usage_breakdowns(usages)
         total_input_tokens = sum(item.input_tokens for item in usage_by_type)
         total_output_tokens = sum(item.output_tokens for item in usage_by_type)
@@ -58,6 +62,9 @@ class BillingQueryService:
             project_id=workflow.project_id,
             workflow_status=workflow.status,
             on_exceed=budget_config.on_exceed,
+            budget_recorded_at=recorded_at,
+            budget_window_start_at=budget_window_start_at,
+            budget_window_end_at=budget_window_end_at,
             total_input_tokens=total_input_tokens,
             total_output_tokens=total_output_tokens,
             total_tokens=total_input_tokens + total_output_tokens,
@@ -71,6 +78,7 @@ class BillingQueryService:
                 workflow,
                 owner_id=owner_id,
                 budget_config=budget_config,
+                recorded_at=recorded_at,
             ),
         )
 
@@ -89,7 +97,40 @@ class BillingQueryService:
             statement = statement.where(TokenUsage.usage_type == usage_type)
         statement = statement.order_by(TokenUsage.created_at.desc(), TokenUsage.id.desc()).limit(limit)
         usages = (await db.scalars(statement)).all()
-        return [to_token_usage_view(item) for item in usages]
+        return [to_token_usage_view(item, workflow_execution_id=workflow.id) for item in usages]
+
+    async def list_project_token_usages(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+        workflow_id: uuid.UUID | None = None,
+        usage_type: UsageType | None = None,
+        model_name: str | None = None,
+        limit: int = 100,
+    ) -> list[TokenUsageViewDTO]:
+        await self._require_owned_project(db, project_id, owner_id=owner_id)
+        scoped_workflow_id = await self._resolve_project_workflow_scope(
+            db,
+            project_id,
+            workflow_id=workflow_id,
+            owner_id=owner_id,
+        )
+        normalized_model_name = normalize_model_name_filter(model_name)
+        statement = self._project_usage_statement(project_id)
+        if scoped_workflow_id is not None:
+            statement = statement.where(NodeExecution.workflow_execution_id == scoped_workflow_id)
+        if usage_type is not None:
+            statement = statement.where(TokenUsage.usage_type == usage_type)
+        if normalized_model_name is not None:
+            statement = statement.where(TokenUsage.model_name == normalized_model_name)
+        statement = statement.order_by(TokenUsage.created_at.desc(), TokenUsage.id.desc()).limit(limit)
+        rows = (await db.execute(statement)).all()
+        return [
+            to_token_usage_view(usage, workflow_execution_id=workflow_execution_id)
+            for usage, workflow_execution_id in rows
+        ]
 
     def _workflow_usage_statement(
         self,
@@ -101,6 +142,17 @@ class BillingQueryService:
             .where(NodeExecution.workflow_execution_id == workflow_id)
         )
 
+    def _project_usage_statement(
+        self,
+        project_id: uuid.UUID,
+    ):
+        return (
+            select(TokenUsage, NodeExecution.workflow_execution_id)
+            .select_from(TokenUsage)
+            .outerjoin(NodeExecution, TokenUsage.node_execution_id == NodeExecution.id)
+            .where(TokenUsage.project_id == project_id)
+        )
+
     async def _build_budget_status_views(
         self,
         db: AsyncSession,
@@ -108,8 +160,8 @@ class BillingQueryService:
         *,
         owner_id: uuid.UUID,
         budget_config: BudgetConfig,
+        recorded_at: datetime,
     ) -> list[BudgetStatusViewDTO]:
-        recorded_at = self.now_factory()
         start_at, end_at = day_window(recorded_at)
         statuses = [
             build_budget_status(
@@ -213,3 +265,34 @@ class BillingQueryService:
         if workflow is None:
             raise NotFoundError(f"Workflow execution not found: {workflow_id}")
         return workflow
+
+    async def _require_owned_project(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+    ) -> None:
+        project_id_result = await db.scalar(
+            select(Project.id).where(
+                Project.id == project_id,
+                Project.owner_id == owner_id,
+            )
+        )
+        if project_id_result is None:
+            raise NotFoundError(f"Project not found: {project_id}")
+
+    async def _resolve_project_workflow_scope(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        *,
+        workflow_id: uuid.UUID | None,
+        owner_id: uuid.UUID,
+    ) -> uuid.UUID | None:
+        if workflow_id is None:
+            return None
+        workflow = await self._require_owned_workflow(db, workflow_id, owner_id=owner_id)
+        if workflow.project_id != project_id:
+            raise NotFoundError(f"Workflow execution not found: {workflow_id}")
+        return workflow.id

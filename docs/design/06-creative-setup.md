@@ -36,6 +36,9 @@
   ↓ 生成结构化设定文档
 ```
 
+> MVP 后端当前先收口为“提交聚合后的自由文本 -> 生成结构化 `ProjectSetting` 草稿 -> 返回完整度与追问建议”。
+> 真正的多轮对话状态与追问编排由上层交互组织；后端不再维护第二套会话真值。
+
 ---
 
 ## 3. 结构化设定输出
@@ -86,14 +89,14 @@
 setting_to_skill_mapping:
   direct:
     genre: "genre"
-    protagonist.name: "protagonist_name"
-    protagonist.background: "protagonist"
-    world_setting.name: "world_setting"
     scale.target_words: "target_words"
-  composite:
-    character_summary: "{{ protagonist.name }}，{{ protagonist.background }}，性格{{ protagonist.personality }}"
+  projections:
+    protagonist/key_supporting_roles: "character_profile"
+    world_setting: "world_setting"
   full_context: true  # 完整设定作为 {{ project_setting }} 注入
 ```
+
+其中内置 `outline/opening_plan` skill 当前优先消费 `character_profile` 与 `world_setting` 这类投影视图，而不是继续直接把 `protagonist` 原始字段拼成另一套 Prompt 语义。
 
 ---
 
@@ -234,9 +237,9 @@ template:
     - question: "故事发生在什么世界?"
       variable: "world_setting"
     - question: "主要冲突是什么?"
-      variable: "conflict"
+      variable: "core_conflict"
 ```
 
 ---
 
-*最后更新: 2026-03-19*
+*最后更新: 2026-03-23*

@@ -12,7 +12,8 @@ from app.modules.user.service import (
     create_token_service,
 )
 from app.shared.db import get_async_db_session
-from app.shared.runtime.errors import UnauthorizedError
+from app.shared.runtime.errors import ForbiddenError, UnauthorizedError
+from app.shared.settings import get_settings
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -35,3 +36,15 @@ async def get_current_user(
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise UnauthorizedError("Authentication required")
     return await auth_service.authenticate(db, credentials.credentials)
+
+
+def ensure_config_admin(current_user: User) -> User:
+    if get_settings().is_config_admin(current_user.username):
+        return current_user
+    raise ForbiddenError("Config admin access required")
+
+
+async def require_config_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    return ensure_config_admin(current_user)

@@ -46,6 +46,8 @@ class StoryBibleService(StoryBibleMutationMixin):
         fact_type: StoryFactType | None = None,
         conflict_status: StoryFactConflictStatus | None = None,
         active_only: bool = True,
+        chapter_number: int | None = None,
+        source_content_version_id: uuid.UUID | None = None,
         visible_at_chapter: int | None = None,
         limit: int = DEFAULT_LIMIT,
     ) -> list[StoryFactDTO]:
@@ -57,12 +59,28 @@ class StoryBibleService(StoryBibleMutationMixin):
                     fact_type=fact_type,
                     conflict_status=conflict_status,
                     active_only=active_only,
+                    chapter_number=chapter_number,
+                    source_content_version_id=source_content_version_id,
                     visible_at_chapter=visible_at_chapter,
                     limit=limit,
                 )
             )
         ).all()
         return [to_fact_dto(fact) for fact in facts]
+
+    async def get_fact(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        fact_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID,
+    ) -> StoryFactDTO:
+        await self.project_service.require_project(db, project_id, owner_id=owner_id)
+        fact = await db.scalar(story_fact_statement(project_id, fact_id))
+        if fact is None:
+            raise NotFoundError(f"StoryFact not found: {fact_id}")
+        return to_fact_dto(fact)
 
     async def create_fact(
         self,

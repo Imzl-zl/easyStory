@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from app.shared.runtime.token_counter import ModelPricing, TokenCounter
 
-from .contracts import ContextSection
+from .contracts import ContextSection, SECTION_TOKEN_CAPS
 from .errors import ContextOverflowError
 
 
@@ -42,6 +42,20 @@ class ContextTruncator:
 
     def total_tokens(self, sections: list[ContextSection]) -> int:
         return sum(section.token_count for section in sections)
+
+    def apply_section_token_cap(
+        self,
+        section: ContextSection,
+        model: str,
+    ) -> ContextSection:
+        token_cap = SECTION_TOKEN_CAPS.get(section.inject_type)
+        if token_cap is None:
+            return section
+        section.metadata.setdefault("token_cap", token_cap)
+        if not section.content or section.token_count <= token_cap:
+            return section
+        self._shrink_section(section, section.token_count - token_cap, model)
+        return section
 
     def raise_overflow(
         self,

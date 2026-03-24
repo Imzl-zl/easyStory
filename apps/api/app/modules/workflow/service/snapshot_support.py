@@ -13,7 +13,7 @@ from app.modules.config_registry.schemas.config_schemas import (
 from app.modules.workflow.models import WorkflowExecution
 from app.shared.runtime.errors import ConfigurationError
 
-from .dto import WorkflowExecutionDTO, WorkflowNodeSummaryDTO
+from .dto import WorkflowExecutionDTO, WorkflowExecutionSummaryDTO, WorkflowNodeSummaryDTO
 
 PREPARATION_NODE_IDS = frozenset({"outline", "opening_plan"})
 
@@ -164,9 +164,18 @@ def resolve_node_order(snapshot: dict[str, Any], node_id: str) -> int:
 
 
 def workflow_to_dto(workflow: WorkflowExecution) -> WorkflowExecutionDTO:
+    payload = workflow_to_summary_dto(workflow)
+    nodes = parse_nodes(workflow.workflow_snapshot or {})
+    return WorkflowExecutionDTO(
+        **payload.model_dump(),
+        nodes=nodes,
+    )
+
+
+def workflow_to_summary_dto(workflow: WorkflowExecution) -> WorkflowExecutionSummaryDTO:
     workflow_snapshot = workflow.workflow_snapshot or {}
     nodes = parse_nodes(workflow_snapshot)
-    return WorkflowExecutionDTO(
+    return WorkflowExecutionSummaryDTO(
         execution_id=workflow.id,
         project_id=workflow.project_id,
         template_id=workflow.template_id,
@@ -182,7 +191,6 @@ def workflow_to_dto(workflow: WorkflowExecution) -> WorkflowExecutionDTO:
         has_runtime_snapshot=workflow.snapshot is not None,
         started_at=workflow.started_at,
         completed_at=workflow.completed_at,
-        nodes=nodes,
     )
 
 

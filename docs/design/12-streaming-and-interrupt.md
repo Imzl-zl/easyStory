@@ -67,7 +67,7 @@
 
 流式生成的核心行为：
 
-1. 通过 LiteLLM 发起流式 LLM 调用
+1. 通过 ToolProvider 发起流式 LLM 调用
 2. 每收到一个 chunk，通过 SSE 推送给前端（event: `chunk`）
 3. 每个 chunk 前检查是否被用户中断（查询 NodeExecution 状态）
 4. 若被中断：停止接收后续 chunk，将已收到的部分内容拼接保存，推送 `stopped` 和 `partial` 事件

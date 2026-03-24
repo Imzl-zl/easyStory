@@ -78,7 +78,7 @@ class ConfigLoader:
         return data[root_key]
 
     def _register(self, cache: dict, config_id: str, config: ConfigModel, yaml_file: Path) -> None:
-        if config_id in cache:
+        if config_id in self._sources:
             previous = self._sources[config_id]
             raise ConfigurationError(
                 f"Duplicate config id '{config_id}' in {previous} and {yaml_file}"
@@ -160,6 +160,11 @@ class ConfigLoader:
 
     def load_workflow(self, workflow_id: str) -> WorkflowConfig:
         return self._get(self._workflows, workflow_id, "Workflow")
+
+    def get_source_path(self, config_id: str) -> Path:
+        if config_id not in self._sources:
+            raise ConfigurationError(f"Config source not found: {config_id}")
+        return self._sources[config_id]
 
     def _get(self, cache: dict[str, ConfigModel], config_id: str, label: str) -> ConfigModel:
         if config_id not in cache:
