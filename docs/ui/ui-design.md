@@ -5,7 +5,7 @@
 | 文档类型 | UI 视觉与信息架构 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-16 |
-| 最后更新 | 2026-03-21 |
+| 最后更新 | 2026-03-24 |
 | 关联文档 | [设计索引](../design/00-index.md)、[系统架构](../specs/architecture.md)、[交互补充](./ui-interaction-supplement.md) |
 
 > 本文档只定义当前实施阶段的工作台信息架构、空间语言和视觉基线。未来能力可以保留设计预留，但不能写成当前已落地能力。
@@ -60,8 +60,8 @@
 | `Recycle Bin` | `Lobby` 子视图 | 已删除项目列表与恢复 | `MVP 已支持` |
 | `Credential Center` | 全局设置 | 用户/项目级模型凭证管理、验证、启用与停用 | `MVP 已支持` |
 | `Template Library` | `Lobby` 子视图 | 模板列表、详情、创建、编辑、删除 | `MVP 已支持` |
-| `Audit Log` | `Settings` / `Project Settings` | 项目审计日志、凭证审计日志 | `MVP 已支持` |
-| `Config Registry Admin` | `Settings` / `Admin` | Skills/Agents/Hooks/Workflows 管理 | `Future` |
+| `Audit Log` | `Credential Center` / `Project Settings` | 项目审计日志、凭证审计日志 | `MVP 已支持` |
+| `Config Registry Admin` | 全局管理入口（预留） | Skills/Agents/Hooks/Workflows 管理 | `Future` |
 
 ### 2.3 视图层级规则
 
@@ -347,5 +347,5 @@ Lab
 
 ---
 
-*文档版本：7.4.0*  
-*更新说明：同步 ui-interaction-supplement.md v2.4.0 更新，补全 Studio 面板体系、Export 预检、Lab 路由联动、Recycle Bin 枯墨美学、页面级状态矩阵。*
+*文档版本：7.4.1*  
+*更新说明：同步 ui-interaction-supplement.md v2.4.1，收口 Audit 挂载点、Config Registry 预留定位，并移除超出当前后端真值的描述。*

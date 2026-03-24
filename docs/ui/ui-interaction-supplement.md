@@ -5,7 +5,7 @@
 | 文档类型 | UI 交互规则与实施补充 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-16 |
-| 最后更新 | 2026-03-21 |
+| 最后更新 | 2026-03-24 |
 | 关联文档 | [设计索引](../design/00-index.md)、[UI 白皮书](./ui-design.md)、[系统架构](../specs/architecture.md) |
 
 > 本文档定义当前前后端联调阶段的交互真值：能力矩阵、状态映射、页面层级、响应式、无障碍和边界态。它不重写产品设计，只负责把当前可实施范围钉死。
@@ -45,9 +45,9 @@
 | Billing | `Engine` | 工作流账单摘要、Token 使用明细 | `MVP 已支持` |
 | Context | `Engine` | 上下文预览 | `MVP 已支持` |
 | Observability | `Engine` | 节点执行、执行日志、SSE 事件流、Prompt 回放 | `MVP 已支持` |
-| Audit | `Settings` / `Project Settings` | 项目审计日志、凭证审计日志 | `MVP 已支持` |
+| Audit | `Credential Center` / `Project Settings` | 项目审计日志、凭证审计日志 | `MVP 已支持` |
 | Export | `Engine` | 项目导出列表、按工作流创建导出、下载导出文件 | `MVP 已支持` |
-| Config Registry | `Settings` / `Admin` | Skills/Agents/Hooks/Workflows 列表、详情、更新 | `Future` |
+| Config Registry | 全局管理入口（预留） | Skills/Agents/Hooks/Workflows 列表、详情、更新 | `Future` |
 ### 2.1 UI 必须按当前后端收口的点
 
 - `Auth` 只做注册 / 登录，不出现忘记密码流程。
@@ -73,9 +73,9 @@
       /:templateId
     /recycle-bin
     /settings
-      ?tab=credentials|audit|profile
-    /config-registry
-      ?type=skills|agents|hooks|workflows
+      ?tab=credentials
+      ?sub=list|audit
+      ?credential=:credentialId
 
   /project/:projectId/studio
     ?panel=setting|outline|opening-plan|chapter
@@ -101,8 +101,8 @@
 - `Incubator / Recycle Bin / Export Dialog / Version Panel` 是子视图，不升级为一级路由主干。
 - `Review & Diff` 属于 `Engine` 的 workflow 子视图；`Studio` 最多提供跳转入口，不直接承载审核数据面板。
 - `Templates` 作为 `Lobby` 的子视图，支持列表和详情路由。
-- `Audit Log` 挂载在 `Settings` 和 `Project Settings` 的 `?tab=audit` 参数下。
-- `Config Registry` 路径钉死为 `/workspace/lobby/config-registry`，与 Lobby、Lab 平级，属于工作台一级管理入口。
+- `Audit Log` 只挂载在 `Credential Center` 的 `?sub=audit` 子视图和 `Project Settings` 的 `?tab=audit` 参数下。
+- `Config Registry` 当前仍是 `Future`；如后续开放，预留路径为 `/workspace/lobby/config-registry?type=skills|agents|hooks|workflows`。
 
 ### 3.1 物理表现层定义（Physical Container）
 
@@ -112,9 +112,9 @@
 | `Recycle Bin` | 独立页面 (Page) | 属于管理流，需要完整的列表空间 |
 | `Credential Center` | 设置页子项 (Settings View) | 属于全局配置，位于设置体系内 |
 | `Template Library` | 独立页面 (Page) | 资产密集型，需要多列展示 |
-| `Audit Log` | 侧抽屉 (Drawer) / 页面 (Page) | 项目级用 Drawer（不打断编辑）；全局级用 Page |
+| `Audit Log` | 侧抽屉 (Drawer) / 页面子视图 (Subview) | 项目级用 Drawer（不打断编辑）；凭证级挂在设置页内 |
 | `Project Settings` | 侧抽屉 (Drawer) | 允许在 Studio 中边查阅正文边修改设定 |
-| `Config Registry` | 独立页面 (Page) | 与 Lobby 平级的管理入口 |
+| `Config Registry（Future）` | 独立页面 (Page, Future Reserve) | 仅预留全局管理入口，不纳入当前主视图真值 |
 | `Export Dialog` | 模态对话框 (Dialog) | 从工作流发起的轻量导出操作 |
 | `Version Panel` | 侧抽屉 (Drawer) | 章节版本列表，折扇式开合 |
 
@@ -259,7 +259,7 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 **信息密度：**
 
 - 比普通列表更紧凑（Compact Mode）。
-- 增加字段：删除时间、预计彻底清理时间。
+- 增加字段：删除时间。
 
 **恢复逻辑：**
 
@@ -410,8 +410,7 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 | 格式 | TXT / Markdown |
 | 体积 | 文件大小 |
 | 完成时间 | 导出完成时间戳 |
-| 下载按钮 | 下载链接（24 小时有效） |
-| 失效倒计时 | 剩余有效时间 |
+| 下载按钮 | 下载入口 |
 
 #### 5.6.4 异常态表现
 
@@ -429,7 +428,7 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 - 列表视图：模板卡片列表，支持分类/标签筛选、搜索。
 - 详情视图：模板预览，包含 Prompt 结构、参数定义、适用场景说明。
 - 创建/编辑表单：YAML/JSON 编辑区 + Schema 校验反馈 + 参数定义表单。
-- 删除确认：显示影响范围提示（当前有多少项目使用此模板）。
+- 删除确认：显示影响范围提示；如后端已返回引用数，则展示具体数量。
 - 另存为模板：从 Studio 某次成功的 Prompt 配置保存为模板的交互路径。
 
 #### 5.7.2 Built-in vs Custom 区分
@@ -441,11 +440,15 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 
 **详情页字段展示：**
 
-- Prompt 结构（核心配置）
-- 关联模型建议
-- 使用次数统计
-- 作者信息
+- 名称、描述、题材
+- `workflow_id` 与节点数量
+- `guided_questions`
+- Prompt 结构（核心配置）与节点快照
 - 创建/更新时间
+
+补充：
+
+- `关联模型建议`、`使用次数统计`、`作者信息` 当前不属于后端已提供字段，保留为 `Future` 展示预留。
 
 #### 5.7.3 冲突与删除处理
 
@@ -457,9 +460,8 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 
 **删除影响范围：**
 
-- 弹窗显示"有 N 个项目正在引用此模板"
-- 提示删除后这些项目将转为"自定义设置"
-- 需要二次确认才能执行删除
+- 若模板仍被项目或历史 workflow 执行引用，删除按钮禁用，并提示"模板仍被引用，不能删除"
+- 仅对未被引用的自定义模板提供二次确认删除
 
 ### 5.8 Credential Center（凭证中心）
 
@@ -500,24 +502,23 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 #### 5.9.1 基础规则
 
 - 项目审计日志：挂载在 `Project Settings Drawer` 的 `?tab=audit` 子 Tab。
-- 凭证审计日志：挂载在 `Settings -> Credential Center` 的 `?tab=audit` 子视图。
+- 凭证审计日志：挂载在 `Settings -> Credential Center` 的 `?sub=audit` 子视图。
 - 日志字段：时间戳、操作类型、操作人、目标资源、变更前后对比。
 - 筛选能力：按时间范围、操作类型、操作人筛选。
 - 视觉风格：沿用 Engine 日志风格（JetBrains Mono），区分"系统行为"与"安全审计"的视觉密度。
 
-#### 5.9.2 三级切换
+#### 5.9.2 双入口视图
 
-顶部面包屑控制三级视图切换：
+当前审计能力只定义两类入口：
 
-```text
-Global（全局审计） > Credential（凭证审计） > Project（项目审计）
-```
-
-| 级别 | 入口位置 | 容器类型 |
+| 类型 | 入口位置 | 容器类型 |
 |---|---|---|
-| Global | `/workspace/lobby/settings?tab=audit` | 独立页面 (Page) |
-| Credential | `/workspace/lobby/settings?tab=credentials&sub=audit` | 页面子视图 |
+| Credential | `/workspace/lobby/settings?tab=credentials&sub=audit&credential=:credentialId` | 页面子视图 |
 | Project | `/project/:projectId/settings?tab=audit` | 侧抽屉 (Drawer) |
+
+补充：
+
+- 当前没有“全局聚合审计”后端接口，不定义 `Global Audit` 总览页。
 
 #### 5.9.3 Payload 处理
 
@@ -537,7 +538,7 @@ Global（全局审计） > Credential（凭证审计） > Project（项目审计
 - 资产列表：四种资产（Skills / Agents / Hooks / Workflows）的 Tab 切换 + 卡片列表。
 - 详情视图：YAML/JSON 配置预览 + 语法高亮 + 元数据展示。
 - 编辑能力：带校验的编辑区 + Schema 错误提示 + 保存确认。
-- 实施标记：当前为 `Future`，本轮不作为前端实施真值。
+- 实施标记：当前为 `Future`，仅保留路由与容器预留，不作为当前前端实施真值。
 
 ### 5.11 Project Settings Drawer（项目设置抽屉）
 
@@ -551,6 +552,10 @@ Global（全局审计） > Credential（凭证审计） > Project（项目审计
 |---|---|---|---|
 | Lobby 进入 | 活跃度、归档状态 | 包含 | 项目卡片摘要 |
 | Studio 进入 | 设定一致性 | 不包含（避免信息过载） | 固定显示"完整度检查卡片" |
+
+补充：
+
+- `/project/:projectId/settings?tab=audit` 主要服务 Lobby / 项目管理入口；从 Studio 打开的 Drawer 默认不暴露 audit tab。
 
 #### 5.11.3 保存时机
 
@@ -649,7 +654,7 @@ Global（全局审计） > Credential（凭证审计） > Project（项目审计
 | 参数 | 非法/无效处理 |
 |---|---|
 | `?tab` 非法 | 回退到第一个 Tab |
-| `?workflow` 无效 | 自动请求并跳转至该项目下 `latest_workflow` |
+| `?workflow` 无效 | 回退到最近一次可访问的 workflow；若无可用 workflow，则回到未载入空态 |
 | `?analysis` 无效 | 回到列表页 |
 | `?chapter` 越界 | 回退到第一章或最后一章 |
 | `?mode` 非法 | 回退到默认模式 |
@@ -662,7 +667,7 @@ Global（全局审计） > Credential（凭证审计） > Project（项目审计
 | 重建章节任务 | "工作流运行中，不可更易计划。" |
 | 导出入口 | "章节尚未确认，无墨可出。" |
 | 删除内置模板 | "官方典籍，不可删改。" |
-| 编辑他人凭证 | "非己之物，不可擅动。" |
+| 删除被引用模板 | "模板仍被引用，暂不可删除。" |
 
 ### 8.8 焦点流与键盘（A11y Flow）
 
@@ -674,5 +679,5 @@ Global（全局审计） > Credential（凭证审计） > Project（项目审计
 
 ---
 
-*文档版本：2.4.0*  
-*更新说明：补全物理表现层、Incubator 状态机、Studio 面板体系、Export 预检、Lab 路由联动、Recycle Bin 枯墨美学、页面级状态矩阵、Query 参数回退规则与禁用态文案。*
+*文档版本：2.4.1*  
+*更新说明：收口 Audit 挂载点与 Settings 路由，明确 Config Registry 为 Future 预留，移除模板/导出/回收站中超出当前后端真值的字段与行为。*

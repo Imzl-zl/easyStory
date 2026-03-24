@@ -2,18 +2,25 @@
 
 ## Concepts
 
-- 本文件记录项目协作知识，不替代 `docs/specs`、`docs/design`、`docs/plans`、`config` 或当前代码。
-- 正式真值优先级：`docs/specs/architecture.md` > `docs/specs/database-design.md` > `docs/specs/config-format.md` > `docs/design/*.md` > `docs/plans/*.md` > 本文件。
+- 本文件记录跨会话稳定协作知识，不替代 `docs/`、`config/` 或当前代码。
 - 当前标准创作主链路：`ProjectSetting -> Outline -> OpeningPlan -> ChapterTask -> Chapter`。
 - 后端实现边界固定为：`Entry -> Service -> Engine -> Infrastructure`。
 
-## Read First
+## Source Lookup
 
 - 总入口：`docs/README.md`
 - 架构真值：`docs/specs/architecture.md`
 - 数据边界：`docs/specs/database-design.md`
 - 配置边界：`docs/specs/config-format.md`
 - 当前主链路补充计划：`docs/plans/2026-03-19-pre-writing-assets.md`
+
+## Collaboration
+
+- 文件归属：规则看 `AGENTS.md`；稳定知识写 `tools.md`；当前状态看 `memory.md`；重要历史根因查 `memory/archive/`；正式设计查 `docs/`
+- 协作恢复默认先按当前已加载的 `AGENTS.md` 执行，再读项目根 `tools.md` / `memory.md`；设计细节只在需要时查 `docs/`
+- 只把跨会话仍有效的信息写进本文件；不要写当天进度、Validation 通过数、一次性 TODO 或临时审查播报
+- 同一条知识只保留一个主归属；已在 `docs/` 或 `AGENTS.md` 说清的内容，不再在这里展开第二份
+- 深入追根因时，优先查当月归档最近相关条目，不默认整月通读
 
 ## Tools
 
@@ -77,7 +84,6 @@
 - `tools.md` / `memory.md` 发生冲突时，以正式设计、配置和当前代码为准。
 - 外部安装的 project skills 只作为协作增强，不覆盖 `AGENTS.md`、`docs/`、`config/` 与当前代码真值。
 - `.serena` 里的旧 memory 可能滞后于磁盘当前状态；实现判断以当前仓库文件为准。
-- 工作区当前是脏的，包含用户已有未提交改动和本轮实现改动；不要回滚不属于当前任务的文件。
 - 涉及 DB 事务和文件系统副作用的删除/导出逻辑时，先完成 `commit`，再做不可回滚的文件删除或落盘清理；否则一旦事务失败，就会制造"数据库已回滚、文件却已经删掉"的双真值。
 - 当前项目不是"只有 docs 的空仓库"，`apps/api` 已有实装代码和通过的测试基线。
 - Alembic CLI 若不显式覆盖 `sqlalchemy.url`，默认会命中 `apps/api/.runtime/easystory.db`；做 baseline/autogenerate/临时验证时要用 `-x database_url=...` 或在 Config 里显式覆盖。
