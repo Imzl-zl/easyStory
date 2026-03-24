@@ -38,13 +38,16 @@
 | Project | `Lobby` / `Studio` | 创建、列表、详情、更新、软删除、恢复、项目设定更新、完整度检查 | `MVP 已支持` |
 | Content | `Studio` | `Outline`/`OpeningPlan` 保存与确认，章节列表/详情/保存/确认，版本列表/回滚/最佳版本 | `MVP 已支持` |
 | Workflow | `Engine` | 启动、详情、暂停、恢复、取消、章节任务重建、任务列表、任务编辑 | `MVP 已支持` |
+| Template | `Lobby` / `Settings` | 模板列表、详情、创建、更新、删除 | `MVP 已支持` |
 | Credential | 全局设置 | 用户/项目级凭证列表、创建、更新、删除、验证、启用、停用 | `MVP 已支持` |
 | Analysis | `Lab` | 新建分析、列表、详情 | `MVP 已支持` |
 | Review | `Engine` | 审核摘要、审核动作列表 | `MVP 已支持` |
 | Billing | `Engine` | 工作流账单摘要、Token 使用明细 | `MVP 已支持` |
 | Context | `Engine` | 上下文预览 | `MVP 已支持` |
 | Observability | `Engine` | 节点执行、执行日志、SSE 事件流、Prompt 回放 | `MVP 已支持` |
+| Audit | `Settings` / `Project Settings` | 项目审计日志、凭证审计日志 | `MVP 已支持` |
 | Export | `Engine` | 项目导出列表、按工作流创建导出、下载导出文件 | `MVP 已支持` |
+| Config Registry | `Settings` / `Admin` | Skills/Agents/Hooks/Workflows 列表、详情、更新 | `Future` |
 ### 2.1 UI 必须按当前后端收口的点
 
 - `Auth` 只做注册 / 登录，不出现忘记密码流程。
@@ -64,8 +67,13 @@
 /workspace
   /lobby
     /new -> incubator
+      ?mode=template|chat|one-click
+      ?step=1|2|3
+    /templates
+      /:templateId
     /recycle-bin
     /settings
+      ?tab=credentials|audit|config
 
   /project/:projectId/studio
     ?panel=setting|outline|opening-plan|chapter
@@ -80,6 +88,9 @@
   /project/:projectId/lab
     ?analysis=:analysisId
     ?mode=list|create
+
+  /project/:projectId/settings
+    ?tab=audit
 ```
 
 规则：
@@ -87,6 +98,8 @@
 - `Lobby / Studio / Engine / Lab` 是主视图，不再新增同级页面。
 - `Incubator / Recycle Bin / Export Dialog / Version Panel` 是子视图，不升级为一级路由主干。
 - `Review & Diff` 属于 `Engine` 的 workflow 子视图；`Studio` 最多提供跳转入口，不直接承载审核数据面板。
+- `Templates` 作为 `Lobby` 的子视图，支持列表和详情路由。
+- `Audit Log` 挂载在 `Settings` 和 `Project Settings` 的 `?tab=audit` 参数下。
 ---
 ## 4. UI 状态映射
 ### 4.1 项目状态
@@ -212,6 +225,32 @@
 - 发起导出前先选择格式。
 - 只显示 `txt` 与 `markdown`。
 - 下载入口来自项目导出列表，不额外造一套下载中心。
+
+### 5.7 Template Library（模板库）
+
+- 入口位置：`Lobby` 侧边栏或全局设置子视图。
+- 列表视图：模板卡片列表，支持分类/标签筛选、搜索。
+- 详情视图：模板预览，包含 Prompt 结构、参数定义、适用场景说明。
+- 创建/编辑表单：YAML/JSON 编辑区 + Schema 校验反馈 + 参数定义表单。
+- 删除确认：显示影响范围提示（当前有多少项目使用此模板）。
+- 另存为模板：从 Studio 某次成功的 Prompt 配置保存为模板的交互路径。
+
+### 5.8 Audit Log（审计日志）
+
+- 项目审计日志：挂载在 `Project Settings Drawer` 的 `?tab=audit` 子 Tab。
+- 凭证审计日志：挂载在 `Settings -> Credential Center` 的 `?tab=audit` 子视图。
+- 日志字段：时间戳、操作类型、操作人、目标资源、变更前后对比。
+- 筛选能力：按时间范围、操作类型、操作人筛选。
+- 视觉风格：沿用 Engine 日志风格（JetBrains Mono），区分"系统行为"与"安全审计"的视觉密度。
+
+### 5.9 Config Registry Admin（配置注册中心）
+
+- 入口位置：`Settings -> Admin` 或独立 `/admin/config` 路由。
+- 资产列表：四种资产（Skills / Agents / Hooks / Workflows）的 Tab 切换 + 卡片列表。
+- 详情视图：YAML/JSON 配置预览 + 语法高亮 + 元数据展示。
+- 编辑能力：带校验的编辑区 + Schema 错误提示 + 保存确认。
+- 实施标记：当前为 `Future`，本轮不作为前端实施真值。
+
 ---
 ## 6. 响应式规则
 ### 6.1 断点
@@ -230,6 +269,8 @@
 | `Studio` | 三栏 | 两栏 + 抽屉 | 章节列表与编辑分步进入 |
 | `Engine` | 概览 + 任务 + 详情 | 概览 / 详情分 tab | 只提供状态浏览，不做复杂编排 |
 | `Lab` | 列表 + 详情 + 新建 | 列表 / 详情切换 | 列表优先，详情单独进入 |
+| `Template Library` | 三列卡片 + 右侧详情侧板 | 双列卡片 + 抽屉详情 | 单列卡片，详情 Bottom Sheet |
+| `Config Registry` | 双栏：配置树 + 编辑区 | 隐藏配置树，顶部导航 | 编辑器 readOnly，全屏编辑 |
 
 补充：
 
@@ -256,6 +297,9 @@
 | 无章节 | 引导先重建章节任务或启动工作流 |
 | 无分析结果 | 引导新建第一条分析记录 |
 | 无导出记录 | 引导从已完成工作流发起导出 |
+| 模板库为空 | "书案初设，尚无典籍。点击'创建模板'，为你的创作定下法度。" |
+| 审计日志为空 | "雪地无痕，暂无往来行迹。待你落笔生花，此处自见功过。" |
+| Config Registry 为空 | "机枢未发，灵窍尚待开启。" |
 ### 8.2 加载态
 
 - 列表用骨架屏。
@@ -278,5 +322,5 @@
 - 当前没有可用 `workflow_id` 时，禁用导出入口。
 ---
 
-*文档版本：2.1.0*  
-*更新说明：补充大屏 Web 工作台语义、折扇式侧板、湿墨/入纸状态反馈与 Ink Pool 触发规则。*
+*文档版本：2.2.0*  
+*更新说明：补全 Template/Audit/Config Registry 能力矩阵与路由定义，新增分视图交互规则、响应式策略与水墨风空态文案。*

@@ -52,13 +52,16 @@
 
 | 视图 | 挂载位置 | 说明 | 实施标记 |
 |---|---|---|---|
-| `Incubator` | 从 `Lobby` 进入 | 新建项目向导，不单独升级为第五主工作台 | `MVP 已支持` |
+| `Incubator` | 从 `Lobby` 进入 | 新建项目向导，支持模板问答/自由对话/一键创建三种模式 | `MVP 已支持` |
 | `Project Settings Drawer` | `Lobby` / `Studio` | 项目基础信息与设定完整度检查入口 | `MVP 已支持` |
 | `Version Panel` | `Studio` | 章节版本列表、回滚、最佳版本标记 | `MVP 已支持` |
 | `Review & Diff` | `Engine` 子视图 | 审核摘要与问题明细；MVP 以只读定位为主 | `MVP 已支持` |
 | `Export Dialog` | `Engine` | 从工作流发起导出，查看项目导出历史 | `MVP 已支持` |
 | `Recycle Bin` | `Lobby` 子视图 | 已删除项目列表与恢复 | `MVP 已支持` |
 | `Credential Center` | 全局设置 | 用户/项目级模型凭证管理、验证、启用与停用 | `MVP 已支持` |
+| `Template Library` | `Lobby` 子视图 | 模板列表、详情、创建、编辑、删除 | `MVP 已支持` |
+| `Audit Log` | `Settings` / `Project Settings` | 项目审计日志、凭证审计日志 | `MVP 已支持` |
+| `Config Registry Admin` | `Settings` / `Admin` | Skills/Agents/Hooks/Workflows 管理 | `Future` |
 
 ### 2.3 视图层级规则
 
@@ -146,6 +149,54 @@ Lab
 
 - 所有动效都必须支持 `prefers-reduced-motion`，且 `Engine` 里的实时状态优先级高于装饰动效。
 - 折扇式侧板只发生在面板开合，不延伸到 tab 切换和常规列表刷新。
+
+### 3.5 水墨流组件规范
+
+#### 3.5.1 枯墨与润墨的状态隐喻
+
+**润墨（Active）状态**：
+
+- 适用场景：正在编辑或刚生成的内容
+- 视觉表现：边缘有极轻微的"湿润感"，通过 `text-shadow: 0 0 2px rgba(46, 111, 106, 0.15)` 实现极淡的晕染
+
+**枯墨（Stale）状态**：
+
+- 适用场景：失效内容，需要重新生成
+- 视觉表现：透明度降低 + "枯笔"纹理效果，暗示内容已"干涸"
+- 左侧边缘出现一条"干墨笔触"的垂直警示线
+
+| 状态 | 视觉隐喻 | 用户感知 |
+|---|---|---|
+| Active（润墨） | 边缘晕染、微湿润感 | 新鲜、可继续编辑 |
+| Stale（枯墨） | 干涸纹理、透明度降低 | 过时、需重新生成 |
+
+#### 3.5.2 朱砂印章（验证反馈）
+
+- 验证通过后显示"朱砂印章"图标，颜色使用 `--accent-success` 变体
+- 带轻微的印压纹理感（`box-shadow: inset 0 0 4px rgba(0,0,0,0.3)`）
+- 验证失败时，输入框底部出现"红墨泼溅"般的警示线条（1px 不规则波浪线）
+
+#### 3.5.3 长卷滚动条
+
+- 适用场景：Audit Log、Engine 日志流、Config Registry 列表
+- 滚动条轨道：设计为一根"细长笔杆"，颜色使用 `--bg-muted`
+- 滚动条滑块：设计为"笔头"，颜色使用 `--accent-ink`
+- 蘸墨效果：滑块呈现渐变色（顶部浅、底部深），模拟蘸墨效果
+
+#### 3.5.4 无障碍降级
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  .ink-ripple,
+  .fan-open {
+    transition: none !important;
+    animation: none !important;
+  }
+  .seal-stamp {
+    transform: none !important;
+  }
+}
+```
 
 ---
 
@@ -296,5 +347,5 @@ Lab
 
 ---
 
-*文档版本：7.1.0*  
-*更新说明：补充大屏 Web 工作台语义、湿墨/入纸反馈、折扇式侧板与静态纸纹规则。*
+*文档版本：7.2.0*  
+*更新说明：补全 Template/Audit/Config Registry 子视图定义，新增水墨流组件规范（枯墨/润墨隐喻、朱砂印章、长卷滚动条）。*
