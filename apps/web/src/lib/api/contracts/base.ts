@@ -98,6 +98,14 @@ export type CredentialCreatePayload = {
   default_model: string;
 };
 
+export type CredentialUpdatePayload = {
+  api_dialect?: CredentialApiDialect | null;
+  display_name?: string | null;
+  api_key?: string | null;
+  base_url?: string | null;
+  default_model?: string | null;
+};
+
 export type CredentialVerifyResult = {
   credential_id: string;
   status: "verified";

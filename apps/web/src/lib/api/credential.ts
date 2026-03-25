@@ -1,6 +1,7 @@
 import { requestJson } from "@/lib/api/client";
 import type {
   CredentialCreatePayload,
+  CredentialUpdatePayload,
   CredentialVerifyResult,
   CredentialView,
 } from "@/lib/api/types";
@@ -16,6 +17,13 @@ export function listCredentials(ownerType: "user" | "project", projectId?: strin
 export function createCredential(payload: CredentialCreatePayload) {
   return requestJson<CredentialView>("/api/v1/credentials", {
     method: "POST",
+    body: payload,
+  });
+}
+
+export function updateCredential(credentialId: string, payload: CredentialUpdatePayload) {
+  return requestJson<CredentialView>(`/api/v1/credentials/${credentialId}`, {
+    method: "PUT",
     body: payload,
   });
 }

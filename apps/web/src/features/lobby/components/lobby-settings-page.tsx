@@ -1,53 +1,119 @@
 "use client";
 
+import { useCallback, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import {
+  isValidCredentialCenterMode,
+  isValidCredentialCenterScope,
+  normalizeCredentialSettingsPath,
+  resolveCredentialCenterMode,
+  resolveCredentialCenterScope,
+} from "@/features/lobby/components/lobby-settings-support";
 import { CredentialCenter } from "@/features/settings/components/credential-center";
-import type { CredentialCenterMode } from "@/features/settings/components/credential-center-support";
+import { normalizeOptionalQueryValue } from "@/features/settings/components/credential-center-support";
 
 export function LobbySettingsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const mode = resolveCredentialMode(searchParams.get("sub"));
-  const credentialId = searchParams.get("credential");
+  const [isPending, startTransition] = useTransition();
+  const routeMode = searchParams.get("sub");
+  const routeScope = searchParams.get("scope");
+  const routeProjectId = searchParams.get("project");
+  const routeCredentialId = searchParams.get("credential");
+  const mode = resolveCredentialCenterMode(routeMode);
+  const projectId = normalizeOptionalQueryValue(routeProjectId);
+  const scope = resolveCredentialCenterScope(routeScope, projectId);
+  const credentialId = normalizeOptionalQueryValue(routeCredentialId);
+  const currentSearch = searchParams.toString();
+
+  const setParams = useCallback(
+    (patches: Record<string, string | null>) => {
+      startTransition(() => {
+        router.replace(normalizeCredentialSettingsPath(pathname, currentSearch, patches));
+      });
+    },
+    [currentSearch, pathname, router],
+  );
+
+  useEffect(() => {
+    const hasInvalidMode = routeMode !== null && !isValidCredentialCenterMode(routeMode);
+    const hasInvalidScope =
+      (routeScope !== null && !isValidCredentialCenterScope(routeScope)) ||
+      (routeScope === "project" && projectId === null);
+    const hasUnnormalizedProjectId = routeProjectId !== projectId;
+    const hasUnnormalizedCredentialId = routeCredentialId !== credentialId;
+    if (
+      !hasInvalidMode &&
+      !hasInvalidScope &&
+      !hasUnnormalizedProjectId &&
+      !hasUnnormalizedCredentialId
+    ) {
+      return;
+    }
+    setParams({
+      credential: hasUnnormalizedCredentialId ? credentialId : routeCredentialId,
+      project: hasUnnormalizedProjectId ? projectId : routeProjectId,
+      scope: hasInvalidScope ? scope : routeScope,
+      sub: hasInvalidMode ? mode : routeMode,
+    });
+  }, [
+    credentialId,
+    mode,
+    projectId,
+    routeCredentialId,
+    routeMode,
+    routeProjectId,
+    routeScope,
+    scope,
+    setParams,
+  ]);
 
   return (
     <CredentialCenter
       headerAction={<Link className="ink-button-secondary" href="/workspace/lobby">返回 Lobby</Link>}
+      isNavigationPending={isPending}
       mode={mode}
+      projectId={projectId}
+      scope={scope}
       selectedCredentialId={credentialId}
-      onModeChange={(nextMode) => setSettingsParams(router, pathname, searchParams, { sub: nextMode, credential: nextMode === "audit" ? credentialId : null })}
-      onSelectCredential={(nextCredentialId) => setSettingsParams(router, pathname, searchParams, { sub: "audit", credential: nextCredentialId })}
+      onModeChange={(nextMode) =>
+        setParams({
+          credential: nextMode === "audit" ? credentialId : null,
+          scope,
+          sub: nextMode,
+        })
+      }
+      onScopeChange={(nextScope) =>
+        setParams({
+          credential: null,
+          scope: nextScope,
+          sub: mode,
+        })
+      }
+      onSelectCredential={(nextCredentialId) =>
+        setParams({
+          credential: nextCredentialId,
+          scope,
+          sub: "audit",
+        })
+      }
+      onSelectCredentialForEdit={(nextCredentialId) =>
+        setParams({
+          credential: nextCredentialId,
+          scope,
+          sub: "list",
+        })
+      }
+      onResetEditor={() =>
+        setParams({
+          credential: null,
+          scope,
+          sub: "list",
+        })
+      }
     />
   );
-}
-
-function resolveCredentialMode(value: string | null): CredentialCenterMode {
-  return value === "audit" ? "audit" : "list";
-}
-
-function setSettingsParams(
-  router: ReturnType<typeof useRouter>,
-  pathname: string,
-  current: ReturnType<typeof useSearchParams>,
-  next: {
-    sub?: string | null;
-    credential?: string | null;
-  },
-) {
-  const params = new URLSearchParams(current.toString());
-  params.set("tab", "credentials");
-  updateSearchParam(params, "sub", next.sub ?? null);
-  updateSearchParam(params, "credential", next.credential ?? null);
-  router.push(`${pathname}?${params.toString()}`);
-}
-
-function updateSearchParam(params: URLSearchParams, key: string, value: string | null) {
-  if (value) {
-    params.set(key, value);
-    return;
-  }
-  params.delete(key);
 }

@@ -20,6 +20,9 @@
 - config_registry 管理闭环：skills / agents / hooks / workflows 查询与 detail / update，strict DTO + staged config 校验
 - Config Registry 前端闭环：Lobby 子视图已支持 skills / agents / hooks / workflows 列表、详情预览与 JSON 编辑保存
 - Project Settings 前端闭环：`/workspace/project/:projectId/settings` 已支持项目设定编辑与项目审计日志子页
+- Credential Center 前端闭环：`/workspace/lobby/settings?tab=credentials` 已支持全局/项目作用域切换、项目入口、凭证编辑更新与审计子视图
+- Credential Center 删除确认闭环：删除前现有显式确认弹窗，影响文案对齐后端作用域优先级与 usage 历史限制
+- Credential Center 覆盖提示闭环：带项目上下文查看全局凭证时，可显式看到哪些 provider 已被项目级启用凭证接管
 - 数据库演进闭环：Alembic baseline，startup 与文件型 SQLite helper 优先走 Alembic
 - Web 工作台主子视图已基本路由化：Lobby / Incubator / Config Registry / Template Library / Recycle Bin / Global Settings / Project Settings / Studio / Engine / Lab
 
@@ -76,3 +79,8 @@
 - 2026-03-25：收口 Engine Prompt Replay URL 状态：`execution` 成为 Engine 页的唯一选中真值，`overview/logs -> replay` 一次性写入 `tab + execution`，workflow 切换与动作成功回写统一通过 helper 决定是否保留 execution；execution 列表加载完成后会显式清理 stale `execution` 参数，但 observability 查询失败时不静默清理；同时把 `EnginePage` 左栏与顶部 action 拆成独立组件，`engine-page.tsx` 降到 289 行，前端 `tsc/lint/test:unit` 通过
 - 2026-03-25：补齐 Config Registry 前端管理页：Lobby 新增“配置中心”入口与 `/workspace/lobby/config-registry` 路由，已支持 skills / agents / hooks / workflows 的列表、详情预览和完整 JSON DTO 编辑保存；前端 contract 直接对齐后端 `ConfigRegistry` DTO，不再自造第二套字段语义；前端 `tsc/lint/test:unit` 通过
 - 2026-03-25：补齐 Project Settings 前端子页：Lobby 项目卡新增“项目设置”入口，`/workspace/project/:projectId/settings` 已支持设定编辑与 `?tab=audit&event=` 项目审计过滤；工作台导航在 settings 子页下继续归属 Studio，前端 `tsc/lint/test:unit` 通过
+- 2026-03-25：补齐 Credential Center 前端 scope/update 闭环：全局设置页现支持 `scope=user|project` 与 `project=:projectId` 语义，项目设置侧栏新增“项目凭证”入口，凭证列表支持编辑，表单支持 create/edit 两种模式与 update payload 精准构造；新增 query/payload support 单测，前端 `tsc/lint/test:unit` 通过
+- 2026-03-25：补齐 Credential Center 删除确认交互：凭证列表删除改为显式确认弹窗，影响说明仅基于已确认规则（项目级 > 全局 > 系统[仅显式允许]、usage 历史会阻止删除、成功后写审计）；新增 delete confirm support 单测，前端 `tsc/lint/test:unit` 通过
+- 2026-03-25：补齐 Credential Center 覆盖提示：在带项目上下文的全局凭证视图里，前端会并行查询当前项目凭证，并按 active provider 匹配显示“已被项目级重载”提示；覆盖提示查询失败时会显式报错，不做静默忽略；新增 override support 单测，前端 `tsc/lint/test:unit` 通过
+- 2026-03-25：收口 Credential Center 动作状态语义：`actionMutation.variables` 现在作为唯一 pending action 真值，列表按钮可按 `credentialId + actionType` 显示“验证中/启用中/停用中/删除中...”；验证成功反馈时间统一改为 UTC 格式，并新增 action/feedback support 单测
+- 2026-03-25：修复 Credential Center review issues：`audit` 子视图收口为只读审计视图，不再暴露 verify/enable/disable/delete；同时在 mutation 期间锁定 `scope`/`mode`/审计目标切换，避免 pending 语义和反馈上下文漂移

@@ -137,6 +137,12 @@ function ProjectSettingsSidebar({
             <Link className="ink-button-secondary" href={`/workspace/project/${projectId}/engine`}>
               打开 Engine
             </Link>
+            <Link
+              className="ink-button-secondary"
+              href={`/workspace/lobby/settings?tab=credentials&scope=project&project=${projectId}&sub=list`}
+            >
+              项目凭证
+            </Link>
           </div>
         </div>
       </SectionCard>

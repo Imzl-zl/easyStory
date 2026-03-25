@@ -58,7 +58,7 @@
 | `Review & Diff` | `Engine` 子视图 | 审核摘要与问题明细；MVP 以只读定位为主 | `MVP 已支持` |
 | `Export Dialog` | `Engine` | 从工作流发起导出，查看项目导出历史 | `MVP 已支持` |
 | `Recycle Bin` | `Lobby` 子视图 | 已删除项目列表与恢复 | `MVP 已支持` |
-| `Credential Center` | 全局设置 | 用户/项目级模型凭证管理、验证、启用与停用 | `MVP 已支持` |
+| `Credential Center` | 全局设置 | 用户/项目级模型凭证管理，支持作用域切换、覆盖提示、编辑、验证、启用与停用 | `MVP 已支持` |
 | `Template Library` | `Lobby` 子视图 | 模板列表、详情、创建、编辑、删除 | `MVP 已支持` |
 | `Audit Log` | `Credential Center` / `Project Settings` | 项目审计日志、凭证审计日志 | `MVP 已支持` |
 | `Config Registry Admin` | `Lobby` 子视图 | Skills/Agents/Hooks/Workflows 管理 | `MVP 已支持` |
@@ -214,6 +214,7 @@ Lab
 - 最近更新时间、项目状态、目标字数等摘要信息
 - 回收站入口与已删除项目恢复
 - 全局设置与凭证中心入口
+- 项目设置侧栏到当前项目凭证中心的跳转入口
 
 **Future：**
 
