@@ -57,6 +57,9 @@ function LobbyToolbar() {
       <Link className="ink-button-secondary" href="/workspace/lobby/settings?tab=credentials&sub=list">
         全局设置
       </Link>
+      <Link className="ink-button-secondary" href="/workspace/lobby/config-registry?type=skills">
+        配置中心
+      </Link>
       <Link className="ink-button-secondary" href="/workspace/lobby/recycle-bin">
         回收站
       </Link>

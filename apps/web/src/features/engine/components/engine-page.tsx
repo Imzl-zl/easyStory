@@ -1,30 +1,26 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { EmptyState } from "@/components/ui/empty-state";
 import { SectionCard } from "@/components/ui/section-card";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { EngineDetailPanel } from "@/features/engine/components/engine-detail-panel";
+import { EnginePageHeaderActions } from "@/features/engine/components/engine-page-header-actions";
+import { EnginePageSidebar } from "@/features/engine/components/engine-page-sidebar";
 import { resolveEngineDetailTab } from "@/features/engine/components/engine-detail-panel-support";
 import {
   buildEnginePathWithParams,
   createWorkflowBoundValue,
+  resolveExecutionParamForWorkflow,
+  resolveReplayExecutionSelection,
   resolveStartWorkflowDisabledReason,
   resolveWorkflowBoundValue,
-  shouldResetSelectedExecution,
   useRememberLastWorkflow,
 } from "@/features/engine/components/engine-page-support";
 import { EngineExportPanel } from "@/features/engine/components/engine-export-panel";
 import { resolveWorkflowEventsBanner, useWorkflowEventsQuerySync, useWorkflowEventsStream } from "@/features/engine/components/engine-events-stream";
-import { EngineWorkflowDebugPanel } from "@/features/engine/components/engine-workflow-debug-panel";
-import { EngineWorkflowSummaryCard } from "@/features/engine/components/engine-workflow-summary-card";
 import { buildWorkflowSummary } from "@/features/engine/components/engine-workflow-summary-support";
-import { EngineWorkflowStatusCallout } from "@/features/engine/components/engine-workflow-status-callout";
-import { PreparationStatusPanel } from "@/features/project/components/preparation-status-panel";
 import { resolveEngineWorkflowControls, shouldPollWorkflow } from "@/features/engine/components/engine-workflow-controls";
 import { getWorkflowBillingSummary, listWorkflowTokenUsages } from "@/lib/api/billing";
 import { getErrorMessage } from "@/lib/api/client";
@@ -48,8 +44,8 @@ export function EnginePage({ projectId }: EnginePageProps) {
   const lastWorkflowByProject = useWorkspaceStore((state) => state.lastWorkflowByProject);
   const setLastWorkflow = useWorkspaceStore((state) => state.setLastWorkflow);
   const workflowId = searchParams.get("workflow") ?? lastWorkflowByProject[projectId] ?? "";
+  const selectedExecutionId = searchParams.get("execution") ?? "";
   const [workflowInputState, setWorkflowInputState] = useState(() => createWorkflowBoundValue(workflowId, workflowId));
-  const [selectedExecutionState, setSelectedExecutionState] = useState(() => createWorkflowBoundValue(workflowId, ""));
   const [feedback, setFeedback] = useState<string | null>(null);
   const workflowInput = resolveWorkflowBoundValue(workflowInputState, workflowId, workflowId);
   const setParams = (patches: Record<string, string | null>) => startTransition(() => router.replace(buildEnginePathWithParams(pathname, searchParams.toString(), patches)));
@@ -86,8 +82,15 @@ export function EnginePage({ projectId }: EnginePageProps) {
   });
 
   const logExecutions = logsQuery.data?.[0] ?? [];
-  const selectedExecutionId = resolveWorkflowBoundValue(selectedExecutionState, workflowId, "");
-  const activeSelectedExecutionId = shouldResetSelectedExecution({ executions: logExecutions, selectedExecutionId }) ? "" : selectedExecutionId;
+  const replayExecutionSelection = resolveReplayExecutionSelection({
+    canValidateSelection:
+      hasWorkflow &&
+      logsQuery.data !== undefined &&
+      (tab === "logs" || tab === "replays" || tab === "overview"),
+    executions: logExecutions,
+    selectedExecutionId,
+  });
+  const activeSelectedExecutionId = replayExecutionSelection.activeSelectedExecutionId;
   const promptReplayQuery = useQuery({
     queryKey: ["prompt-replays", workflowId, activeSelectedExecutionId],
     queryFn: () => listPromptReplays(workflowId, activeSelectedExecutionId),
@@ -111,8 +114,14 @@ export function EnginePage({ projectId }: EnginePageProps) {
       setFeedback("工作流状态已更新。");
       setLastWorkflow(projectId, result.execution_id);
       setWorkflowInputState(createWorkflowBoundValue(result.execution_id, result.execution_id));
-      setSelectedExecutionState(createWorkflowBoundValue(result.execution_id, ""));
-      setParams({ workflow: result.execution_id });
+      setParams({
+        execution: resolveExecutionParamForWorkflow({
+          currentExecutionId: selectedExecutionId,
+          currentWorkflowId: workflowId,
+          nextWorkflowId: result.execution_id,
+        }),
+        workflow: result.execution_id,
+      });
       queryClient.invalidateQueries({ queryKey: ["workflow"] });
       queryClient.invalidateQueries({ queryKey: ["workflow-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["workflow-observability"] });
@@ -136,6 +145,23 @@ export function EnginePage({ projectId }: EnginePageProps) {
     workflowId,
   });
 
+  useEffect(() => {
+    if (!replayExecutionSelection.shouldClearExecutionParam) {
+      return;
+    }
+    startTransition(() => {
+      router.replace(
+        buildEnginePathWithParams(pathname, searchParams.toString(), { execution: null }),
+      );
+    });
+  }, [
+    pathname,
+    replayExecutionSelection.shouldClearExecutionParam,
+    router,
+    searchParams,
+    startTransition,
+  ]);
+
   const executionLogs = workflowEvents.logs;
   const reviewSummary = reviewsQuery.data?.[0] ?? null;
   const reviewActions = reviewsQuery.data?.[1] ?? [];
@@ -155,6 +181,8 @@ export function EnginePage({ projectId }: EnginePageProps) {
     workflowControls.primary.disabled ||
     Boolean(startWorkflowDisabledReason);
   const openEngineTab = (nextTab: EngineTabKey) => setParams({ tab: nextTab });
+  const openReplayExecution = (executionId: string) =>
+    setParams({ execution: executionId, tab: "replays" });
 
   useWorkflowEventsQuerySync({
     workflowId,
@@ -168,93 +196,53 @@ export function EnginePage({ projectId }: EnginePageProps) {
         title="Engine"
         description="执行控制台优先回答三个问题：现在在跑什么、为何暂停、是否可以继续。"
         action={
-          <div className="flex flex-wrap gap-2">
-            {workflowSummary ? (
-              <>
-                <StatusBadge
-                  status={workflowSummary.statusTone}
-                  label={workflowSummary.statusLabel}
-                />
-                <StatusBadge
-                  status={workflowSummary.modeTone}
-                  label={workflowSummary.modeLabel}
-                />
-              </>
-            ) : null}
-            <button
-              className="ink-button"
-              disabled={primaryActionDisabled}
-              onClick={() => actionMutation.mutate(workflowControls.primary.action)}
-              title={startWorkflowDisabledReason ?? undefined}
-            >
-              {actionMutation.isPending ? "处理中..." : workflowControls.primary.label}
-            </button>
-            {workflowControls.secondary.map((control) => (
-              <button key={control.action} className={control.tone === "danger" ? "ink-button-danger" : "ink-button-secondary"} disabled={actionMutation.isPending || control.disabled} onClick={() => actionMutation.mutate(control.action)}>
-                {control.label}
-              </button>
-            ))}
-          </div>
+          <EnginePageHeaderActions
+            isActionPending={actionMutation.isPending}
+            onAction={(action) => actionMutation.mutate(action)}
+            primaryAction={workflowControls.primary}
+            primaryActionDisabled={primaryActionDisabled}
+            secondaryControls={workflowControls.secondary}
+            startWorkflowDisabledReason={startWorkflowDisabledReason}
+            workflowSummary={workflowSummary}
+          />
         }
       >
         <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-          <div className="space-y-4">
-            <label className="block space-y-2">
-              <span className="label-text">当前 workflow id</span>
-              <input className="ink-input" value={workflowInput} onChange={(event) => setWorkflowInputState(createWorkflowBoundValue(workflowId, event.target.value))} />
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="ink-button-secondary"
-                disabled={!workflowInput || isPending}
-                onClick={() => {
-                  setFeedback(null);
-                  setSelectedExecutionState(createWorkflowBoundValue(workflowInput, ""));
-                  setParams({ workflow: workflowInput });
-                }}
-              >
-                载入已有 workflow
-              </button>
-              <button aria-haspopup="dialog" className="ink-button-secondary" disabled={!hasWorkflow} onClick={() => setParams({ export: "1" })}>
-                导出成稿
-              </button>
-              <Link className="ink-button-secondary" href={`/workspace/project/${projectId}/studio?panel=chapter`}>
-                返回 Studio
-              </Link>
-            </div>
-            {startWorkflowDisabledReason ? <div className="rounded-2xl border border-[rgba(183,121,31,0.18)] bg-[rgba(183,121,31,0.08)] px-4 py-3 text-sm text-[var(--accent-warning)]">{startWorkflowDisabledReason}</div> : null}
-            {workflowEventsBanner ? <div className="rounded-2xl bg-[rgba(183,121,31,0.1)] px-4 py-3 text-sm text-[var(--accent-warning)]">{workflowEventsBanner}</div> : null}
-            {workflowEventsErrorMessage ? <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">{workflowEventsErrorMessage}</div> : null}
-            <EngineWorkflowStatusCallout workflow={workflowQuery.data} onOpenTab={openEngineTab} />
-            {feedback ? <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">{feedback}</div> : null}
-            {workflowQuery.error ? <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">{getErrorMessage(workflowQuery.error)}</div> : null}
-            {workflowQuery.data ? (
-              <div className="space-y-4">
-                {workflowSummary ? (
-                  <EngineWorkflowSummaryCard summary={workflowSummary} />
-                ) : null}
-                <EngineWorkflowDebugPanel workflow={workflowQuery.data} />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <PreparationStatusPanel projectId={projectId} />
-                <EmptyState
-                  title="尚未载入工作流"
-                  description="请先看当前准备状态；若条件已满足可直接启动，若已有 workflow id 也可手动载入。"
-                  action={
-                    <button
-                      className="ink-button"
-                      disabled={primaryActionDisabled}
-                      onClick={() => actionMutation.mutate(workflowControls.primary.action)}
-                      title={startWorkflowDisabledReason ?? undefined}
-                    >
-                      {actionMutation.isPending ? "处理中..." : workflowControls.primary.label}
-                    </button>
-                  }
-                />
-              </div>
-            )}
-          </div>
+          <EnginePageSidebar
+            feedback={feedback}
+            hasWorkflow={hasWorkflow}
+            isActionPending={actionMutation.isPending}
+            isLoadWorkflowDisabled={!workflowInput || isPending}
+            onLoadWorkflow={() => {
+              setFeedback(null);
+              setParams({
+                execution: resolveExecutionParamForWorkflow({
+                  currentExecutionId: selectedExecutionId,
+                  currentWorkflowId: workflowId,
+                  nextWorkflowId: workflowInput,
+                }),
+                workflow: workflowInput,
+              });
+            }}
+            onOpenExport={() => setParams({ export: "1" })}
+            onOpenTab={openEngineTab}
+            onPrimaryAction={() => actionMutation.mutate(workflowControls.primary.action)}
+            onWorkflowInputChange={(value) =>
+              setWorkflowInputState(createWorkflowBoundValue(workflowId, value))
+            }
+            primaryActionDisabled={primaryActionDisabled}
+            primaryActionLabel={workflowControls.primary.label}
+            projectId={projectId}
+            startWorkflowDisabledReason={startWorkflowDisabledReason}
+            workflow={workflowQuery.data}
+            workflowErrorMessage={
+              workflowQuery.error ? getErrorMessage(workflowQuery.error) : null
+            }
+            workflowEventsBanner={workflowEventsBanner}
+            workflowEventsErrorMessage={workflowEventsErrorMessage}
+            workflowInput={workflowInput}
+            workflowSummary={workflowSummary}
+          />
           <EngineDetailPanel
             activeTab={tab}
             billing={{
@@ -271,6 +259,7 @@ export function EnginePage({ projectId }: EnginePageProps) {
               executionLogs,
               isLoading: logsQuery.isPending,
             }}
+            onOpenReplayExecution={openReplayExecution}
             onOpenTab={openEngineTab}
             projectId={projectId}
             replays={{
@@ -279,7 +268,7 @@ export function EnginePage({ projectId }: EnginePageProps) {
               executionsErrorMessage: logsQuery.error ? getErrorMessage(logsQuery.error) : null,
               isExecutionsLoading: logsQuery.isPending,
               isReplaysLoading: promptReplayQuery.isPending,
-              onSelectExecutionId: (value) => setSelectedExecutionState(createWorkflowBoundValue(workflowId, value)),
+              onSelectExecutionId: (value) => setParams({ execution: value || null }),
               replays: promptReplayQuery.data ?? [],
               selectedExecution,
               selectedExecutionId: activeSelectedExecutionId,

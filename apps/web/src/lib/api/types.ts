@@ -1,4 +1,5 @@
 export * from "@/lib/api/contracts/base";
+export * from "@/lib/api/contracts/config-registry";
 export * from "@/lib/api/contracts/project";
 export * from "@/lib/api/contracts/workflow";
 export * from "@/lib/api/contracts/analysis";

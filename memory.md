@@ -18,8 +18,10 @@
 - context / review / billing / export / analysis 已补到查询面板或最小业务闭环
 - template + incubator 闭环：built-in sync、自定义模板、draft / create-project / conversation draft、完整度前移
 - config_registry 管理闭环：skills / agents / hooks / workflows 查询与 detail / update，strict DTO + staged config 校验
+- Config Registry 前端闭环：Lobby 子视图已支持 skills / agents / hooks / workflows 列表、详情预览与 JSON 编辑保存
+- Project Settings 前端闭环：`/workspace/project/:projectId/settings` 已支持项目设定编辑与项目审计日志子页
 - 数据库演进闭环：Alembic baseline，startup 与文件型 SQLite helper 优先走 Alembic
-- Web 工作台主子视图已基本路由化：Lobby / Incubator / Template Library / Recycle Bin / Settings / Studio / Engine
+- Web 工作台主子视图已基本路由化：Lobby / Incubator / Config Registry / Template Library / Recycle Bin / Global Settings / Project Settings / Studio / Engine / Lab
 
 ## 进行中 / 未完成
 
@@ -71,3 +73,6 @@
 - 2026-03-25：收口 Engine detail 语义：右侧 detail tab 统一改为中文标签，tab 装配逻辑抽到独立 `EngineDetailPanel`；raw workflow JSON 改为折叠式调试入口，不再占左侧主信息层；前端 `tsc/lint/test:unit` 通过
 - 2026-03-25：补齐 Engine execution 到 replay 入口联动：`overview` 节点时间线和 `logs` 执行卡都可直接切到 `Prompt Replay` 并选中对应 execution；同时 `logs` 面板在保留旧数据时改为顶部错误 banner，不再因 refetch 错误整块丢内容；新增 logs support/test 并纳入 `test:unit` 白名单，前端 `tsc/lint/test:unit` 通过
 - 2026-03-25：修复 Engine review follow-up：统一 `logs/review/billing/context` 的时间展示为真实 UTC；`overview` 指标改为把 `skipped` 计入完成推进；`test:unit` 改为自动扫描 `src/features/**/*.test.ts`，避免新增 support 测试再次漏跑；前端 `tsc/lint/test:unit` 通过
+- 2026-03-25：收口 Engine Prompt Replay URL 状态：`execution` 成为 Engine 页的唯一选中真值，`overview/logs -> replay` 一次性写入 `tab + execution`，workflow 切换与动作成功回写统一通过 helper 决定是否保留 execution；execution 列表加载完成后会显式清理 stale `execution` 参数，但 observability 查询失败时不静默清理；同时把 `EnginePage` 左栏与顶部 action 拆成独立组件，`engine-page.tsx` 降到 289 行，前端 `tsc/lint/test:unit` 通过
+- 2026-03-25：补齐 Config Registry 前端管理页：Lobby 新增“配置中心”入口与 `/workspace/lobby/config-registry` 路由，已支持 skills / agents / hooks / workflows 的列表、详情预览和完整 JSON DTO 编辑保存；前端 contract 直接对齐后端 `ConfigRegistry` DTO，不再自造第二套字段语义；前端 `tsc/lint/test:unit` 通过
+- 2026-03-25：补齐 Project Settings 前端子页：Lobby 项目卡新增“项目设置”入口，`/workspace/project/:projectId/settings` 已支持设定编辑与 `?tab=audit&event=` 项目审计过滤；工作台导航在 settings 子页下继续归属 Studio，前端 `tsc/lint/test:unit` 通过

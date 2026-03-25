@@ -44,6 +44,7 @@ type EngineDetailPanelProps = {
     executionLogs: ExecutionLogView[];
     isLoading: boolean;
   };
+  onOpenReplayExecution: (executionId: string) => void;
   onOpenTab: (tab: EngineTabKey) => void;
   projectId: string;
   replays: {
@@ -72,6 +73,7 @@ export function EngineDetailPanel({
   context,
   hasWorkflow,
   logs,
+  onOpenReplayExecution,
   onOpenTab,
   projectId,
   replays,
@@ -79,10 +81,6 @@ export function EngineDetailPanel({
   workflow,
 }: Readonly<EngineDetailPanelProps>) {
   const tabs = listEngineDetailTabs();
-  const openReplayExecution = (executionId: string) => {
-    replays.onSelectExecutionId(executionId);
-    onOpenTab("replays");
-  };
 
   return (
     <div className="space-y-4">
@@ -106,7 +104,7 @@ export function EngineDetailPanel({
             executions={logs.executions}
             isLoading={logs.isLoading}
             errorMessage={logs.errorMessage}
-            onOpenReplayExecution={openReplayExecution}
+            onOpenReplayExecution={onOpenReplayExecution}
           />
         </EngineBlock>
       ) : null}
@@ -146,7 +144,7 @@ export function EngineDetailPanel({
             logs={logs.executionLogs}
             isLoading={logs.isLoading}
             errorMessage={logs.errorMessage}
-            onOpenReplayExecution={openReplayExecution}
+            onOpenReplayExecution={onOpenReplayExecution}
           />
         </EngineBlock>
       ) : null}

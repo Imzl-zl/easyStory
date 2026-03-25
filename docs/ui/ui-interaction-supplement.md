@@ -5,7 +5,7 @@
 | 文档类型 | UI 交互规则与实施补充 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-16 |
-| 最后更新 | 2026-03-24 |
+| 最后更新 | 2026-03-25 |
 | 关联文档 | [设计索引](../design/00-index.md)、[UI 白皮书](./ui-design.md)、[系统架构](../specs/architecture.md) |
 
 > 本文档定义当前前后端联调阶段的交互真值：能力矩阵、状态映射、页面层级、响应式、无障碍和边界态。它不重写产品设计，只负责把当前可实施范围钉死。
@@ -47,7 +47,7 @@
 | Observability | `Engine` | 节点执行、执行日志、SSE 事件流、Prompt 回放 | `MVP 已支持` |
 | Audit | `Credential Center` / `Project Settings` | 项目审计日志、凭证审计日志 | `MVP 已支持` |
 | Export | `Engine` | 项目导出列表、按工作流创建导出、下载导出文件 | `MVP 已支持` |
-| Config Registry | 全局管理入口（预留） | Skills/Agents/Hooks/Workflows 列表、详情、更新 | `Future` |
+| Config Registry | `Lobby` | Skills/Agents/Hooks/Workflows 列表、详情、更新 | `MVP 已支持` |
 ### 2.1 UI 必须按当前后端收口的点
 
 - `Auth` 只做注册 / 登录，不出现忘记密码流程。
@@ -64,11 +64,14 @@
   /login
   /register
 
-/workspace
+  /workspace
   /lobby
     /new -> incubator
       ?mode=template|chat|one-click
       ?step=1|2|3
+    /config-registry
+      ?type=skills|agents|hooks|workflows
+      ?item=:configId
     /templates
       /:templateId
     /recycle-bin
@@ -77,22 +80,24 @@
       ?sub=list|audit
       ?credential=:credentialId
 
-  /project/:projectId/studio
+  /workspace/project/:projectId/studio
     ?panel=setting|outline|opening-plan|chapter
     ?chapter=1
     ?versionPanel=1
 
-  /project/:projectId/engine
+  /workspace/project/:projectId/engine
     ?workflow=:workflowId
     ?tab=overview|tasks|reviews|billing|logs|context|replays
+    ?execution=:executionId
     ?export=1
 
-  /project/:projectId/lab
+  /workspace/project/:projectId/lab
     ?analysis=:analysisId
     ?mode=list|create
 
-  /project/:projectId/settings
+  /workspace/project/:projectId/settings
     ?tab=audit
+    ?event=:eventType
 ```
 
 规则：
@@ -102,7 +107,7 @@
 - `Review & Diff` 属于 `Engine` 的 workflow 子视图；`Studio` 最多提供跳转入口，不直接承载审核数据面板。
 - `Templates` 作为 `Lobby` 的子视图，支持列表和详情路由。
 - `Audit Log` 只挂载在 `Credential Center` 的 `?sub=audit` 子视图和 `Project Settings` 的 `?tab=audit` 参数下。
-- `Config Registry` 当前仍是 `Future`；如后续开放，预留路径为 `/workspace/lobby/config-registry?type=skills|agents|hooks|workflows`。
+- `Config Registry` 作为 `Lobby` 子视图，统一挂在 `/workspace/lobby/config-registry?type=skills|agents|hooks|workflows`。
 
 ### 3.1 物理表现层定义（Physical Container）
 
@@ -112,9 +117,9 @@
 | `Recycle Bin` | 独立页面 (Page) | 属于管理流，需要完整的列表空间 |
 | `Credential Center` | 设置页子项 (Settings View) | 属于全局配置，位于设置体系内 |
 | `Template Library` | 独立页面 (Page) | 资产密集型，需要多列展示 |
-| `Audit Log` | 侧抽屉 (Drawer) / 页面子视图 (Subview) | 项目级用 Drawer（不打断编辑）；凭证级挂在设置页内 |
-| `Project Settings` | 侧抽屉 (Drawer) | 允许在 Studio 中边查阅正文边修改设定 |
-| `Config Registry（Future）` | 独立页面 (Page, Future Reserve) | 仅预留全局管理入口，不纳入当前主视图真值 |
+| `Audit Log` | 独立页面 (Page) / 页面子视图 (Subview) | 项目级复用项目设置子页；凭证级挂在设置页内 |
+| `Project Settings` | 独立页面 (Page) | 作为项目级子页承载设定与审计，不扩张顶层导航 |
+| `Config Registry` | 独立页面 (Page) | 管理 Skills / Agents / Hooks / Workflows 的配置真值 |
 | `Export Dialog` | 模态对话框 (Dialog) | 从工作流发起的轻量导出操作 |
 | `Version Panel` | 侧抽屉 (Drawer) | 章节版本列表，折扇式开合 |
 
@@ -344,6 +349,8 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 - 中央区域才会浮现对应的 Prompt 对话过程。
 - 支持折叠/展开 Prompt 内容。
 - 显示 token 使用量和模型信息。
+- 当前选中的 `execution` 需要同步到 URL 查询参数，刷新后可恢复。
+- 若 URL 中的 `execution` 不属于当前 workflow，execution 列表加载完成后必须显式清理该参数。
 
 #### 5.4.4 章节任务重建确认
 
@@ -501,10 +508,10 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 
 #### 5.9.1 基础规则
 
-- 项目审计日志：挂载在 `Project Settings Drawer` 的 `?tab=audit` 子 Tab。
+- 项目审计日志：挂载在 `Project Settings` 子页的 `?tab=audit` 子 Tab。
 - 凭证审计日志：挂载在 `Settings -> Credential Center` 的 `?sub=audit` 子视图。
 - 日志字段：时间戳、操作类型、操作人、目标资源、变更前后对比。
-- 筛选能力：按时间范围、操作类型、操作人筛选。
+- 当前 MVP 筛选能力：按操作类型过滤；时间范围、操作人筛选待后端接口补齐后再加。
 - 视觉风格：沿用 Engine 日志风格（JetBrains Mono），区分"系统行为"与"安全审计"的视觉密度。
 
 #### 5.9.2 双入口视图
@@ -514,7 +521,7 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 | 类型 | 入口位置 | 容器类型 |
 |---|---|---|
 | Credential | `/workspace/lobby/settings?tab=credentials&sub=audit&credential=:credentialId` | 页面子视图 |
-| Project | `/project/:projectId/settings?tab=audit` | 侧抽屉 (Drawer) |
+| Project | `/workspace/project/:projectId/settings?tab=audit` | 独立页面 (Page) |
 
 补充：
 
@@ -536,36 +543,39 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 
 - 入口位置：`/workspace/lobby/config-registry`。
 - 资产列表：四种资产（Skills / Agents / Hooks / Workflows）的 Tab 切换 + 卡片列表。
-- 详情视图：YAML/JSON 配置预览 + 语法高亮 + 元数据展示。
-- 编辑能力：带校验的编辑区 + Schema 错误提示 + 保存确认。
-- 实施标记：当前为 `Future`，仅保留路由与容器预留，不作为当前前端实施真值。
+- 详情视图：元数据展示 + 原始 JSON DTO 预览。
+- 编辑能力：完整 JSON DTO 编辑区；保存前先做前端 JSON 解析，字段校验仍以后端返回为准。
+- 权限规则：不在前端静默推断管理员身份；401/403 必须直接展示后端错误。
+- 实施标记：`MVP 已支持`。
 
-### 5.11 Project Settings Drawer（项目设置抽屉）
+### 5.11 Project Settings（项目设置子页）
 
 #### 5.11.1 容器类型
 
-- 侧抽屉 (Drawer)，从右侧滑入。
+- 当前 MVP 以独立页面 (Page) 实现，路径为 `/workspace/project/:projectId/settings`。
+- 后续若改回 Drawer，不改变 `tab` 查询参数语义。
 
 #### 5.11.2 入口差异
 
 | 入口 | 侧重点 | Audit Tab | 特殊展示 |
 |---|---|---|---|
-| Lobby 进入 | 活跃度、归档状态 | 包含 | 项目卡片摘要 |
-| Studio 进入 | 设定一致性 | 不包含（避免信息过载） | 固定显示"完整度检查卡片" |
+| Lobby 进入 | 项目摘要、设定与项目审计 | 包含 | 项目卡片快捷入口 |
+| Studio 进入 | 设定一致性 | 不走该子页 | 继续使用 `panel=setting` 的设定面板 |
 
 补充：
 
-- `/project/:projectId/settings?tab=audit` 主要服务 Lobby / 项目管理入口；从 Studio 打开的 Drawer 默认不暴露 audit tab。
+- `/workspace/project/:projectId/settings?tab=audit` 主要服务 Lobby / 项目管理入口。
+- `Studio` 内设定编辑继续走 `/workspace/project/:projectId/studio?panel=setting`，不把项目审计塞回 Studio 主编辑区。
 
 #### 5.11.3 保存时机
 
-- 自动节流保存（输入停止 500ms 后触发）。
-- 手动"保存"按钮（显式确认）。
-- 关闭未保存时，弹出"墨迹未干，确定离开？"确认框。
+- 当前 MVP 使用手动“保存设定”按钮。
+- 完整度检查由用户显式触发，不做静默自动检查。
+- 保存失败必须直接展示后端错误，不做 silent autosave。
 
 #### 5.11.4 完整度检查卡片
 
-- 固定显示在 Drawer 顶部。
+- 固定显示在设定编辑区顶部。
 - 展示当前设定完整度百分比。
 - 缺失项以列表形式展示，点击可跳转对应编辑区。
 

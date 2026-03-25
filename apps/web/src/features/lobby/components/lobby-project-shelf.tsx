@@ -105,6 +105,9 @@ function LobbyProjectCard({
             <Link className="ink-button" href={`/workspace/project/${project.id}/studio?panel=setting`}>
               进入 Studio
             </Link>
+            <Link className="ink-button-secondary" href={`/workspace/project/${project.id}/settings`}>
+              项目设置
+            </Link>
             <Link className="ink-button-secondary" href={`/workspace/project/${project.id}/engine`}>
               打开 Engine
             </Link>

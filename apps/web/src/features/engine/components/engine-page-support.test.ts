@@ -5,6 +5,8 @@ import type { NodeExecutionView, ProjectPreparationStatus } from "@/lib/api/type
 import {
   buildEnginePathWithParams,
   createWorkflowBoundValue,
+  resolveExecutionParamForWorkflow,
+  resolveReplayExecutionSelection,
   resolveStartWorkflowDisabledReason,
   resolveWorkflowBoundValue,
   shouldRememberWorkflow,
@@ -15,15 +17,79 @@ test("buildEnginePathWithParams updates and removes query params without leaving
   assert.equal(
     buildEnginePathWithParams("/workspace/project/p1/engine", "tab=replays&export=1", {
       export: null,
+      execution: "exec-2",
       workflow: "wf-1",
     }),
-    "/workspace/project/p1/engine?tab=replays&workflow=wf-1",
+    "/workspace/project/p1/engine?tab=replays&execution=exec-2&workflow=wf-1",
   );
   assert.equal(
     buildEnginePathWithParams("/workspace/project/p1/engine", "workflow=wf-1", {
       workflow: null,
     }),
     "/workspace/project/p1/engine",
+  );
+});
+
+test("resolveReplayExecutionSelection only validates execution id after observability data is ready", () => {
+  assert.deepEqual(
+    resolveReplayExecutionSelection({
+      canValidateSelection: false,
+      executions: [],
+      selectedExecutionId: "node-1",
+    }),
+    {
+      activeSelectedExecutionId: "",
+      shouldClearExecutionParam: false,
+    },
+  );
+  assert.deepEqual(
+    resolveReplayExecutionSelection({
+      canValidateSelection: true,
+      executions: [createExecution("node-1"), createExecution("node-2")],
+      selectedExecutionId: "node-1",
+    }),
+    {
+      activeSelectedExecutionId: "node-1",
+      shouldClearExecutionParam: false,
+    },
+  );
+  assert.deepEqual(
+    resolveReplayExecutionSelection({
+      canValidateSelection: true,
+      executions: [createExecution("node-1"), createExecution("node-2")],
+      selectedExecutionId: "node-9",
+    }),
+    {
+      activeSelectedExecutionId: "",
+      shouldClearExecutionParam: true,
+    },
+  );
+});
+
+test("resolveExecutionParamForWorkflow preserves execution only for the same workflow", () => {
+  assert.equal(
+    resolveExecutionParamForWorkflow({
+      currentExecutionId: "exec-1",
+      currentWorkflowId: "wf-1",
+      nextWorkflowId: "wf-1",
+    }),
+    "exec-1",
+  );
+  assert.equal(
+    resolveExecutionParamForWorkflow({
+      currentExecutionId: "exec-1",
+      currentWorkflowId: "wf-1",
+      nextWorkflowId: "wf-2",
+    }),
+    null,
+  );
+  assert.equal(
+    resolveExecutionParamForWorkflow({
+      currentExecutionId: "",
+      currentWorkflowId: "wf-1",
+      nextWorkflowId: "wf-1",
+    }),
+    null,
   );
 });
 

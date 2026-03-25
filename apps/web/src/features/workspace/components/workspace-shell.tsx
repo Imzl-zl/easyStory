@@ -9,6 +9,7 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 
 const PROJECT_PATH_PATTERN = /^\/workspace\/project\/([^/]+)\//;
+const PROJECT_SETTINGS_PATH_PATTERN = /^\/workspace\/project\/[^/]+\/settings(?:\/|$)/;
 const LOBBY_PATH_PREFIX = "/workspace/lobby";
 const PROJECT_WORKSPACE_ITEMS = [
   { segment: "studio", label: "Studio" },
@@ -122,6 +123,9 @@ function isWorkspaceItemActive(segment: string, href: string | null, pathname: s
   }
   if (segment === "lobby") {
     return pathname.startsWith(LOBBY_PATH_PREFIX);
+  }
+  if (segment === "studio" && PROJECT_SETTINGS_PATH_PATTERN.test(pathname)) {
+    return true;
   }
   return pathname.includes(`/${segment}`);
 }

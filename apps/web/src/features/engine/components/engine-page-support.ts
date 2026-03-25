@@ -66,6 +66,60 @@ export function shouldResetSelectedExecution({
   return !executions.some((execution) => execution.id === selectedExecutionId);
 }
 
+export function resolveReplayExecutionSelection({
+  canValidateSelection,
+  executions,
+  selectedExecutionId,
+}: {
+  canValidateSelection: boolean;
+  executions: NodeExecutionView[];
+  selectedExecutionId: string;
+}): {
+  activeSelectedExecutionId: string;
+  shouldClearExecutionParam: boolean;
+} {
+  if (!selectedExecutionId) {
+    return {
+      activeSelectedExecutionId: "",
+      shouldClearExecutionParam: false,
+    };
+  }
+  if (!canValidateSelection) {
+    return {
+      activeSelectedExecutionId: "",
+      shouldClearExecutionParam: false,
+    };
+  }
+  if (shouldResetSelectedExecution({ executions, selectedExecutionId })) {
+    return {
+      activeSelectedExecutionId: "",
+      shouldClearExecutionParam: true,
+    };
+  }
+  return {
+    activeSelectedExecutionId: selectedExecutionId,
+    shouldClearExecutionParam: false,
+  };
+}
+
+export function resolveExecutionParamForWorkflow({
+  currentExecutionId,
+  currentWorkflowId,
+  nextWorkflowId,
+}: {
+  currentExecutionId: string;
+  currentWorkflowId: string;
+  nextWorkflowId: string;
+}): string | null {
+  if (!currentExecutionId) {
+    return null;
+  }
+  if (!currentWorkflowId) {
+    return null;
+  }
+  return currentWorkflowId === nextWorkflowId ? currentExecutionId : null;
+}
+
 export function resolveStartWorkflowDisabledReason({
   action,
   errorMessage,

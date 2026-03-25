@@ -5,7 +5,7 @@
 | 文档类型 | UI 视觉与信息架构 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-16 |
-| 最后更新 | 2026-03-24 |
+| 最后更新 | 2026-03-25 |
 | 关联文档 | [设计索引](../design/00-index.md)、[系统架构](../specs/architecture.md)、[交互补充](./ui-interaction-supplement.md) |
 
 > 本文档只定义当前实施阶段的工作台信息架构、空间语言和视觉基线。未来能力可以保留设计预留，但不能写成当前已落地能力。
@@ -53,7 +53,7 @@
 | 视图 | 挂载位置 | 说明 | 实施标记 |
 |---|---|---|---|
 | `Incubator` | 从 `Lobby` 进入 | 新建项目向导，支持模板问答/自由对话/一键创建三种模式 | `MVP 已支持` |
-| `Project Settings Drawer` | `Lobby` / `Studio` | 项目基础信息与设定完整度检查入口 | `MVP 已支持` |
+| `Project Settings` | `Lobby` / `Studio` | 项目设定子页与 Studio 设定入口；项目审计挂在 `?tab=audit` | `MVP 已支持` |
 | `Version Panel` | `Studio` | 章节版本列表、回滚、最佳版本标记 | `MVP 已支持` |
 | `Review & Diff` | `Engine` 子视图 | 审核摘要与问题明细；MVP 以只读定位为主 | `MVP 已支持` |
 | `Export Dialog` | `Engine` | 从工作流发起导出，查看项目导出历史 | `MVP 已支持` |
@@ -61,7 +61,7 @@
 | `Credential Center` | 全局设置 | 用户/项目级模型凭证管理、验证、启用与停用 | `MVP 已支持` |
 | `Template Library` | `Lobby` 子视图 | 模板列表、详情、创建、编辑、删除 | `MVP 已支持` |
 | `Audit Log` | `Credential Center` / `Project Settings` | 项目审计日志、凭证审计日志 | `MVP 已支持` |
-| `Config Registry Admin` | 全局管理入口（预留） | Skills/Agents/Hooks/Workflows 管理 | `Future` |
+| `Config Registry Admin` | `Lobby` 子视图 | Skills/Agents/Hooks/Workflows 管理 | `MVP 已支持` |
 
 ### 2.3 视图层级规则
 
@@ -72,6 +72,7 @@ Auth
 Lobby
   ├── 项目列表
   ├── Incubator（新建项目）
+  ├── Config Registry Admin
   ├── Recycle Bin
   └── 全局设置
 

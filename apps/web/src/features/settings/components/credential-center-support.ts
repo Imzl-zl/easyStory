@@ -1,3 +1,4 @@
+import { formatObservabilityDateTime } from "@/features/observability/components/observability-datetime-support";
 import type { CredentialApiDialect, CredentialView } from "@/lib/api/types";
 
 export type CredentialCenterMode = "list" | "audit";
@@ -99,11 +100,5 @@ export function resolveActiveCredentialId(
 }
 
 export function formatAuditTime(value: string) {
-  return new Date(value).toLocaleString("zh-CN", {
-    hour12: false,
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatObservabilityDateTime(value);
 }
