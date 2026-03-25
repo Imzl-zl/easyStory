@@ -19,6 +19,7 @@ from .export_file_support import cleanup_files, resolve_download_path, write_exp
 
 EXPORT_ROOT_DIR = SHARED_EXPORT_ROOT_DIR
 EXPORTABLE_CONTENT_STATUSES = frozenset({"approved", "stale"})
+EXPORTABLE_TASK_STATUSES = frozenset({"completed", "stale"})
 BLOCKING_TASK_STATUS_MESSAGES = {
     "pending": "第{chapter_number}章尚未完成，无法导出",
     "generating": "第{chapter_number}章正在生成中，无法导出",
@@ -177,7 +178,7 @@ class ExportService:
         for task in tasks:
             if task.status == "skipped":
                 continue
-            if task.status != "completed":
+            if task.status not in EXPORTABLE_TASK_STATUSES:
                 raise BusinessRuleError(
                     BLOCKING_TASK_STATUS_MESSAGES.get(
                         task.status,

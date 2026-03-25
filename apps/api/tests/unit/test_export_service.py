@@ -84,6 +84,52 @@ def test_export_workflow_blocks_generating_task(db):
         shutil.rmtree(export_root, ignore_errors=True)
 
 
+def test_export_workflow_allows_stale_task_with_stale_content(db):
+    project = create_project(db, project_setting=ready_project_setting())
+    workflow = create_workflow(db, project=project, status="paused")
+    chapter = _create_chapter(db, project, 1, "第一章", "第一章旧稿仍可导出", status="stale")
+    create_chapter_task(
+        db,
+        workflow=workflow,
+        chapter_number=1,
+        status="stale",
+        content_id=chapter.id,
+    )
+    export_root = _build_export_root()
+    service = ExportService(export_root)
+
+    try:
+        exports = asyncio.run(service.export_workflow(async_db(db), workflow, formats=["txt"]))
+        db.commit()
+        export_path = export_root / Path(exports[0].file_path)
+
+        assert export_path.exists()
+        assert "第一章旧稿仍可导出" in export_path.read_text(encoding="utf-8")
+    finally:
+        shutil.rmtree(export_root, ignore_errors=True)
+
+
+def test_export_workflow_blocks_stale_task_without_confirmed_content(db):
+    project = create_project(db, project_setting=ready_project_setting())
+    workflow = create_workflow(db, project=project, status="paused")
+    create_chapter_task(
+        db,
+        workflow=workflow,
+        chapter_number=1,
+        status="stale",
+        title="第一章",
+        brief="缺少正文",
+    )
+    export_root = _build_export_root()
+    service = ExportService(export_root)
+
+    try:
+        with pytest.raises(BusinessRuleError, match="缺少已确认正文"):
+            asyncio.run(service.export_workflow(async_db(db), workflow, formats=["txt"]))
+    finally:
+        shutil.rmtree(export_root, ignore_errors=True)
+
+
 def test_export_workflow_cleans_up_files_when_flush_fails(
     db,
     monkeypatch,

@@ -15,13 +15,17 @@ import { EngineReviewPanel } from "@/features/engine/components/engine-review-pa
 import { EngineTaskPanel } from "@/features/engine/components/engine-task-panel";
 import { getWorkflowBillingSummary, listWorkflowTokenUsages } from "@/lib/api/billing";
 import { getErrorMessage } from "@/lib/api/client";
-import { createWorkflowExports, listProjectExports } from "@/lib/api/export";
 import { listWorkflowExecutions, listWorkflowLogs, listPromptReplays } from "@/lib/api/observability";
 import { getWorkflowReviewSummary, listWorkflowReviewActions } from "@/lib/api/review";
 import { getWorkflow, pauseWorkflow, resumeWorkflow, startWorkflow, cancelWorkflow } from "@/lib/api/workflow";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import { EngineExportPanel } from "@/features/engine/components/engine-export-panel";
 import { resolveEngineWorkflowControls, shouldPollWorkflow } from "@/features/engine/components/engine-workflow-controls";
+import {
+  resolveWorkflowEventsBanner,
+  useWorkflowEventsStream,
+  useWorkflowEventsQuerySync,
+} from "@/features/engine/components/engine-events-stream";
 const TABS = ["overview", "tasks", "reviews", "billing", "logs", "context", "replays"] as const;
 type EnginePageProps = { projectId: string };
 export function EnginePage({ projectId }: EnginePageProps) {
@@ -75,11 +79,6 @@ export function EnginePage({ projectId }: EnginePageProps) {
     enabled: hasWorkflow && (tab === "logs" || tab === "replays" || tab === "overview"),
     refetchInterval: shouldPollWorkflow(workflowQuery.data?.status) ? 5000 : false,
   });
-  const exportsQuery = useQuery({
-    queryKey: ["project-exports", projectId],
-    queryFn: () => listProjectExports(projectId),
-    enabled: hasWorkflow,
-  });
   const promptReplayQuery = useQuery({
     queryKey: ["prompt-replays", workflowId, selectedExecutionId],
     queryFn: () => listPromptReplays(workflowId, selectedExecutionId),
@@ -109,24 +108,28 @@ export function EnginePage({ projectId }: EnginePageProps) {
     },
     onError: (error) => setFeedback(getErrorMessage(error)),
   });
-  const exportMutation = useMutation({
-    mutationFn: () => createWorkflowExports(workflowId, { formats: ["txt", "markdown"] }),
-    onSuccess: () => {
-      setFeedback("导出任务已创建。");
-      queryClient.invalidateQueries({ queryKey: ["project-exports", projectId] });
-    },
-    onError: (error) => setFeedback(getErrorMessage(error)),
-  });
   const selectedExecution = useMemo(
     () => logsQuery.data?.[0].find((item) => item.id === selectedExecutionId) ?? null,
     [logsQuery.data, selectedExecutionId],
   );
+  const workflowEvents = useWorkflowEventsStream({
+    workflowId,
+    enabled: hasWorkflow && shouldPollWorkflow(workflowQuery.data?.status),
+    snapshotLogs: logsQuery.data?.[1] ?? [],
+  });
   const logExecutions = logsQuery.data?.[0] ?? [];
-  const executionLogs = logsQuery.data?.[1] ?? [];
+  const executionLogs = workflowEvents.logs;
   const reviewSummary = reviewsQuery.data?.[0] ?? null;
   const reviewActions = reviewsQuery.data?.[1] ?? [];
   const billingSummary = billingQuery.data?.[0] ?? null;
   const billingUsages = billingQuery.data?.[1] ?? [];
+  const workflowEventsBanner = resolveWorkflowEventsBanner(workflowEvents.connectionState);
+  useWorkflowEventsQuerySync({
+    workflowId,
+    reconnectSignal: workflowEvents.reconnectSignal,
+    endSignal: workflowEvents.endSignal,
+  });
+
   return (
     <div className="space-y-6">
       <SectionCard
@@ -165,13 +168,23 @@ export function EnginePage({ projectId }: EnginePageProps) {
               <button className="ink-button-secondary" disabled={!workflowInput || isPending} onClick={() => setParams({ workflow: workflowInput })}>
                 载入已有 workflow
               </button>
-              <button className="ink-button-secondary" onClick={() => setParams({ export: exportOpen ? null : "1" })}>
-                {exportOpen ? "关闭导出面板" : "打开导出面板"}
+              <button
+                aria-haspopup="dialog"
+                className="ink-button-secondary"
+                disabled={!hasWorkflow}
+                onClick={() => setParams({ export: "1" })}
+              >
+                导出成稿
               </button>
               <Link className="ink-button-secondary" href={`/workspace/project/${projectId}/studio?panel=chapter`}>
                 返回 Studio
               </Link>
             </div>
+            {workflowEventsBanner ? (
+              <div className="rounded-2xl bg-[rgba(183,121,31,0.1)] px-4 py-3 text-sm text-[var(--accent-warning)]">
+                {workflowEventsBanner}
+              </div>
+            ) : null}
             {feedback ? (
               <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
                 {feedback}
@@ -184,7 +197,6 @@ export function EnginePage({ projectId }: EnginePageProps) {
             ) : null}
             {workflowQuery.data ? <CodeBlock value={workflowQuery.data} /> : <EmptyState title="尚未载入工作流" description="先启动工作流，或输入已有 workflow id 后载入。" />}
           </div>
-
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
               {TABS.map((item) => (
@@ -268,10 +280,9 @@ export function EnginePage({ projectId }: EnginePageProps) {
 
       {exportOpen ? (
         <EngineExportPanel
-          disabled={!hasWorkflow}
-          exports={exportsQuery.data}
-          isPending={exportMutation.isPending}
-          onCreate={() => exportMutation.mutate()}
+          onClose={() => setParams({ export: null })}
+          projectId={projectId}
+          workflowId={workflowId}
         />
       ) : null}
     </div>

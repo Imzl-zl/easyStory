@@ -55,3 +55,6 @@
 - 2026-03-25：修复 Web Incubator review 问题：模板 loading/error 语义显式化，模板详情未就绪时阻断提交，自由描述 preview 支持 stale 提示
 - 2026-03-25：补齐 Web Template Library 前端闭环：独立路由、模板列表筛选、详情快照、自定义模板 CRUD、内建模板复制与 Lobby 入口
 - 2026-03-25：完成 Lobby 子视图路由化：回收站与全局设置拆出独立路由，Credential Center 支持审计日志子视图与默认 base_url 预填
+- 2026-03-25：补齐 Engine 实时事件流：前端改为 `fetch + ReadableStream` 接 SSE，支持带鉴权订阅、静默 EOF 重连、异常断线提示、重连成功系统日志与终态停重连
+- 2026-03-25：补齐 Engine Export Dialog：导出入口改为模态对话框，支持格式选择、章节任务预检、项目导出历史；后端 `stale` 导出口径与文档对齐
+- 2026-03-25：收口 Engine review fixes：导出预检与后端 `stale` 规则对齐，SSE 本地状态改为 session 隔离且 4xx 停止重连，DialogShell 基础焦点管理通过 lint，导出定向 pytest 与前端 tsc/lint 全绿
