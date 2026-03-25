@@ -118,7 +118,7 @@ function ReplaySelection({
         ))}
       </select>
       <p className="text-sm leading-6 text-[var(--text-secondary)]">
-        必须先从执行时间轴选中一个节点，回放面板才会展示对应的 Prompt 与响应文本。
+        必须先从执行时间轴选中一个节点，回放面板才会展示对应的 Prompt 与响应文本；也可以从执行概览或日志直接进入。
       </p>
     </label>
   );

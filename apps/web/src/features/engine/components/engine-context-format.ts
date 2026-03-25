@@ -1,14 +1,7 @@
 import type { AnalysisSummary, ContextPreviewSection } from "@/lib/api/types";
+import { formatEngineDateTime } from "./engine-datetime-format";
 
 const NUMBER_FORMATTER = new Intl.NumberFormat("zh-CN");
-
-const DATETIME_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
 
 const SECTION_LABELS: Record<string, string> = {
   project_setting: "项目设定",
@@ -93,5 +86,5 @@ export function buildSectionDetail(section: ContextPreviewSection): string[] {
 }
 
 function formatDateTime(value: string): string {
-  return `${DATETIME_FORMATTER.format(new Date(value))} UTC`;
+  return formatEngineDateTime(value);
 }

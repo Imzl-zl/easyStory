@@ -1,12 +1,5 @@
 import type { ExecutionLogLevel, NodeExecutionStatus } from "@/lib/api/types";
-
-const DATETIME_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
+import { formatEngineDateTime } from "./engine-datetime-format";
 
 const NUMBER_FORMATTER = new Intl.NumberFormat("zh-CN");
 
@@ -33,10 +26,7 @@ export function formatCount(value: number): string {
 }
 
 export function formatDateTime(value: string | null): string {
-  if (!value) {
-    return "暂无";
-  }
-  return `${DATETIME_FORMATTER.format(new Date(value))} UTC`;
+  return formatEngineDateTime(value);
 }
 
 export function formatExecutionStatusLabel(value: NodeExecutionStatus): string {

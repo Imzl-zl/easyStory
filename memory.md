@@ -66,3 +66,8 @@
 - 2026-03-25：补齐 Engine 工作流启动前的 preparation 状态展示：`PreparationStatusPanel` 与 support 抽到 shared `project` feature，Studio / Engine 共用一套状态文案与映射；Engine 未载入 workflow 时先展示设定完整度、前置资产和下一步提示，并补显式 support 单测
 - 2026-03-25：补齐 Engine 章节任务重建确认闭环：重建按钮改为“检查并确认”，新增确认对话框与固定风险文案“重建将覆盖当前章节计划，已生成的草稿将被标记为失效。”；确认后才真正调用重建接口，成功后对话框关闭并把焦点回到任务列表
 - 2026-03-25：修复 Engine review issues：start 按钮现绑定 `project-preparation-status.can_start_workflow`，preparation 未就绪/加载中/查询失败时前端直接禁用并给出原因；`DialogShell` 支持可选焦点恢复目标，任务重建确认弹窗成功后回任务列表、取消后回触发按钮
+- 2026-03-25：补齐 Engine 工作流摘要展示：顶部状态区改为中文 `status + mode` 徽标，左侧在 raw JSON 前新增 `Workflow Summary` 卡片，统一展示当前节点、恢复起点、启动/完成时间和 runtime snapshot；摘要逻辑收口到独立 support，并通过前端 `tsc/lint/test:unit`
+- 2026-03-25：补齐 Engine overview 结构化执行概览：中央 `overview` tab 不再输出 raw JSON，改为概览指标 + 节点时间线；时间线以 `workflow.nodes` 为主顺序，用 `node executions` 补齐最新状态、时间、重试、产物与审查数量，并把“定义外节点”显式暴露；runtime 查询失败时直接展示错误，不伪造等待态
+- 2026-03-25：收口 Engine detail 语义：右侧 detail tab 统一改为中文标签，tab 装配逻辑抽到独立 `EngineDetailPanel`；raw workflow JSON 改为折叠式调试入口，不再占左侧主信息层；前端 `tsc/lint/test:unit` 通过
+- 2026-03-25：补齐 Engine execution 到 replay 入口联动：`overview` 节点时间线和 `logs` 执行卡都可直接切到 `Prompt Replay` 并选中对应 execution；同时 `logs` 面板在保留旧数据时改为顶部错误 banner，不再因 refetch 错误整块丢内容；新增 logs support/test 并纳入 `test:unit` 白名单，前端 `tsc/lint/test:unit` 通过
+- 2026-03-25：修复 Engine review follow-up：统一 `logs/review/billing/context` 的时间展示为真实 UTC；`overview` 指标改为把 `skipped` 计入完成推进；`test:unit` 改为自动扫描 `src/features/**/*.test.ts`，避免新增 support 测试再次漏跑；前端 `tsc/lint/test:unit` 通过

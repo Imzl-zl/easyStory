@@ -14,16 +14,27 @@ import {
   resolveExecutionTone,
   resolveLogLevelTone,
 } from "./engine-logs-format";
+import {
+  buildEngineLogsSummary,
+  formatDetailValue,
+} from "./engine-logs-panel-support";
 
 type EngineLogsPanelProps = {
   executions: NodeExecutionView[];
   logs: ExecutionLogView[];
   isLoading: boolean;
   errorMessage: string | null;
+  onOpenReplayExecution?: (executionId: string) => void;
 };
 
-export function EngineLogsPanel({ executions, logs, isLoading, errorMessage }: EngineLogsPanelProps) {
-  if (errorMessage) {
+export function EngineLogsPanel({
+  executions,
+  logs,
+  isLoading,
+  errorMessage,
+  onOpenReplayExecution,
+}: EngineLogsPanelProps) {
+  if (errorMessage && executions.length === 0 && logs.length === 0) {
     return <FeedbackMessage tone="danger" message={errorMessage} />;
   }
 
@@ -40,24 +51,16 @@ export function EngineLogsPanel({ executions, logs, isLoading, errorMessage }: E
     );
   }
 
-  const failedExecutionCount = executions.filter((execution) => execution.status === "failed").length;
-  const activeExecutionCount = executions.filter((execution) =>
-    execution.status === "running" ||
-    execution.status === "running_stream" ||
-    execution.status === "reviewing" ||
-    execution.status === "fixing"
-  ).length;
-  const latestActivityAt = resolveLatestActivity(executions, logs);
-  const orderedExecutions = [...executions].sort(compareExecutions);
-  const orderedLogs = [...logs].sort(compareLogs);
+  const summary = buildEngineLogsSummary(executions, logs);
 
   return (
     <div className="space-y-4">
+      {errorMessage ? <FeedbackMessage tone="danger" message={errorMessage} /> : null}
       <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
         <LogsMetricCard
           label="节点执行"
           value={formatCount(executions.length)}
-          detail={`进行中 ${formatCount(activeExecutionCount)}，失败 ${formatCount(failedExecutionCount)}`}
+          detail={`进行中 ${formatCount(summary.activeExecutionCount)}，失败 ${formatCount(summary.failedExecutionCount)}`}
         />
         <LogsMetricCard
           label="事件日志"
@@ -66,25 +69,34 @@ export function EngineLogsPanel({ executions, logs, isLoading, errorMessage }: E
         />
         <LogsMetricCard
           label="最新活动"
-          value={formatDateTime(latestActivityAt)}
+          value={formatDateTime(summary.latestActivityAt)}
           detail="按 execution 完成时间与日志时间共同判断"
         />
         <LogsMetricCard
           label="已落审查"
-          value={formatCount(executions.reduce((total, item) => total + item.review_actions.length, 0))}
-          detail={`关联 artifacts ${formatCount(executions.reduce((total, item) => total + item.artifacts.length, 0))}`}
+          value={formatCount(summary.reviewCount)}
+          detail={`关联 artifacts ${formatCount(summary.artifactCount)}`}
         />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-        <ExecutionSection executions={orderedExecutions} />
-        <ExecutionLogSection logs={orderedLogs} />
+        <ExecutionSection
+          executions={summary.orderedExecutions}
+          onOpenReplayExecution={onOpenReplayExecution}
+        />
+        <ExecutionLogSection logs={summary.orderedLogs} />
       </div>
     </div>
   );
 }
 
-function ExecutionSection({ executions }: Readonly<{ executions: NodeExecutionView[] }>) {
+function ExecutionSection({
+  executions,
+  onOpenReplayExecution,
+}: Readonly<{
+  executions: NodeExecutionView[];
+  onOpenReplayExecution?: (executionId: string) => void;
+}>) {
   return (
     <section className="panel-muted space-y-3 p-4">
       <header className="space-y-1">
@@ -96,7 +108,7 @@ function ExecutionSection({ executions }: Readonly<{ executions: NodeExecutionVi
       {executions.length > 0 ? (
         <div className="space-y-3">
           {executions.map((execution) => (
-            <ExecutionCard key={execution.id} execution={execution} />
+            <ExecutionCard key={execution.id} execution={execution} onOpenReplayExecution={onOpenReplayExecution} />
           ))}
         </div>
       ) : (
@@ -106,7 +118,13 @@ function ExecutionSection({ executions }: Readonly<{ executions: NodeExecutionVi
   );
 }
 
-function ExecutionCard({ execution }: Readonly<{ execution: NodeExecutionView }>) {
+function ExecutionCard({
+  execution,
+  onOpenReplayExecution,
+}: Readonly<{
+  execution: NodeExecutionView;
+  onOpenReplayExecution?: (executionId: string) => void;
+}>) {
   return (
     <div className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -142,6 +160,17 @@ function ExecutionCard({ execution }: Readonly<{ execution: NodeExecutionView }>
           value={execution.output_data ? "已产出" : execution.context_report ? "上下文已记录" : "暂无"}
         />
       </div>
+      {onOpenReplayExecution ? (
+        <div className="mt-4">
+          <button
+            className="ink-button-secondary"
+            onClick={() => onOpenReplayExecution(execution.id)}
+            type="button"
+          >
+            查看 Prompt 回放
+          </button>
+        </div>
+      ) : null}
       {execution.error_message ? (
         <div className="mt-4 rounded-[18px] bg-[rgba(178,65,46,0.1)] px-4 py-3 text-sm leading-6 text-[var(--accent-danger)]">
           {execution.error_message}
@@ -252,33 +281,4 @@ function FeedbackMessage({
   }
 
   return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">{message}</div>;
-}
-
-function compareExecutions(left: NodeExecutionView, right: NodeExecutionView): number {
-  const leftTime = new Date(left.completed_at ?? left.started_at ?? 0).getTime();
-  const rightTime = new Date(right.completed_at ?? right.started_at ?? 0).getTime();
-  return rightTime - leftTime || right.node_order - left.node_order || right.sequence - left.sequence;
-}
-
-function compareLogs(left: ExecutionLogView, right: ExecutionLogView): number {
-  return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
-}
-
-function resolveLatestActivity(executions: NodeExecutionView[], logs: ExecutionLogView[]): string | null {
-  const executionTimes = executions
-    .map((execution) => execution.completed_at ?? execution.started_at)
-    .filter((value): value is string => value !== null);
-  const logTimes = logs.map((log) => log.created_at);
-  const latest = [...executionTimes, ...logTimes].sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0];
-  return latest ?? null;
-}
-
-function formatDetailValue(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  return JSON.stringify(value);
 }

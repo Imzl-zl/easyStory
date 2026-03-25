@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test:unit": "node --loader ./scripts/ts-path-alias-loader.mjs --test --experimental-strip-types src/features/engine/components/engine-export-support.test.ts src/features/engine/components/engine-events-stream-support.test.ts src/features/engine/components/engine-page-support.test.ts src/features/engine/components/engine-replay-support.test.ts src/features/engine/components/engine-task-regenerate-support.test.ts src/features/engine/components/engine-workflow-status-support.test.ts src/features/project/components/preparation-status-support.test.ts"
+    "test:unit": "node ./scripts/run-unit-tests.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
