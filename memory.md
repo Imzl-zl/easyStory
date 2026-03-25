@@ -23,6 +23,7 @@
 - Credential Center 前端闭环：`/workspace/lobby/settings?tab=credentials` 已支持全局/项目作用域切换、项目入口、凭证编辑更新与审计子视图
 - Credential Center 删除确认闭环：删除前现有显式确认弹窗，影响文案对齐后端作用域优先级与 usage 历史限制
 - Credential Center 覆盖提示闭环：带项目上下文查看全局凭证时，可显式看到哪些 provider 已被项目级启用凭证接管
+- Lab 前端 MVP 闭环：`/workspace/project/:projectId/lab` 已支持 `analysis_type / content_id / generated_skill_key` 过滤、详情删除确认、创建结果反馈与组件拆分
 - 数据库演进闭环：Alembic baseline，startup 与文件型 SQLite helper 优先走 Alembic
 - Web 工作台主子视图已基本路由化：Lobby / Incubator / Config Registry / Template Library / Recycle Bin / Global Settings / Project Settings / Studio / Engine / Lab
 
@@ -84,3 +85,4 @@
 - 2026-03-25：补齐 Credential Center 覆盖提示：在带项目上下文的全局凭证视图里，前端会并行查询当前项目凭证，并按 active provider 匹配显示“已被项目级重载”提示；覆盖提示查询失败时会显式报错，不做静默忽略；新增 override support 单测，前端 `tsc/lint/test:unit` 通过
 - 2026-03-25：收口 Credential Center 动作状态语义：`actionMutation.variables` 现在作为唯一 pending action 真值，列表按钮可按 `credentialId + actionType` 显示“验证中/启用中/停用中/删除中...”；验证成功反馈时间统一改为 UTC 格式，并新增 action/feedback support 单测
 - 2026-03-25：修复 Credential Center review issues：`audit` 子视图收口为只读审计视图，不再暴露 verify/enable/disable/delete；同时在 mutation 期间锁定 `scope`/`mode`/审计目标切换，避免 pending 语义和反馈上下文漂移
+- 2026-03-25：补齐 Lab 前端 MVP：Lab 页面拆成 sidebar/detail/create/delete-confirm/feedback/support，列表支持 `analysis_type / content_id / generated_skill_key` 过滤；创建成功会根据当前过滤条件决定是否自动选中，删除后按相邻记录回退，顶栏反馈统一收口为 `info / danger`；refetch 失败时保留已有列表/详情数据，`result` 空对象在前端直接阻断

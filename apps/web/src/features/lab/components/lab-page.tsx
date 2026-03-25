@@ -1,39 +1,70 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { CodeBlock } from "@/components/ui/code-block";
-import { EmptyState } from "@/components/ui/empty-state";
-import { SectionCard } from "@/components/ui/section-card";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { createAnalysis, getAnalysis, listAnalyses } from "@/lib/api/analysis";
+import { createAnalysis, deleteAnalysis, getAnalysis, listAnalyses } from "@/lib/api/analysis";
 import { getErrorMessage } from "@/lib/api/client";
-import type { AnalysisType } from "@/lib/api/types";
+import type { AnalysisDetail, AnalysisSummary } from "@/lib/api/types";
+
+import { LabCreatePanel } from "./lab-create-panel";
+import { LabDeleteConfirmDialog } from "./lab-delete-confirm-dialog";
+import { LabDetailPanel } from "./lab-detail-panel";
+import { LabFeedbackBanner } from "./lab-feedback-banner";
+import { LabSidebar } from "./lab-sidebar";
+import {
+  buildLabAnalysisSummary,
+  buildLabAnalysisListOptions,
+  buildLabAnalysisQueryKey,
+  buildLabCreatePayload,
+  buildLabFeedback,
+  createInitialLabAnalysisFilterState,
+  createInitialLabAnalysisFormState,
+  hasActiveLabAnalysisListOptions,
+  matchesLabAnalysisListOptions,
+  prependLabAnalysisSummary,
+  removeLabAnalysisSummary,
+  resolveActiveLabAnalysisId,
+  resolveNextLabSelectedIdAfterDelete,
+  type LabFeedback,
+} from "./lab-support";
 
 type LabPageProps = {
   projectId: string;
 };
 
-const ANALYSIS_TYPES: AnalysisType[] = ["plot", "character", "style", "pacing", "structure"];
+type DeleteAnalysisMutationVariables = {
+  analysisId: string;
+  analysisTitle: string;
+};
 
 export function LabPage({ projectId }: LabPageProps) {
   const queryClient = useQueryClient();
+  const [filterState, setFilterState] = useState(createInitialLabAnalysisFilterState);
+  const [formState, setFormState] = useState(createInitialLabAnalysisFormState);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [formState, setFormState] = useState({
-    analysisType: "plot" as AnalysisType,
-    sourceTitle: "",
-    result: '{\n  "summary": ""\n}',
-    suggestions: '{\n  "next_step": ""\n}',
-  });
+  const [feedback, setFeedback] = useState<LabFeedback>(null);
+  const [pendingDeleteAnalysis, setPendingDeleteAnalysis] = useState<AnalysisSummary | AnalysisDetail | null>(null);
+  const deferredContentId = useDeferredValue(filterState.contentId.trim());
+  const deferredGeneratedSkillKey = useDeferredValue(filterState.generatedSkillKey.trim());
+  const listOptions = useMemo(
+    () =>
+      buildLabAnalysisListOptions({
+        ...filterState,
+        contentId: deferredContentId,
+        generatedSkillKey: deferredGeneratedSkillKey,
+      }),
+    [deferredContentId, deferredGeneratedSkillKey, filterState],
+  );
+  const listQueryKey = buildLabAnalysisQueryKey(projectId, listOptions);
 
   const listQuery = useQuery({
-    queryKey: ["analyses", projectId],
-    queryFn: () => listAnalyses(projectId),
+    queryKey: listQueryKey,
+    queryFn: () => listAnalyses(projectId, listOptions),
   });
-
-  const activeId = selectedId ?? listQuery.data?.[0]?.id ?? null;
+  const analyses = listQuery.data ?? [];
+  const activeId = resolveActiveLabAnalysisId(analyses, selectedId);
+  const hasActiveFilters = hasActiveLabAnalysisListOptions(listOptions);
 
   const detailQuery = useQuery({
     queryKey: ["analysis-detail", projectId, activeId],
@@ -41,154 +72,109 @@ export function LabPage({ projectId }: LabPageProps) {
     enabled: Boolean(activeId),
   });
 
+  const refreshAnalyses = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["analyses", projectId] }),
+      queryClient.invalidateQueries({ queryKey: ["analysis-detail", projectId] }),
+      queryClient.invalidateQueries({ queryKey: ["engine-context-style-analyses", projectId] }),
+    ]);
+  };
+
   const createMutation = useMutation({
     mutationFn: () =>
-      createAnalysis(projectId, {
-        analysis_type: formState.analysisType,
-        source_title: formState.sourceTitle || undefined,
-        result: JSON.parse(formState.result),
-        suggestions: JSON.parse(formState.suggestions),
-      }),
-    onSuccess: (result) => {
-      setFeedback("分析记录已创建。");
-      setSelectedId(result.id);
-      queryClient.invalidateQueries({ queryKey: ["analyses", projectId] });
+      createAnalysis(projectId, buildLabCreatePayload(formState)),
+    onSuccess: async (result) => {
+      const matchesFilters = matchesLabAnalysisListOptions(result, listOptions);
+      if (matchesFilters) {
+        const createdSummary = buildLabAnalysisSummary(result);
+        queryClient.setQueryData<AnalysisSummary[]>(listQueryKey, (current) =>
+          prependLabAnalysisSummary(current, createdSummary),
+        );
+        queryClient.setQueryData(["analysis-detail", projectId, result.id], result);
+      }
+      setFeedback(
+        buildLabFeedback(
+          matchesFilters
+            ? "分析记录已创建。"
+            : "分析记录已创建，但当前过滤条件未包含它；清除过滤后可查看。",
+        ),
+      );
+      setSelectedId(matchesFilters ? result.id : activeId);
+      setFormState(createInitialLabAnalysisFormState());
+      await refreshAnalyses();
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) => setFeedback(buildLabFeedback(getErrorMessage(error), "danger")),
   });
 
-  const selectedSummary = useMemo(
-    () => listQuery.data?.find((item) => item.id === activeId) ?? null,
-    [activeId, listQuery.data],
-  );
+  const deleteMutation = useMutation({
+    mutationFn: ({ analysisId }: DeleteAnalysisMutationVariables) => deleteAnalysis(projectId, analysisId),
+    onSuccess: async (_, variables) => {
+      queryClient.setQueryData<AnalysisSummary[]>(listQueryKey, (current) =>
+        removeLabAnalysisSummary(current, variables.analysisId),
+      );
+      queryClient.removeQueries({
+        exact: true,
+        queryKey: ["analysis-detail", projectId, variables.analysisId],
+      });
+      setSelectedId(resolveNextLabSelectedIdAfterDelete(analyses, activeId, variables.analysisId));
+      setFeedback(buildLabFeedback(`分析记录「${variables.analysisTitle}」已删除。`));
+      setPendingDeleteAnalysis(null);
+      await refreshAnalyses();
+    },
+    onError: (error) => {
+      setFeedback(buildLabFeedback(getErrorMessage(error), "danger"));
+      setPendingDeleteAnalysis(null);
+    },
+  });
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[260px_1fr_360px]">
-      <aside className="panel-shell space-y-3 p-5">
-        <div className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">Lab</p>
-          <h1 className="font-serif text-2xl font-semibold">分析结果工作台</h1>
-        </div>
-        {listQuery.data?.length ? (
-          listQuery.data.map((item) => (
-            <button
-              key={item.id}
-              className="ink-tab w-full justify-between"
-              data-active={item.id === activeId}
-              onClick={() => setSelectedId(item.id)}
-            >
-              <span>{item.source_title ?? item.analysis_type}</span>
-              <StatusBadge status="active" label={item.analysis_type} />
-            </button>
-          ))
-        ) : (
-          <EmptyState
-            title="暂无分析记录"
-            description="右侧表单可以直接创建第一条分析结果。"
-          />
-        )}
-      </aside>
-
-      <SectionCard
-        title={selectedSummary?.source_title ?? "分析详情"}
-        description="Lab 当前只负责分析记录的创建、列表与详情查看。"
-      >
-        {detailQuery.isLoading ? <p className="text-sm text-[var(--text-secondary)]">正在加载分析详情...</p> : null}
-        {detailQuery.error ? (
-          <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
-            {getErrorMessage(detailQuery.error)}
-          </div>
-        ) : null}
-        {detailQuery.data ? (
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge status="active" label={detailQuery.data.analysis_type} />
-              {detailQuery.data.generated_skill_key ? (
-                <StatusBadge status="approved" label={detailQuery.data.generated_skill_key} />
-              ) : null}
-            </div>
-            <CodeBlock value={detailQuery.data.result} />
-            {detailQuery.data.suggestions ? <CodeBlock value={detailQuery.data.suggestions} /> : null}
-          </div>
-        ) : null}
-      </SectionCard>
-
-      <form
-        className="panel-shell space-y-4 p-5"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setFeedback(null);
-          createMutation.mutate();
-        }}
-      >
-        <div className="space-y-1">
-          <h2 className="font-serif text-xl font-semibold">新建分析</h2>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
-            当前结果字段保持结构化 JSON，便于和后端 DTO 对齐。
-          </p>
-        </div>
-
-        <label className="block space-y-2">
-          <span className="label-text">分析类型</span>
-          <select
-            className="ink-select"
-            value={formState.analysisType}
-            onChange={(event) =>
-              setFormState((current) => ({
-                ...current,
-                analysisType: event.target.value as AnalysisType,
-              }))
-            }
-          >
-            {ANALYSIS_TYPES.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block space-y-2">
-          <span className="label-text">来源标题</span>
-          <input
-            className="ink-input"
-            value={formState.sourceTitle}
-            onChange={(event) =>
-              setFormState((current) => ({ ...current, sourceTitle: event.target.value }))
-            }
-          />
-        </label>
-
-        <label className="block space-y-2">
-          <span className="label-text">result JSON</span>
-          <textarea
-            className="ink-textarea min-h-40"
-            value={formState.result}
-            onChange={(event) => setFormState((current) => ({ ...current, result: event.target.value }))}
-          />
-        </label>
-
-        <label className="block space-y-2">
-          <span className="label-text">suggestions JSON</span>
-          <textarea
-            className="ink-textarea min-h-32"
-            value={formState.suggestions}
-            onChange={(event) =>
-              setFormState((current) => ({ ...current, suggestions: event.target.value }))
-            }
-          />
-        </label>
-
-        {feedback ? (
-          <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
-            {feedback}
-          </div>
-        ) : null}
-
-        <button className="ink-button w-full" disabled={createMutation.isPending} type="submit">
-          {createMutation.isPending ? "创建中..." : "创建分析"}
-        </button>
-      </form>
+    <div className="space-y-4">
+      <LabFeedbackBanner feedback={feedback} />
+      <div className="grid gap-6 xl:grid-cols-[280px_1fr_360px]">
+        <LabSidebar
+          activeId={activeId}
+          analyses={analyses}
+          errorMessage={listQuery.error ? getErrorMessage(listQuery.error) : null}
+          filters={filterState}
+          isLoading={listQuery.isLoading}
+          isPending={deleteMutation.isPending}
+          onFilterChange={(patch) => setFilterState((current) => ({ ...current, ...patch }))}
+          onSelect={setSelectedId}
+        />
+        <LabDetailPanel
+          activeId={activeId}
+          analysis={detailQuery.data}
+          errorMessage={detailQuery.error ? getErrorMessage(detailQuery.error) : null}
+          hasActiveFilters={hasActiveFilters}
+          isDeletePending={deleteMutation.isPending}
+          isLoading={detailQuery.isLoading}
+          onRequestDelete={setPendingDeleteAnalysis}
+        />
+        <LabCreatePanel
+          formState={formState}
+          isPending={createMutation.isPending}
+          onFieldChange={(patch) => setFormState((current) => ({ ...current, ...patch }))}
+          onSubmit={() => {
+            setFeedback(null);
+            createMutation.mutate();
+          }}
+        />
+      </div>
+      {pendingDeleteAnalysis ? (
+        <LabDeleteConfirmDialog
+          analysisTitle={pendingDeleteAnalysis.source_title ?? pendingDeleteAnalysis.analysis_type}
+          analysisType={pendingDeleteAnalysis.analysis_type}
+          generatedSkillKey={pendingDeleteAnalysis.generated_skill_key}
+          isPending={deleteMutation.isPending}
+          onClose={() => setPendingDeleteAnalysis(null)}
+          onConfirm={() =>
+            deleteMutation.mutate({
+              analysisId: pendingDeleteAnalysis.id,
+              analysisTitle: pendingDeleteAnalysis.source_title ?? pendingDeleteAnalysis.analysis_type,
+            })
+          }
+        />
+      ) : null}
     </div>
   );
 }

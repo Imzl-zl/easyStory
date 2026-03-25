@@ -361,30 +361,28 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 
 #### 5.5.1 基础规则
 
-- 默认入口是分析记录列表，不是上传面板。
-- 新建分析使用结构化表单，写入 `analysis_type`、`source_title`、`result`、`suggestions`。
-- `generated_skill_key` 当前只作为只读结果字段展示。
+- 默认入口是左侧过滤器 + 列表，不是上传面板。
+- 新建分析使用结构化表单，写入 `analysis_type`、`source_title`、`generated_skill_key`、`result`、`suggestions`。
+- 删除动作只从详情区触发，必须先显式确认。
+- 创建成功后，若新记录命中当前过滤器则自动选中；若未命中，则保留当前详情并给出顶部提示。
 
 #### 5.5.2 筛选栏与布局
 
-- 筛选栏位置：固定在 Lab 视图顶部，采用 `sticky` 布局。
-- 背景：带 80% 透明度的 `--bg-canvas`。
-- 筛选维度：`analysis_type`、`content_id`、时间范围。
+- Lab 使用三栏布局：左侧过滤器 + 列表，中央详情，右侧新建。
+- 筛选栏位于左侧面板内部，不单独做 `sticky` 顶栏。
+- 筛选维度：`analysis_type`、`content_id`、`generated_skill_key`。
 
 #### 5.5.3 路由联动
 
-| 操作 | URL 变化 |
-|---|---|
-| 切换 `analysis_type` | `?type=xxx` 同步更新 |
-| 清除过滤器 | URL 瞬间重置回主路径 |
-| 点击列表项 | `?analysis=:id` |
-| 创建成功 | 自动从 `create` 模式切换至 `detail` 模式 |
+- 当前 Lab 不做 URL query sync。
+- 过滤条件与当前选中分析都只保留在页面本地状态。
+- 刷新页面后回到服务端列表结果，并按当前列表默认选中规则恢复详情。
 
-#### 5.5.4 跳转动效
+#### 5.5.4 反馈与选中
 
-- 创建成功后：自动从 `create` 模式切换至该条记录的 `detail` 模式。
-- 动效：使用"笔触划过"式的水平过渡。
-- URL 变为 `?analysis=:id`。
+- 创建、删除、查询失败统一走页面顶部 feedback banner，只使用 `info / danger` 两种语义。
+- 删除当前选中记录后，优先回退到列表中的下一条可用记录；若已是最后一条，则回退到上一条；若列表为空，详情区显式回到空态。
+- 不为当前 MVP 增加额外的模式切换动效或 URL 驱动状态。
 ### 5.6 Export Dialog
 
 #### 5.6.1 基础规则

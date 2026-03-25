@@ -297,9 +297,10 @@ Lab
 **MVP 范围：**
 
 - 按项目查看分析结果
-- 按 `analysis_type` / `content_id` 过滤
-- 新建分析记录
+- 按 `analysis_type` / `content_id` / `generated_skill_key` 过滤
+- 新建分析记录，显式写入 `analysis_type` / `source_title` / `generated_skill_key` / `result` / `suggestions`
 - 查看分析详情与 `generated_skill_key`
+- 在详情区删除当前分析记录
 
 **MVP UI 占位：**
 

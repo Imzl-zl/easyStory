@@ -1,13 +1,15 @@
 import { requestJson } from "@/lib/api/client";
 import type { AnalysisCreatePayload, AnalysisDetail, AnalysisSummary, AnalysisType } from "@/lib/api/types";
 
+export type AnalysisListOptions = {
+  analysisType?: AnalysisType;
+  contentId?: string;
+  generatedSkillKey?: string;
+};
+
 export function listAnalyses(
   projectId: string,
-  options: {
-    analysisType?: AnalysisType;
-    contentId?: string;
-    generatedSkillKey?: string;
-  } = {},
+  options: AnalysisListOptions = {},
 ) {
   const search = new URLSearchParams();
   if (options.analysisType) {
@@ -32,4 +34,10 @@ export function createAnalysis(projectId: string, payload: AnalysisCreatePayload
 
 export function getAnalysis(projectId: string, analysisId: string) {
   return requestJson<AnalysisDetail>(`/api/v1/projects/${projectId}/analyses/${analysisId}`);
+}
+
+export function deleteAnalysis(projectId: string, analysisId: string) {
+  return requestJson<void>(`/api/v1/projects/${projectId}/analyses/${analysisId}`, {
+    method: "DELETE",
+  });
 }
