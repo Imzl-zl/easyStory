@@ -6,8 +6,8 @@
 ## 当前基线
 
 - 后端测试：最近一次已知全量 `cd apps/api && ruff check app tests && pytest -q` 通过（记录日期：2026-03-23）
-- 前端检查：最近一次已知 `pnpm --dir apps/web exec tsc --noEmit` + `pnpm --dir apps/web lint` 通过（记录日期：2026-03-23）
-- 最后更新：2026-03-24
+- 前端检查：最近一次已知 `pnpm --dir apps/web exec tsc --noEmit` + `pnpm --dir apps/web lint` 通过（记录日期：2026-03-25）
+- 最后更新：2026-03-25
 
 ## 已完成能力
 
@@ -19,7 +19,7 @@
 - template + incubator 闭环：built-in sync、自定义模板、draft / create-project / conversation draft、完整度前移
 - config_registry 管理闭环：skills / agents / hooks / workflows 查询与 detail / update，strict DTO + staged config 校验
 - 数据库演进闭环：Alembic baseline，startup 与文件型 SQLite helper 优先走 Alembic
-- Web 工作台基座已可用：Engine / Studio、stale 章节引导层
+- Web 工作台基座已可用：Lobby / Incubator / Studio / Engine、stale 章节引导层
 
 ## 进行中 / 未完成
 
@@ -51,3 +51,5 @@
 - 2026-03-23：完成 config_registry skills / agents / hooks / workflows detail / update 闭环，并收口 strict DTO + staged validation
 - 2026-03-23：完成 template 自定义模板、incubator draft / create-project / conversation draft 与完整度前移
 - 2026-03-24：收口协作文件边界：`AGENTS.md` 管规则，`tools.md` 管稳定知识，`memory.md` 管当前快照；`docs/` 改为按需查
+- 2026-03-24：完成 Web Incubator 前端闭环：独立路由、模板问答 draft/create、自由描述 draft、Lobby 入口与导航高亮
+- 2026-03-25：修复 Web Incubator review 问题：模板 loading/error 语义显式化，模板详情未就绪时阻断提交，自由描述 preview 支持 stale 提示

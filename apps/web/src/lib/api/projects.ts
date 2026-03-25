@@ -1,5 +1,11 @@
 import { requestJson } from "@/lib/api/client";
 import type {
+  ProjectIncubatorConversationDraft,
+  ProjectIncubatorConversationDraftPayload,
+  ProjectIncubatorCreatePayload,
+  ProjectIncubatorCreateResult,
+  ProjectIncubatorDraft,
+  ProjectIncubatorDraftPayload,
   ProjectCreatePayload,
   ProjectDetail,
   ProjectPreparationStatus,
@@ -16,6 +22,32 @@ export function listProjects(deletedOnly = false) {
 
 export function createProject(payload: ProjectCreatePayload) {
   return requestJson<ProjectDetail>("/api/v1/projects", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function buildIncubatorDraft(payload: ProjectIncubatorDraftPayload) {
+  return requestJson<ProjectIncubatorDraft>("/api/v1/projects/incubator/draft-setting", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function buildIncubatorConversationDraft(
+  payload: ProjectIncubatorConversationDraftPayload,
+) {
+  return requestJson<ProjectIncubatorConversationDraft>(
+    "/api/v1/projects/incubator/conversation/draft-setting",
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
+}
+
+export function createProjectFromIncubator(payload: ProjectIncubatorCreatePayload) {
+  return requestJson<ProjectIncubatorCreateResult>("/api/v1/projects/incubator/create-project", {
     method: "POST",
     body: payload,
   });

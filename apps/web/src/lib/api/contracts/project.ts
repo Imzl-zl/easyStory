@@ -75,6 +75,76 @@ export type SettingCompletenessResult = {
   issues: SettingCompletenessIssue[];
 };
 
+export type ProjectIncubatorAnswer = {
+  variable: string;
+  value: string;
+};
+
+export type ProjectIncubatorQuestion = {
+  question: string;
+  variable: string;
+};
+
+export type ProjectIncubatorTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  genre: string | null;
+  workflow_id: string | null;
+  guided_questions: ProjectIncubatorQuestion[];
+};
+
+export type ProjectIncubatorAppliedAnswer = {
+  variable: string;
+  field_path: string;
+  value: string | number | string[];
+};
+
+export type ProjectIncubatorUnmappedAnswer = {
+  variable: string;
+  value: string;
+  reason: string;
+};
+
+export type ProjectIncubatorDraftPayload = {
+  template_id: string;
+  answers: ProjectIncubatorAnswer[];
+};
+
+export type ProjectIncubatorDraft = {
+  template: ProjectIncubatorTemplate;
+  project_setting: ProjectSetting;
+  setting_completeness: SettingCompletenessResult;
+  applied_answers: ProjectIncubatorAppliedAnswer[];
+  unmapped_answers: ProjectIncubatorUnmappedAnswer[];
+};
+
+export type ProjectIncubatorConversationDraftPayload = {
+  conversation_text: string;
+  provider: string;
+  model_name?: string;
+};
+
+export type ProjectIncubatorConversationDraft = {
+  project_setting: ProjectSetting;
+  setting_completeness: SettingCompletenessResult;
+  follow_up_questions: string[];
+};
+
+export type ProjectIncubatorCreatePayload = {
+  name: string;
+  template_id: string;
+  answers: ProjectIncubatorAnswer[];
+  allow_system_credential_pool?: boolean;
+};
+
+export type ProjectIncubatorCreateResult = {
+  project: ProjectDetail;
+  setting_completeness: SettingCompletenessResult;
+  applied_answers: ProjectIncubatorAppliedAnswer[];
+  unmapped_answers: ProjectIncubatorUnmappedAnswer[];
+};
+
 export type ProjectSettingImpactItem = {
   target: SettingImpactTarget;
   action: SettingImpactAction;

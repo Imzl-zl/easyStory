@@ -9,6 +9,7 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 
 const PROJECT_PATH_PATTERN = /^\/workspace\/project\/([^/]+)\//;
+const LOBBY_PATH_PREFIX = "/workspace/lobby";
 const PROJECT_WORKSPACE_ITEMS = [
   { segment: "studio", label: "Studio" },
   { segment: "engine", label: "Engine" },
@@ -62,8 +63,7 @@ export function WorkspaceShell({
 
             <nav className="space-y-2" aria-label="主导航">
               {workspaceItems.map((item) => {
-                const isActive =
-                  item.segment === "lobby" ? pathname === item.href : pathname.includes(`/${item.segment}`);
+                const isActive = isWorkspaceItemActive(item.segment, item.href, pathname);
                 return (
                   item.href ? (
                     <Link
@@ -114,4 +114,14 @@ export function WorkspaceShell({
       </div>
     </AuthGuard>
   );
+}
+
+function isWorkspaceItemActive(segment: string, href: string | null, pathname: string) {
+  if (!href) {
+    return false;
+  }
+  if (segment === "lobby") {
+    return pathname.startsWith(LOBBY_PATH_PREFIX);
+  }
+  return pathname.includes(`/${segment}`);
 }
