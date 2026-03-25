@@ -15,6 +15,7 @@ import { EngineContextPanel } from "@/features/engine/components/engine-context-
 import {
   buildEnginePathWithParams,
   createWorkflowBoundValue,
+  resolveStartWorkflowDisabledReason,
   resolveWorkflowBoundValue,
   shouldResetSelectedExecution,
   useRememberLastWorkflow,
@@ -25,10 +26,13 @@ import { EngineLogsPanel } from "@/features/engine/components/engine-logs-panel"
 import { EngineReplayPanel } from "@/features/engine/components/engine-replay-panel";
 import { EngineReviewPanel } from "@/features/engine/components/engine-review-panel";
 import { EngineTaskPanel } from "@/features/engine/components/engine-task-panel";
+import { EngineWorkflowStatusCallout } from "@/features/engine/components/engine-workflow-status-callout";
+import { PreparationStatusPanel } from "@/features/project/components/preparation-status-panel";
 import { resolveEngineWorkflowControls, shouldPollWorkflow } from "@/features/engine/components/engine-workflow-controls";
 import { getWorkflowBillingSummary, listWorkflowTokenUsages } from "@/lib/api/billing";
 import { getErrorMessage } from "@/lib/api/client";
 import { listWorkflowExecutions, listWorkflowLogs, listPromptReplays } from "@/lib/api/observability";
+import { getProjectPreparationStatus } from "@/lib/api/projects";
 import { getWorkflowReviewSummary, listWorkflowReviewActions } from "@/lib/api/review";
 import { cancelWorkflow, getWorkflow, pauseWorkflow, resumeWorkflow, startWorkflow } from "@/lib/api/workflow";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
@@ -62,6 +66,11 @@ export function EnginePage({ projectId }: EnginePageProps) {
   });
   const workflowControls = resolveEngineWorkflowControls(workflowQuery.data);
   const hasWorkflow = Boolean(workflowId && workflowQuery.data);
+  const preparationQuery = useQuery({
+    queryKey: ["project-preparation-status", projectId],
+    queryFn: () => getProjectPreparationStatus(projectId),
+    enabled: workflowControls.primary.action === "start" && !workflowControls.primary.disabled,
+  });
 
   const reviewsQuery = useQuery({
     queryKey: ["workflow-reviews", workflowId],
@@ -111,6 +120,7 @@ export function EnginePage({ projectId }: EnginePageProps) {
       queryClient.invalidateQueries({ queryKey: ["workflow"] });
       queryClient.invalidateQueries({ queryKey: ["workflow-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["workflow-observability"] });
+      queryClient.invalidateQueries({ queryKey: ["project-preparation-status", projectId] });
     },
     onError: (error) => setFeedback(getErrorMessage(error)),
   });
@@ -137,6 +147,17 @@ export function EnginePage({ projectId }: EnginePageProps) {
   const billingUsages = billingQuery.data?.[1] ?? [];
   const workflowEventsBanner = resolveWorkflowEventsBanner(workflowEvents.connectionState);
   const workflowEventsErrorMessage = workflowEvents.clientErrorMessage;
+  const startWorkflowDisabledReason = resolveStartWorkflowDisabledReason({
+    action: workflowControls.primary.action,
+    errorMessage: preparationQuery.error ? getErrorMessage(preparationQuery.error) : null,
+    isLoading: preparationQuery.isLoading,
+    preparation: preparationQuery.data,
+  });
+  const primaryActionDisabled =
+    actionMutation.isPending ||
+    workflowControls.primary.disabled ||
+    Boolean(startWorkflowDisabledReason);
+  const openEngineTab = (nextTab: (typeof TABS)[number]) => setParams({ tab: nextTab });
 
   useWorkflowEventsQuerySync({
     workflowId,
@@ -152,7 +173,12 @@ export function EnginePage({ projectId }: EnginePageProps) {
         action={
           <div className="flex flex-wrap gap-2">
             {workflowQuery.data ? <StatusBadge status={workflowQuery.data.status} /> : null}
-            <button className="ink-button" disabled={actionMutation.isPending || workflowControls.primary.disabled} onClick={() => actionMutation.mutate(workflowControls.primary.action)}>
+            <button
+              className="ink-button"
+              disabled={primaryActionDisabled}
+              onClick={() => actionMutation.mutate(workflowControls.primary.action)}
+              title={startWorkflowDisabledReason ?? undefined}
+            >
               {actionMutation.isPending ? "处理中..." : workflowControls.primary.label}
             </button>
             {workflowControls.secondary.map((control) => (
@@ -188,11 +214,33 @@ export function EnginePage({ projectId }: EnginePageProps) {
                 返回 Studio
               </Link>
             </div>
+            {startWorkflowDisabledReason ? <div className="rounded-2xl border border-[rgba(183,121,31,0.18)] bg-[rgba(183,121,31,0.08)] px-4 py-3 text-sm text-[var(--accent-warning)]">{startWorkflowDisabledReason}</div> : null}
             {workflowEventsBanner ? <div className="rounded-2xl bg-[rgba(183,121,31,0.1)] px-4 py-3 text-sm text-[var(--accent-warning)]">{workflowEventsBanner}</div> : null}
             {workflowEventsErrorMessage ? <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">{workflowEventsErrorMessage}</div> : null}
+            <EngineWorkflowStatusCallout workflow={workflowQuery.data} onOpenTab={openEngineTab} />
             {feedback ? <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">{feedback}</div> : null}
             {workflowQuery.error ? <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">{getErrorMessage(workflowQuery.error)}</div> : null}
-            {workflowQuery.data ? <CodeBlock value={workflowQuery.data} /> : <EmptyState title="尚未载入工作流" description="先启动工作流，或输入已有 workflow id 后载入。" />}
+            {workflowQuery.data ? (
+              <CodeBlock value={workflowQuery.data} />
+            ) : (
+              <div className="space-y-4">
+                <PreparationStatusPanel projectId={projectId} />
+                <EmptyState
+                  title="尚未载入工作流"
+                  description="请先看当前准备状态；若条件已满足可直接启动，若已有 workflow id 也可手动载入。"
+                  action={
+                    <button
+                      className="ink-button"
+                      disabled={primaryActionDisabled}
+                      onClick={() => actionMutation.mutate(workflowControls.primary.action)}
+                      title={startWorkflowDisabledReason ?? undefined}
+                    >
+                      {actionMutation.isPending ? "处理中..." : workflowControls.primary.label}
+                    </button>
+                  }
+                />
+              </div>
+            )}
           </div>
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">

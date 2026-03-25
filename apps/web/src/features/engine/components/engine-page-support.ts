@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import type { NodeExecutionView } from "@/lib/api/types";
+import type { NodeExecutionView, ProjectPreparationStatus } from "@/lib/api/types";
 
 export type WorkflowBoundValue<T> = {
   value: T;
@@ -64,6 +64,35 @@ export function shouldResetSelectedExecution({
     return false;
   }
   return !executions.some((execution) => execution.id === selectedExecutionId);
+}
+
+export function resolveStartWorkflowDisabledReason({
+  action,
+  errorMessage,
+  isLoading,
+  preparation,
+}: {
+  action: "start" | "pause" | "resume" | "cancel";
+  errorMessage: string | null;
+  isLoading: boolean;
+  preparation: ProjectPreparationStatus | undefined;
+}): string | null {
+  if (action !== "start") {
+    return null;
+  }
+  if (isLoading) {
+    return "正在检查项目设定与前置资产状态。";
+  }
+  if (errorMessage) {
+    return errorMessage;
+  }
+  if (!preparation) {
+    return "当前无法确认项目前置状态，暂不可启动工作流。";
+  }
+  if (!preparation.can_start_workflow) {
+    return preparation.next_step_detail;
+  }
+  return null;
 }
 
 export function useRememberLastWorkflow({

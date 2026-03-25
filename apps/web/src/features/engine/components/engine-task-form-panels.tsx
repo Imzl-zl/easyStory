@@ -1,5 +1,7 @@
 "use client";
 
+import type { RefObject } from "react";
+
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -31,9 +33,10 @@ type EngineTaskRegenerateSectionProps = {
   onAddRow: () => void;
   onCreateBlank: () => void;
   onLoadCurrentPlan: () => void;
-  onRegenerate: () => void;
+  onRequestRegenerate: () => void;
   onRemoveRow: (index: number) => void;
   onUpdateRow: (index: number, row: ChapterTaskDraftRow) => void;
+  regenerateButtonRef: RefObject<HTMLButtonElement | null>;
 };
 
 export function EngineTaskEditorSection({
@@ -130,9 +133,10 @@ export function EngineTaskRegenerateSection({
   onAddRow,
   onCreateBlank,
   onLoadCurrentPlan,
-  onRegenerate,
+  onRequestRegenerate,
   onRemoveRow,
   onUpdateRow,
+  regenerateButtonRef,
 }: Readonly<EngineTaskRegenerateSectionProps>) {
   return (
     <section className="panel-muted space-y-4 p-5">
@@ -158,8 +162,15 @@ export function EngineTaskRegenerateSection({
             <button className="ink-button-secondary" onClick={onAddRow}>
               追加一章
             </button>
-            <button className="ink-button-danger" disabled={isPending || draftRows.length === 0} onClick={onRegenerate}>
-              {isPending ? "覆盖中..." : "覆盖当前计划"}
+            <button
+              aria-haspopup="dialog"
+              className="ink-button-danger"
+              disabled={isPending || draftRows.length === 0}
+              onClick={onRequestRegenerate}
+              ref={regenerateButtonRef}
+              type="button"
+            >
+              {isPending ? "覆盖中..." : "检查并确认"}
             </button>
           </div>
           {draftRows.length === 0 ? (

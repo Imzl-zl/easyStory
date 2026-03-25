@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { NodeExecutionView } from "@/lib/api/types";
+import type { NodeExecutionView, ProjectPreparationStatus } from "@/lib/api/types";
 import {
   buildEnginePathWithParams,
   createWorkflowBoundValue,
+  resolveStartWorkflowDisabledReason,
   resolveWorkflowBoundValue,
   shouldRememberWorkflow,
   shouldResetSelectedExecution,
@@ -95,6 +96,60 @@ test("shouldResetSelectedExecution clears stale selections only when current exe
   );
 });
 
+test("resolveStartWorkflowDisabledReason blocks start until preparation is ready", () => {
+  assert.equal(
+    resolveStartWorkflowDisabledReason({
+      action: "pause",
+      errorMessage: null,
+      isLoading: false,
+      preparation: undefined,
+    }),
+    null,
+  );
+  assert.equal(
+    resolveStartWorkflowDisabledReason({
+      action: "start",
+      errorMessage: null,
+      isLoading: true,
+      preparation: undefined,
+    }),
+    "正在检查项目设定与前置资产状态。",
+  );
+  assert.equal(
+    resolveStartWorkflowDisabledReason({
+      action: "start",
+      errorMessage: "准备状态加载失败",
+      isLoading: false,
+      preparation: undefined,
+    }),
+    "准备状态加载失败",
+  );
+  assert.equal(
+    resolveStartWorkflowDisabledReason({
+      action: "start",
+      errorMessage: null,
+      isLoading: false,
+      preparation: createPreparationStatus({
+        can_start_workflow: false,
+        next_step_detail: "开篇设计必须先确认后才能启动工作流",
+      }),
+    }),
+    "开篇设计必须先确认后才能启动工作流",
+  );
+  assert.equal(
+    resolveStartWorkflowDisabledReason({
+      action: "start",
+      errorMessage: null,
+      isLoading: false,
+      preparation: createPreparationStatus({
+        can_start_workflow: true,
+        next_step_detail: "前置资产已就绪，可以启动工作流",
+      }),
+    }),
+    null,
+  );
+});
+
 function createExecution(id: string): NodeExecutionView {
   return {
     id,
@@ -114,5 +169,52 @@ function createExecution(id: string): NodeExecutionView {
     completed_at: null,
     artifacts: [],
     review_actions: [],
+  };
+}
+
+function createPreparationStatus(
+  overrides: Partial<ProjectPreparationStatus>,
+): ProjectPreparationStatus {
+  return {
+    active_workflow: null,
+    can_start_workflow: false,
+    chapter_tasks: {
+      counts: {
+        completed: 0,
+        failed: 0,
+        generating: 0,
+        interrupted: 0,
+        pending: 0,
+        skipped: 0,
+        stale: 0,
+      },
+      step_status: "not_started",
+      total: 0,
+      workflow_execution_id: null,
+    },
+    next_step: "setting",
+    next_step_detail: "请先补齐项目设定。",
+    opening_plan: {
+      content_id: null,
+      content_status: null,
+      has_content: false,
+      step_status: "not_started",
+      updated_at: null,
+      version_number: null,
+    },
+    outline: {
+      content_id: null,
+      content_status: null,
+      has_content: false,
+      step_status: "not_started",
+      updated_at: null,
+      version_number: null,
+    },
+    project_id: "project-1",
+    setting: {
+      issues: [],
+      status: "ready",
+    },
+    ...overrides,
   };
 }

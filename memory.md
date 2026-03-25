@@ -62,3 +62,7 @@
 - 2026-03-25：收口 Engine workflow 切换状态一致性：`EnginePage` 现在对输入框和 selected execution 使用 workflow-bound 本地状态，手动载入已有 workflow 后会回写 `lastWorkflowByProject`，避免切换 workflow 时继续请求旧 prompt replay
 - 2026-03-25：收口 Engine Prompt Replay 面板：新增独立 `EngineReplayPanel` 与 replay support/test，显式覆盖 workflow 未载入、execution 未就绪、replay 加载/失败/空态，并补齐模型名、token 用量与 prompt/response 折叠展示
 - 2026-03-25：修复 Engine Prompt Replay 审查项：已有 execution/replay 数据时不再被 refetch 错误整块覆盖，Prompt/Response 折叠状态可跨 rerender 保持，execution 选择项补齐序列与短 ID 以避免同名歧义
+- 2026-03-25：补齐 Engine pause reason 闭环：页面顶部新增暂停原因 callout，`review_failed`/`budget_exceeded` 可直接跳转到对应 tab，未载入 workflow 空态补显式“启动工作流”入口
+- 2026-03-25：补齐 Engine 工作流启动前的 preparation 状态展示：`PreparationStatusPanel` 与 support 抽到 shared `project` feature，Studio / Engine 共用一套状态文案与映射；Engine 未载入 workflow 时先展示设定完整度、前置资产和下一步提示，并补显式 support 单测
+- 2026-03-25：补齐 Engine 章节任务重建确认闭环：重建按钮改为“检查并确认”，新增确认对话框与固定风险文案“重建将覆盖当前章节计划，已生成的草稿将被标记为失效。”；确认后才真正调用重建接口，成功后对话框关闭并把焦点回到任务列表
+- 2026-03-25：修复 Engine review issues：start 按钮现绑定 `project-preparation-status.can_start_workflow`，preparation 未就绪/加载中/查询失败时前端直接禁用并给出原因；`DialogShell` 支持可选焦点恢复目标，任务重建确认弹窗成功后回任务列表、取消后回触发按钮

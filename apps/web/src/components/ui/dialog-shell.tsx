@@ -1,18 +1,20 @@
 "use client";
 
-import { useEffect, useEffectEvent, useId, useRef } from "react";
+import { useEffect, useEffectEvent, useId, useRef, type RefObject } from "react";
 
 type DialogShellProps = {
-  title: string;
+  children: React.ReactNode;
   description?: string;
   onClose: () => void;
-  children: React.ReactNode;
+  restoreFocusRef?: RefObject<HTMLElement | null>;
+  title: string;
 };
 
 export function DialogShell({
   title,
   description,
   onClose,
+  restoreFocusRef,
   children,
 }: DialogShellProps) {
   const titleId = useId();
@@ -21,6 +23,9 @@ export function DialogShell({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const handleDismiss = useEffectEvent(() => {
     onClose();
+  });
+  const resolveRestoreFocusTarget = useEffectEvent((fallbackTarget: HTMLElement | null) => {
+    return restoreFocusRef?.current ?? fallbackTarget;
   });
 
   useEffect(() => {
@@ -65,7 +70,8 @@ export function DialogShell({
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
-      previousFocusedElement?.focus();
+      const focusTarget = resolveRestoreFocusTarget(previousFocusedElement);
+      focusTarget?.focus();
     };
   }, []);
 
@@ -97,7 +103,7 @@ export function DialogShell({
             ) : null}
           </div>
           <button
-            aria-label="关闭导出对话框"
+            aria-label="关闭对话框"
             className="ink-button-secondary min-w-0 px-4"
             onClick={onClose}
             ref={closeButtonRef}

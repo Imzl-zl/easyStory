@@ -8,7 +8,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ChapterEditor } from "@/features/studio/components/chapter-editor";
-import { PreparationStatusPanel } from "@/features/studio/components/preparation-status-panel";
+import { PreparationStatusPanel } from "@/features/project/components/preparation-status-panel";
 import { ProjectSettingEditor } from "@/features/studio/components/project-setting-editor";
 import { StoryAssetEditor } from "@/features/studio/components/story-asset-editor";
 import { StudioStaleChapterPanel } from "@/features/studio/components/studio-stale-chapter-panel";
