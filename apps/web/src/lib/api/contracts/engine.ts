@@ -248,6 +248,16 @@ export type ExecutionLogView = {
   created_at: string;
 };
 
+export type AuditLogView = {
+  id: string;
+  actor_user_id: string | null;
+  event_type: string;
+  entity_type: string;
+  entity_id: string;
+  details: Record<string, JsonValue> | null;
+  created_at: string;
+};
+
 export type PromptReplayView = {
   id: string;
   node_execution_id: string;

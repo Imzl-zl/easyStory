@@ -94,6 +94,40 @@
   - `EASYSTORY_CONFIG_ADMIN_USERNAMES`
     逗号分隔的配置管理员用户名白名单；只有命中的用户才能访问 `/api/v1/config/*`，默认空列表表示全部拒绝。
 
+### 后端本地启动
+
+1. 进入后端目录并准备运行时配置：
+
+   ```bash
+   cd apps/api
+   cp .env.example .env
+   ```
+
+2. 编辑 `apps/api/.env`，至少把 `EASYSTORY_JWT_SECRET` 改成真实随机字符串。
+   `EASYSTORY_CREDENTIAL_MASTER_KEY` 只在使用 `Credential Center` 创建、加密或校验模型凭证时需要。
+
+3. 安装依赖并启动开发服务：
+
+   ```bash
+   cd apps/api
+   uv sync --extra dev
+   uv run uvicorn app.main:app --reload --port 8000
+   ```
+
+4. 启动后可访问：
+   - API 文档：`http://127.0.0.1:8000/docs`
+   - 健康检查：`http://127.0.0.1:8000/healthz`
+
+5. 数据库默认行为：
+   - 如果未设置 `EASYSTORY_DATABASE_URL`，后端默认使用 `apps/api/.runtime/easystory.db`
+   - 应用启动时会自动执行数据库初始化和 Alembic upgrade，不需要先手动建库
+
+6. 如需手动执行迁移，可在 `apps/api` 下运行：
+
+   ```bash
+   uv run alembic -c alembic.ini upgrade head
+   ```
+
 ---
 
 ## 优先级说明
@@ -127,4 +161,4 @@ docs/
 
 ---
 
-*最后更新: 2026-03-23*
+*最后更新: 2026-03-25*

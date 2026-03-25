@@ -40,6 +40,14 @@ export type TemplateGuidedQuestion = {
   variable: string;
 };
 
+export type TemplateUpsertPayload = {
+  name: string;
+  description?: string | null;
+  genre?: string | null;
+  workflow_id: string;
+  guided_questions: TemplateGuidedQuestion[];
+};
+
 export type TemplateSummary = {
   id: string;
   name: string;
