@@ -3,12 +3,17 @@ import { getAuthToken } from "@/lib/stores/auth-store";
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 
 export class ApiError extends Error {
+  readonly detail: unknown;
+  readonly status: number;
+
   constructor(
     message: string,
-    readonly status: number,
-    readonly detail: unknown,
+    status: number,
+    detail: unknown,
   ) {
     super(message);
+    this.status = status;
+    this.detail = detail;
   }
 }
 

@@ -25,6 +25,7 @@
 ## Tools
 
 - 后端标准验证命令：`cd apps/api && ruff check app tests && pytest -q`
+- 前端 support 单测命令：`pnpm --dir apps/web test:unit`
 - 定向内容模块验证：`cd apps/api && pytest -q tests/unit/test_story_asset_service.py tests/unit/test_chapter_content_service.py tests/unit/test_chapter_content_api.py`
 - Alembic 基线验证：`cd apps/api && ./.venv/bin/alembic -c alembic.ini upgrade head`
 - 项目共享 skills 目录：`.codex/skills/`
@@ -60,6 +61,8 @@
 - 受保护 API 统一走 `app.modules.user.entry.http.dependencies.get_current_user`（async 版），不保留 `get_current_user_async` 第二命名入口。
 - 当业务 service 文件超出 300 行时，优先保持公开 `Service + factory` 不变，只把"查询/权限 helper""状态变更 helper""DTO 映射与归一化 helper"下沉到 `*_support.py`；不要用改公开命名来掩盖内部结构问题。
 - `workflow events` SSE 端点需要 `Authorization: Bearer`；前端不要用原生 `EventSource`，统一走 `fetch + ReadableStream`，并区分正常 EOF 静默重连与错误重连提示。
+- `apps/web` 当前 support 纯逻辑单测走 Node 原生 `--test` + 自定义 `scripts/ts-path-alias-loader.mjs`，这样可直接执行带 `@/` 路径别名的 TypeScript 文件而不引入额外测试框架。
+- 对 `workflow` 维度的本地 UI 状态（如当前输入框值、已选 node execution、SSE 本地信号），优先用 `{ workflowId, value }` 绑定态再在 render 时按当前 `workflowId` 取值；不要依赖 effect 在切换后“补清空”，否则 A -> B -> A 容易复活旧状态。
 - 导出口径当前已收口：`ChapterTask.status` 为 `completed | stale` 且正文状态为 `approved | stale` 时允许导出；`pending / generating / interrupted / failed` 阻断，`skipped` 直接省略，前端导出对话框必须先跑章节任务预检再发请求。
 - 对"公开 async 入口 + 内部纯规则聚合"的服务（如 review/billing），最佳拆分边界：真实 I/O（并发调度、timeout、DB flush）保留 async；纯规则 helper（归一化、状态聚合、配置校验）保持 sync。
 - 读取 `request.app.state`、容器字段或内存注入对象的 accessor，如果不做 I/O 就保持同步 `def`；不为"全 async"把纯 accessor 改成 coroutine。

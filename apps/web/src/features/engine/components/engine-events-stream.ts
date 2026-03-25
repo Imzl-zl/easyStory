@@ -32,6 +32,7 @@ type WorkflowBoundState<T> = {
 };
 
 type WorkflowEventsStreamState = {
+  clientErrorMessage: string | null;
   connectionState: WorkflowEventsConnectionState;
   endSignal: number;
   logs: ExecutionLogView[];
@@ -52,6 +53,8 @@ export function useWorkflowEventsStream({
     useState<WorkflowBoundState<ExecutionLogView[]>>(createWorkflowBoundState([]));
   const [connectionState, setConnectionState] =
     useState<WorkflowBoundState<WorkflowEventsConnectionState>>(createWorkflowBoundState("idle"));
+  const [clientError, setClientError] =
+    useState<WorkflowBoundState<string | null>>(createWorkflowBoundState(null));
   const [reconnectSignal, setReconnectSignal] =
     useState<WorkflowBoundState<number>>(createWorkflowBoundState(0));
   const [endSignal, setEndSignal] = useState<WorkflowBoundState<number>>(createWorkflowBoundState(0));
@@ -111,6 +114,7 @@ export function useWorkflowEventsStream({
 
       controller = new AbortController();
       updateConnectionState(hadConnectionError ? "reconnecting" : "connecting");
+      setClientError({ ...session, value: null });
 
       try {
         const outcome = await consumeWorkflowEvents({
@@ -120,6 +124,7 @@ export function useWorkflowEventsStream({
           onExecutionLog: appendExecutionLog,
           onOpen: () => {
             updateConnectionState("connected");
+            setClientError({ ...session, value: null });
             if (!hadConnectionError) {
               return;
             }
@@ -145,9 +150,11 @@ export function useWorkflowEventsStream({
           return;
         }
         if (isClientStreamError(error)) {
+          const message = resolveClientStreamErrorMessage(error);
           updateConnectionState("idle");
+          setClientError({ ...session, value: message });
           appendExecutionLog(
-            buildSystemExecutionLog(workflowId, resolveClientStreamErrorMessage(error)),
+            buildSystemExecutionLog(workflowId, message),
           );
           return;
         }
@@ -175,6 +182,7 @@ export function useWorkflowEventsStream({
   );
 
   return {
+    clientErrorMessage: matchesWorkflowSession(clientError, activeSession) ? clientError.value : null,
     connectionState: enabled && matchesWorkflowSession(connectionState, activeSession) ? connectionState.value : "idle",
     endSignal: matchesWorkflowSession(endSignal, activeSession) ? endSignal.value : 0,
     logs,

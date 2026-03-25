@@ -6,7 +6,7 @@
 ## 当前基线
 
 - 后端测试：最近一次已知全量 `cd apps/api && ruff check app tests && pytest -q` 通过（记录日期：2026-03-23）
-- 前端检查：最近一次已知 `pnpm --dir apps/web exec tsc --noEmit` + `pnpm --dir apps/web lint` 通过（记录日期：2026-03-25）
+- 前端检查：最近一次已知 `pnpm --dir apps/web exec tsc --noEmit` + `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-03-25）
 - 最后更新：2026-03-25
 
 ## 已完成能力
@@ -58,3 +58,7 @@
 - 2026-03-25：补齐 Engine 实时事件流：前端改为 `fetch + ReadableStream` 接 SSE，支持带鉴权订阅、静默 EOF 重连、异常断线提示、重连成功系统日志与终态停重连
 - 2026-03-25：补齐 Engine Export Dialog：导出入口改为模态对话框，支持格式选择、章节任务预检、项目导出历史；后端 `stale` 导出口径与文档对齐
 - 2026-03-25：收口 Engine review fixes：导出预检与后端 `stale` 规则对齐，SSE 本地状态改为 session 隔离且 4xx 停止重连，DialogShell 基础焦点管理通过 lint，导出定向 pytest 与前端 tsc/lint 全绿
+- 2026-03-25：补齐 Engine SSE fatal error 显式提示：页面顶部新增 danger banner，不再只靠系统日志暴露 4xx；同时给 export/events support 补了 Node 原生单测链，`apps/web test:unit` 可执行
+- 2026-03-25：收口 Engine workflow 切换状态一致性：`EnginePage` 现在对输入框和 selected execution 使用 workflow-bound 本地状态，手动载入已有 workflow 后会回写 `lastWorkflowByProject`，避免切换 workflow 时继续请求旧 prompt replay
+- 2026-03-25：收口 Engine Prompt Replay 面板：新增独立 `EngineReplayPanel` 与 replay support/test，显式覆盖 workflow 未载入、execution 未就绪、replay 加载/失败/空态，并补齐模型名、token 用量与 prompt/response 折叠展示
+- 2026-03-25：修复 Engine Prompt Replay 审查项：已有 execution/replay 数据时不再被 refetch 错误整块覆盖，Prompt/Response 折叠状态可跨 rerender 保持，execution 选择项补齐序列与短 ID 以避免同名歧义
