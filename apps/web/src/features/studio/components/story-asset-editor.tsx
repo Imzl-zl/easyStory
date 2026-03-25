@@ -121,8 +121,8 @@ function StoryAssetEditorForm({
 
   return (
     <SectionCard
-      title={assetType === "outline" ? "Outline" : "Opening Plan"}
-      description="当前阶段只保留保存草稿和确认两步，不制造额外流程分叉。"
+      title={assetType === "outline" ? "大纲" : "开篇设计"}
+      description="编辑大纲或开篇设计，保存后可确认。"
       action={
         <div className="flex flex-wrap gap-2">
           {asset ? <StatusBadge status={asset.status} /> : null}
@@ -144,7 +144,7 @@ function StoryAssetEditorForm({
       {isMissingAsset ? (
         <EmptyState
           title="当前还没有草稿"
-          description="这是正常状态。填写标题和正文后可直接保存，后端会创建首个版本。"
+          description="填写标题和正文后保存，系统会创建首个版本。"
         />
       ) : null}
 

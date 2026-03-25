@@ -58,7 +58,7 @@ export function CredentialCenterForm({
         <StaticField
           label="渠道键 / Provider Key"
           value={formState.provider}
-          description="provider 是当前凭证的稳定渠道键；更新接口不支持直接修改。"
+          description="渠道键创建后不可修改。"
         />
       )}
       <label className="block">

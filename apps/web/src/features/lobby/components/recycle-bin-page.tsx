@@ -12,9 +12,9 @@ export function RecycleBinPage() {
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Recycle Bin"
-        description="回收站只处理已删除项目的浏览与恢复，不暴露永久删除。"
-        action={<Link className="ink-button-secondary" href="/workspace/lobby">返回 Lobby</Link>}
+        title="回收站"
+        description="已删除的项目可以在这里恢复。"
+        action={<Link className="ink-button-secondary" href="/workspace/lobby">返回项目大厅</Link>}
       >
         <div className="space-y-5">
           {model.feedback ? (

@@ -24,7 +24,7 @@ export function LabDeleteConfirmDialog({
   return (
     <DialogShell
       title="确认删除分析记录"
-      description="删除后当前记录会从 Lab 列表移除。这里只做显式删除，不伪造可恢复结果。"
+      description="删除后该记录将从列表中移除。"
       onClose={onClose}
     >
       <div className="space-y-4">

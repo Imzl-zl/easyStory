@@ -14,8 +14,8 @@ export function LobbyPage() {
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Lobby"
-        description="项目书架只负责浏览和筛选；新建、模板管理、回收站和设置都走独立子视图。"
+        title="项目大厅"
+        description="管理你的故事项目，开启创作之旅。"
         action={<LobbyToolbar />}
       >
         <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">

@@ -78,7 +78,7 @@ export function EngineContextStyleReferenceHelper({
   return (
     <section className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
       <header className="space-y-1">
-        <h3 className="font-serif text-lg font-semibold">Style Reference Helper</h3>
+        <h3 className="font-serif text-lg font-semibold">风格参考助手</h3>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
           按最新优先列出 style 分析，选中后自动写入 `style_reference`，不再手填
           `analysis_id`。
@@ -116,7 +116,7 @@ export function EngineContextStyleReferenceHelper({
         {!analysesQuery.isLoading && !analysesQuery.error && analyses.length === 0 ? (
           <EmptyState
             title="暂无可选 style 分析"
-            description="当前过滤条件下没有 style analysis，可先去 Lab 创建或调整过滤。"
+            description="暂无 style 分析记录，可前往 Lab 创建。"
           />
         ) : null}
         {analyses.length > 0 ? (

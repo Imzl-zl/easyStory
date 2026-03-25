@@ -77,7 +77,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
     <div className="grid gap-6 xl:grid-cols-[260px_1fr]">
       <aside className="panel-shell space-y-6 p-5">
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">Studio</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">工作室</p>
           <h1 className="font-serif text-2xl font-semibold">
             {projectQuery.data?.name ?? "正在加载项目..."}
           </h1>
@@ -94,7 +94,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
               onClick={() => updateParams({ panel: item.key })}
             >
               <span>{item.label}</span>
-              <span className="text-xs uppercase tracking-[0.16em]">Panel</span>
+              <span className="text-xs uppercase tracking-[0.16em]">面板</span>
             </button>
           ))}
         </div>
@@ -184,7 +184,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
         {panel === "chapter" && chaptersQuery.data?.length === 0 ? (
           <EmptyState
             title="当前还没有章节"
-            description="章节内容来自当前工作流生成。先进入 Engine 启动工作流，再回到 Studio 编辑与确认。"
+            description="启动工作流后，章节内容会在这里生成。"
           />
         ) : null}
       </div>

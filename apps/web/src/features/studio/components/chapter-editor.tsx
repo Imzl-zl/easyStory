@@ -65,7 +65,7 @@ export function ChapterEditor({
     return (
       <EmptyState
         title="还没有章节可编辑"
-        description="先在左侧选择已有章节，或在 Engine 中启动工作流生成章节任务。"
+        description="选择左侧章节，或启动工作流生成内容。"
       />
     );
   }
@@ -186,7 +186,7 @@ function ChapterEditorForm({
     <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
       <SectionCard
         title={`Chapter ${chapterNumber}`}
-        description="章节正文默认以草稿和确认两种主动作推进，后续版本由右侧版本面板管理。"
+        description="编辑章节内容，保存后可确认或查看历史版本。"
         action={
           <div className="flex flex-wrap gap-2">
             {detail ? <StatusBadge status={detail.status} /> : null}
@@ -242,7 +242,7 @@ function ChapterEditorForm({
       {versionPanelOpen ? (
         <aside className="panel-shell fan-panel space-y-4 p-5">
           <div className="space-y-1">
-            <h3 className="font-serif text-lg font-semibold">Version Panel</h3>
+            <h3 className="font-serif text-lg font-semibold">版本面板</h3>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
               当前只保留版本列表、最佳版本标记与回滚入口。
             </p>

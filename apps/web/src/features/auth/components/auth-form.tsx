@@ -93,7 +93,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               <p className="text-sm leading-6 text-[var(--text-secondary)]">
                 {mode === "login"
                   ? "使用已有账号进入工作台。"
-                  : "注册成功后会直接签发 bearer token 并进入 Lobby。"}
+                  : "注册成功后会直接签发 bearer token 并进入项目大厅。"}
               </p>
             </div>
 
@@ -150,7 +150,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               ) : null}
 
               <button className="ink-button w-full" disabled={mutation.isPending} type="submit">
-                {mutation.isPending ? "处理中..." : mode === "login" ? "进入 Lobby" : "创建账号"}
+                {mutation.isPending ? "处理中..." : mode === "login" ? "进入项目大厅" : "创建账号"}
               </button>
             </form>
 

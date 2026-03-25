@@ -97,8 +97,8 @@ function ProjectSettingEditorForm({
 
   return (
     <SectionCard
-      title="Project Setting"
-      description="项目设定是当前创作主链路的真值源。保存后可再次执行完整度检查。"
+      title="项目设定"
+      description="设定故事的基本信息与创作方向。"
       action={
         <div className="flex flex-wrap gap-2">
           <button

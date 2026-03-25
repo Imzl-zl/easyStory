@@ -85,7 +85,7 @@ export function EngineDetailPanel({
   return (
     <div className="space-y-4">
       <nav
-        aria-label="Engine detail tabs"
+        aria-label="引擎详情标签"
         className="flex flex-wrap gap-2"
       >
         {tabs.map((tab) => (
@@ -158,7 +158,7 @@ export function EngineDetailPanel({
         </EngineBlock>
       ) : null}
       {activeTab === "replays" ? (
-        <EngineBlock title="Prompt 回放">
+        <EngineBlock title="提示词回放">
           <EngineReplayPanel
             isWorkflowReady={hasWorkflow}
             executions={replays.executions}

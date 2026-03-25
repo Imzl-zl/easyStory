@@ -30,7 +30,7 @@ export function LabDetailPanel({
   return (
     <SectionCard
       title={analysis ? formatLabAnalysisTitle(analysis) : "分析详情"}
-      description="详情区只负责查看当前分析结果与元数据，不在这里继续扩展成编辑工作台。"
+      description="查看分析结果与提取的文风特征。"
       action={
         analysis ? (
           <button
@@ -72,7 +72,7 @@ function LabDetailContent({
     return (
       <EmptyState
         title={hasActiveFilters ? "当前过滤条件下没有分析记录" : "先选一条分析记录"}
-        description={hasActiveFilters ? "调整过滤器后，再查看分析详情。" : "左侧选中一条分析记录后，这里会展示详情。"}
+        description={hasActiveFilters ? "尝试调整过滤条件。" : "选择左侧记录查看详情。"}
       />
     );
   }
@@ -87,7 +87,7 @@ function LabDetailContent({
     );
   }
   if (!analysis) {
-    return <EmptyState title="暂无分析详情" description="当前选中项没有可展示的数据。" />;
+    return <EmptyState title="暂无分析详情" description="该记录暂无可展示的数据。" />;
   }
   return (
     <div className="space-y-4">

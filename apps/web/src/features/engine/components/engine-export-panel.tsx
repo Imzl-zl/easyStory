@@ -69,7 +69,7 @@ export function EngineExportPanel({
   return (
     <DialogShell
       title="导出成稿"
-      description="导出入口只挂在当前 workflow。当前仅支持 txt 与 markdown，下载入口统一来自项目导出历史。"
+      description="导出当前工作流的成稿，支持 txt 和 markdown 格式。"
       onClose={onClose}
     >
       <div className="grid gap-4 xl:grid-cols-[0.94fr_1.06fr]">
@@ -81,7 +81,7 @@ export function EngineExportPanel({
             </p>
           </div>
           {!workflowId ? (
-            <EmptyState title="尚未载入工作流" description="请先回到 Engine 主面板载入一个 workflow，再从该工作流发起导出。" />
+            <EmptyState title="尚未载入工作流" description="请先载入工作流，再发起导出。" />
           ) : (
             <>
               <FormatSelection
@@ -105,7 +105,7 @@ export function EngineExportPanel({
                   <PrecheckGroup items={precheck.warningItems} tone="warning" title="警示项" />
                   <PrecheckGroup items={precheck.infoItems} tone="draft" title="导出备注" />
                   {tasks.length === 0 ? (
-                    <EmptyState title="当前没有章节计划" description="当前 workflow 还没有章节任务真值，暂时无法生成导出文件。" />
+                    <EmptyState title="当前没有章节计划" description="工作流尚未生成章节任务。" />
                   ) : precheck.blockingItems.length === 0 ? (
                     <div className="rounded-2xl border border-[rgba(47,107,69,0.18)] bg-[rgba(47,107,69,0.08)] px-4 py-3 text-sm text-[var(--accent-success)]">
                       当前章节任务已满足导出条件。
@@ -175,7 +175,7 @@ export function EngineExportPanel({
               ))}
             </div>
           ) : (
-            <EmptyState title="尚未付梓" description="暂无导出痕迹。先完成一次导出，再从这里下载文件。" />
+            <EmptyState title="尚未付梓" description="完成导出后，可以在这里下载文件。" />
           )}
         </section>
       </div>

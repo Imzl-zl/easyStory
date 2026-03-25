@@ -46,7 +46,7 @@ export function EngineLogsPanel({
     return (
       <EmptyState
         title="暂无执行日志"
-        description="先载入一个 workflow，日志面板才会显示节点执行轨迹和 runtime 事件。"
+        description="载入工作流后，可以查看执行轨迹和日志。"
       />
     );
   }
@@ -112,7 +112,7 @@ function ExecutionSection({
           ))}
         </div>
       ) : (
-        <EmptyState title="暂无节点执行" description="当前 workflow 还没有落库的 node execution 记录。" />
+        <EmptyState title="暂无节点执行" description="工作流尚未产生节点执行记录。" />
       )}
     </section>
   );
@@ -152,8 +152,8 @@ function ExecutionCard({
         </div>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <ExecutionMetric label="Artifacts" value={formatCount(execution.artifacts.length)} />
-        <ExecutionMetric label="Reviews" value={formatCount(execution.review_actions.length)} />
+        <ExecutionMetric label="产物" value={formatCount(execution.artifacts.length)} />
+        <ExecutionMetric label="审核" value={formatCount(execution.review_actions.length)} />
         <ExecutionMetric label="输入字段" value={formatCount(Object.keys(execution.input_summary).length)} />
         <ExecutionMetric
           label="输出状态"
@@ -196,7 +196,7 @@ function ExecutionLogSection({ logs }: Readonly<{ logs: ExecutionLogView[] }>) {
           ))}
         </div>
       ) : (
-        <EmptyState title="暂无日志事件" description="当前 workflow 还没有可展示的 execution log。" />
+        <EmptyState title="暂无日志事件" description="工作流暂无可展示的执行日志。" />
       )}
     </section>
   );

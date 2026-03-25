@@ -176,7 +176,7 @@ export function EngineTaskRegenerateSection({
           {draftRows.length === 0 ? (
             <EmptyState
               title="还没有重建草稿"
-              description="先载入当前计划，或从空白开始新建章节任务列表。"
+              description="载入当前计划或新建章节任务。"
             />
           ) : (
             <div className="space-y-3">

@@ -20,7 +20,7 @@ export function LobbyEntryCard({
   return (
     <section className="panel-muted space-y-4 p-5">
       <div className="space-y-1">
-        <h3 className="font-serif text-lg font-semibold">Incubator</h3>
+        <h3 className="font-serif text-lg font-semibold">创建项目</h3>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
           模板问答、自由描述和模板建项目已经独立出来，Lobby 不再内联承担创建状态。
         </p>

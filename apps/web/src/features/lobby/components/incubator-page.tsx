@@ -50,9 +50,9 @@ export function IncubatorPage() {
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Incubator"
-        description="把模板问答、自由描述和模板建项目收口到独立路由，避免在 Lobby 内联堆状态。"
-        action={<Link className="ink-button-secondary" href="/workspace/lobby">返回 Lobby</Link>}
+        title="创建项目"
+        description="创建新项目，开始你的故事。"
+        action={<Link className="ink-button-secondary" href="/workspace/lobby">返回项目大厅</Link>}
       >
         <div className="space-y-5">
           <ModeTabs mode={mode} onModeChange={handleModeChange} />

@@ -30,7 +30,7 @@ export function ConfigRegistryEditorPanel({
     return (
       <EmptyState
         title="暂无可编辑配置"
-        description="先选择一条配置详情，再在这里直接编辑完整 JSON DTO。"
+        description="选择配置后，可以编辑 JSON 内容。"
       />
     );
   }
@@ -40,7 +40,7 @@ export function ConfigRegistryEditorPanel({
       <section className="panel-muted space-y-4 p-5">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">
-            Editor
+            编辑器
           </p>
           <h3 className="font-serif text-lg font-semibold">{getEditorTitle(type)}</h3>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">

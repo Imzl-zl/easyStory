@@ -54,7 +54,7 @@ export function EngineContextPanel({
     return (
       <EmptyState
         title="尚未载入工作流"
-        description="先启动或载入一个 workflow，才能试跑节点上下文预览。"
+        description="启动工作流后，可以预览节点上下文。"
       />
     );
   }
@@ -129,7 +129,7 @@ function ContextPreviewResult({ preview }: Readonly<{ preview: ContextPreview }>
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
         <MetricCard
-          label="Skill"
+          label="技能"
           value={preview.skill_id}
           detail={`节点 ${preview.node_id} · 模型 ${preview.model_name}`}
         />
@@ -144,7 +144,7 @@ function ContextPreviewResult({ preview }: Readonly<{ preview: ContextPreview }>
           detail={`预算 ${formatTokenCount(preview.context_report.budget_limit)}`}
         />
         <MetricCard
-          label="Section 数"
+          label="段落数"
           value={formatCount(preview.context_report.sections.length)}
           detail={`窗口 ${formatTokenCount(preview.context_report.model_context_window)}`}
         />

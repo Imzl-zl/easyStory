@@ -39,7 +39,7 @@ export function LabSidebar({
   return (
     <aside className="panel-shell space-y-4 p-5">
       <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">Lab</p>
+        <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">实验室</p>
         <h1 className="font-serif text-2xl font-semibold">分析结果工作台</h1>
       </div>
       <LabFilters filters={filters} isPending={isPending} onFilterChange={onFilterChange} />
@@ -160,8 +160,8 @@ function LabAnalysisList({
       title={hasActiveLabAnalysisFilters(filters) ? "没有匹配的分析记录" : "暂无分析记录"}
       description={
         hasActiveLabAnalysisFilters(filters)
-          ? "当前过滤条件下没有分析记录，可调整 analysis_type / content_id / generated_skill_key。"
-          : "右侧表单可以直接创建第一条分析结果。"
+          ? "尝试调整过滤条件。"
+          : "创建你的第一条分析记录。"
       }
     />
   );

@@ -18,12 +18,12 @@ export function TemplateLibraryPage({ initialTemplateId = null }: TemplateLibrar
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Template Library"
-        description="模板库是 Lobby 的子视图：这里管理内建模板与自定义模板，不把模板 CRUD 混进书架页本体。"
+        title="模板库"
+        description="管理创作模板，为你的故事定下基调。"
         action={
           <div className="flex flex-wrap gap-2">
-            <Link className="ink-button-secondary" href="/workspace/lobby">返回 Lobby</Link>
-            <Link className="ink-button-secondary" href="/workspace/lobby/new">进入 Incubator</Link>
+            <Link className="ink-button-secondary" href="/workspace/lobby">返回项目大厅</Link>
+            <Link className="ink-button-secondary" href="/workspace/lobby/new">创建项目</Link>
           </div>
         }
       >

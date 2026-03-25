@@ -75,7 +75,7 @@ function ReplayGateStateView({
     return (
       <EmptyState
         title="尚未载入工作流"
-        description="先启动或载入一个 workflow，再选择 node execution 查看 Prompt 回放。"
+        description="启动工作流后，可以查看 Prompt 回放。"
       />
     );
   }
@@ -88,7 +88,7 @@ function ReplayGateStateView({
   return (
     <EmptyState
       title="暂无可回放节点"
-      description="当前 workflow 还没有落库的 node execution，暂时无法查看 Prompt 回放。"
+      description="工作流尚未产生可回放的节点执行。"
     />
   );
 }
@@ -181,7 +181,7 @@ function ReplayDetailStateView({
     return (
       <EmptyState
         title="等待选择节点"
-        description="请先选择一个 node execution，中央区域才会浮现对应的 Prompt 对话过程。"
+        description="选择节点后，可以查看对应的 Prompt 对话。"
       />
     );
   }
@@ -194,8 +194,8 @@ function ReplayDetailStateView({
   if (detailState === "replays-empty") {
     return (
       <EmptyState
-        title="暂无 Prompt 回放"
-        description="当前节点还没有落库的 Prompt 记录，可能尚未真正调用模型，或本轮执行没有产生回放。"
+        title="暂无提示词回放"
+        description="该节点暂无 Prompt 记录。"
       />
     );
   }
@@ -234,8 +234,8 @@ function ReplayCard({
           回放 ID：{formatShortId(replay.id)}
         </p>
       </div>
-      <ReplayTextDisclosure title="Prompt" value={replay.prompt_text} defaultOpen />
-      <ReplayTextDisclosure title="Response" value={replay.response_text ?? "模型未返回文本响应。"} />
+      <ReplayTextDisclosure title="提示词" value={replay.prompt_text} defaultOpen />
+      <ReplayTextDisclosure title="响应" value={replay.response_text ?? "模型未返回文本响应。"} />
     </article>
   );
 }

@@ -22,7 +22,7 @@ function SidebarHeader({ onStartCreate }: { onStartCreate: () => void }) {
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">Template Library</p>
+        <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">模板库</p>
         <h2 className="font-serif text-2xl font-semibold">模板法度</h2>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">管理内建模板与自定义模板，所有节点快照都以后端展开结果为准。</p>
       </div>
@@ -135,7 +135,7 @@ function SidebarBody({ model }: { model: TemplateLibraryModel }) {
     return (
       <EmptyState
         title="暂无模板"
-        description="可以从右侧创建第一份自定义模板，也可以稍后从内建模板创建副本。"
+        description="创建你的第一个模板，或从内置模板开始。"
       />
     );
   }

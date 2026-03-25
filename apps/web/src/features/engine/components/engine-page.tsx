@@ -193,8 +193,8 @@ export function EnginePage({ projectId }: EnginePageProps) {
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Engine"
-        description="执行控制台优先回答三个问题：现在在跑什么、为何暂停、是否可以继续。"
+        title="引擎"
+        description="控制工作流执行，监控生成进度。"
         action={
           <EnginePageHeaderActions
             isActionPending={actionMutation.isPending}

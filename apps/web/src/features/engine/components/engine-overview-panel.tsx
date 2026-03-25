@@ -29,7 +29,7 @@ export function EngineOverviewPanel({
     return (
       <EmptyState
         title="暂无执行概览"
-        description="先载入一个 workflow，概览面板才会显示节点推进状态和时间线。"
+        description="载入工作流后，可以查看执行状态和时间线。"
       />
     );
   }
@@ -47,7 +47,7 @@ export function EngineOverviewPanel({
     return (
       <EmptyState
         title="暂无节点时间线"
-        description="当前 workflow 还没有定义节点，也没有可展示的运行轨迹。"
+        description="工作流尚未定义节点或产生执行轨迹。"
       />
     );
   }

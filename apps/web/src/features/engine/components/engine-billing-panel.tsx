@@ -50,7 +50,7 @@ export function EngineBillingPanel({
     return (
       <EmptyState
         title="暂无账单摘要"
-        description="先载入一个 workflow，账单面板才会显示预算窗口与 Token 使用详情。"
+        description="载入工作流后，可以查看 Token 使用和成本统计。"
       />
     );
   }

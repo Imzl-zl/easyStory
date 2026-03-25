@@ -85,7 +85,7 @@ function SettingPreviewCard({ setting }: { setting: ProjectSetting }) {
   return (
     <section className="panel-shell fan-panel space-y-4 p-5">
       <header className="space-y-1">
-        <h3 className="font-serif text-lg font-semibold">Project Setting 预览</h3>
+        <h3 className="font-serif text-lg font-semibold">项目设定预览</h3>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
           这里展示后端返回的草稿结果，便于继续进入 Studio 精修。
         </p>

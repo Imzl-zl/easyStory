@@ -40,7 +40,7 @@ export function EngineReviewPanel({ summary, actions, isLoading, errorMessage }:
     return (
       <EmptyState
         title="暂无审核摘要"
-        description="先载入一个 workflow，审核面板才会显示 reviewer 动作和问题分级。"
+        description="载入工作流后，可以查看审核结果和问题分级。"
       />
     );
   }
@@ -144,7 +144,7 @@ function ReviewTypesSection({ summary }: Readonly<{ summary: WorkflowReviewSumma
           ))}
         </div>
       ) : (
-        <EmptyState title="暂无类型拆分" description="当前 workflow 还没有 reviewer 返回可归类的审核结果。" />
+        <EmptyState title="暂无类型拆分" description="工作流暂无可归类的审核结果。" />
       )}
     </section>
   );
@@ -166,7 +166,7 @@ function ReviewActionsSection({ actions }: Readonly<{ actions: WorkflowReviewAct
           ))}
         </div>
       ) : (
-        <EmptyState title="暂无审核动作" description="当前 workflow 尚未产生可展示的 reviewer 动作。" />
+        <EmptyState title="暂无审核动作" description="工作流暂未产生审核记录。" />
       )}
     </section>
   );

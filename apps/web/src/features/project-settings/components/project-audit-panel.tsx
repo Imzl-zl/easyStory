@@ -43,8 +43,8 @@ export function ProjectAuditPanel({
 
   return (
     <SectionCard
-      title="Project Audit"
-      description="项目审计直接读取后端 AuditLogView。当前 MVP 支持按操作类型过滤，并保留原始 details JSON 作为唯一详情真值。"
+      title="操作记录"
+      description="查看项目的操作历史与变更记录。"
     >
       <div className="space-y-4">
         <AuditFilterBar
@@ -140,8 +140,8 @@ function AuditPanelBody({
         title="暂无项目审计日志"
         description={
           eventType
-            ? `当前过滤条件 \`${eventType}\` 下没有可展示记录。`
-            : "雪地无痕，当前项目还没有可展示的审计记录。"
+            ? `当前过滤条件 \`${eventType}\` 下没有记录。`
+            : "暂无操作记录。"
         }
       />
     );

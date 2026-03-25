@@ -73,7 +73,7 @@ export function LobbySettingsPage() {
 
   return (
     <CredentialCenter
-      headerAction={<Link className="ink-button-secondary" href="/workspace/lobby">返回 Lobby</Link>}
+      headerAction={<Link className="ink-button-secondary" href="/workspace/lobby">返回项目大厅</Link>}
       isNavigationPending={isPending}
       mode={mode}
       projectId={projectId}

@@ -131,7 +131,7 @@ export function EnginePageSidebar({
           <PreparationStatusPanel projectId={projectId} />
           <EmptyState
             title="尚未载入工作流"
-            description="请先看当前准备状态；若条件已满足可直接启动，若已有 workflow id 也可手动载入。"
+            description="查看准备状态，满足条件后启动工作流。"
             action={
               <button
                 className="ink-button"

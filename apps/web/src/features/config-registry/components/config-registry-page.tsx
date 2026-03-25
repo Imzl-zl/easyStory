@@ -102,8 +102,8 @@ export function ConfigRegistryPage() {
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Config Registry"
-        description="后端配置真值直接来自 config DTO。当前页面提供列表、详情预览和 JSON 级编辑，不再自造第二套字段映射。"
+        title="配置中心"
+        description="管理系统配置，支持查看和编辑 JSON。"
         action={
           <div className="flex flex-wrap gap-2">
             <Link className="ink-button-secondary" href="/workspace/lobby">

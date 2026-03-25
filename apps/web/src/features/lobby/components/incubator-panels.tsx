@@ -62,7 +62,7 @@ export function TemplateModePanel({ model, onSwitchToChat }: TemplateModePanelPr
     return (
       <EmptyState
         title="当前没有模板"
-        description="模板问答模式暂时不可用，但你仍然可以切换到自由描述模式生成设定草稿。"
+        description="暂无可用模板，可切换到自由描述模式创建项目。"
         action={
           <button className="ink-button-secondary" onClick={onSwitchToChat} type="button">
             切换到自由描述
@@ -80,7 +80,7 @@ export function TemplateModePanel({ model, onSwitchToChat }: TemplateModePanelPr
       </div>
       <IncubatorPreview
         title="模板草稿预览"
-        description="模板模式会把有效回答映射到 Project Setting，并给出当前完整度。"
+        description="回答问题后生成项目设定，并评估完整度。"
         emptyMessage={previewEmptyMessage}
         completeness={model.draftMutation.data?.setting_completeness}
         setting={model.draftMutation.data?.project_setting}

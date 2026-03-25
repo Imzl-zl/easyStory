@@ -25,7 +25,7 @@ export function CredentialDeleteConfirmDialog({
   return (
     <DialogShell
       title={`确认删除${scopeLabel}`}
-      description="这是删除式操作。请先确认移除后，对当前作用域和运行时解析会产生什么影响。"
+      description="删除后无法恢复，请确认影响范围。"
       onClose={onClose}
     >
       <div className="grid gap-4 xl:grid-cols-[0.96fr_1.04fr]">

@@ -231,8 +231,8 @@ export function CredentialCenter({
 
   return (
     <SectionCard
-      title="Credential Center"
-      description="当前已支持用户级和项目级模型连接管理、验证、启停与凭证审计。"
+      title="凭证中心"
+      description="配置 AI 模型连接，管理 API 凭证。"
       action={headerAction}
     >
       <div className="space-y-5">

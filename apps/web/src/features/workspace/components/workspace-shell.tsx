@@ -87,7 +87,7 @@ export function WorkspaceShell({
                       type="button"
                     >
                       <span>{item.label}</span>
-                      <span className="text-xs uppercase tracking-[0.18em]">Select</span>
+                      <span className="text-xs uppercase tracking-[0.18em]">选择</span>
                     </button>
                   )
                 );

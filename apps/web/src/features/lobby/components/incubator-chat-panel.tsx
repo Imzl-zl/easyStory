@@ -35,7 +35,7 @@ export function ChatModePanel({ model }: ChatModePanelProps) {
           </p>
         </div>
         <label className="block">
-          <span className="label-text">Provider</span>
+          <span className="label-text">模型提供商</span>
           <input
             className="ink-input"
             value={model.form.provider}
@@ -76,7 +76,7 @@ export function ChatModePanel({ model }: ChatModePanelProps) {
       </section>
       <IncubatorPreview
         title="自由描述草稿预览"
-        description="后端会返回设定完整度与建议继续补充的问题，便于后续进 Studio。"
+        description="提取描述后生成项目设定，并评估完整度。"
         emptyMessage="输入创作意图、Provider 后点击“提取设定草稿”。"
         completeness={model.draftMutation.data?.setting_completeness}
         followUpQuestions={model.draftMutation.data?.follow_up_questions}

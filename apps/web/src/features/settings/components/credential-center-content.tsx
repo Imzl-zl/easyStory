@@ -94,7 +94,7 @@ export function CredentialCenterContent({
     );
   }
   if (mode === "audit") {
-    return <EmptyState title="暂无凭证" description="先创建一条凭证，审计子视图才会出现可选目标。" />;
+    return <EmptyState title="暂无凭证" description="创建凭证后，可以查看其审计记录。" />;
   }
   if (shouldShowEditLoadingState) {
     return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载凭证详情...</div>;

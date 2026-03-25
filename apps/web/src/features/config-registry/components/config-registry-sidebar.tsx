@@ -64,7 +64,7 @@ export function ConfigRegistrySidebar({
       {items.length === 0 && !isLoading && !errorMessage ? (
         <EmptyState
           title="暂无配置"
-          description="当前配置仓还没有可展示的条目，或你没有对应的配置管理员访问权限。"
+          description="暂无配置条目，或无访问权限。"
         />
       ) : (
         <div className="space-y-3">

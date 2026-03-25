@@ -31,7 +31,7 @@ export function ConfigRegistryDetailPanel({
     return (
       <EmptyState
         title="尚未选择配置"
-        description="先从左侧列表选择一条配置，再查看其元数据和原始 JSON。"
+        description="选择左侧配置项，查看详情。"
       />
     );
   }
@@ -45,7 +45,7 @@ export function ConfigRegistryDetailPanel({
       <section className="panel-muted space-y-4 p-5">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">
-            Config Detail
+            配置详情
           </p>
           <h3 className="font-serif text-xl font-semibold">{detail.name}</h3>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">

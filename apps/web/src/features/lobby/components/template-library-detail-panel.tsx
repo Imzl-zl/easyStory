@@ -30,7 +30,7 @@ export function TemplateLibraryDetailPanel({ model }: { model: TemplateLibraryMo
     return (
       <EmptyState
         title="先选一个模板"
-        description="左侧选择模板后，这里会展示节点快照、引导问题与核心配置。"
+        description="选择左侧模板，查看详情与配置。"
       />
     );
   }

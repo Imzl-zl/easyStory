@@ -142,7 +142,7 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
     return (
       <EmptyState
         title="尚未载入章节任务"
-        description="先启动或载入一个 workflow，再在这里查看、编辑或重建章节任务。"
+        description="启动工作流后，可以查看和管理章节任务。"
       />
     );
   }
@@ -185,7 +185,7 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
           {tasks.length === 0 && !tasksQuery.isLoading ? (
             <EmptyState
               title="当前没有章节任务"
-              description="这通常意味着 chapter_split 还没有产出计划，或当前 workflow 还没有任务真值。"
+              description="工作流尚未生成章节计划。"
             />
           ) : (
             <div className="space-y-3">

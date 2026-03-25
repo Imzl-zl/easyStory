@@ -34,7 +34,7 @@ export function EngineTaskRegenerateDialog({
   return (
     <DialogShell
       title="确认重建章节任务"
-      description="这是覆盖式操作。请先确认新的章节计划，再执行真正的重建。"
+      description="重建将覆盖当前计划，请确认后继续。"
       onClose={onClose}
       restoreFocusRef={restoreFocusRef}
     >

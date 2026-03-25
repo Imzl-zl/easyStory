@@ -106,13 +106,13 @@ function ProjectSettingsSidebar({
   return (
     <aside className="space-y-6">
       <SectionCard
-        title="Project Settings"
-        description="项目设定与项目审计都收口到这里，但仍保持顶层导航只保留四柱结构。"
-        action={<Link className="ink-button-secondary" href="/workspace/lobby">返回 Lobby</Link>}
+        title="项目设置"
+        description="调整项目设定，查看操作记录。"
+        action={<Link className="ink-button-secondary" href="/workspace/lobby">返回项目大厅</Link>}
       >
         <div className="space-y-4">
           <div className="panel-muted space-y-2 p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--accent-ink)]">Project</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--accent-ink)]">项目</p>
             <h1 className="font-serif text-2xl font-semibold text-[var(--text-primary)]">{projectName}</h1>
             {projectStatus ? <StatusBadge status={projectStatus} /> : null}
           </div>
@@ -171,7 +171,7 @@ function ProjectSettingsTabButton({
       type="button"
     >
       <span>{label}</span>
-      <span className="text-xs uppercase tracking-[0.16em]">Tab</span>
+      <span className="text-xs uppercase tracking-[0.16em]">标签</span>
     </button>
   );
 }
