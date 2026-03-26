@@ -58,6 +58,110 @@
 └──────────────┴────────────────────────┴────────────────────────────────┘
 ```
 
+#### 2.1.1 水墨流视觉规范应用
+
+基于现有 `globals.css` 中的水墨流设计语言，配置中心采用以下视觉规范：
+
+**背景层级（三栏区分）**：
+
+| 区域 | CSS 变量 | 视觉隐喻 |
+|------|----------|----------|
+| 左栏（索引） | `--bg-muted` | 书架/公文卷轴 |
+| 中栏（预览） | `--bg-canvas` | 过渡区，无边框 |
+| 右栏（编辑） | `--bg-surface` | 铺开的新纸 |
+
+```css
+.config-sidebar { background: var(--bg-muted); }
+.config-detail { background: var(--bg-canvas); }
+.config-editor {
+  background: var(--bg-surface);
+  box-shadow: 0 4px 12px rgba(31, 27, 22, 0.05);
+}
+```
+
+**状态隐喻（润墨/枯墨）**：
+
+| 状态 | 效果 | CSS 实现 |
+|------|------|----------|
+| 已启用（润墨） | 文字边缘淡晕，内容鲜活 | `text-shadow: 0 0 2px rgba(46, 111, 106, 0.15)` |
+| 已停用（枯墨） | 透明度降低，边缘模糊 | `opacity: 0.6` |
+
+```css
+.config-item[data-enabled="true"] {
+  text-shadow: 0 0 2px rgba(46, 111, 106, 0.15);
+}
+.config-item[data-enabled="false"] {
+  opacity: 0.6;
+}
+```
+
+**搜索框湿墨下划线**：
+
+激活时底部出现从中心向两侧延伸的墨线：
+
+```css
+.ink-input.ink-search {
+  position: relative;
+}
+.ink-input.ink-search::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--accent-ink);
+  transform: translateX(-50%) scaleX(0);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ink-input.ink-search:focus::after {
+  transform: translateX(-50%) scaleX(1);
+}
+```
+
+**朱砂印章（保存成功反馈）**：
+
+```css
+.seal-stamp {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  color: var(--accent-danger);
+  border: 2px solid var(--accent-danger);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: "Source Han Serif SC", serif;
+  transform: rotate(-15deg);
+  opacity: 0;
+  animation: seal-stamp-in 300ms ease forwards;
+}
+
+@keyframes seal-stamp-in {
+  from { opacity: 0; transform: rotate(-15deg) scale(0.8); }
+  to { opacity: 0.85; transform: rotate(-15deg) scale(1); }
+}
+```
+
+**类型标签（枯墨/润墨切换）**：
+
+```css
+.ink-tab[data-active="true"] {
+  border-color: var(--line-strong);
+  background: rgba(46, 111, 106, 0.1);
+  color: var(--accent-ink);
+  text-shadow: 0 0 2px rgba(46, 111, 106, 0.1);
+}
+```
+
+**不采纳的视觉建议**：
+
+| 建议 | 原因 |
+|------|------|
+| "红墨泼溅"错误纹理 | 过度装饰，保持 `--accent-danger` 边框即可 |
+| 变量映射表"连线感" | 增加复杂度，普通表格 + 高亮已足够 |
+| Hook 事件流"墨点时间轴" | 与列表结构冲突，可读性不如列表 |
+| "笔架"变量插入 UI | 功能价值有限，textarea + 自动补全更实用 |
+
 ### 2.2 核心改动
 
 #### 2.2.1 双模式编辑器
@@ -1074,3 +1178,4 @@ apps/web/src/features/config-registry/components/
 | 2026-03-26 | - | 待审核 | 修正 3 个交互问题：1) JSON→表单解析失败改为阻止切换；2) 离页保护覆盖跨页 Link 和浏览器导航；3) URL 同步加入编辑器模式 |
 | 2026-03-26 | - | 待审核 | 修正 3 个精度问题：1) popstate 恢复改为保存 currentUrl；2) ProtectedLink 保留 modifier 点击行为；3) Hook payload 表注明视节点实现而定 |
 | 2026-03-26 | - | 待审核 | 修正 popstate 状态漂移：改用 stableUrlRef 在每次 !isDirty 时同步更新，避免恢复到错误旧地址 |
+| 2026-03-26 | - | 待审核 | 新增 2.1.1 水墨流视觉规范：背景层级、润墨/枯墨状态、湿墨下划线、朱砂印章，明确不采纳的视觉建议 |
