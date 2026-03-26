@@ -112,11 +112,43 @@
 └─────────────────────────────┘
 ```
 
-#### 2.2.3 离页保护
+#### 2.2.3 URL 状态同步
 
-- 切换配置项时：未保存则弹窗确认
-- 切换类型时：未保存则弹窗确认
-- 关闭页面时：`beforeunload` 提醒
+**要求**：所有 UI 状态必须同步到 URL query params，确保：
+- 刷新页面后状态保持
+- 分享链接可直接定位到特定配置
+- 浏览器前进/后退正常工作
+
+**同步字段**：
+| 状态 | Query Param | 示例 |
+|------|-------------|------|
+| 当前类型 | `type` | `?type=skills` |
+| 当前配置项 | `item` | `?type=skills&item=draft-generation` |
+| 搜索关键词 | `q` | `?type=skills&q=draft` |
+| 排序方式 | `sort` | `?type=skills&sort=name_desc` |
+| 标签过滤 | `tags` | `?type=skills&tags=generation,polish` |
+| 状态过滤 | `status` | `?type=hooks&status=enabled` |
+
+**实现方式**：
+```typescript
+// 使用 router.replace 同步状态到 URL
+const updateQuery = useCallback((updates: Record<string, string | null>) => {
+  const params = new URLSearchParams(searchParams);
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+    else params.delete(key);
+  });
+  router.replace(`?${params.toString()}`);
+}, [router, searchParams]);
+```
+
+#### 2.2.4 离页保护
+
+- 切换配置项时：拦截 `onSelectItem`，未保存则弹窗确认
+- 切换类型时：拦截 `onSelectType`，未保存则弹窗确认
+- 关闭页面/刷新时：`beforeunload` 提醒
+
+**注意**：当前页面是 Next App Router 客户端页面，导航通过 `router.replace(...)` 改变 query 参数实现，不依赖 middleware。实现时应拦截本地导航动作而非寄托给 middleware。
 
 ---
 
@@ -404,12 +436,11 @@ class HookConfig:
 │  执行条件 (可选)                                             │
 │  ────────────                                                │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │  字段路径    [node.word_count           ]           │   │
-│  │  操作符      [>=                      ▼]             │   │
-│  │  值          [1000                        ]          │   │
+│  │  字段路径    [node.type                   ]           │   │
+│  │  操作符      [==                       ▼]             │   │
+│  │  值          [generate                     ]          │   │
 │  │                                                      │   │
-│  │  路径语法：纯点路径，如 workflow.node.id              │   │
-│  │  不支持 {{...}} 包裹语法                             │   │
+│  │  路径语法：纯点路径，不支持 {{...}} 包裹             │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                                                             │
 │  动作配置                                                    │
@@ -450,8 +481,8 @@ class HookConfig:
 │  │  │  输入映射 (input_mapping)                   │   │   │
 │  │  │  ┌─────────────────────────────────────┐   │   │   │
 │  │  │  │ 目标变量    源路径                    │   │   │   │
-│  │  │  │ content     request.user_input       │   │   │   │
-│  │  │  │ node_id     workflow.node.id         │   │   │   │
+│  │  │  │ project_id  workflow.project_id      │   │   │   │
+│  │  │  │ node_id     node.id                  │   │   │   │
 │  │  │  └─────────────────────────────────────┘   │   │   │
 │  │  │                                             │   │   │
 │  │  │  路径语法：纯点路径，不支持 {{...}} 包裹      │   │   │
@@ -483,10 +514,68 @@ class HookConfig:
 - `node_types` 可选值：`generate` / `review` / `export`（`custom` 当前不支持）
 - `action_type` 切换时显示不同的配置面板
 - Script 配置：`module` / `function` / `params`（不是脚本路径）
-- `input_mapping` 路径语法：纯点路径（如 `workflow.node.id`），**不支持** `{{...}}` 包裹
-- 可用路径参考运行时 payload 结构：
-  - Workflow 事件：`workflow.execution_id`、`workflow.project_id`、`node.id`、`node.type`
-  - Assistant 事件：`assistant.agent_id`、`request.user_input`、`response.content`
+- `input_mapping` 路径语法：纯点路径，**不支持** `{{...}}` 包裹
+
+**Payload 路径参考（按事件类型分组）**：
+
+Workflow 事件 payload 结构（`workflow` 和 `node` 平级）：
+```
+{
+  "event": "before_generate",
+  "workflow": {
+    "execution_id": "...",
+    "workflow_id": "...",
+    "workflow_name": "...",
+    "project_id": "..."
+  },
+  "node": {
+    "id": "...",
+    "name": "...",
+    "type": "generate"
+  },
+  "node_execution_id": "...",  // 可选
+  // 额外字段按事件类型添加
+}
+```
+
+| 事件类型 | 可用路径示例 | 说明 |
+|----------|--------------|------|
+| 所有 Workflow 事件 | `workflow.execution_id` | 执行 ID |
+| 所有 Workflow 事件 | `workflow.project_id` | 项目 ID |
+| 所有 Workflow 事件 | `node.id` | 节点 ID |
+| 所有 Workflow 事件 | `node.type` | 节点类型 |
+| `before_generate` / `after_generate` | `chapter.number` | 章节号 |
+| `before_generate` / `after_generate` | `chapter.task_id` | 章节任务 ID |
+
+Assistant 事件 payload 结构：
+```
+{
+  "event": "before_assistant_response",
+  "assistant": {
+    "agent_id": "...",
+    "skill_id": "...",
+    "project_id": "...",
+    "mcp_servers": [...]
+  },
+  "conversation": {
+    "message_count": 3,
+    "messages": [...]
+  },
+  "request": {
+    "input_data": {...},
+    "user_input": "..."
+  }
+}
+```
+
+| 事件类型 | 可用路径示例 | 说明 |
+|----------|--------------|------|
+| 所有 Assistant 事件 | `assistant.agent_id` | Agent ID |
+| 所有 Assistant 事件 | `assistant.skill_id` | Skill ID |
+| 所有 Assistant 事件 | `request.user_input` | 用户输入 |
+| `after_assistant_response` | `response.content` | 响应内容 |
+
+**注意**：不存在 `workflow.node.*` 这种嵌套路径，`workflow` 和 `node` 是平级的。
 
 ---
 
@@ -680,16 +769,30 @@ class McpServerConfig:
 ### 5.2 离页保护
 
 **触发场景**：
-1. 切换配置项
-2. 切换配置类型
-3. 关闭页面/刷新
+1. 切换配置项（拦截 `onSelectItem`）
+2. 切换配置类型（拦截 `onSelectType`）
+3. 关闭页面/刷新（`beforeunload`）
 
 **实现方式**：
 ```typescript
-// 路由守卫
+// 当前页面入口：config-registry-page.tsx
+// 导航通过 router.replace(...) 改变 query 参数
+
 const { isDirty } = useUnsavedChanges(editorValue, originalValue);
 
-// beforeunload
+// 拦截本地导航动作
+const handleSelectItem = useCallback((id: string) => {
+  if (isDirty) {
+    showConfirmDialog({
+      message: "有未保存的更改，确定要离开吗？",
+      onConfirm: () => router.replace(`?type=${type}&item=${id}`),
+    });
+  } else {
+    router.replace(`?type=${type}&item=${id}`);
+  }
+}, [isDirty, type, router]);
+
+// beforeunload 处理页面关闭/刷新
 useEffect(() => {
   const handleBeforeUnload = (e: BeforeUnloadEvent) => {
     if (isDirty) {
@@ -700,10 +803,9 @@ useEffect(() => {
   window.addEventListener("beforeunload", handleBeforeUnload);
   return () => window.removeEventListener("beforeunload", handleBeforeUnload);
 }, [isDirty]);
-
-// Next.js 路由守卫
-// 使用 router 事件或 middleware
 ```
+
+**注意**：不要使用 middleware 处理 dirty-state 保护，因为当前页面是客户端渲染，所有导航都是本地 `router.replace(...)` 调用。
 
 ### 5.3 字段级错误提示
 
@@ -902,5 +1004,6 @@ apps/web/src/features/config-registry/components/
 
 | 日期 | 审核人 | 状态 | 备注 |
 |------|--------|------|------|
-| 2025-03-26 | - | 待审核 | 初始版本 |
-| 2025-03-26 | - | 待审核 | 修正 7 个文档级错误：1) Hook script 配置改为 module/function/params；2) Hook 路径语法改为纯点路径；3) Agent system_prompt 说明不支持模板变量；4) Hook node_types 改为 generate/review/export；5) Workflow mode 改为 manual/auto；6) 移除更新时间排序；7) 过滤选项按类型区分 |
+| 2026-03-26 | - | 待审核 | 初始版本 |
+| 2026-03-26 | - | 待审核 | 修正 7 个文档级错误：1) Hook script 配置改为 module/function/params；2) Hook 路径语法改为纯点路径；3) Agent system_prompt 说明不支持模板变量；4) Hook node_types 改为 generate/review/export；5) Workflow mode 改为 manual/auto；6) 移除更新时间排序；7) 过滤选项按类型区分 |
+| 2026-03-26 | - | 待审核 | 修正 4 个遗留问题：1) Hook payload 路径按事件分组，明确 workflow/node 平级；2) 离页保护改为拦截本地导航动作；3) 添加 URL 状态同步要求；4) 修正审核记录日期 |
