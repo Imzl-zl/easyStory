@@ -117,6 +117,18 @@ class WorkflowRuntimeReviewMixin:
         owner_id: uuid.UUID,
         review_type: str,
     ) -> AggregatedReviewResult:
+        await self._run_before_review_hook(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            execution.id,
+            owner_id=owner_id,
+            content=content,
+            reviewers=reviewers,
+            review_type=review_type,
+        )
+
         async def runner(text: str, reviewer):
             return await self._run_reviewer(
                 db,
@@ -142,6 +154,17 @@ class WorkflowRuntimeReviewMixin:
                 self._append_review_actions(db, execution, partial, review_type)
             raise
         self._append_review_actions(db, execution, aggregated, review_type)
+        await self._run_after_review_hooks(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            execution.id,
+            owner_id=owner_id,
+            content=content,
+            aggregated=aggregated,
+            review_type=review_type,
+        )
         return aggregated
 
     def _append_review_actions(
@@ -229,3 +252,113 @@ class WorkflowRuntimeReviewMixin:
             failure_message=exc.message,
             pause_reason="model_fallback_exhausted",
         )
+
+    async def _run_before_review_hook(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        execution_id,
+        *,
+        owner_id: uuid.UUID,
+        content: str,
+        reviewers: Sequence[Any],
+        review_type: str,
+    ) -> None:
+        context = self._build_hook_context(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            "before_review",
+            owner_id=owner_id,
+            payload=self._base_hook_payload(
+                workflow,
+                workflow_config,
+                node,
+                "before_review",
+                node_execution_id=execution_id,
+                extra=self._review_hook_payload(content, reviewers, review_type),
+            ),
+            node_execution_id=execution_id,
+        )
+        await self._run_hook_event(context)
+
+    async def _run_after_review_hooks(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        execution_id,
+        *,
+        owner_id: uuid.UUID,
+        content: str,
+        aggregated: AggregatedReviewResult,
+        review_type: str,
+    ) -> None:
+        extra = self._review_result_payload(content, aggregated, review_type)
+        context = self._build_hook_context(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            "after_review",
+            owner_id=owner_id,
+            payload=self._base_hook_payload(
+                workflow,
+                workflow_config,
+                node,
+                "after_review",
+                node_execution_id=execution_id,
+                extra=extra,
+            ),
+            node_execution_id=execution_id,
+        )
+        await self._run_hook_event(context)
+        if aggregated.overall_status == "passed" and not aggregated.execution_failures:
+            return
+        failure_context = self._build_hook_context(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            "on_review_fail",
+            owner_id=owner_id,
+            payload=self._base_hook_payload(
+                workflow,
+                workflow_config,
+                node,
+                "on_review_fail",
+                node_execution_id=execution_id,
+                extra=extra,
+            ),
+            node_execution_id=execution_id,
+        )
+        await self._run_hook_event(failure_context)
+
+    def _review_hook_payload(
+        self,
+        content: str,
+        reviewers: Sequence[Any],
+        review_type: str,
+    ) -> dict[str, Any]:
+        return {
+            "review_type": review_type,
+            "content": content,
+            "reviewer_ids": [reviewer.id for reviewer in reviewers],
+            "reviewer_names": [reviewer.name for reviewer in reviewers],
+        }
+
+    def _review_result_payload(
+        self,
+        content: str,
+        aggregated: AggregatedReviewResult,
+        review_type: str,
+    ) -> dict[str, Any]:
+        return {
+            "review_type": review_type,
+            "content": content,
+            "aggregated_review": aggregated.model_dump(mode="json"),
+        }

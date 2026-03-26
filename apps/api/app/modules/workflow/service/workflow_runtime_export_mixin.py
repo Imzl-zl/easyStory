@@ -32,4 +32,8 @@ class WorkflowRuntimeExportMixin:
         except Exception as exc:
             self._fail_execution(db, execution, started_at, exc)
             raise
-        return NodeOutcome(next_node_id=None)
+        return NodeOutcome(
+            next_node_id=None,
+            node_execution_id=execution.id,
+            hook_payload={"export_ids": export_ids},
+        )

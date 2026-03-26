@@ -4,6 +4,8 @@ from app.modules.config_registry import ConfigLoader
 
 from .agent_write_support import require_agent
 from .hook_write_support import require_hook
+from .mcp_query_dto import McpServerConfigDetailDTO, McpServerConfigSummaryDTO
+from .mcp_write_support import require_mcp_server
 from .query_dto import (
     AgentConfigDetailDTO,
     AgentConfigSummaryDTO,
@@ -19,6 +21,8 @@ from .query_support import (
     to_agent_summary,
     to_hook_detail,
     to_hook_summary,
+    to_mcp_server_detail,
+    to_mcp_server_summary,
     to_skill_detail,
     to_skill_summary,
 )
@@ -60,6 +64,13 @@ class ConfigRegistryQueryService:
 
     async def get_hook(self, hook_id: str) -> HookConfigDetailDTO:
         return to_hook_detail(require_hook(self.config_loader, hook_id))
+
+    async def list_mcp_servers(self) -> list[McpServerConfigSummaryDTO]:
+        servers = sorted(self.config_loader.list_mcp_servers(), key=lambda item: (item.name, item.id))
+        return [to_mcp_server_summary(server) for server in servers]
+
+    async def get_mcp_server(self, server_id: str) -> McpServerConfigDetailDTO:
+        return to_mcp_server_detail(require_mcp_server(self.config_loader, server_id))
 
     async def list_workflows(self) -> list[WorkflowConfigSummaryDTO]:
         workflows = sorted(self.config_loader.list_workflows(), key=lambda item: (item.name, item.id))

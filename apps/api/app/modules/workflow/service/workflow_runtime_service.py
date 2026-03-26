@@ -12,14 +12,16 @@ from app.modules.context.engine import ContextBuilder
 from app.modules.credential.service import CredentialService
 from app.modules.export.service import ExportService
 from app.modules.workflow.models import WorkflowExecution
-from app.shared.runtime import SkillTemplateRenderer, ToolProvider
+from app.shared.runtime import PluginRegistry, SkillTemplateRenderer, ToolProvider
 from app.shared.runtime.errors import ConfigurationError
 
+from .workflow_hook_providers import build_workflow_plugin_registry
 from .snapshot_support import build_runtime_snapshot, load_workflow_snapshot, resolve_node_config
 from .workflow_runtime_chapter_candidate_mixin import WorkflowRuntimeChapterCandidateMixin
 from .workflow_runtime_execute_mixin import WorkflowRuntimeExecuteMixin
 from .workflow_runtime_export_mixin import WorkflowRuntimeExportMixin
 from .workflow_runtime_fix_mixin import WorkflowRuntimeFixMixin
+from .workflow_runtime_hook_mixin import WorkflowRuntimeHookMixin
 from .workflow_runtime_llm_mixin import WorkflowRuntimeLlmMixin
 from .workflow_runtime_persistence_mixin import WorkflowRuntimePersistenceMixin
 from .workflow_runtime_prompt_mixin import WorkflowRuntimePromptMixin
@@ -30,6 +32,7 @@ from .workflow_service import WorkflowService
 
 
 class WorkflowRuntimeService(
+    WorkflowRuntimeHookMixin,
     WorkflowRuntimeExecuteMixin,
     WorkflowRuntimeChapterCandidateMixin,
     WorkflowRuntimeTaskMixin,
@@ -50,6 +53,7 @@ class WorkflowRuntimeService(
         export_service: ExportService,
         template_renderer: SkillTemplateRenderer,
         tool_provider: ToolProvider,
+        plugin_registry: PluginRegistry | None = None,
     ) -> None:
         self.workflow_service = workflow_service
         self.billing_service = billing_service
@@ -59,6 +63,7 @@ class WorkflowRuntimeService(
         self.export_service = export_service
         self.template_renderer = template_renderer
         self.tool_provider = tool_provider
+        self.plugin_registry = plugin_registry or build_workflow_plugin_registry(self)
         self._credential_service: CredentialService | None = None
 
     async def run(
@@ -77,6 +82,92 @@ class WorkflowRuntimeService(
         return workflow
 
     async def _execute_node(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        *,
+        owner_id: uuid.UUID,
+    ) -> NodeOutcome:
+        before_context = self._build_hook_context(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            "before_node_start",
+            owner_id=owner_id,
+            payload=self._base_hook_payload(workflow, workflow_config, node, "before_node_start"),
+        )
+        try:
+            await self._run_hook_event(before_context)
+        except Exception as exc:
+            await self._run_on_error_hooks(
+                self._build_hook_context(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    "on_error",
+                    owner_id=owner_id,
+                    payload=self._base_hook_payload(workflow, workflow_config, node, "on_error"),
+                ),
+                exc,
+            )
+            raise
+        return await self._execute_node_body(db, workflow, workflow_config, node, owner_id=owner_id)
+
+    async def _execute_node_body(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        *,
+        owner_id: uuid.UUID,
+    ) -> NodeOutcome:
+        try:
+            outcome = await self._dispatch_node(db, workflow, workflow_config, node, owner_id=owner_id)
+        except Exception as exc:
+            await self._run_on_error_hooks(
+                self._build_hook_context(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    "on_error",
+                    owner_id=owner_id,
+                    payload=self._base_hook_payload(workflow, workflow_config, node, "on_error"),
+                ),
+                exc,
+            )
+            raise
+        after_payload = self._after_node_payload(outcome)
+        after_context = self._build_hook_context(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            "after_node_end",
+            owner_id=owner_id,
+            payload=self._base_hook_payload(
+                workflow,
+                workflow_config,
+                node,
+                "after_node_end",
+                node_execution_id=outcome.node_execution_id,
+                extra=after_payload,
+            ),
+            node_execution_id=outcome.node_execution_id,
+        )
+        try:
+            await self._run_hook_event(after_context)
+        except Exception as exc:
+            await self._run_on_error_hooks(after_context, exc)
+            raise
+        return outcome
+
+    async def _dispatch_node(
         self,
         db: AsyncSession,
         workflow: WorkflowExecution,
@@ -104,6 +195,16 @@ class WorkflowRuntimeService(
         if node.node_type == "export":
             return await self._execute_export(db, workflow, node)
         raise ConfigurationError(f"Unsupported runtime node: {node.id}")
+
+    def _after_node_payload(self, outcome: NodeOutcome) -> dict[str, object]:
+        payload: dict[str, object] = {
+            "next_node_id": outcome.next_node_id,
+            "pause_reason": outcome.pause_reason,
+            "workflow_status": outcome.workflow_status,
+        }
+        if outcome.hook_payload:
+            payload.update(outcome.hook_payload)
+        return payload
 
     def _apply_outcome(
         self,

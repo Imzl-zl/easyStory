@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,6 +53,14 @@ class WorkflowRuntimeExecuteMixin:
                 chapter_number=None,
             )
             execution.input_data = prompt_bundle["input_data"]
+            await self._run_before_generate_hook(
+                db,
+                workflow,
+                workflow_config,
+                node,
+                owner_id=owner_id,
+                execution_id=execution.id,
+            )
             try:
                 raw_output = await self._call_llm(
                     db,
@@ -72,6 +81,7 @@ class WorkflowRuntimeExecuteMixin:
                     exc,
                     execution_id=execution.id,
                     next_node_id=node.id,
+                    hook_payload={"node_id": node.id},
                 )
             chapters = self._parse_chapter_split_output(raw_output["content"])
             if budget_error is not None:
@@ -82,6 +92,16 @@ class WorkflowRuntimeExecuteMixin:
                 execution,
                 "chapter_tasks",
                 {"chapters": [item.model_dump() for item in chapters]},
+            )
+            chapter_payload = self._chapter_split_hook_payload(chapters, budget_error)
+            await self._run_after_generate_hook(
+                db,
+                workflow,
+                workflow_config,
+                node,
+                owner_id=owner_id,
+                execution_id=execution.id,
+                extra=chapter_payload,
             )
             self._record_prompt_replay(db, execution, prompt_bundle, raw_output)
             self._complete_execution(db, execution, started_at, {"chapters_count": len(chapters)})
@@ -95,8 +115,15 @@ class WorkflowRuntimeExecuteMixin:
                 completed_snapshot=completed_snapshot,
                 next_node_id=next_node_id,
                 budget_error=budget_error,
+                node_execution_id=execution.id,
+                hook_payload=chapter_payload,
             )
-        return NodeOutcome(next_node_id=next_node_id, snapshot_extra=completed_snapshot)
+        return NodeOutcome(
+            next_node_id=next_node_id,
+            snapshot_extra=completed_snapshot,
+            node_execution_id=execution.id,
+            hook_payload=chapter_payload,
+        )
 
     async def _execute_chapter_gen(
         self,
@@ -146,7 +173,31 @@ class WorkflowRuntimeExecuteMixin:
                 prompt_bundle["context_snapshot_hash"],
                 review_outcome,
             )
-            return self._finalize_chapter_execution(db, task, execution, started_at, review_outcome, candidate)
+            hook_payload = self._chapter_generate_hook_payload(
+                task,
+                review_outcome,
+                candidate,
+                generated_content,
+            )
+            if candidate[0] is not None:
+                await self._run_after_generate_hook(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    owner_id=owner_id,
+                    execution_id=execution.id,
+                    extra=hook_payload,
+                )
+            return self._finalize_chapter_execution(
+                db,
+                task,
+                execution,
+                started_at,
+                review_outcome,
+                candidate,
+                hook_payload,
+            )
         except ModelFallbackExhaustedError as exc:
             task.status = "failed"
             self._fail_execution(db, execution, started_at, BusinessRuleError(exc.message))
@@ -156,6 +207,7 @@ class WorkflowRuntimeExecuteMixin:
                 next_node_id=execution.node_id,
                 chapter_number=task.chapter_number,
                 content_id=task.content_id,
+                hook_payload={"chapter": {"number": task.chapter_number}},
             )
         except Exception as exc:
             task.status = "failed"
@@ -184,6 +236,15 @@ class WorkflowRuntimeExecuteMixin:
         prompt_bundle["input_data"]["chapter_task_id"] = str(task.id)
         prompt_bundle["input_data"]["chapter_number"] = task.chapter_number
         execution.input_data = prompt_bundle["input_data"]
+        await self._run_before_generate_hook(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            owner_id=owner_id,
+            execution_id=execution.id,
+            extra={"chapter": {"number": task.chapter_number, "task_id": str(task.id)}},
+        )
         budget_error: BudgetExceededError | None = None
         try:
             raw_output = await self._call_llm(
@@ -212,6 +273,7 @@ class WorkflowRuntimeExecuteMixin:
         started_at: datetime,
         review_outcome: ReviewCycleOutcome,
         candidate: tuple[str | None, str | None, int | None],
+        hook_payload: dict[str, Any],
     ) -> NodeOutcome:
         content_id, version_id, word_count = candidate
         if version_id is not None:
@@ -231,7 +293,12 @@ class WorkflowRuntimeExecuteMixin:
                 started_at,
                 {"chapter_number": task.chapter_number, "content_id": str(content_id)},
             )
-            return NodeOutcome(next_node_id=execution.node_id, snapshot_extra=self._chapter_snapshot(execution, task))
+            return NodeOutcome(
+                next_node_id=execution.node_id,
+                snapshot_extra=self._chapter_snapshot(execution, task),
+                node_execution_id=execution.id,
+                hook_payload=hook_payload,
+            )
         if review_outcome.resolution == "skip":
             task.status = "skipped"
             self._skip_execution(
@@ -240,7 +307,11 @@ class WorkflowRuntimeExecuteMixin:
                 started_at,
                 {"chapter_number": task.chapter_number, "status": "skipped"},
             )
-            return NodeOutcome(next_node_id=execution.node_id)
+            return NodeOutcome(
+                next_node_id=execution.node_id,
+                node_execution_id=execution.id,
+                hook_payload=hook_payload,
+            )
         if review_outcome.resolution == "pause":
             task.status = WAITING_CONFIRM_TASK_STATUS
             self._fail_execution(
@@ -253,6 +324,8 @@ class WorkflowRuntimeExecuteMixin:
                 next_node_id=execution.node_id,
                 pause_reason=resolve_review_pause_reason(review_outcome),
                 snapshot_extra=self._chapter_snapshot(execution, task),
+                node_execution_id=execution.id,
+                hook_payload=hook_payload,
             )
         task.status = "failed"
         self._fail_execution(
@@ -269,4 +342,106 @@ class WorkflowRuntimeExecuteMixin:
                 content_id=task.content_id,
             ),
             workflow_status="failed",
+            node_execution_id=execution.id,
+            hook_payload=hook_payload,
         )
+
+    async def _run_before_generate_hook(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        *,
+        owner_id: uuid.UUID,
+        execution_id: uuid.UUID,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        context = self._build_hook_context(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            "before_generate",
+            owner_id=owner_id,
+            payload=self._base_hook_payload(
+                workflow,
+                workflow_config,
+                node,
+                "before_generate",
+                node_execution_id=execution_id,
+                extra=extra,
+            ),
+            node_execution_id=execution_id,
+        )
+        await self._run_hook_event(context)
+
+    async def _run_after_generate_hook(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        *,
+        owner_id: uuid.UUID,
+        execution_id: uuid.UUID,
+        extra: dict[str, Any],
+    ) -> None:
+        context = self._build_hook_context(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            "after_generate",
+            owner_id=owner_id,
+            payload=self._base_hook_payload(
+                workflow,
+                workflow_config,
+                node,
+                "after_generate",
+                node_execution_id=execution_id,
+                extra=extra,
+            ),
+            node_execution_id=execution_id,
+        )
+        await self._run_hook_event(context)
+
+    def _chapter_split_hook_payload(
+        self,
+        chapters,
+        budget_error: BudgetExceededError | None,
+    ) -> dict[str, Any]:
+        return {
+            "chapters_count": len(chapters),
+            "chapters": [item.model_dump(mode="json") for item in chapters],
+            "budget_exceeded": budget_error is not None,
+        }
+
+    def _chapter_generate_hook_payload(
+        self,
+        task: ChapterTask,
+        review_outcome: ReviewCycleOutcome,
+        candidate: tuple[str | None, str | None, int | None],
+        generated_content: str,
+    ) -> dict[str, Any]:
+        content_id, version_id, word_count = candidate
+        return {
+            "chapter": {
+                "number": task.chapter_number,
+                "title": task.title,
+                "task_id": str(task.id),
+            },
+            "content": {
+                "id": str(content_id) if content_id is not None else None,
+                "version_id": str(version_id) if version_id is not None else None,
+                "word_count": word_count,
+                "text": review_outcome.final_content,
+                "source": review_outcome.content_source,
+                "generated_text": generated_content,
+            },
+            "review": {
+                "resolution": review_outcome.resolution,
+                "failure_message": review_outcome.failure_message,
+                "pause_reason": review_outcome.pause_reason,
+            },
+        }

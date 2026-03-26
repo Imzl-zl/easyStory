@@ -213,6 +213,55 @@ async def test_config_registry_api_rejects_workflow_extra_fields(monkeypatch, tm
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
+async def test_config_registry_api_rejects_assistant_only_hook_binding(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    monkeypatch.setenv(CONFIG_ADMIN_USERNAMES_ENV, CONFIG_ADMIN_USERNAME)
+    temp_root = _copy_config_root(tmp_path)
+    _write_yaml(
+        temp_root / "hooks" / "assistant-only.yaml",
+        """
+hook:
+  id: "hook.assistant_only"
+  name: "Assistant Only"
+  trigger:
+    event: "before_assistant_response"
+  action:
+    type: "script"
+    config:
+      module: "app.hooks.builtin"
+      function: "auto_save_content"
+""",
+    )
+    config_loader = ConfigLoader(temp_root)
+    query_service = create_config_registry_query_service(config_loader=config_loader)
+    payload = (await query_service.get_workflow(TARGET_WORKFLOW_ID)).model_dump(mode="json")
+    _get_by_id(payload["nodes"], "chapter_gen")["hooks"]["after"].append("hook.assistant_only")
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="config-registry-workflow-api-assistant-hook")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session, username=CONFIG_ADMIN_USERNAME).id
+
+        app = create_app(async_session_factory=async_session_factory)
+        app.dependency_overrides[get_config_registry_workflow_write_service] = lambda: (
+            create_config_registry_workflow_write_service(config_loader=config_loader)
+        )
+
+        async with started_async_client(app) as client:
+            response = await client.put(
+                f"/api/v1/config/workflows/{TARGET_WORKFLOW_ID}",
+                json=payload,
+                headers=_auth_headers(owner_id),
+            )
+
+        assert response.status_code == 422
+        assert "not supported on workflow nodes" in response.text
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
 def _get_by_id(items: list[dict], workflow_id: str) -> dict:
     for item in items:
         if item["id"] == workflow_id:
@@ -224,3 +273,8 @@ def _copy_config_root(tmp_path: Path) -> Path:
     temp_root = tmp_path / "config"
     shutil.copytree(CONFIG_ROOT, temp_root)
     return temp_root
+
+
+def _write_yaml(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content.strip() + "\n", encoding="utf-8")

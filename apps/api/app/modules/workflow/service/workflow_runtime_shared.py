@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Literal
+import uuid
 
 from pydantic import BaseModel, ConfigDict
 
@@ -21,6 +22,8 @@ class NodeOutcome:
     pause_reason: str | None = None
     snapshot_extra: dict[str, Any] | None = None
     workflow_status: Literal["failed"] | None = None
+    node_execution_id: uuid.UUID | None = None
+    hook_payload: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

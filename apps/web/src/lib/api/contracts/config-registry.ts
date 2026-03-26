@@ -1,9 +1,9 @@
 import type { JsonValue } from "./base";
 
-export type ConfigRegistryType = "skills" | "agents" | "hooks" | "workflows";
+export type ConfigRegistryType = "skills" | "agents" | "hooks" | "mcp_servers" | "workflows";
 export type ConfigRegistryObject = Record<string, JsonValue>;
 export type AgentType = "writer" | "reviewer" | "checker";
-export type HookActionType = "script" | "webhook" | "agent";
+export type HookActionType = "script" | "webhook" | "agent" | "mcp";
 export type WorkflowMode = "manual" | "auto";
 export type WorkflowNodeType = "generate" | "review" | "export" | "custom";
 
@@ -96,6 +96,24 @@ export type HookConfigDetail = ConfigRegistryDetailBase & {
   };
 };
 
+export type McpServerConfigSummary = ConfigRegistrySummaryBase & {
+  author: null;
+  enabled: boolean;
+  header_count: number;
+  timeout: number;
+  transport: string;
+  url: string;
+};
+
+export type McpServerConfigDetail = ConfigRegistryDetailBase & {
+  author: null;
+  enabled: boolean;
+  headers: Record<string, string>;
+  timeout: number;
+  transport: string;
+  url: string;
+};
+
 export type ConfigRegistryWorkflowNodeSummary = {
   auto_fix: boolean | null;
   auto_proceed: boolean | null;
@@ -142,10 +160,12 @@ export type ConfigRegistrySummary =
   | SkillConfigSummary
   | AgentConfigSummary
   | HookConfigSummary
+  | McpServerConfigSummary
   | WorkflowConfigSummary;
 
 export type ConfigRegistryDetail =
   | SkillConfigDetail
   | AgentConfigDetail
   | HookConfigDetail
+  | McpServerConfigDetail
   | WorkflowConfigDetail;

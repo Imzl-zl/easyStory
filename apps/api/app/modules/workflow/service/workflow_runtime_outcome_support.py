@@ -34,6 +34,7 @@ def build_model_fallback_node_outcome(
     next_node_id: str,
     chapter_number: int | None = None,
     content_id: uuid.UUID | None = None,
+    hook_payload: dict[str, object] | None = None,
 ) -> NodeOutcome:
     snapshot: dict[str, object] = {
         "current_node_execution_id": str(execution_id),
@@ -48,9 +49,13 @@ def build_model_fallback_node_outcome(
             next_node_id=next_node_id,
             pause_reason=MODEL_FALLBACK_PAUSE_REASON,
             snapshot_extra=snapshot,
+            node_execution_id=execution_id,
+            hook_payload=hook_payload,
         )
     return NodeOutcome(
         next_node_id=next_node_id,
         snapshot_extra=snapshot,
         workflow_status="failed",
+        node_execution_id=execution_id,
+        hook_payload=hook_payload,
     )

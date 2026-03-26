@@ -6,6 +6,7 @@ from app.modules.config_registry import ConfigLoader
 
 from .agent_write_service import ConfigRegistryAgentWriteService
 from .hook_write_service import ConfigRegistryHookWriteService
+from .mcp_write_service import ConfigRegistryMcpWriteService
 from .query_service import ConfigRegistryQueryService
 from .skill_write_service import ConfigRegistrySkillWriteService
 from .workflow_write_service import ConfigRegistryWorkflowWriteService
@@ -32,6 +33,13 @@ def create_config_registry_hook_write_service(
     config_loader: ConfigLoader | None = None,
 ) -> ConfigRegistryHookWriteService:
     return ConfigRegistryHookWriteService(config_loader or ConfigLoader(DEFAULT_CONFIG_ROOT))
+
+
+def create_config_registry_mcp_write_service(
+    *,
+    config_loader: ConfigLoader | None = None,
+) -> ConfigRegistryMcpWriteService:
+    return ConfigRegistryMcpWriteService(config_loader or ConfigLoader(DEFAULT_CONFIG_ROOT))
 
 
 def create_config_registry_skill_write_service(

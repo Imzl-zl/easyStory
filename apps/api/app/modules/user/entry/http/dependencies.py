@@ -39,12 +39,22 @@ async def get_current_user(
 
 
 def ensure_config_admin(current_user: User) -> User:
+    return ensure_control_plane_admin(current_user)
+
+
+def ensure_control_plane_admin(current_user: User) -> User:
     if get_settings().is_config_admin(current_user.username):
         return current_user
-    raise ForbiddenError("Config admin access required")
+    raise ForbiddenError("Control-plane admin access required")
+
+
+async def require_control_plane_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    return ensure_control_plane_admin(current_user)
 
 
 async def require_config_admin(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    return ensure_config_admin(current_user)
+    return ensure_control_plane_admin(current_user)

@@ -13,6 +13,7 @@ import {
 
 test("resolveConfigRegistryType falls back to skills for invalid values", () => {
   assert.equal(resolveConfigRegistryType("hooks"), "hooks");
+  assert.equal(resolveConfigRegistryType("mcp_servers"), "mcp_servers");
   assert.equal(resolveConfigRegistryType("unknown"), "skills");
   assert.equal(resolveConfigRegistryType(null), "skills");
 });

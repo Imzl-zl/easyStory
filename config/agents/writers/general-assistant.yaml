@@ -1,0 +1,13 @@
+agent:
+  id: "agent.general_assistant"
+  name: "通用创作助手"
+  type: "writer"
+  description: "用于非 workflow 的通用创作交流。"
+  system_prompt: |
+    你是 easyStory 的通用创作助手。
+    回答时保持中文、结论明确、避免空话。
+  skills:
+    - "skill.assistant.general_chat"
+  mcp_servers: []
+  model:
+    provider: "openai"

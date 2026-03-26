@@ -6,6 +6,7 @@ from app.modules.config_registry import ConfigLoader
 from app.modules.config_registry.schemas.config_schemas import (
     AgentConfig,
     HookConfig,
+    McpServerConfig,
     NodeConfig,
     SkillConfig,
     WorkflowConfig,
@@ -33,8 +34,11 @@ def freeze_workflow(
 ) -> dict[str, Any]:
     snapshot = dump_config(workflow_config)
     hooks = freeze_hooks(config_loader, workflow_config)
+    mcp_servers = freeze_mcp_servers(config_loader, workflow_config)
     if hooks:
         snapshot["resolved_hooks"] = hooks
+    if mcp_servers:
+        snapshot["resolved_mcp_servers"] = mcp_servers
     return snapshot
 
 
@@ -42,12 +46,7 @@ def freeze_hooks(
     config_loader: ConfigLoader,
     workflow_config: WorkflowConfig,
 ) -> dict[str, Any]:
-    hook_ids = {
-        hook_id
-        for node in workflow_config.nodes
-        for hook_ids in node.hooks.values()
-        for hook_id in hook_ids
-    }
+    hook_ids = collect_hook_ids(workflow_config)
     return {
         hook_id: dump_config(config_loader.load_hook(hook_id))
         for hook_id in sorted(hook_ids)
@@ -58,11 +57,8 @@ def freeze_agents(
     config_loader: ConfigLoader,
     workflow_config: WorkflowConfig,
 ) -> list[AgentConfig]:
-    agent_ids = {
-        reviewer
-        for node in workflow_config.nodes
-        for reviewer in node.reviewers
-    }
+    agent_ids = collect_reviewer_agent_ids(workflow_config)
+    agent_ids.update(collect_hook_agent_ids(config_loader, workflow_config))
     return [config_loader.load_agent(agent_id) for agent_id in sorted(agent_ids)]
 
 
@@ -75,6 +71,17 @@ def freeze_skills(
     return {
         skill_id: dump_config(config_loader.load_skill(skill_id))
         for skill_id in sorted(skill_ids)
+    }
+
+
+def freeze_mcp_servers(
+    config_loader: ConfigLoader,
+    workflow_config: WorkflowConfig,
+) -> dict[str, Any]:
+    server_ids = collect_mcp_server_ids(config_loader, workflow_config)
+    return {
+        server_id: dump_config(config_loader.load_mcp_server(server_id))
+        for server_id in sorted(server_ids)
     }
 
 
@@ -93,6 +100,55 @@ def collect_skill_ids(
     for agent in agents:
         skill_ids.update(agent.skills)
     return skill_ids
+
+
+def collect_hook_ids(workflow_config: WorkflowConfig) -> set[str]:
+    return {
+        hook_id
+        for node in workflow_config.nodes
+        for hook_ids in node.hooks.values()
+        for hook_id in hook_ids
+    }
+
+
+def collect_mcp_server_ids(
+    config_loader: ConfigLoader,
+    workflow_config: WorkflowConfig,
+) -> set[str]:
+    server_ids: set[str] = set()
+    for agent in freeze_agents(config_loader, workflow_config):
+        server_ids.update(agent.mcp_servers)
+    for hook_id in collect_hook_ids(workflow_config):
+        hook = config_loader.load_hook(hook_id)
+        if hook.action.action_type != "mcp":
+            continue
+        raw_server_id = hook.action.config.get("server_id")
+        if isinstance(raw_server_id, str) and raw_server_id.strip():
+            server_ids.add(raw_server_id)
+    return server_ids
+
+
+def collect_reviewer_agent_ids(workflow_config: WorkflowConfig) -> set[str]:
+    return {
+        reviewer
+        for node in workflow_config.nodes
+        for reviewer in node.reviewers
+    }
+
+
+def collect_hook_agent_ids(
+    config_loader: ConfigLoader,
+    workflow_config: WorkflowConfig,
+) -> set[str]:
+    agent_ids: set[str] = set()
+    for hook_id in collect_hook_ids(workflow_config):
+        hook = config_loader.load_hook(hook_id)
+        if hook.action.action_type != "agent":
+            continue
+        raw_agent_id = hook.action.config.get("agent_id")
+        if isinstance(raw_agent_id, str) and raw_agent_id.strip():
+            agent_ids.add(raw_agent_id)
+    return agent_ids
 
 
 def build_runtime_snapshot(
@@ -141,6 +197,19 @@ def load_agent_snapshot(
     if not isinstance(raw, dict):
         raise ConfigurationError(f"Agent snapshot not found: {agent_id}")
     return AgentConfig.model_validate(raw)
+
+
+def load_mcp_server_snapshot(
+    workflow_snapshot: dict[str, Any],
+    server_id: str,
+) -> McpServerConfig:
+    resolved_mcp_servers = workflow_snapshot.get("resolved_mcp_servers")
+    if not isinstance(resolved_mcp_servers, dict):
+        raise ConfigurationError("Workflow snapshot is missing resolved_mcp_servers")
+    raw = resolved_mcp_servers.get(server_id)
+    if not isinstance(raw, dict):
+        raise ConfigurationError(f"MCP server snapshot not found: {server_id}")
+    return McpServerConfig.model_validate(raw)
 
 
 def resolve_node_config(
@@ -237,7 +306,7 @@ def resolve_next_node_id(
 
 
 def dump_config(
-    config: WorkflowConfig | SkillConfig | AgentConfig | HookConfig,
+    config: WorkflowConfig | SkillConfig | AgentConfig | HookConfig | McpServerConfig,
 ) -> dict[str, Any]:
     return config.model_dump(mode="json", exclude_none=True)
 

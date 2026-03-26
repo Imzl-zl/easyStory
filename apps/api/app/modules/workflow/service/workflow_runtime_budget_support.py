@@ -21,18 +21,24 @@ def build_chapter_split_budget_outcome(
     completed_snapshot: dict[str, list[dict[str, int | str]]],
     next_node_id: str | None,
     budget_error: BudgetExceededError,
+    node_execution_id,
+    hook_payload: dict[str, object] | None = None,
 ) -> NodeOutcome:
     if budget_error.action == "pause":
         return NodeOutcome(
             next_node_id=next_node_id,
             pause_reason=BUDGET_PAUSE_REASON,
             snapshot_extra=completed_snapshot,
+            node_execution_id=node_execution_id,
+            hook_payload=hook_payload,
         )
     if budget_error.action == "fail":
         return NodeOutcome(
             next_node_id=next_node_id,
             snapshot_extra=completed_snapshot,
             workflow_status="failed",
+            node_execution_id=node_execution_id,
+            hook_payload=hook_payload,
         )
     raise ConfigurationError("chapter_split does not support budget.on_exceed=skip")
 

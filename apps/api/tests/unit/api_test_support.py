@@ -15,6 +15,7 @@ from app.modules.content.models import Content, ContentVersion
 from app.modules.content.service import create_chapter_content_service
 from app.modules.context.engine import create_context_builder
 from app.modules.credential.models import ModelCredential
+from app.modules.credential.service.credential_service_support import ResolvedCredentialModel
 from app.modules.export.entry.http.router import get_export_service
 from app.modules.export.service import ExportService, create_export_service
 from app.modules.user.service import TokenService
@@ -165,6 +166,24 @@ class _FakeCredentialService:
             db.add(credential)
             await db.flush()
         return credential
+
+    async def resolve_active_credential_model(
+        self,
+        db: AsyncSession,
+        *,
+        provider: str,
+        requested_model_name: str | None,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID | None = None,
+    ) -> ResolvedCredentialModel:
+        credential = await self.resolve_active_credential(
+            db,
+            provider=provider,
+            user_id=user_id,
+            project_id=project_id,
+        )
+        model_name = requested_model_name or credential.default_model or "gpt-4o"
+        return ResolvedCredentialModel(credential=credential, model_name=model_name)
 
 
 class _FakeToolProvider(ToolProvider):

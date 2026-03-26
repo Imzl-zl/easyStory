@@ -8,12 +8,16 @@ from app.modules.config_registry.service import (
     AgentConfigUpdateDTO,
     ConfigRegistryAgentWriteService,
     ConfigRegistryHookWriteService,
+    ConfigRegistryMcpWriteService,
     ConfigRegistryQueryService,
     ConfigRegistrySkillWriteService,
     ConfigRegistryWorkflowWriteService,
     HookConfigDetailDTO,
     HookConfigSummaryDTO,
     HookConfigUpdateDTO,
+    McpServerConfigDetailDTO,
+    McpServerConfigSummaryDTO,
+    McpServerConfigUpdateDTO,
     SkillConfigDetailDTO,
     SkillConfigSummaryDTO,
     SkillConfigUpdateDTO,
@@ -22,16 +26,17 @@ from app.modules.config_registry.service import (
     WorkflowConfigUpdateDTO,
     create_config_registry_agent_write_service,
     create_config_registry_hook_write_service,
+    create_config_registry_mcp_write_service,
     create_config_registry_query_service,
     create_config_registry_skill_write_service,
     create_config_registry_workflow_write_service,
 )
-from app.modules.user.entry.http.dependencies import require_config_admin
+from app.modules.user.entry.http.dependencies import require_control_plane_admin
 
 router = APIRouter(
     prefix="/api/v1/config",
     tags=["config"],
-    dependencies=[Depends(require_config_admin)],
+    dependencies=[Depends(require_control_plane_admin)],
 )
 
 
@@ -45,6 +50,10 @@ async def get_config_registry_agent_write_service() -> ConfigRegistryAgentWriteS
 
 async def get_config_registry_hook_write_service() -> ConfigRegistryHookWriteService:
     return create_config_registry_hook_write_service()
+
+
+async def get_config_registry_mcp_write_service() -> ConfigRegistryMcpWriteService:
+    return create_config_registry_mcp_write_service()
 
 
 async def get_config_registry_skill_write_service() -> ConfigRegistrySkillWriteService:
@@ -143,6 +152,36 @@ async def update_hook(
     ),
 ) -> HookConfigDetailDTO:
     return await config_registry_hook_write_service.update_hook(hook_id, payload)
+
+
+@router.get("/mcp_servers", response_model=list[McpServerConfigSummaryDTO])
+async def list_mcp_servers(
+    config_registry_query_service: ConfigRegistryQueryService = Depends(
+        get_config_registry_query_service
+    ),
+) -> list[McpServerConfigSummaryDTO]:
+    return await config_registry_query_service.list_mcp_servers()
+
+
+@router.get("/mcp_servers/{server_id}", response_model=McpServerConfigDetailDTO)
+async def get_mcp_server(
+    server_id: str,
+    config_registry_query_service: ConfigRegistryQueryService = Depends(
+        get_config_registry_query_service
+    ),
+) -> McpServerConfigDetailDTO:
+    return await config_registry_query_service.get_mcp_server(server_id)
+
+
+@router.put("/mcp_servers/{server_id}", response_model=McpServerConfigDetailDTO)
+async def update_mcp_server(
+    server_id: str,
+    payload: McpServerConfigUpdateDTO,
+    config_registry_mcp_write_service: ConfigRegistryMcpWriteService = Depends(
+        get_config_registry_mcp_write_service
+    ),
+) -> McpServerConfigDetailDTO:
+    return await config_registry_mcp_write_service.update_mcp_server(server_id, payload)
 
 
 @router.get("/workflows", response_model=list[WorkflowConfigSummaryDTO])

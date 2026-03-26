@@ -5,10 +5,12 @@ from copy import deepcopy
 from app.modules.config_registry.schemas import (
     AgentConfig,
     HookConfig,
+    McpServerConfig,
     ModelConfig,
     SkillConfig,
 )
 
+from .mcp_query_dto import McpServerConfigDetailDTO, McpServerConfigSummaryDTO
 from .query_dto import (
     AgentConfigDetailDTO,
     AgentConfigSummaryDTO,
@@ -132,6 +134,34 @@ def to_hook_detail(hook: HookConfig) -> HookConfigDetailDTO:
     )
 
 
+def to_mcp_server_summary(server: McpServerConfig) -> McpServerConfigSummaryDTO:
+    return McpServerConfigSummaryDTO(
+        id=server.id,
+        name=server.name,
+        version=server.version,
+        description=server.description,
+        transport=server.transport,
+        url=server.url,
+        timeout=server.timeout,
+        enabled=server.enabled,
+        header_count=len(server.headers),
+    )
+
+
+def to_mcp_server_detail(server: McpServerConfig) -> McpServerConfigDetailDTO:
+    return McpServerConfigDetailDTO(
+        id=server.id,
+        name=server.name,
+        version=server.version,
+        description=server.description,
+        transport=server.transport,
+        url=server.url,
+        headers=deepcopy(server.headers),
+        timeout=server.timeout,
+        enabled=server.enabled,
+    )
+
+
 def to_model_reference(model: ModelConfig | None) -> ModelReferenceDTO | None:
     if model is None:
         return None
@@ -161,6 +191,7 @@ def _to_hook_retry(hook: HookConfig) -> HookRetryDTO | None:
         max_attempts=hook.retry.max_attempts,
         delay=hook.retry.delay,
     )
+
 
 def _copy_output_schema(output_schema: dict | None) -> dict | None:
     if output_schema is None:

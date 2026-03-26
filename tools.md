@@ -43,6 +43,9 @@
 - `workflow` 路由入口：`apps/api/app/modules/workflow/entry/http/router.py`
 - `content` 章节服务入口：`apps/api/app/modules/content/service/chapter_content_service.py`
 - `workflow` 控制面服务入口：`apps/api/app/modules/workflow/service/workflow_app_service.py`
+- `workflow runtime hooks` 主入口：`apps/api/app/modules/workflow/service/workflow_runtime_service.py`
+- `assistant` 对话入口：`apps/api/app/modules/assistant/entry/http/router.py`
+- `assistant` 运行时主入口：`apps/api/app/modules/assistant/service/assistant_service.py`
 - `config_registry` agent 写回服务入口：`apps/api/app/modules/config_registry/service/agent_write_service.py`
 - `config_registry` hook 写回服务入口：`apps/api/app/modules/config_registry/service/hook_write_service.py`
 - `config_registry` skill 写回服务入口：`apps/api/app/modules/config_registry/service/skill_write_service.py`
@@ -52,8 +55,11 @@
 - provider interop 示例：`apps/api/provider-interop.example.json`
 - provider interop 支撑模块：`apps/api/app/shared/runtime/provider_interop_support.py`
 - provider interop 探测脚本：`apps/api/scripts/provider_interop_check.py`
+- MCP client 支撑模块：`apps/api/app/shared/runtime/mcp_client.py`
+- 统一插件 provider：`apps/api/app/shared/runtime/plugin_providers.py`
 - provider interop 显式公网 `http` 放行开关：`EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS`
 - `config_registry` 管理 API 除 JWT 外，还要求 `EASYSTORY_CONFIG_ADMIN_USERNAMES` 命中当前用户名；默认空列表即全部拒绝
+- 控制面轻权限当前统一口径：`EASYSTORY_CONFIG_ADMIN_USERNAMES` 命中才允许写控制面资源；现阶段包括 `config_registry` 全部接口和模板创建/更新/删除，模板读取仍只要求登录
 - `create_app()` 当前对外部注入的 `async_session_factory` 只挂载到 `app.state` 并继续执行 settings/template startup；只有内部自行创建 session factory 时才负责启动期建库，并通过 `initialize_async_database()` 走 Alembic。测试若需要同步 seed，会在 app 外部单独创建 sync `session_factory`
 - 文件型 SQLite 测试 helper `build_sqlite_session_factories()` 已改为先调用 `initialize_database(sync_url)`；正式 schema 真值与测试建库入口保持一致
 - 程序化 Alembic 若需要命中 memory SQLite 或避免 URL 掩码/二次建库问题，应优先复用现有 `connection`（`Config.attributes["connection"]`），不要只传 `sqlalchemy.url`
@@ -79,6 +85,10 @@
 - 对 `workflow` 维度的本地 UI 状态（如当前输入框值、已选 node execution、SSE 本地信号），优先用 `{ workflowId, value }` 绑定态再在 render 时按当前 `workflowId` 取值；不要依赖 effect 在切换后“补清空”，否则 A -> B -> A 容易复活旧状态。
 - 导出口径当前已收口：`ChapterTask.status` 为 `completed | stale` 且正文状态为 `approved | stale` 时允许导出；`pending / generating / interrupted / failed` 阻断，`skipped` 直接省略，前端导出对话框必须先跑章节任务预检再发请求。
 - 对"公开 async 入口 + 内部纯规则聚合"的服务（如 review/billing），最佳拆分边界：真实 I/O（并发调度、timeout、DB flush）保留 async；纯规则 helper（归一化、状态聚合、配置校验）保持 sync。
+- `workflow hooks` 现已真实接入 runtime：通过 `PluginRegistry.execute` 分发 `script/webhook/agent/mcp`，默认事件覆盖 `before_node_start / before_generate / after_generate / before_review / after_review / on_review_fail / before_fix / after_fix / after_node_end / on_error`；新增 provider 继续沿这条 registry 抽象扩展，不要把类型判断塞回 runtime 主链。
+- `workflow` 节点级 `hooks.before/after` 现在有 staged 校验：assistant-only 事件（如 `before_assistant_response`）不能挂到 workflow node，且 hook event 必须落在匹配的 stage（如 `after_generate -> after`）。
+- `McpPluginProvider` 当前最佳实践语义：`server.enabled=false` 直接视为配置错误；上游返回 `is_error=true` 直接抛显式异常，不做“成功返回但结果里带错误”的静默降级。
+- `assistant runtime` 当前已落地：`/api/v1/assistant/turn` 支持非 workflow 对话，skill 负责 prompt、hook 负责生命周期、`mcp` 通过 PluginRegistry 执行；但还没有前端聊天 UI，也还没有 agent 通用 tool-calling 回路。
 - 读取 `request.app.state`、容器字段或内存注入对象的 accessor，如果不做 I/O 就保持同步 `def`；不为"全 async"把纯 accessor 改成 coroutine。
 - async 语义审查时，不要误把基础设施事实命名当成待清理对象；`AsyncSessionFactory`、`create_async_session_factory`、`get_async_db_session`、`AsyncCredentialVerifier` 是真实底层边界，应保留。
 - 对混合 DB 编排和文件 I/O 的服务（如 export），优先把路径校验、文件写入/清理、文档渲染抽到 `*_support.py`；主服务只保留 owner 校验、装配和事务边界。

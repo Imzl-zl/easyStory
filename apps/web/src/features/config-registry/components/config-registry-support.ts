@@ -9,6 +9,8 @@ import type {
   HookConfigDetail,
   HookConfigSummary,
   JsonValue,
+  McpServerConfigDetail,
+  McpServerConfigSummary,
   SkillConfigDetail,
   SkillConfigSummary,
   WorkflowConfigDetail,
@@ -30,6 +32,7 @@ const CONFIG_REGISTRY_TABS: ConfigRegistryTabOption[] = [
   { key: "skills", label: "Skills", description: "Prompt 模板、输入输出契约与模型设置。" },
   { key: "agents", label: "Agents", description: "执行角色、技能绑定与系统提示词。" },
   { key: "hooks", label: "Hooks", description: "触发条件、动作类型与重试策略。" },
+  { key: "mcp_servers", label: "MCP Servers", description: "MCP 服务地址、请求头与超时配置。" },
   { key: "workflows", label: "Workflows", description: "节点结构、默认策略与预算安全设置。" },
 ];
 
@@ -139,6 +142,8 @@ export function buildConfigRegistrySummaryRows(
       return buildAgentSummaryRows(summary as AgentConfigSummary);
     case "hooks":
       return buildHookSummaryRows(summary as HookConfigSummary);
+    case "mcp_servers":
+      return buildMcpServerSummaryRows(summary as McpServerConfigSummary);
     case "workflows":
       return buildWorkflowSummaryRows(summary as WorkflowConfigSummary);
   }
@@ -155,6 +160,8 @@ export function buildConfigRegistryDetailRows(
       return buildAgentDetailRows(detail as AgentConfigDetail);
     case "hooks":
       return buildHookDetailRows(detail as HookConfigDetail);
+    case "mcp_servers":
+      return buildMcpServerDetailRows(detail as McpServerConfigDetail);
     case "workflows":
       return buildWorkflowDetailRows(detail as WorkflowConfigDetail);
   }
@@ -192,6 +199,14 @@ function buildWorkflowSummaryRows(summary: WorkflowConfigSummary): ConfigRegistr
   ];
 }
 
+function buildMcpServerSummaryRows(summary: McpServerConfigSummary): ConfigRegistryMetaRow[] {
+  return [
+    { label: "传输", value: summary.transport },
+    { label: "状态", value: summary.enabled ? "已启用" : "已停用" },
+    { label: "超时", value: `${summary.timeout}s` },
+  ];
+}
+
 function buildSkillDetailRows(detail: SkillConfigDetail): ConfigRegistryMetaRow[] {
   return [
     { label: "分类", value: detail.category },
@@ -216,6 +231,16 @@ function buildHookDetailRows(detail: HookConfigDetail): ConfigRegistryMetaRow[] 
     { label: "触发事件", value: detail.trigger.event },
     { label: "节点类型", value: formatList(detail.trigger.node_types) },
     { label: "重试", value: detail.retry ? `${detail.retry.max_attempts} 次 / ${detail.retry.delay}s` : "关闭" },
+  ];
+}
+
+function buildMcpServerDetailRows(detail: McpServerConfigDetail): ConfigRegistryMetaRow[] {
+  return [
+    { label: "传输", value: detail.transport },
+    { label: "地址", value: detail.url },
+    { label: "请求头", value: `${Object.keys(detail.headers).length} 个` },
+    { label: "超时", value: `${detail.timeout}s` },
+    { label: "状态", value: detail.enabled ? "已启用" : "已停用" },
   ];
 }
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.main import create_app
+from app.shared.settings import CONFIG_ADMIN_USERNAMES_ENV, clear_settings_cache
 from tests.unit.async_api_support import (
     build_sqlite_session_factories,
     cleanup_sqlite_session_factories,
@@ -8,6 +9,13 @@ from tests.unit.async_api_support import (
 )
 from tests.unit.api_test_support import TEST_JWT_SECRET, auth_headers as _auth_headers
 from tests.unit.models.helpers import create_user
+
+CONTROL_PLANE_ADMIN = "template-admin"
+
+
+def _configure_control_plane_admin(monkeypatch) -> None:
+    monkeypatch.setenv(CONFIG_ADMIN_USERNAMES_ENV, CONTROL_PLANE_ADMIN)
+    clear_settings_cache()
 
 
 async def test_template_api_lists_and_reads_builtin_templates_after_startup(
@@ -67,13 +75,14 @@ async def test_template_api_requires_authentication(monkeypatch, tmp_path) -> No
 
 async def test_template_api_supports_custom_template_crud(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    _configure_control_plane_admin(monkeypatch)
     session_factory, async_session_factory, engine, async_engine, database_path = (
         build_sqlite_session_factories(tmp_path, name="template-api-write")
     )
 
     try:
         with session_factory() as session:
-            owner_id = create_user(session).id
+            owner_id = create_user(session, username=CONTROL_PLANE_ADMIN).id
 
         app = create_app(
             async_session_factory=async_session_factory,
@@ -141,6 +150,7 @@ async def test_template_api_supports_custom_template_crud(monkeypatch, tmp_path)
             assert missing_response.status_code == 404
             assert missing_response.json()["code"] == "not_found"
     finally:
+        clear_settings_cache()
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
@@ -149,13 +159,14 @@ async def test_template_api_rejects_builtin_mutation_and_duplicate_names(
     tmp_path,
 ) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    _configure_control_plane_admin(monkeypatch)
     session_factory, async_session_factory, engine, async_engine, database_path = (
         build_sqlite_session_factories(tmp_path, name="template-api-rules")
     )
 
     try:
         with session_factory() as session:
-            owner_id = create_user(session).id
+            owner_id = create_user(session, username=CONTROL_PLANE_ADMIN).id
 
         app = create_app(
             async_session_factory=async_session_factory,
@@ -186,4 +197,41 @@ async def test_template_api_rejects_builtin_mutation_and_duplicate_names(
             assert builtin_update_response.status_code == 422
             assert builtin_update_response.json()["code"] == "business_rule_error"
     finally:
+        clear_settings_cache()
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_template_api_allows_read_but_forbids_write_for_non_admin(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    _configure_control_plane_admin(monkeypatch)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="template-api-non-admin")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session, username="normal-user").id
+
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
+        async with started_async_client(app) as client:
+            list_response = await client.get("/api/v1/templates", headers=_auth_headers(owner_id))
+            assert list_response.status_code == 200
+
+            create_response = await client.post(
+                "/api/v1/templates",
+                headers=_auth_headers(owner_id),
+                json={
+                    "name": "普通用户模板",
+                    "workflow_id": "workflow.xuanhuan_manual",
+                },
+            )
+            assert create_response.status_code == 403
+            assert create_response.json()["code"] == "forbidden"
+    finally:
+        clear_settings_cache()
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)

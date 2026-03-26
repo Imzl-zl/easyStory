@@ -34,6 +34,7 @@
 - `project`：项目与 `ProjectSetting`
 - `content`：`Outline / OpeningPlan / Chapter / ContentVersion`
 - `workflow`：工作流执行、节点执行、章节任务、过程产物
+- `assistant`：非 workflow 的通用对话运行时、skill/hook/mcp 能力装配
 - `review`：审核与精修
 - `context`：上下文注入与 Story Bible
 - `analysis`：小说分析与分析结果
@@ -50,7 +51,7 @@
 - 根目录职责：
 - `apps/api`：后端
 - `apps/web`：前端
-- `config`：Skills / Agents / Hooks / Workflows YAML
+- `config`：Skills / Agents / Hooks / MCP Servers / Workflows YAML
 - `docs`：需求、设计、规格、计划
 - `tools.md`：项目协作知识、常用命令、模式、坑点
 - `memory.md`：项目当前状态快照与最近活跃窗口

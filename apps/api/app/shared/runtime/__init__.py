@@ -8,9 +8,12 @@ __all__ = [
     "EasyStoryError",
     "EXPORT_ROOT_DIR",
     "LLMToolProvider",
+    "McpToolCaller",
+    "McpToolCallResult",
     "ModelPrice",
     "ModelPricing",
     "PluginRegistry",
+    "StreamableHttpMcpToolCaller",
     "SkillTemplateRenderer",
     "TokenCounter",
     "ToolProvider",
@@ -27,6 +30,14 @@ def __getattr__(name: str):
         from .llm_tool_provider import LLMToolProvider
 
         return LLMToolProvider
+    if name == "McpToolCallResult":
+        from .mcp_client import McpToolCallResult
+
+        return McpToolCallResult
+    if name == "McpToolCaller":
+        from .mcp_client import McpToolCaller
+
+        return McpToolCaller
     if name == "ModelPrice":
         from .token_counter import ModelPrice
 
@@ -39,6 +50,10 @@ def __getattr__(name: str):
         from .plugin_registry import PluginRegistry
 
         return PluginRegistry
+    if name == "StreamableHttpMcpToolCaller":
+        from .mcp_client import StreamableHttpMcpToolCaller
+
+        return StreamableHttpMcpToolCaller
     if name == "SkillTemplateRenderer":
         from .template_renderer import SkillTemplateRenderer
 

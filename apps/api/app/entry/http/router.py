@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.modules.assistant.entry.http.router import router as assistant_router
 from app.modules.analysis.entry.http.router import router as analysis_router
 from app.modules.billing.entry.http.router import router as billing_router
 from app.modules.config_registry.entry.http.router import router as config_router
@@ -17,6 +18,7 @@ from app.modules.workflow.entry.http.router import router as workflow_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
+api_router.include_router(assistant_router)
 api_router.include_router(credential_router)
 api_router.include_router(project_router)
 api_router.include_router(analysis_router)

@@ -17,11 +17,13 @@
 - 项目与前置资产闭环：project CRUD、setting completeness、story asset generation / confirm
 - 内容主链路闭环：outline / opening_plan / chapter / content version、章节确认与 stale 传播
 - 工作流闭环：control plane、runtime、auto-review / fix、workflow logs / prompt replay / audit
+- workflow hooks runtime 闭环：`script/webhook/agent` 已真实接入 workflow runtime，`PluginRegistry` 支持 execute/timeout，hook agent 依赖已进入 snapshot，builtin `auto_save_content` 可执行
+- assistant runtime 第一阶段闭环：新增 `/api/v1/assistant/turn`，非 workflow 对话已支持 skill prompt、hook 生命周期与 `mcp` 插件调用；workflow snapshot 已可冻结 `resolved_mcp_servers`
 - workflow runtime 模型回退闭环：已支持 candidate 构建、capability skip、retry、fallback exhausted pause/fail 语义；相关 pause reason 与 snapshot 已接入 state machine / review executor
 - context / review / billing / export / analysis 已补到查询面板或最小业务闭环
 - template + incubator 闭环：built-in sync、自定义模板、draft / create-project / conversation draft、完整度前移
 - config_registry 管理闭环：skills / agents / hooks / workflows 查询与 detail / update，strict DTO + staged config 校验
-- Config Registry 前端闭环：Lobby 子视图已支持 skills / agents / hooks / workflows 列表、详情预览与 JSON 编辑保存
+- Config Registry 前端闭环：Lobby 子视图已支持 skills / agents / hooks / mcp_servers / workflows 列表、详情预览与 JSON 编辑保存
 - Project Settings 前端闭环：`/workspace/project/:projectId/settings` 已支持项目设定编辑与项目审计日志子页
 - Credential Center 前端闭环：`/workspace/lobby/settings?tab=credentials` 已支持全局/项目作用域切换、项目入口、凭证编辑更新与审计子视图
 - Credential Center 删除确认闭环：删除前现有显式确认弹窗，影响文案对齐后端作用域优先级与 usage 历史限制
@@ -33,6 +35,7 @@
 ## 进行中 / 未完成
 
 - 前端更多页面和交互完善
+- assistant 聊天 UI 与 agent 通用 tool-calling 尚未实现
 
 ## 当前仍有效的关键决策
 
@@ -43,6 +46,9 @@
 - endpoint 安全策略必须同时落在写入入口和运行时出口
 - 程序化 Alembic 优先复用现有 `connection` / `engine`，不要退回字符串化 URL
 - config_registry 对外暴露语义化 DTO，写回前必须 staged full-config 校验，未知字段直接失败
+- `assistant runtime` 当前采用显式 `agent_id/skill_id + hook_ids` 装配，不把配置自动全局注入任意对话；`mcp` 当前通过 hook/plugin 路径可执行，agent 通用 tool-calling 仍是下一阶段
+- runtime hardening 当前已补齐：assistant hook-agent 会按 agent 类型传 `response_format`；MCP provider 会显式拒绝 disabled server / `is_error=true`；workflow staged config 会拒绝 assistant-only hook 事件和 before/after stage 错绑
+- 轻权限边界当前正式口径：普通业务面继续 owner-only；控制面写操作走 `EASYSTORY_CONFIG_ADMIN_USERNAMES` 轻量白名单。当前已覆盖 `config_registry` 与模板创建/更新/删除，模板读取仍只要求登录
 
 ## 仍需注意的坑点
 
@@ -93,4 +99,8 @@
 - 2026-03-26：收口凭证兼容层实现：`model_credentials` 新增 `auth_strategy / api_key_header_name / extra_headers`，Credential Center 表单新增“高级兼容设置”，验证短提示改为自然句“今天天气真好。”
 - 2026-03-26：收口凭证 review fixes：provider interop `--model` 覆写现会真正进入 probe 请求；`api_key_header_name` 不再允许覆盖运行时保留头；`extra_headers` 改为只允许非敏感元数据头，前后端校验与定向 pytest / tsc / test:unit 已通过
 - 2026-03-26：完成 runtime/provider hardening：`project incubator` 改为复用统一 credential payload，workflow runtime 已补 candidate/capability/retry/model fallback 主链并把 `model_fallback_exhausted` 接到 pause/fail 语义；`workflow_runtime_*` 与 provider interop helper 已拆分到 support 文件，核心 mixin 均降到 300 行内
+- 2026-03-26：完成 workflow hooks runtime 闭环：新增 `PluginRegistry.execute`、workflow hook providers（script/webhook/agent）、节点级 hook dispatch、hook agent snapshot 冻结与 `app.hooks.builtin.auto_save_content`；定向 `ruff + pytest` 已通过
 - 2026-03-26：完成真实上游文字联调：`gpt / gemini / anthropic` 非流式与流式 probe 均对 `今天有什么新闻` 返回文字；其中 Gemini 初始返回半句，经确认是上游 `finishReason=MAX_TOKENS` + 默认 thinking 导致，probe 现已显式压低 thinking 配置后恢复为有效文本返回
+- 2026-03-26：完成 assistant runtime 第一阶段：新增 `assistant` 模块与 `/api/v1/assistant/turn`，支持 skill 驱动 prompt、assistant hook 事件、`mcp_server` 配置加载、`mcp` hook provider 与 workflow `resolved_mcp_servers` snapshot；定向 `ruff + pytest` 已通过
+- 2026-03-26：补齐 `mcp_servers` 配置管理闭环：`config_registry` 后端已支持 list/detail/update，Web 配置中心已新增 `mcp_servers` 类型；后端 `15` 个 config_registry 单测与前端 `tsc/lint/test:unit` 均通过
+- 2026-03-26：完成 runtime/config hardening：assistant hook-agent `response_format` 与 workflow 对齐；`McpPluginProvider` 现在会显式拒绝 disabled server 和 `is_error=true`；workflow staged validation 会在写回前拒绝 assistant-only hook 事件和 stage 错绑；最终 `ruff + 35` 项定向 pytest 通过

@@ -44,6 +44,8 @@ class WorkflowRuntimeFixMixin:
                     current_content,
                     aggregated,
                     owner_id,
+                    attempt=attempt,
+                    max_attempts=max_fix_attempts,
                 )
             except ModelFallbackExhaustedError as exc:
                 return self._resolve_model_fallback_review_outcome(
@@ -92,9 +94,24 @@ class WorkflowRuntimeFixMixin:
         content: str,
         aggregated: AggregatedReviewResult,
         owner_id: uuid.UUID,
+        *,
+        attempt: int,
+        max_attempts: int,
     ) -> str:
         recorded_prompt_bundle: dict[str, Any] = {}
         recorded_raw_output: dict[str, Any] = {}
+        await self._run_before_fix_hook(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            execution.id,
+            owner_id=owner_id,
+            content=content,
+            aggregated=aggregated,
+            attempt=attempt,
+            max_attempts=max_attempts,
+        )
 
         async def runner(request: FixExecutionRequest) -> str:
             nonlocal recorded_prompt_bundle, recorded_raw_output
@@ -134,6 +151,19 @@ class WorkflowRuntimeFixMixin:
             )
             raise
         self._record_prompt_replay(db, execution, recorded_prompt_bundle, recorded_raw_output, replay_type="fix")
+        await self._run_after_fix_hook(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            execution.id,
+            owner_id=owner_id,
+            content=content,
+            fixed_content=fixed_content,
+            aggregated=aggregated,
+            attempt=attempt,
+            max_attempts=max_attempts,
+        )
         return fixed_content
 
     def _build_fix_prompt_bundle(
@@ -194,3 +224,86 @@ class WorkflowRuntimeFixMixin:
         if node.on_fix_fail == "fail":
             return ReviewCycleOutcome("fail", content, "auto_fix", failure_message=message)
         return ReviewCycleOutcome("pause", content, "auto_fix", failure_message=message)
+
+    async def _run_before_fix_hook(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        execution_id,
+        *,
+        owner_id: uuid.UUID,
+        content: str,
+        aggregated: AggregatedReviewResult,
+        attempt: int,
+        max_attempts: int,
+    ) -> None:
+        context = self._build_hook_context(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            "before_fix",
+            owner_id=owner_id,
+            payload=self._base_hook_payload(
+                workflow,
+                workflow_config,
+                node,
+                "before_fix",
+                node_execution_id=execution_id,
+                extra=self._fix_hook_payload(content, aggregated, attempt, max_attempts),
+            ),
+            node_execution_id=execution_id,
+        )
+        await self._run_hook_event(context)
+
+    async def _run_after_fix_hook(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        execution_id,
+        *,
+        owner_id: uuid.UUID,
+        content: str,
+        fixed_content: str,
+        aggregated: AggregatedReviewResult,
+        attempt: int,
+        max_attempts: int,
+    ) -> None:
+        extra = self._fix_hook_payload(content, aggregated, attempt, max_attempts)
+        extra["fixed_content"] = fixed_content
+        context = self._build_hook_context(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            "after_fix",
+            owner_id=owner_id,
+            payload=self._base_hook_payload(
+                workflow,
+                workflow_config,
+                node,
+                "after_fix",
+                node_execution_id=execution_id,
+                extra=extra,
+            ),
+            node_execution_id=execution_id,
+        )
+        await self._run_hook_event(context)
+
+    def _fix_hook_payload(
+        self,
+        content: str,
+        aggregated: AggregatedReviewResult,
+        attempt: int,
+        max_attempts: int,
+    ) -> dict[str, Any]:
+        return {
+            "attempt": attempt,
+            "max_attempts": max_attempts,
+            "content": content,
+            "aggregated_review": aggregated.model_dump(mode="json"),
+        }

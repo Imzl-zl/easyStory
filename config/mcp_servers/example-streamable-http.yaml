@@ -1,0 +1,8 @@
+mcp_server:
+  id: "mcp.example.streamable_http"
+  name: "示例 MCP HTTP Server"
+  description: "示例配置，仅用于展示 streamable_http 格式。"
+  transport: "streamable_http"
+  url: "https://example.com/mcp"
+  timeout: 30
+  enabled: false

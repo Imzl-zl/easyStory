@@ -2,11 +2,18 @@ from .agent_write_service import ConfigRegistryAgentWriteService
 from .factory import (
     create_config_registry_agent_write_service,
     create_config_registry_hook_write_service,
+    create_config_registry_mcp_write_service,
     create_config_registry_query_service,
     create_config_registry_skill_write_service,
     create_config_registry_workflow_write_service,
 )
 from .hook_write_service import ConfigRegistryHookWriteService
+from .mcp_query_dto import (
+    McpServerConfigDetailDTO,
+    McpServerConfigSummaryDTO,
+    McpServerConfigUpdateDTO,
+)
+from .mcp_write_service import ConfigRegistryMcpWriteService
 from .query_dto import (
     AgentConfigDetailDTO,
     AgentConfigSummaryDTO,
@@ -41,6 +48,7 @@ __all__ = [
     "AgentConfigUpdateDTO",
     "ConfigRegistryAgentWriteService",
     "ConfigRegistryHookWriteService",
+    "ConfigRegistryMcpWriteService",
     "ConfigRegistryQueryService",
     "ConfigRegistrySkillWriteService",
     "ConfigRegistryWorkflowWriteService",
@@ -54,6 +62,9 @@ __all__ = [
     "HookRetryDTO",
     "HookConfigSummaryDTO",
     "HookTriggerDTO",
+    "McpServerConfigDetailDTO",
+    "McpServerConfigSummaryDTO",
+    "McpServerConfigUpdateDTO",
     "ModelReferenceDTO",
     "SkillConfigDetailDTO",
     "SkillConfigSummaryDTO",
@@ -65,6 +76,7 @@ __all__ = [
     "WorkflowNodeSummaryDTO",
     "create_config_registry_agent_write_service",
     "create_config_registry_hook_write_service",
+    "create_config_registry_mcp_write_service",
     "create_config_registry_query_service",
     "create_config_registry_skill_write_service",
     "create_config_registry_workflow_write_service",

@@ -42,6 +42,9 @@
 ├── hooks/                         # Hooks 配置
 │   └── *.yaml
 │
+├── mcp_servers/                   # MCP Server 配置
+│   └── *.yaml
+│
 ├── workflows/                     # Workflows 配置
 │   └── *.yaml
 ```
@@ -298,7 +301,7 @@ agent:
 | `skills` | array | ❌ | 关联的技能 ID 列表 |
 | `model` | object | ❌ | 模型配置（不含凭证，含 provider/name、参数，以及可选 `required_capabilities`） |
 | `output_schema` | object | ❌ | 输出格式定义（JSON Schema）。仅 writer/checker 可用；reviewer 固定为 ReviewResult |
-| `mcp_servers` | array | ❌ | MCP Server 列表（MVP 为空，第二阶段启用，见 [MCP 预留](../design/16-mcp-architecture.md)） |
+| `mcp_servers` | array | ❌ | MCP Server 列表；当前可用于 assistant / hook runtime 的能力装配 |
 
 **类型说明**：
 
@@ -307,6 +310,35 @@ agent:
 | `writer` | 写作类 | `agent.writers.*` |
 | `reviewer` | 审核类 | `agent.reviewers.*` |
 | `checker` | 检查类 | `agent.checkers.*` |
+
+---
+
+### MCP Server 配置格式
+
+**用途**：定义可被 Hook / Assistant runtime 调用的外部 MCP Server。
+
+```yaml
+mcp_server:
+  id: "mcp.news.lookup"
+  name: "新闻检索 MCP"
+  version: "1.0.0"
+  description: "通过 streamable_http 暴露新闻检索工具"
+  transport: "streamable_http"
+  url: "https://example.com/mcp"
+  headers: {}
+  timeout: 30
+  enabled: true
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|-----|------|------|------|
+| `id` | string | ✅ | 唯一标识，格式：`mcp.{name}` |
+| `name` | string | ✅ | 显示名称 |
+| `transport` | string | ✅ | 当前支持 `streamable_http` |
+| `url` | string | ✅ | MCP Server 地址 |
+| `headers` | object | ❌ | 静态请求头 |
+| `timeout` | integer | ❌ | 请求超时秒数，默认 30 |
+| `enabled` | boolean | ❌ | 是否启用，默认 true |
 
 ---
 
@@ -336,7 +368,7 @@ hook:
     value: "completed"                # 值
   
   action:                             # 必填，执行动作
-    type: "script"                    # MVP 内置：script/webhook/agent（通过 PluginRegistry 可扩展，二期增加 mcp）
+    type: "script"                    # 当前内置：script/webhook/agent/mcp
     config:
       module: "app.hooks.builtin"     # 模块路径（script 类型）
       function: "auto_save_content"   # 函数名
@@ -359,7 +391,7 @@ hook:
 | `trigger.event` | string | ✅ | 触发事件 |
 | `trigger.node_types` | array | ❌ | 适用的节点类型 |
 | `condition` | object | ❌ | 额外触发条件 |
-| `action.type` | string | ✅ | 动作类型（通过 PluginRegistry 分发，可扩展）。MVP 内置：script/webhook/agent；第二阶段增加 mcp |
+| `action.type` | string | ✅ | 动作类型（通过 PluginRegistry 分发，可扩展）。当前内置：script/webhook/agent/mcp |
 | `action.config` | object | ✅ | 动作配置 |
 | `priority` | integer | ❌ | 优先级，默认 10 |
 | `enabled` | boolean | ❌ | 是否启用，默认 true |
@@ -379,6 +411,8 @@ hook:
 | `on_review_fail` | 审核失败 | 审核不通过时 |
 | `before_fix` | 精修前 | 开始精修前 |
 | `after_fix` | 精修后 | 精修完成后 |
+| `before_assistant_response` | Assistant 回复前 | assistant 调用模型前 |
+| `after_assistant_response` | Assistant 回复后 | assistant 返回结果后 |
 | `on_error` | 错误发生 | 任何错误时 |
 
 **动作类型说明**：
@@ -388,8 +422,10 @@ hook:
 | `script` | 执行 Python 函数 | `module`, `function`, `params` |
 | `webhook` | 调用 HTTP 接口 | `url`, `method`, `headers`, `body` |
 | `agent` | 调用 Agent | `agent_id`, `input_mapping` |
+| `mcp` | 调用 MCP 工具 | `server_id`, `tool_name`, `arguments`, `input_mapping` |
 
-> `action.type` 通过 PluginRegistry 分发，支持扩展新类型。MVP 内置 script/webhook/agent 三种；第二阶段增加 `mcp` 类型（见 [MCP 预留](../design/16-mcp-architecture.md)）。
+> `action.type` 通过 PluginRegistry 分发，支持扩展新类型。当前内置 script/webhook/agent/mcp 四种；其中 `mcp` 走官方 MCP client，当前仅支持 `streamable_http` transport。
+> 事件适用边界：`before_assistant_response` / `after_assistant_response` 仅用于 assistant runtime；不能挂到 workflow 节点的 `hooks.before/after`。workflow 节点钩子的 stage 也必须与事件方向一致，例如 `before_generate` 只能放 `before`，`after_generate` 只能放 `after`。
 
 ---
 
@@ -679,7 +715,7 @@ model:
 | `EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX` | 可选 | `^https?://(localhost|127\.0\.0\.1)(:\d+)?$` | CORS 正则白名单 |
 | `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS` | 可选 | `false` | 是否允许 `localhost` / 私网 IP 等本地模型 endpoint；默认只允许公网 `https` endpoint |
 | `EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS` | 可选 | `false` | 是否显式允许公网 `http` 模型 endpoint；仅用于兼容测试或受控代理环境 |
-| `EASYSTORY_CONFIG_ADMIN_USERNAMES` | 可选 | 空列表 | 逗号分隔的配置管理员用户名白名单；仅命中用户可访问 `/api/v1/config/*` |
+| `EASYSTORY_CONFIG_ADMIN_USERNAMES` | 可选 | 空列表 | 逗号分隔的控制面管理员用户名白名单；仅命中用户可访问 `/api/v1/config/*` 与模板写接口 |
 
 **校验与暴露规则**：
 
@@ -688,7 +724,7 @@ model:
 - `EASYSTORY_CORS_ALLOWED_ORIGINS` 接受逗号分隔字符串；解析失败视为配置错误。
 - 自定义模型 `base_url` 默认只允许公网 `https` endpoint；若确需访问本地 / 私网模型网关，必须显式设置 `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS=true`。
 - 若确需访问公网 `http` 模型网关，必须显式设置 `EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS=true`；该能力默认关闭，且只应用于兼容测试或明确受控的代理环境。
-- `EASYSTORY_CONFIG_ADMIN_USERNAMES` 为空时，`/api/v1/config/*` 管理接口默认全部拒绝；只有命中白名单的已认证用户才能读写配置。
+- `EASYSTORY_CONFIG_ADMIN_USERNAMES` 为空时，控制面写入口默认全部拒绝；当前包括 `/api/v1/config/*` 与模板创建/修改/删除接口。只有命中白名单的已认证用户才能执行这些写操作。
 - 新增运行时环境变量时，必须同时更新 `app/shared/settings.py`、`apps/api/.env.example`、本规范与 `docs/README.md`。
 
 ### 8.2 YAML 配置注册表加载

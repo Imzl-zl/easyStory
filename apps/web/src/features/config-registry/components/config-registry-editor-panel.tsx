@@ -91,5 +91,8 @@ function getEditorTitle(type: ConfigRegistryType): string {
   if (type === "hooks") {
     return "Hook 配置编辑";
   }
+  if (type === "mcp_servers") {
+    return "MCP Server 配置编辑";
+  }
   return "Workflow 配置编辑";
 }

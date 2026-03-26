@@ -20,7 +20,7 @@ from app.modules.config_registry.schemas import (
 
 
 AgentType = Literal["writer", "reviewer", "checker"]
-HookActionType = Literal["script", "webhook", "agent"]
+HookActionType = Literal["script", "webhook", "agent", "mcp"]
 HookEventType = Literal[
     "before_workflow_start",
     "after_workflow_end",
@@ -33,6 +33,8 @@ HookEventType = Literal[
     "on_review_fail",
     "before_fix",
     "after_fix",
+    "before_assistant_response",
+    "after_assistant_response",
     "on_error",
 ]
 ContextInjectionType = Literal[

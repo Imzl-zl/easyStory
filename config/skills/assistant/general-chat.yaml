@@ -1,0 +1,27 @@
+skill:
+  id: "skill.assistant.general_chat"
+  name: "通用对话助手"
+  category: "assistant"
+  description: "用于非 workflow 的通用对话与创作辅助。"
+  prompt: |
+    你是 easyStory 的创作助手。
+
+    {% if conversation_history %}
+    【历史对话】
+    {{ conversation_history }}
+    {% endif %}
+
+    【用户当前消息】
+    {{ user_input }}
+
+    请直接回答用户，保持清晰、务实、简洁。
+  variables:
+    conversation_history:
+      type: "string"
+      required: false
+      default: ""
+    user_input:
+      type: "string"
+      required: true
+  model:
+    provider: "openai"

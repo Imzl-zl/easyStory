@@ -75,7 +75,7 @@ async def test_config_registry_api_reads_and_updates_agent_detail(
             payload = {
                 **detail,
                 "name": "文风检查员 API 更新",
-                "mcp_servers": ["ctx.story_bible"],
+                "mcp_servers": ["mcp.example.streamable_http"],
             }
             update_response = await client.put(
                 f"/api/v1/config/agents/{TARGET_AGENT_ID}",
@@ -85,7 +85,7 @@ async def test_config_registry_api_reads_and_updates_agent_detail(
             assert update_response.status_code == 200
             updated = update_response.json()
             assert updated["name"] == "文风检查员 API 更新"
-            assert updated["mcp_servers"] == ["ctx.story_bible"]
+            assert updated["mcp_servers"] == ["mcp.example.streamable_http"]
 
             list_response = await client.get(
                 "/api/v1/config/agents",

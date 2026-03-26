@@ -103,6 +103,41 @@ async def test_config_registry_workflow_write_service_rejects_generate_node_with
     assert source_path.read_text(encoding="utf-8") == original_text
 
 
+async def test_config_registry_workflow_write_service_rejects_assistant_only_hook_binding(
+    tmp_path,
+) -> None:
+    temp_root = _copy_config_root(tmp_path)
+    _write_yaml(
+        temp_root / "hooks" / "assistant-only.yaml",
+        """
+hook:
+  id: "hook.assistant_only"
+  name: "Assistant Only"
+  trigger:
+    event: "before_assistant_response"
+  action:
+    type: "script"
+    config:
+      module: "app.hooks.builtin"
+      function: "auto_save_content"
+""",
+    )
+    loader = ConfigLoader(temp_root)
+    query_service = create_config_registry_query_service(config_loader=loader)
+    write_service = create_config_registry_workflow_write_service(config_loader=loader)
+    source_path = loader.get_source_path(TARGET_WORKFLOW_ID)
+    original_text = source_path.read_text(encoding="utf-8")
+    detail = await query_service.get_workflow(TARGET_WORKFLOW_ID)
+    document = detail.model_dump()
+    _get_by_id(document["nodes"], "chapter_gen")["hooks"]["after"].append("hook.assistant_only")
+    payload = WorkflowConfigUpdateDTO(**document)
+
+    with pytest.raises(BusinessRuleError, match="not supported on workflow nodes"):
+        await write_service.update_workflow(TARGET_WORKFLOW_ID, payload)
+
+    assert source_path.read_text(encoding="utf-8") == original_text
+
+
 def _get_by_id(items, workflow_id: str):
     for item in items:
         item_id = item["id"] if isinstance(item, dict) else item.id
@@ -115,3 +150,8 @@ def _copy_config_root(tmp_path: Path) -> Path:
     temp_root = tmp_path / "config"
     shutil.copytree(CONFIG_ROOT, temp_root)
     return temp_root
+
+
+def _write_yaml(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content.strip() + "\n", encoding="utf-8")

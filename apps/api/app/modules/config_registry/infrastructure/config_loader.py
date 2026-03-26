@@ -12,13 +12,22 @@ from app.modules.config_registry.infrastructure.skill_input_validator import (
 from app.modules.config_registry.schemas.config_schemas import (
     AgentConfig,
     HookConfig,
+    McpServerConfig,
     SkillConfig,
     WorkflowConfig,
 )
+from app.modules.config_registry.schemas.hook_schema import expected_workflow_node_hook_stage
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.template_renderer import SkillTemplateRenderer
 
-ConfigModel = TypeVar("ConfigModel", SkillConfig, AgentConfig, HookConfig, WorkflowConfig)
+ConfigModel = TypeVar(
+    "ConfigModel",
+    SkillConfig,
+    AgentConfig,
+    HookConfig,
+    WorkflowConfig,
+    McpServerConfig,
+)
 
 
 class ConfigLoader:
@@ -28,6 +37,7 @@ class ConfigLoader:
         self._skills: dict[str, SkillConfig] = {}
         self._agents: dict[str, AgentConfig] = {}
         self._hooks: dict[str, HookConfig] = {}
+        self._mcp_servers: dict[str, McpServerConfig] = {}
         self._workflows: dict[str, WorkflowConfig] = {}
         self._sources: dict[str, Path] = {}
         self._load_all()
@@ -36,6 +46,7 @@ class ConfigLoader:
         self._skills = {}
         self._agents = {}
         self._hooks = {}
+        self._mcp_servers = {}
         self._workflows = {}
         self._sources = {}
         self._load_all()
@@ -44,6 +55,7 @@ class ConfigLoader:
         self._skills = self._load_dir("skills", "skill", SkillConfig)
         self._agents = self._load_dir("agents", "agent", AgentConfig)
         self._hooks = self._load_dir("hooks", "hook", HookConfig)
+        self._mcp_servers = self._load_dir("mcp_servers", "mcp_server", McpServerConfig)
         self._workflows = self._load_dir("workflows", "workflow", WorkflowConfig)
         self._validate_references()
 
@@ -104,6 +116,8 @@ class ConfigLoader:
         for agent in self._agents.values():
             for skill_id in agent.skills:
                 self._require(self._skills, skill_id, f"agent {agent.id} skill")
+            for server_id in agent.mcp_servers:
+                self._require(self._mcp_servers, server_id, f"agent {agent.id} mcp_server")
 
     def _validate_hook_refs(self) -> None:
         for hook in self._hooks.values():
@@ -112,6 +126,11 @@ class ConfigLoader:
                 if not agent_id:
                     raise ConfigurationError(f"hook {hook.id} agent action missing agent_id")
                 self._require(self._agents, agent_id, f"hook {hook.id} action agent")
+            if hook.action.action_type == "mcp":
+                server_id = hook.action.config.get("server_id")
+                if not server_id:
+                    raise ConfigurationError(f"hook {hook.id} mcp action missing server_id")
+                self._require(self._mcp_servers, server_id, f"hook {hook.id} action mcp_server")
 
     def _validate_workflow_refs(self) -> None:
         for workflow in self._workflows.values():
@@ -139,15 +158,36 @@ class ConfigLoader:
                             f"workflow {workflow.id} node {node.id} has invalid hook stage '{stage}'"
                         )
                     for hook_id in hook_ids:
-                        self._require(
+                        hook = self._require(
                             self._hooks,
                             hook_id,
                             f"workflow {workflow.id} node {node.id} hook",
                         )
+                        self._validate_workflow_node_hook(workflow.id, node.id, stage, hook)
 
-    def _require(self, cache: dict, config_id: str, context: str) -> None:
+    def _validate_workflow_node_hook(
+        self,
+        workflow_id: str,
+        node_id: str,
+        stage: str,
+        hook: HookConfig,
+    ) -> None:
+        expected_stage = expected_workflow_node_hook_stage(hook.trigger.event)
+        if expected_stage is None:
+            raise ConfigurationError(
+                f"workflow {workflow_id} node {node_id} hook '{hook.id}' event "
+                f"'{hook.trigger.event}' is not supported on workflow nodes"
+            )
+        if expected_stage != stage:
+            raise ConfigurationError(
+                f"workflow {workflow_id} node {node_id} hook '{hook.id}' event "
+                f"'{hook.trigger.event}' must use stage '{expected_stage}', got '{stage}'"
+            )
+
+    def _require(self, cache: dict[str, ConfigModel], config_id: str, context: str) -> ConfigModel:
         if config_id not in cache:
             raise ConfigurationError(f"{context} references missing config '{config_id}'")
+        return cache[config_id]
 
     def load_skill(self, skill_id: str) -> SkillConfig:
         return self._get(self._skills, skill_id, "Skill")
@@ -160,6 +200,9 @@ class ConfigLoader:
 
     def load_workflow(self, workflow_id: str) -> WorkflowConfig:
         return self._get(self._workflows, workflow_id, "Workflow")
+
+    def load_mcp_server(self, server_id: str) -> McpServerConfig:
+        return self._get(self._mcp_servers, server_id, "MCP server")
 
     def get_source_path(self, config_id: str) -> Path:
         if config_id not in self._sources:
@@ -190,3 +233,6 @@ class ConfigLoader:
 
     def list_workflows(self) -> list[WorkflowConfig]:
         return list(self._workflows.values())
+
+    def list_mcp_servers(self) -> list[McpServerConfig]:
+        return list(self._mcp_servers.values())

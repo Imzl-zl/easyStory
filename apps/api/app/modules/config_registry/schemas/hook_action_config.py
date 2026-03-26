@@ -27,10 +27,18 @@ class AgentHookConfig(StrictHookConfig):
     input_mapping: dict[str, str] = Field(default_factory=dict)
 
 
+class McpHookConfig(StrictHookConfig):
+    server_id: str
+    tool_name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    input_mapping: dict[str, str] = Field(default_factory=dict)
+
+
 HOOK_ACTION_CONFIGS: dict[str, type[StrictHookConfig]] = {
     "script": ScriptHookConfig,
     "webhook": WebhookHookConfig,
     "agent": AgentHookConfig,
+    "mcp": McpHookConfig,
 }
 
 

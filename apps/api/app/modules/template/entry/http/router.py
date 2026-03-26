@@ -15,7 +15,7 @@ from app.modules.template.service import (
     create_template_query_service,
     create_template_write_service,
 )
-from app.modules.user.entry.http.dependencies import get_current_user
+from app.modules.user.entry.http.dependencies import get_current_user, require_control_plane_admin
 from app.modules.user.models import User
 from app.shared.db import get_async_db_session
 
@@ -55,7 +55,7 @@ async def get_template(
 async def create_template(
     payload: TemplateCreateDTO,
     template_write_service: TemplateWriteService = Depends(get_template_write_service),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_control_plane_admin),
     db: AsyncSession = Depends(get_async_db_session),
 ) -> TemplateDetailDTO:
     del current_user
@@ -67,7 +67,7 @@ async def update_template(
     template_id: uuid.UUID,
     payload: TemplateUpdateDTO,
     template_write_service: TemplateWriteService = Depends(get_template_write_service),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_control_plane_admin),
     db: AsyncSession = Depends(get_async_db_session),
 ) -> TemplateDetailDTO:
     del current_user
@@ -78,7 +78,7 @@ async def update_template(
 async def delete_template(
     template_id: uuid.UUID,
     template_write_service: TemplateWriteService = Depends(get_template_write_service),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_control_plane_admin),
     db: AsyncSession = Depends(get_async_db_session),
 ) -> Response:
     del current_user
