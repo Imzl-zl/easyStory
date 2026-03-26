@@ -69,7 +69,10 @@
 
 切换逻辑：
 - `表单 → JSON`：格式化输出
-- `JSON → 表单`：解析 + 校验，解析失败则提示但允许切换
+- `JSON → 表单`：解析 + 校验
+  - 解析成功：切换到表单视图
+  - 解析失败：**阻止切换**，显示错误位置和原因，用户必须修复 JSON 或手动撤销更改后才能切换
+  - 理由：表单视图无法承载无效 JSON，"允许切换"会导致数据丢失
 
 #### 2.2.2 侧边栏增强
 
@@ -114,9 +117,9 @@
 
 #### 2.2.3 URL 状态同步
 
-**要求**：所有 UI 状态必须同步到 URL query params，确保：
+**要求**：导航状态和编辑器模式必须同步到 URL query params，确保：
 - 刷新页面后状态保持
-- 分享链接可直接定位到特定配置
+- 分享链接可直接定位到特定配置和编辑模式
 - 浏览器前进/后退正常工作
 
 **同步字段**：
@@ -124,10 +127,15 @@
 |------|-------------|------|
 | 当前类型 | `type` | `?type=skills` |
 | 当前配置项 | `item` | `?type=skills&item=draft-generation` |
+| 编辑器模式 | `mode` | `?type=skills&item=draft-generation&mode=json` |
 | 搜索关键词 | `q` | `?type=skills&q=draft` |
 | 排序方式 | `sort` | `?type=skills&sort=name_desc` |
 | 标签过滤 | `tags` | `?type=skills&tags=generation,polish` |
 | 状态过滤 | `status` | `?type=hooks&status=enabled` |
+
+**编辑器模式值**：
+- `mode=form` 或省略：表单视图（默认）
+- `mode=json`：JSON 高级模式
 
 **实现方式**：
 ```typescript
@@ -144,11 +152,74 @@ const updateQuery = useCallback((updates: Record<string, string | null>) => {
 
 #### 2.2.4 离页保护
 
-- 切换配置项时：拦截 `onSelectItem`，未保存则弹窗确认
-- 切换类型时：拦截 `onSelectType`，未保存则弹窗确认
-- 关闭页面/刷新时：`beforeunload` 提醒
+**触发场景**：
+1. 本地导航（拦截 `onSelectItem` / `onSelectType`）
+2. 跨页导航（页面上的 `<Link>` 出口：返回 Lobby、全局设置）
+3. 浏览器导航（前进/后退）
+4. 页面关闭/刷新（`beforeunload`）
 
-**注意**：当前页面是 Next App Router 客户端页面，导航通过 `router.replace(...)` 改变 query 参数实现，不依赖 middleware。实现时应拦截本地导航动作而非寄托给 middleware。
+**实现方式**：
+```typescript
+// 当前页面有跨页 Link 出口，需全面拦截
+
+const { isDirty } = useUnsavedChanges(editorValue, originalValue);
+
+// 1. 拦截本地导航
+const handleSelectItem = useCallback((id: string) => {
+  if (isDirty) {
+    showConfirmDialog({
+      message: "有未保存的更改，确定要离开吗？",
+      onConfirm: () => setParams({ item: id }),
+    });
+  } else {
+    setParams({ item: id });
+  }
+}, [isDirty, setParams]);
+
+// 2. 拦截跨页 Link（使用自定义 Link 组件或拦截 onClick）
+const ProtectedLink = ({ href, children, ...props }) => {
+  const handleClick = (e) => {
+    if (isDirty) {
+      e.preventDefault();
+      showConfirmDialog({
+        message: "有未保存的更改，确定要离开吗？",
+        onConfirm: () => router.push(href),
+      });
+    }
+  };
+  return <Link href={href} onClick={handleClick} {...props}>{children}</Link>;
+};
+
+// 3. 拦截浏览器前进/后退
+useEffect(() => {
+  const handlePopState = () => {
+    if (isDirty) {
+      // 注意：popstate 无法阻止，只能提示后恢复历史
+      showConfirmDialog({
+        message: "有未保存的更改，确定要离开吗？",
+        onConfirm: () => {}, // 允许导航
+        onCancel: () => window.history.pushState(null, "", window.location.href), // 恢复
+      });
+    }
+  };
+  window.addEventListener("popstate", handlePopState);
+  return () => window.removeEventListener("popstate", handlePopState);
+}, [isDirty]);
+
+// 4. beforeunload 处理页面关闭/刷新
+useEffect(() => {
+  const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (isDirty) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  };
+  window.addEventListener("beforeunload", handleBeforeUnload);
+  return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+}, [isDirty]);
+```
+
+**注意**：页面存在跨页 `<Link>` 出口（返回 Lobby、全局设置），不能只拦截 `onSelectItem`/`onSelectType`，否则这些出口会绕过保护。
 
 ---
 
@@ -769,43 +840,12 @@ class McpServerConfig:
 ### 5.2 离页保护
 
 **触发场景**：
-1. 切换配置项（拦截 `onSelectItem`）
-2. 切换配置类型（拦截 `onSelectType`）
-3. 关闭页面/刷新（`beforeunload`）
+1. 本地导航（拦截 `onSelectItem` / `onSelectType`）
+2. 跨页导航（页面上的 `<Link>` 出口：返回 Lobby、全局设置）
+3. 浏览器导航（前进/后退）
+4. 页面关闭/刷新（`beforeunload`）
 
-**实现方式**：
-```typescript
-// 当前页面入口：config-registry-page.tsx
-// 导航通过 router.replace(...) 改变 query 参数
-
-const { isDirty } = useUnsavedChanges(editorValue, originalValue);
-
-// 拦截本地导航动作
-const handleSelectItem = useCallback((id: string) => {
-  if (isDirty) {
-    showConfirmDialog({
-      message: "有未保存的更改，确定要离开吗？",
-      onConfirm: () => router.replace(`?type=${type}&item=${id}`),
-    });
-  } else {
-    router.replace(`?type=${type}&item=${id}`);
-  }
-}, [isDirty, type, router]);
-
-// beforeunload 处理页面关闭/刷新
-useEffect(() => {
-  const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-    if (isDirty) {
-      e.preventDefault();
-      e.returnValue = "";
-    }
-  };
-  window.addEventListener("beforeunload", handleBeforeUnload);
-  return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-}, [isDirty]);
-```
-
-**注意**：不要使用 middleware 处理 dirty-state 保护，因为当前页面是客户端渲染，所有导航都是本地 `router.replace(...)` 调用。
+**注意**：页面存在跨页 `<Link>` 出口，不能只拦截本地导航，否则这些出口会绕过保护。详细实现见 2.2.4 节。
 
 ### 5.3 字段级错误提示
 
@@ -1007,3 +1047,4 @@ apps/web/src/features/config-registry/components/
 | 2026-03-26 | - | 待审核 | 初始版本 |
 | 2026-03-26 | - | 待审核 | 修正 7 个文档级错误：1) Hook script 配置改为 module/function/params；2) Hook 路径语法改为纯点路径；3) Agent system_prompt 说明不支持模板变量；4) Hook node_types 改为 generate/review/export；5) Workflow mode 改为 manual/auto；6) 移除更新时间排序；7) 过滤选项按类型区分 |
 | 2026-03-26 | - | 待审核 | 修正 4 个遗留问题：1) Hook payload 路径按事件分组，明确 workflow/node 平级；2) 离页保护改为拦截本地导航动作；3) 添加 URL 状态同步要求；4) 修正审核记录日期 |
+| 2026-03-26 | - | 待审核 | 修正 3 个交互问题：1) JSON→表单解析失败改为阻止切换；2) 离页保护覆盖跨页 Link 和浏览器导航；3) URL 同步加入编辑器模式 |
