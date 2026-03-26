@@ -164,6 +164,17 @@ const updateQuery = useCallback((updates: Record<string, string | null>) => {
 
 const { isDirty } = useUnsavedChanges(editorValue, originalValue);
 
+// 保存"上一份稳定 URL"，用于 popstate 取消时恢复
+// 必须在每次成功的本地 URL 更新后同步刷新，否则会状态漂移
+const stableUrlRef = useRef(window.location.href);
+
+// 监听 URL 变化，在非 dirty 状态下更新 stableUrl
+useEffect(() => {
+  if (!isDirty) {
+    stableUrlRef.current = window.location.href;
+  }
+}, [isDirty]); // 依赖 searchParams 或 pathname 也可，但需确保在 URL 更新后执行
+
 // 1. 拦截本地导航
 const handleSelectItem = useCallback((id: string) => {
   if (isDirty) {
@@ -194,24 +205,19 @@ const ProtectedLink = ({ href, children, ...props }) => {
 
 // 3. 拦截浏览器前进/后退
 useEffect(() => {
-  // 保存当前 URL，用于取消时恢复
-  let currentUrl = window.location.href;
-  
   const handlePopState = () => {
     if (isDirty) {
-      // popstate 触发后 location 已变成新地址，需要用保存的 currentUrl 恢复
+      // popstate 触发后 location 已变成新地址，用 stableUrlRef 恢复到离开前的稳定状态
       showConfirmDialog({
         message: "有未保存的更改，确定要离开吗？",
         onConfirm: () => {
-          currentUrl = window.location.href; // 更新为允许导航后的新地址
+          // 允许导航，stableUrl 会在下次 !isDirty 时更新
         },
         onCancel: () => {
-          // 恢复到离开前的 URL
-          window.history.pushState(null, "", currentUrl);
+          // 恢复到上一份稳定 URL
+          window.history.pushState(null, "", stableUrlRef.current);
         },
       });
-    } else {
-      currentUrl = window.location.href; // 正常导航时更新
     }
   };
   window.addEventListener("popstate", handlePopState);
@@ -230,6 +236,8 @@ useEffect(() => {
   return () => window.removeEventListener("beforeunload", handleBeforeUnload);
 }, [isDirty]);
 ```
+
+**关键点**：`stableUrlRef` 必须在每次成功的本地 URL 更新后同步刷新（通过监听 `!isDirty` 状态），否则用户做了多次普通导航后再点后退，取消时会恢复到错误的旧地址。
 
 **注意**：页面存在跨页 `<Link>` 出口（返回 Lobby、全局设置），不能只拦截 `onSelectItem`/`onSelectType`，否则这些出口会绕过保护。
 
@@ -1065,3 +1073,4 @@ apps/web/src/features/config-registry/components/
 | 2026-03-26 | - | 待审核 | 修正 4 个遗留问题：1) Hook payload 路径按事件分组，明确 workflow/node 平级；2) 离页保护改为拦截本地导航动作；3) 添加 URL 状态同步要求；4) 修正审核记录日期 |
 | 2026-03-26 | - | 待审核 | 修正 3 个交互问题：1) JSON→表单解析失败改为阻止切换；2) 离页保护覆盖跨页 Link 和浏览器导航；3) URL 同步加入编辑器模式 |
 | 2026-03-26 | - | 待审核 | 修正 3 个精度问题：1) popstate 恢复改为保存 currentUrl；2) ProtectedLink 保留 modifier 点击行为；3) Hook payload 表注明视节点实现而定 |
+| 2026-03-26 | - | 待审核 | 修正 popstate 状态漂移：改用 stableUrlRef 在每次 !isDirty 时同步更新，避免恢复到错误旧地址 |
