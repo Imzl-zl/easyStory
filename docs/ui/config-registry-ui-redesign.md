@@ -176,30 +176,42 @@ const handleSelectItem = useCallback((id: string) => {
   }
 }, [isDirty, setParams]);
 
-// 2. 拦截跨页 Link（使用自定义 Link 组件或拦截 onClick）
+// 2. 拦截跨页 Link（只拦截普通左键点击，保留 Cmd/Ctrl+点击等标准行为）
 const ProtectedLink = ({ href, children, ...props }) => {
-  const handleClick = (e) => {
-    if (isDirty) {
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // 只拦截普通左键点击，不拦截 modifier 点击（Cmd/Ctrl+点击、Shift+点击等）
+    if (isDirty && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       showConfirmDialog({
         message: "有未保存的更改，确定要离开吗？",
         onConfirm: () => router.push(href),
       });
     }
+    // 其他情况（modifier 点击）保持默认行为，允许新标签页打开等
   };
   return <Link href={href} onClick={handleClick} {...props}>{children}</Link>;
 };
 
 // 3. 拦截浏览器前进/后退
 useEffect(() => {
+  // 保存当前 URL，用于取消时恢复
+  let currentUrl = window.location.href;
+  
   const handlePopState = () => {
     if (isDirty) {
-      // 注意：popstate 无法阻止，只能提示后恢复历史
+      // popstate 触发后 location 已变成新地址，需要用保存的 currentUrl 恢复
       showConfirmDialog({
         message: "有未保存的更改，确定要离开吗？",
-        onConfirm: () => {}, // 允许导航
-        onCancel: () => window.history.pushState(null, "", window.location.href), // 恢复
+        onConfirm: () => {
+          currentUrl = window.location.href; // 更新为允许导航后的新地址
+        },
+        onCancel: () => {
+          // 恢复到离开前的 URL
+          window.history.pushState(null, "", currentUrl);
+        },
       });
+    } else {
+      currentUrl = window.location.href; // 正常导航时更新
     }
   };
   window.addEventListener("popstate", handlePopState);
@@ -605,7 +617,7 @@ Workflow 事件 payload 结构（`workflow` 和 `node` 平级）：
     "type": "generate"
   },
   "node_execution_id": "...",  // 可选
-  // 额外字段按事件类型添加
+  // 额外字段视具体节点实现而定
 }
 ```
 
@@ -615,8 +627,12 @@ Workflow 事件 payload 结构（`workflow` 和 `node` 平级）：
 | 所有 Workflow 事件 | `workflow.project_id` | 项目 ID |
 | 所有 Workflow 事件 | `node.id` | 节点 ID |
 | 所有 Workflow 事件 | `node.type` | 节点类型 |
-| `before_generate` / `after_generate` | `chapter.number` | 章节号 |
-| `before_generate` / `after_generate` | `chapter.task_id` | 章节任务 ID |
+| `before_generate`（章节生成节点） | `chapter.number` | 章节号 |
+| `before_generate`（章节生成节点） | `chapter.task_id` | 章节任务 ID |
+| `after_generate`（章节生成节点） | `chapter.number` / `content.word_count` | 章节信息 / 内容信息 |
+| `after_generate`（章节拆分节点） | `chapters_count` / `chapters` | 拆分结果 |
+
+**注意**：`before_generate` / `after_generate` 的额外字段视具体节点实现而定，不同节点类型可能携带不同字段。上述为常见示例，实际可用字段请参考对应节点的 runtime 实现。
 
 Assistant 事件 payload 结构：
 ```
@@ -1048,3 +1064,4 @@ apps/web/src/features/config-registry/components/
 | 2026-03-26 | - | 待审核 | 修正 7 个文档级错误：1) Hook script 配置改为 module/function/params；2) Hook 路径语法改为纯点路径；3) Agent system_prompt 说明不支持模板变量；4) Hook node_types 改为 generate/review/export；5) Workflow mode 改为 manual/auto；6) 移除更新时间排序；7) 过滤选项按类型区分 |
 | 2026-03-26 | - | 待审核 | 修正 4 个遗留问题：1) Hook payload 路径按事件分组，明确 workflow/node 平级；2) 离页保护改为拦截本地导航动作；3) 添加 URL 状态同步要求；4) 修正审核记录日期 |
 | 2026-03-26 | - | 待审核 | 修正 3 个交互问题：1) JSON→表单解析失败改为阻止切换；2) 离页保护覆盖跨页 Link 和浏览器导航；3) URL 同步加入编辑器模式 |
+| 2026-03-26 | - | 待审核 | 修正 3 个精度问题：1) popstate 恢复改为保存 currentUrl；2) ProtectedLink 保留 modifier 点击行为；3) Hook payload 表注明视节点实现而定 |
