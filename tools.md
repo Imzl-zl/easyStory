@@ -25,6 +25,8 @@
 ## Tools
 
 - 后端标准验证命令：`cd apps/api && ruff check app tests && pytest -q`
+- provider interop 本地探测：`cd apps/api && ./.venv/bin/python scripts/provider_interop_check.py list`
+- provider interop dry-run：`cd apps/api && ./.venv/bin/python scripts/provider_interop_check.py probe <profile_id> --dry-run --show-request`
 - 前端 support 单测命令：`pnpm --dir apps/web test:unit`
 - 定向内容模块验证：`cd apps/api && pytest -q tests/unit/test_story_asset_service.py tests/unit/test_chapter_content_service.py tests/unit/test_chapter_content_api.py`
 - Alembic 基线验证：`cd apps/api && ./.venv/bin/alembic -c alembic.ini upgrade head`
@@ -45,6 +47,12 @@
 - `config_registry` hook 写回服务入口：`apps/api/app/modules/config_registry/service/hook_write_service.py`
 - `config_registry` skill 写回服务入口：`apps/api/app/modules/config_registry/service/skill_write_service.py`
 - `config_registry` workflow 写回服务入口：`apps/api/app/modules/config_registry/service/workflow_write_service.py`
+- provider interop 本地 profile：`apps/api/.runtime/provider-interop.local.json`
+- provider interop 本地 key 文件：`apps/api/.env.provider-interop.local`
+- provider interop 示例：`apps/api/provider-interop.example.json`
+- provider interop 支撑模块：`apps/api/app/shared/runtime/provider_interop_support.py`
+- provider interop 探测脚本：`apps/api/scripts/provider_interop_check.py`
+- provider interop 显式公网 `http` 放行开关：`EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS`
 - `config_registry` 管理 API 除 JWT 外，还要求 `EASYSTORY_CONFIG_ADMIN_USERNAMES` 命中当前用户名；默认空列表即全部拒绝
 - `create_app()` 当前对外部注入的 `async_session_factory` 只挂载到 `app.state` 并继续执行 settings/template startup；只有内部自行创建 session factory 时才负责启动期建库，并通过 `initialize_async_database()` 走 Alembic。测试若需要同步 seed，会在 app 外部单独创建 sync `session_factory`
 - 文件型 SQLite 测试 helper `build_sqlite_session_factories()` 已改为先调用 `initialize_database(sync_url)`；正式 schema 真值与测试建库入口保持一致
@@ -58,6 +66,12 @@
 - `workflow` 只做编排、状态机、恢复与执行记录；内容规则、审核规则、导出规则分别回对应模块。
 - 新实现优先补服务和测试，再接路由；保持 API 只做装配，不直接写业务规则。
 - 所有业务模块公开面已收敛为 async-only：统一 `Service + create_*_service` 命名，不保留 `Async*` 镜像类或 `create_async_*` 第二导出面。内部若只剩 async 一套实现，把 `*_async` 名称改回业务语义名。
+- LLM 供应商兼容层当前最佳实践入口：`api_dialect` 只决定协议格式与解析；鉴权方式由 `auth_strategy` / `api_key_header_name` 显式 override，不再硬绑在 dialect 上。
+- Credential Center 当前正式支持的高级兼容字段只保留三类：`auth_strategy`、`api_key_header_name`、`extra_headers`；这三项同时作用于保存、验证和运行时请求，不引入 2API 风格的 prefix / alias / provider 路由复杂度。
+- `extra_headers` 只用于非敏感元数据头（如 Referer、租户标识）；鉴权类 header 不允许塞进这里，必须走 `auth_strategy / api_key_header_name`。
+- provider interop 本地 probe 若使用 `--model` 覆写，最终请求体中的探测模型也必须同步覆写，不能只改展示值。
+- Anthropic Messages 请求当前默认把 `system_prompt` 编码为 text block 数组，而不是裸字符串；官方两种都允许，但兼容代理对数组更稳。
+- Gemini probe 对简单连通性验证应显式压低思考配置；否则某些 `gemini-flash-latest` 代理会落到带默认 thinking 的 Gemini 3 变体，直接把 probe token 吃在内部思考上，表面看是“返回半句”，实际是上游 `finishReason=MAX_TOKENS`。
 - 受保护 API 统一走 `app.modules.user.entry.http.dependencies.get_current_user`（async 版），不保留 `get_current_user_async` 第二命名入口。
 - 当业务 service 文件超出 300 行时，优先保持公开 `Service + factory` 不变，只把"查询/权限 helper""状态变更 helper""DTO 映射与归一化 helper"下沉到 `*_support.py`；不要用改公开命名来掩盖内部结构问题。
 - `workflow events` SSE 端点需要 `Authorization: Bearer`；前端不要用原生 `EventSource`，统一走 `fetch + ReadableStream`，并区分正常 EOF 静默重连与错误重连提示。
@@ -94,3 +108,9 @@
 - Alembic CLI 若不显式覆盖 `sqlalchemy.url`，默认会命中 `apps/api/.runtime/easystory.db`；做 baseline/autogenerate/临时验证时要用 `-x database_url=...` 或在 Config 里显式覆盖。
 - 默认沙箱内，任何命中 `aiosqlite` 的 async SQLite 验证都可能挂起；需在非沙箱环境执行，不是业务回归。
 - unified exec 进程数告警是工具层会话配额问题，不是仓库代码回归。
+- `provider_interop_check.py` 会复用正式 endpoint policy：公网模型端点默认要求 `https`；若确需验证公网 `http` 代理，必须显式设置 `EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS=true`，脚本不会静默绕过。
+- workflow runtime 记账不能把 `raw_output.model_name` 当唯一真值；兼容代理或测试替身省略该字段时，必须回退到已解析 candidate 模型名，否则 billing 会把空模型名当配置错误直接打断运行。
+- 用户提供的测试 profile 当前已验证可用口径：
+  - `gpt`：`openai_responses`
+  - `anthropic`：`anthropic_messages` + `system` text block array
+  - `gemini`：`gemini_generate_content`

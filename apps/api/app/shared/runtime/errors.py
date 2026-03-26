@@ -75,3 +75,23 @@ class BudgetExceededError(EasyStoryError):
         self.usage_type = usage_type
         self.raw_output = raw_output
         self.partial_aggregated_review = partial_aggregated_review
+
+
+class ModelFallbackExhaustedError(EasyStoryError):
+    """Raised when all explicit model candidates are exhausted."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        action: Literal["pause", "fail"],
+        attempted_models: list[str],
+        skipped_models: list[str] | None = None,
+        last_error: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.message = message
+        self.action = action
+        self.attempted_models = attempted_models
+        self.skipped_models = skipped_models or []
+        self.last_error = last_error

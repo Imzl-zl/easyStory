@@ -10,6 +10,7 @@ from .llm_protocol import (
     LLMGenerateRequest,
     PreparedLLMHttpRequest,
     normalize_api_dialect,
+    normalize_auth_strategy,
     parse_generation_response,
     prepare_generation_request,
     resolve_model_name,
@@ -87,12 +88,7 @@ def _build_request(params: dict[str, Any]) -> LLMRequest:
         max_tokens=_optional_int(model.get("max_tokens")),
         top_p=_optional_float(model.get("top_p")),
         stop=_optional_string_list(model.get("stop")),
-        connection=LLMConnection(
-            api_dialect=normalize_api_dialect(_optional_string(credential.get("api_dialect"))),
-            api_key=_require_non_empty_string(credential.get("api_key"), "credential.api_key"),
-            base_url=_optional_string(credential.get("base_url")),
-            default_model=_optional_string(credential.get("default_model")),
-        ),
+        connection=_build_connection(credential),
     )
 
 
@@ -121,6 +117,18 @@ def _build_http_error_message(response: HttpJsonResponse) -> str:
     if suffix:
         return f"LLM request failed: HTTP {response.status_code} - {suffix}"
     return f"LLM request failed: HTTP {response.status_code}"
+
+
+def _build_connection(credential: dict[str, Any]) -> LLMConnection:
+    return LLMConnection(
+        api_dialect=normalize_api_dialect(_optional_string(credential.get("api_dialect"))),
+        api_key=_require_non_empty_string(credential.get("api_key"), "credential.api_key"),
+        base_url=_optional_string(credential.get("base_url")),
+        default_model=_optional_string(credential.get("default_model")),
+        auth_strategy=normalize_auth_strategy(_optional_string(credential.get("auth_strategy"))),
+        api_key_header_name=_optional_string(credential.get("api_key_header_name")),
+        extra_headers=_optional_string_mapping(credential.get("extra_headers")),
+    )
 
 
 def _require_dict(value: Any, field_name: str) -> dict[str, Any]:
@@ -169,6 +177,19 @@ def _optional_string_list(value: Any) -> list[str] | None:
     for item in value:
         normalized_item = _require_non_empty_string(item, "string_list_item")
         normalized.append(normalized_item)
+    return normalized or None
+
+
+def _optional_string_mapping(value: Any) -> dict[str, str] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ConfigurationError("Expected string mapping value")
+    normalized: dict[str, str] = {}
+    for raw_key, raw_value in value.items():
+        key = _require_non_empty_string(raw_key, "string_mapping_key")
+        mapped_value = _require_non_empty_string(raw_value, f"string_mapping[{key}]")
+        normalized[key] = mapped_value
     return normalized or None
 
 

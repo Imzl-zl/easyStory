@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any, Literal
 
 import httpx
@@ -13,8 +14,21 @@ LlmApiDialect = Literal[
     "anthropic_messages",
     "gemini_generate_content",
 ]
+LlmAuthStrategy = Literal["bearer", "x_api_key", "x_goog_api_key", "custom_header"]
 
 DEFAULT_API_DIALECT: LlmApiDialect = "openai_chat_completions"
+DEFAULT_AUTH_STRATEGY_BY_DIALECT: dict[LlmApiDialect, LlmAuthStrategy] = {
+    "openai_chat_completions": "bearer",
+    "openai_responses": "bearer",
+    "anthropic_messages": "x_api_key",
+    "gemini_generate_content": "x_goog_api_key",
+}
+DEFAULT_API_KEY_HEADER_NAMES: dict[LlmAuthStrategy, str] = {
+    "x_api_key": "x-api-key",
+    "x_goog_api_key": "x-goog-api-key",
+    "custom_header": "",
+    "bearer": "",
+}
 SUPPORTED_API_DIALECTS = frozenset(
     {
         "openai_chat_completions",
@@ -23,6 +37,7 @@ SUPPORTED_API_DIALECTS = frozenset(
         "gemini_generate_content",
     }
 )
+SUPPORTED_AUTH_STRATEGIES = frozenset({"bearer", "x_api_key", "x_goog_api_key", "custom_header"})
 DEFAULT_BASE_URLS: dict[LlmApiDialect, str] = {
     "openai_chat_completions": "https://api.openai.com",
     "openai_responses": "https://api.openai.com",
@@ -31,8 +46,10 @@ DEFAULT_BASE_URLS: dict[LlmApiDialect, str] = {
 }
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 60
-VERIFY_MODEL_REPLY = "Reply with ok."
+VERIFY_MODEL_REPLY = "今天天气真好。"
+VERIFY_MAX_TOKENS = 32
 JSON_OBJECT_RESPONSE_FORMAT = "json_object"
+HTTP_HEADER_TOKEN_PATTERN = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
 
 
 @dataclass(frozen=True)
@@ -41,6 +58,9 @@ class LLMConnection:
     api_key: str
     base_url: str | None
     default_model: str | None = None
+    auth_strategy: LlmAuthStrategy | None = None
+    api_key_header_name: str | None = None
+    extra_headers: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -86,6 +106,51 @@ def normalize_api_dialect(api_dialect: str | None) -> LlmApiDialect:
     if normalized not in SUPPORTED_API_DIALECTS:
         raise ConfigurationError(f"Unsupported api_dialect: {api_dialect}")
     return normalized  # type: ignore[return-value]
+
+
+def normalize_auth_strategy(auth_strategy: str | None) -> LlmAuthStrategy | None:
+    normalized = _normalize_optional_string(auth_strategy)
+    if normalized is None:
+        return None
+    if normalized not in SUPPORTED_AUTH_STRATEGIES:
+        raise ConfigurationError(f"Unsupported auth_strategy: {auth_strategy}")
+    return normalized  # type: ignore[return-value]
+
+
+def resolve_auth_strategy(api_dialect: str | None, auth_strategy: str | None) -> LlmAuthStrategy:
+    explicit_strategy = normalize_auth_strategy(auth_strategy)
+    if explicit_strategy is not None:
+        return explicit_strategy
+    dialect = normalize_api_dialect(api_dialect)
+    return DEFAULT_AUTH_STRATEGY_BY_DIALECT[dialect]
+
+
+def resolve_api_key_header_name(
+    *,
+    api_dialect: str | None,
+    auth_strategy: str | None,
+    api_key_header_name: str | None,
+) -> str | None:
+    strategy = resolve_auth_strategy(api_dialect, auth_strategy)
+    normalized_name = _normalize_http_header_name(api_key_header_name)
+    if strategy == "bearer":
+        if normalized_name is not None:
+            raise ConfigurationError("api_key_header_name is only supported with non-bearer auth_strategy")
+        return None
+    if strategy == "custom_header":
+        if normalized_name is None:
+            raise ConfigurationError("custom_header auth_strategy requires api_key_header_name")
+        return normalized_name
+    default_name = DEFAULT_API_KEY_HEADER_NAMES[strategy]
+    if normalized_name is not None and normalized_name.lower() != default_name:
+        raise ConfigurationError(
+            f"api_key_header_name is not supported for auth_strategy '{strategy}'"
+        )
+    return default_name
+
+
+def normalize_http_header_name(header_name: str | None) -> str | None:
+    return _normalize_http_header_name(header_name)
 
 
 def resolve_model_name(
@@ -137,3 +202,12 @@ def _normalize_optional_string(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _normalize_http_header_name(header_name: str | None) -> str | None:
+    normalized = _normalize_optional_string(header_name)
+    if normalized is None:
+        return None
+    if HTTP_HEADER_TOKEN_PATTERN.fullmatch(normalized) is None:
+        raise ConfigurationError("api_key_header_name must be a valid HTTP header name")
+    return normalized

@@ -33,6 +33,7 @@ class WorkflowStateMachine:
             "user_interrupted",
             "budget_exceeded",
             "review_failed",
+            "model_fallback_exhausted",
             "error",
             "loop_pause",
             "max_chapters_reached",

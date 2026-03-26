@@ -33,6 +33,9 @@ class AsyncCredentialVerifier(Protocol):
         base_url: str | None,
         api_dialect: str,
         default_model: str | None,
+        auth_strategy: str | None,
+        api_key_header_name: str | None,
+        extra_headers: dict[str, str] | None,
     ) -> CredentialVerificationResult: ...
 
 
@@ -56,6 +59,9 @@ class AsyncHttpCredentialVerifier:
         base_url: str | None,
         api_dialect: str,
         default_model: str | None,
+        auth_strategy: str | None = None,
+        api_key_header_name: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> CredentialVerificationResult:
         try:
             request = build_verification_request(
@@ -64,6 +70,9 @@ class AsyncHttpCredentialVerifier:
                     api_key=api_key,
                     base_url=base_url,
                     default_model=default_model,
+                    auth_strategy=auth_strategy,
+                    api_key_header_name=api_key_header_name,
+                    extra_headers=extra_headers,
                 )
             )
             response = await self.request_sender(request)

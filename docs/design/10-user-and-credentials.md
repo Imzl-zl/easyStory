@@ -82,7 +82,7 @@ Project 新增 `owner_id`（FK → users.id），与 User 为多对一关系。
 
 ### 4.1 ModelCredential 存储模型
 
-凭证表记录 API Key 的加密存储，支持三级作用域（system/user/project）、渠道键、显式接口类型、自定义 endpoint、默认模型和连通性验证时间。
+凭证表记录 API Key 的加密存储，支持三级作用域（system/user/project）、渠道键、显式接口类型、自定义 endpoint、默认模型，以及少量高级兼容字段（鉴权方式、自定义 API Key Header、额外请求头）。
 
 > → 数据模型详见 [数据库设计](../specs/database-design.md) § model_credentials
 
@@ -97,6 +97,9 @@ Project 新增 `owner_id`（FK → users.id），与 User 为多对一关系。
 | `encrypted_key` | AES-256-GCM 加密后的 API Key，明文永不落盘 |
 | `base_url` | 可选，用于自定义 API endpoint（如代理、私有部署） |
 | `default_model` | 连接级默认模型名，用于连通性验证和运行时 `model.name` 缺省回退 |
+| `auth_strategy` | 可选；显式覆盖鉴权方式，未设置时跟随 `api_dialect` 默认值 |
+| `api_key_header_name` | 可选；仅在 `custom_header` 模式下指定 API Key 写入哪个 Header |
+| `extra_headers` | 可选；附加请求头 JSON 对象，仅用于 Referer、租户标识等非敏感元数据 Header；鉴权类 Header 必须走 `auth_strategy / api_key_header_name` |
 | `last_verified_at` | 最后一次连通性测试通过时间 |
 
 ---
@@ -143,6 +146,7 @@ credential_security:
 - **存储**: API Key 使用 AES-256-GCM 加密后存入数据库，master key 从环境变量获取
 - **传输**: API 返回凭证信息时，Key 始终掩码显示（如 `sk-...xxxx`）
 - **Endpoint 边界**: 自定义 `base_url` 默认只允许公网 `https` endpoint；`localhost` / RFC1918 私网 / 其他本地地址默认拒绝，只有 `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS=true` 时才允许显式接入本地或私有模型网关
+- **兼容字段边界**: Credential Center 只支持少量通用兼容字段：`auth_strategy / api_key_header_name / extra_headers`。其中 `extra_headers` 只承载非敏感元数据头，不回退成第二套鉴权入口。不在主业务里引入 2API 风格的 provider 路由、模型池、prefix 或别名路由规则
 - **审计**: MVP 记录凭证的 create / update / delete / verify / enable / disable 等安全事件
 - **派生**: 加密密钥通过 PBKDF2 从 master key 派生，非直接使用
 
@@ -174,6 +178,8 @@ credential_security:
 ### 7.2 设计要点
 
 - 验证不再通过 `/models` 或探测式接口猜兼容；统一按用户显式选择的 `api_dialect` 发最小生成请求
+- 验证请求会复用凭证上的 `auth_strategy / api_key_header_name / extra_headers`，保证“保存后可用”和“验证时可用”是同一套连接配置
+- `api_key_header_name` 不允许覆盖运行时保留头（如 `Content-Type`、Anthropic 的 `anthropic-version`）；`extra_headers` 若看起来是 token / secret / auth 头，会在保存阶段直接失败
 - 测试请求使用极小输出上限与固定短提示，避免产生实际费用
 - `default_model` 是验证请求的必需模型名，同时也是运行时 `model.name` 缺省时的连接级回退值
 - `base_url` 的安全策略在创建、更新、验证和运行时统一生效，避免旧数据绕过入口校验

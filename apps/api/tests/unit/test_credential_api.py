@@ -8,6 +8,7 @@ from app.modules.credential.entry.http.router import get_credential_service
 from app.modules.credential.infrastructure import CredentialVerificationResult
 from app.modules.credential.service import create_credential_service
 from app.modules.project.models import Project
+from app.shared.settings import clear_settings_cache
 from tests.unit.async_api_support import (
     build_sqlite_session_factories,
     cleanup_sqlite_session_factories,
@@ -30,12 +31,18 @@ class FakeVerifier:
         base_url: str | None,
         api_dialect: str,
         default_model: str | None,
+        auth_strategy: str | None,
+        api_key_header_name: str | None,
+        extra_headers: dict[str, str] | None,
     ) -> CredentialVerificationResult:
         assert provider == "openai"
         assert api_key == "sk-secret-1234"
         assert base_url is None
         assert api_dialect == OPENAI_DIALECT
         assert default_model == OPENAI_MODEL
+        assert auth_strategy == "custom_header"
+        assert api_key_header_name == "api-key"
+        assert extra_headers == {"X-Trace-Id": "api-check"}
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
             message="Credential verified",
@@ -45,6 +52,7 @@ class FakeVerifier:
 async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
     monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    clear_settings_cache()
     session_factory, async_session_factory, engine, async_engine, database_path = (
         build_sqlite_session_factories(tmp_path, name="credential-api-success")
     )
@@ -68,6 +76,9 @@ async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> 
                     "display_name": "我的 OpenAI",
                     "api_key": "sk-secret-1234",
                     "default_model": OPENAI_MODEL,
+                    "auth_strategy": "custom_header",
+                    "api_key_header_name": "api-key",
+                    "extra_headers": {"X-Trace-Id": "api-check"},
                 },
                 headers=headers,
             )
@@ -76,6 +87,9 @@ async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> 
             assert payload["provider"] == "openai"
             assert payload["api_dialect"] == OPENAI_DIALECT
             assert payload["default_model"] == OPENAI_MODEL
+            assert payload["auth_strategy"] == "custom_header"
+            assert payload["api_key_header_name"] == "api-key"
+            assert payload["extra_headers"] == {"X-Trace-Id": "api-check"}
             assert payload["masked_key"] == "sk-...1234"
 
             list_response = await client.get("/api/v1/credentials", headers=headers)
@@ -90,12 +104,14 @@ async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> 
         assert verify_response.status_code == 200
         assert verify_response.json()["message"] == "Credential verified"
     finally:
+        clear_settings_cache()
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
 async def test_credentials_api_hides_other_users_project(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
     monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    clear_settings_cache()
     session_factory, async_session_factory, engine, async_engine, database_path = (
         build_sqlite_session_factories(tmp_path, name="credential-api-owner")
     )
@@ -124,6 +140,7 @@ async def test_credentials_api_hides_other_users_project(monkeypatch, tmp_path) 
         assert response.status_code == 404
         assert response.json()["code"] == "not_found"
     finally:
+        clear_settings_cache()
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
@@ -132,7 +149,8 @@ async def test_credentials_api_returns_configuration_error_when_master_key_missi
     tmp_path,
 ) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
-    monkeypatch.delenv("EASYSTORY_CREDENTIAL_MASTER_KEY", raising=False)
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", "")
+    clear_settings_cache()
     session_factory, async_session_factory, engine, async_engine, database_path = (
         build_sqlite_session_factories(tmp_path, name="credential-api-config")
     )
@@ -159,6 +177,7 @@ async def test_credentials_api_returns_configuration_error_when_master_key_missi
         assert response.status_code == 500
         assert response.json()["code"] == "configuration_error"
     finally:
+        clear_settings_cache()
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 

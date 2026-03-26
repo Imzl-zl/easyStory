@@ -1,10 +1,26 @@
 import { formatObservabilityDateTime } from "@/features/observability/components/observability-datetime-support";
+import {
+  areHeaderMapsEqual,
+  AUTH_STRATEGY_OPTIONS,
+  formatExtraHeaders,
+  getDefaultAuthStrategy,
+  normalizeApiKeyHeaderName,
+  normalizeCredentialAuthStrategy,
+  parseExtraHeadersText,
+  type CredentialAuthStrategyValue,
+} from "@/features/settings/components/credential-center-compatibility-support";
 import type {
   CredentialApiDialect,
   CredentialCreatePayload,
   CredentialUpdatePayload,
   CredentialView,
 } from "@/lib/api/types";
+
+export {
+  AUTH_STRATEGY_OPTIONS,
+  getDefaultAuthStrategy,
+  type CredentialAuthStrategyValue,
+} from "@/features/settings/components/credential-center-compatibility-support";
 
 export type CredentialCenterMode = "list" | "audit";
 export type CredentialCenterScope = "user" | "project";
@@ -50,6 +66,9 @@ export type CredentialFormState = {
   apiKey: string;
   baseUrl: string;
   defaultModel: string;
+  authStrategy: CredentialAuthStrategyValue;
+  apiKeyHeaderName: string;
+  extraHeadersText: string;
 };
 
 export function createInitialCredentialForm(): CredentialFormState {
@@ -60,6 +79,9 @@ export function createInitialCredentialForm(): CredentialFormState {
     apiKey: "",
     baseUrl: DEFAULT_BASE_URLS.openai_chat_completions,
     defaultModel: "",
+    authStrategy: "",
+    apiKeyHeaderName: "",
+    extraHeadersText: "",
   };
 }
 
@@ -71,6 +93,9 @@ export function createCredentialFormFromView(credential: CredentialView): Creden
     apiKey: "",
     baseUrl: credential.base_url ?? getDefaultBaseUrl(credential.api_dialect),
     defaultModel: credential.default_model ?? "",
+    authStrategy: credential.auth_strategy ?? "",
+    apiKeyHeaderName: credential.api_key_header_name ?? "",
+    extraHeadersText: formatExtraHeaders(credential.extra_headers),
   };
 }
 
@@ -109,6 +134,12 @@ export function buildCredentialCreatePayload(options: {
   scope: CredentialCenterScope;
 }): CredentialCreatePayload {
   const { formState, projectId, scope } = options;
+  const authStrategy = normalizeCredentialAuthStrategy(formState.apiDialect, formState.authStrategy);
+  const apiKeyHeaderName = normalizeApiKeyHeaderName(
+    formState.apiDialect,
+    authStrategy,
+    formState.apiKeyHeaderName,
+  );
   return {
     owner_type: scope,
     project_id: scope === "project" ? projectId : null,
@@ -118,6 +149,13 @@ export function buildCredentialCreatePayload(options: {
     api_key: formState.apiKey,
     base_url: normalizeCredentialBaseUrl(formState.apiDialect, formState.baseUrl),
     default_model: formState.defaultModel.trim(),
+    auth_strategy: authStrategy,
+    api_key_header_name: apiKeyHeaderName,
+    extra_headers: parseExtraHeadersText(formState.extraHeadersText, {
+      apiDialect: formState.apiDialect,
+      authStrategy,
+      apiKeyHeaderName,
+    }),
   };
 }
 
@@ -129,6 +167,17 @@ export function buildCredentialUpdatePayload(
   const displayName = formState.displayName.trim();
   const nextBaseUrl = normalizeCredentialBaseUrl(formState.apiDialect, formState.baseUrl);
   const nextDefaultModel = formState.defaultModel.trim();
+  const nextAuthStrategy = normalizeCredentialAuthStrategy(formState.apiDialect, formState.authStrategy);
+  const nextApiKeyHeaderName = normalizeApiKeyHeaderName(
+    formState.apiDialect,
+    nextAuthStrategy,
+    formState.apiKeyHeaderName,
+  );
+  const nextExtraHeaders = parseExtraHeadersText(formState.extraHeadersText, {
+    apiDialect: formState.apiDialect,
+    authStrategy: nextAuthStrategy,
+    apiKeyHeaderName: nextApiKeyHeaderName,
+  });
   if (formState.apiDialect !== credential.api_dialect) {
     payload.api_dialect = formState.apiDialect;
   }
@@ -139,6 +188,15 @@ export function buildCredentialUpdatePayload(
     payload.base_url = nextBaseUrl;
   }
   appendDefaultModelUpdate(payload, credential.default_model, nextDefaultModel);
+  if (nextAuthStrategy !== credential.auth_strategy) {
+    payload.auth_strategy = nextAuthStrategy;
+  }
+  if (nextApiKeyHeaderName !== credential.api_key_header_name) {
+    payload.api_key_header_name = nextApiKeyHeaderName;
+  }
+  if (!areHeaderMapsEqual(nextExtraHeaders, credential.extra_headers)) {
+    payload.extra_headers = nextExtraHeaders;
+  }
   if (formState.apiKey.trim()) {
     payload.api_key = formState.apiKey;
   }

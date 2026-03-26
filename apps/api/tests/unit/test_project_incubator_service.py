@@ -493,6 +493,9 @@ async def test_project_incubator_service_builds_conversation_draft(tmp_path, mon
                 provider="anthropic",
                 api_dialect="anthropic_messages",
                 default_model="claude-sonnet-4-20250514",
+                auth_strategy="custom_header",
+                api_key_header_name="api-key",
+                extra_headers={"HTTP-Referer": "https://story.example.com"},
             )
 
         async with async_session_factory() as session:
@@ -526,6 +529,11 @@ async def test_project_incubator_service_builds_conversation_draft(tmp_path, mon
         assert "只输出 JSON 对象本身" in fake_provider.prompts[0]
         assert fake_provider.params[0]["model"]["provider"] == "anthropic"
         assert fake_provider.params[0]["model"]["name"] == "claude-sonnet-4-20250514"
+        assert fake_provider.params[0]["credential"]["auth_strategy"] == "custom_header"
+        assert fake_provider.params[0]["credential"]["api_key_header_name"] == "api-key"
+        assert fake_provider.params[0]["credential"]["extra_headers"] == {
+            "HTTP-Referer": "https://story.example.com"
+        }
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
@@ -677,6 +685,9 @@ def create_model_credential(
     provider: str,
     api_dialect: str,
     default_model: str,
+    auth_strategy: str | None = None,
+    api_key_header_name: str | None = None,
+    extra_headers: dict[str, str] | None = None,
 ):
     crypto = CredentialCrypto()
     credential = ModelCredential(
@@ -687,6 +698,9 @@ def create_model_credential(
         display_name=provider.title(),
         encrypted_key=crypto.encrypt(f"sk-{provider}-test"),
         default_model=default_model,
+        auth_strategy=auth_strategy,
+        api_key_header_name=api_key_header_name,
+        extra_headers=extra_headers,
         is_active=True,
     )
     session.add(credential)

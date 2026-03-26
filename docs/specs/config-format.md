@@ -678,6 +678,7 @@ model:
 | `EASYSTORY_CORS_ALLOWED_ORIGINS` | 可选 | 空列表 | 逗号分隔 origin 白名单 |
 | `EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX` | 可选 | `^https?://(localhost|127\.0\.0\.1)(:\d+)?$` | CORS 正则白名单 |
 | `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS` | 可选 | `false` | 是否允许 `localhost` / 私网 IP 等本地模型 endpoint；默认只允许公网 `https` endpoint |
+| `EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS` | 可选 | `false` | 是否显式允许公网 `http` 模型 endpoint；仅用于兼容测试或受控代理环境 |
 | `EASYSTORY_CONFIG_ADMIN_USERNAMES` | 可选 | 空列表 | 逗号分隔的配置管理员用户名白名单；仅命中用户可访问 `/api/v1/config/*` |
 
 **校验与暴露规则**：
@@ -686,6 +687,7 @@ model:
 - `EASYSTORY_CREDENTIAL_MASTER_KEY` 保持按能力懒校验；只有真正触发凭证加密/解密路径时才显式报错。
 - `EASYSTORY_CORS_ALLOWED_ORIGINS` 接受逗号分隔字符串；解析失败视为配置错误。
 - 自定义模型 `base_url` 默认只允许公网 `https` endpoint；若确需访问本地 / 私网模型网关，必须显式设置 `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS=true`。
+- 若确需访问公网 `http` 模型网关，必须显式设置 `EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS=true`；该能力默认关闭，且只应用于兼容测试或明确受控的代理环境。
 - `EASYSTORY_CONFIG_ADMIN_USERNAMES` 为空时，`/api/v1/config/*` 管理接口默认全部拒绝；只有命中白名单的已认证用户才能读写配置。
 - 新增运行时环境变量时，必须同时更新 `app/shared/settings.py`、`apps/api/.env.example`、本规范与 `docs/README.md`。
 

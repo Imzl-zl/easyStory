@@ -6,7 +6,7 @@ from typing import Any, Awaitable, Callable, Sequence
 
 from app.modules.config_registry.infrastructure.config_loader import ConfigLoader
 from app.modules.config_registry.schemas.config_schemas import AgentConfig, ReviewConfig
-from app.shared.runtime.errors import BudgetExceededError, EasyStoryError
+from app.shared.runtime.errors import BudgetExceededError, EasyStoryError, ModelFallbackExhaustedError
 
 from .contracts import AggregatedReviewResult, ReviewExecutionFailure, ReviewResult
 from .review_executor_support import (
@@ -215,6 +215,8 @@ class ReviewExecutor:
                 str(exc),
             )
         except BudgetExceededError:
+            raise
+        except ModelFallbackExhaustedError:
             raise
         except Exception as exc:
             return build_execution_failure(

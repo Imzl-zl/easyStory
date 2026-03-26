@@ -54,7 +54,9 @@ def _parse_gemini_generate_content_response(payload: dict[str, Any]) -> Normaliz
     candidates = _require_list(payload.get("candidates"), "candidates")
     first_candidate = _require_dict(candidates[0], "candidates[0]")
     content = _require_dict(first_candidate.get("content"), "candidates[0].content")
-    parts = _require_list(content.get("parts"), "candidates[0].content.parts")
+    parts = _require_list(content.get("parts"), "candidates[0].content.parts", allow_none=True)
+    if parts is None:
+        raise ConfigurationError(_build_gemini_empty_content_message(first_candidate))
     text = "".join(
         part.get("text", "")
         for part in parts
@@ -68,6 +70,16 @@ def _parse_gemini_generate_content_response(payload: dict[str, Any]) -> Normaliz
         "candidatesTokenCount",
         "totalTokenCount",
     )
+
+
+def _build_gemini_empty_content_message(candidate: dict[str, Any]) -> str:
+    finish_reason = candidate.get("finishReason")
+    if isinstance(finish_reason, str) and finish_reason:
+        return (
+            "Gemini response did not return text parts "
+            f"(finishReason={finish_reason})"
+        )
+    return "candidates[0].content.parts must be a non-empty list"
 
 
 def _extract_responses_text(payload: dict[str, Any]) -> str:

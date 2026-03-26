@@ -1,0 +1,38 @@
+{
+  "profiles": [
+    {
+      "id": "openai-compatible",
+      "provider": "openai",
+      "api_dialect": "openai_chat_completions",
+      "base_url": "https://your-proxy.example.com/v1",
+      "default_model": "gpt-4.1-mini",
+      "api_key_env": "EASYSTORY_PROVIDER_INTEROP_OPENAI_API_KEY",
+      "notes": "OpenAI-compatible upstream; auth_strategy omitted means follow dialect default."
+    },
+    {
+      "id": "anthropic-compatible",
+      "provider": "anthropic",
+      "api_dialect": "anthropic_messages",
+      "base_url": "https://your-proxy.example.com",
+      "default_model": "claude-haiku-4-5-20251001",
+      "api_key_env": "EASYSTORY_PROVIDER_INTEROP_ANTHROPIC_API_KEY",
+      "auth_strategy": "bearer",
+      "notes": "Example of overriding auth strategy for an Anthropic-format upstream."
+    },
+    {
+      "id": "custom-header-example",
+      "provider": "custom",
+      "api_dialect": "gemini_generate_content",
+      "base_url": "https://your-proxy.example.com",
+      "default_model": "gemini-flash-latest",
+      "api_key_env": "EASYSTORY_PROVIDER_INTEROP_CUSTOM_API_KEY",
+      "auth_strategy": "custom_header",
+      "api_key_header_name": "api-key",
+      "extra_headers": {
+        "HTTP-Referer": "https://your-app.example.com"
+      },
+      "max_requests_per_minute": 5,
+      "notes": "For upstreams that require a non-standard API key header and metadata headers."
+    }
+  ]
+}

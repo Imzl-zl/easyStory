@@ -177,6 +177,10 @@ class ProjectIncubatorService:
         *,
         owner_id: uuid.UUID,
     ):
+        from app.modules.credential.service.credential_connection_support import (
+            build_runtime_credential_payload,
+        )
+
         credential_service = self._resolve_credential_service()
         resolved = await credential_service.resolve_active_credential_model(
             db,
@@ -191,14 +195,10 @@ class ProjectIncubatorService:
                 "prompt": prompt,
                 "system_prompt": None,
                 "model": resolved_model.model_dump(mode="json", exclude_none=True),
-                "credential": {
-                    "api_key": credential_service.crypto.decrypt(
-                        resolved.credential.encrypted_key
-                    ),
-                    "api_dialect": resolved.credential.api_dialect,
-                    "base_url": resolved.credential.base_url,
-                    "default_model": resolved.credential.default_model,
-                },
+                "credential": build_runtime_credential_payload(
+                    resolved.credential,
+                    decrypt_api_key=credential_service.crypto.decrypt,
+                ),
                 "response_format": "json_object",
             },
         )

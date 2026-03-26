@@ -7,14 +7,17 @@
 
 - 后端测试：最近一次已知全量 `cd apps/api && ruff check app tests && pytest -q` 通过（记录日期：2026-03-23）
 - 前端检查：最近一次已知 `pnpm --dir apps/web exec tsc --noEmit` + `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-03-25）
-- 最后更新：2026-03-25
+- 最后更新：2026-03-26
 
 ## 已完成能力
 
-- 凭证与模型连接闭环：安全存储、endpoint policy、`api_dialect` 路由、旧库 schema reconcile
+- 凭证与模型连接闭环：安全存储、endpoint policy、`api_dialect` 路由、auth strategy override、公网 http 显式测试开关、本地 provider interop probe、旧库 schema reconcile
+- provider interop 深化闭环：本地 probe 已支持 `prompt/system_prompt/extra_headers/stream`，并对 Gemini probe 注入最小思考配置，避免默认 thinking 吞掉输出预算
+- Credential Center 高级兼容设置闭环：凭证现正式支持 `auth_strategy / api_key_header_name / extra_headers`，前后端和运行时请求链已对齐；其中 `extra_headers` 已收口为仅允许非敏感元数据头
 - 项目与前置资产闭环：project CRUD、setting completeness、story asset generation / confirm
 - 内容主链路闭环：outline / opening_plan / chapter / content version、章节确认与 stale 传播
 - 工作流闭环：control plane、runtime、auto-review / fix、workflow logs / prompt replay / audit
+- workflow runtime 模型回退闭环：已支持 candidate 构建、capability skip、retry、fallback exhausted pause/fail 语义；相关 pause reason 与 snapshot 已接入 state machine / review executor
 - context / review / billing / export / analysis 已补到查询面板或最小业务闭环
 - template + incubator 闭环：built-in sync、自定义模板、draft / create-project / conversation draft、完整度前移
 - config_registry 管理闭环：skills / agents / hooks / workflows 查询与 detail / update，strict DTO + staged config 校验
@@ -86,3 +89,8 @@
 - 2026-03-25：收口 Credential Center 动作状态语义：`actionMutation.variables` 现在作为唯一 pending action 真值，列表按钮可按 `credentialId + actionType` 显示“验证中/启用中/停用中/删除中...”；验证成功反馈时间统一改为 UTC 格式，并新增 action/feedback support 单测
 - 2026-03-25：修复 Credential Center review issues：`audit` 子视图收口为只读审计视图，不再暴露 verify/enable/disable/delete；同时在 mutation 期间锁定 `scope`/`mode`/审计目标切换，避免 pending 语义和反馈上下文漂移
 - 2026-03-25：补齐 Lab 前端 MVP：Lab 页面拆成 sidebar/detail/create/delete-confirm/feedback/support，列表支持 `analysis_type / content_id / generated_skill_key` 过滤；创建成功会根据当前过滤条件决定是否自动选中，删除后按相邻记录回退，顶栏反馈统一收口为 `info / danger`；refetch 失败时保留已有列表/详情数据，`result` 空对象在前端直接阻断
+- 2026-03-26：补齐 provider interop 本地联调闭环：`shared/runtime` 现支持 `auth_strategy` / `api_key_header_name` override，并新增 `EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS` 显式测试开关；本地新增 `provider_interop_support.py` 与 `scripts/provider_interop_check.py`，用户提供的 GPT / Gemini / Anthropic profile 已保存到 ignored 本地文件，并已实测全部返回 `ok`：GPT 走 `openai_responses`，Anthropic `system` 需发 text block 数组，Gemini 保持 `generateContent`
+- 2026-03-26：收口凭证兼容层实现：`model_credentials` 新增 `auth_strategy / api_key_header_name / extra_headers`，Credential Center 表单新增“高级兼容设置”，验证短提示改为自然句“今天天气真好。”
+- 2026-03-26：收口凭证 review fixes：provider interop `--model` 覆写现会真正进入 probe 请求；`api_key_header_name` 不再允许覆盖运行时保留头；`extra_headers` 改为只允许非敏感元数据头，前后端校验与定向 pytest / tsc / test:unit 已通过
+- 2026-03-26：完成 runtime/provider hardening：`project incubator` 改为复用统一 credential payload，workflow runtime 已补 candidate/capability/retry/model fallback 主链并把 `model_fallback_exhausted` 接到 pause/fail 语义；`workflow_runtime_*` 与 provider interop helper 已拆分到 support 文件，核心 mixin 均降到 300 行内
+- 2026-03-26：完成真实上游文字联调：`gpt / gemini / anthropic` 非流式与流式 probe 均对 `今天有什么新闻` 返回文字；其中 Gemini 初始返回半句，经确认是上游 `finishReason=MAX_TOKENS` + 默认 thinking 导致，probe 现已显式压低 thinking 配置后恢复为有效文本返回

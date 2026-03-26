@@ -31,6 +31,9 @@ async def verify_credential_record(
             base_url=credential.base_url,
             api_dialect=credential.api_dialect,
             default_model=credential.default_model,
+            auth_strategy=credential.auth_strategy,
+            api_key_header_name=credential.api_key_header_name,
+            extra_headers=credential.extra_headers,
         )
     except Exception as exc:
         record_audit(

@@ -105,6 +105,9 @@ class CredentialService:
             encrypted_key=self.crypto.encrypt(payload.api_key),
             base_url=payload.base_url,
             default_model=payload.default_model,
+            auth_strategy=payload.auth_strategy,
+            api_key_header_name=payload.api_key_header_name,
+            extra_headers=payload.extra_headers,
         )
         db.add(credential)
         await db.flush()

@@ -37,12 +37,18 @@ class FakeVerifier:
         base_url: str | None,
         api_dialect: str,
         default_model: str | None,
+        auth_strategy: str | None,
+        api_key_header_name: str | None,
+        extra_headers: dict[str, str] | None,
     ) -> CredentialVerificationResult:
         assert provider
         assert api_key
         assert base_url is None
         assert api_dialect == OPENAI_DIALECT
         assert default_model == OPENAI_MODEL
+        assert auth_strategy is None
+        assert api_key_header_name is None
+        assert extra_headers is None
         return CredentialVerificationResult(
             verified_at=self.verified_at,
             message="Credential verified",
@@ -91,6 +97,9 @@ def test_create_user_credential_encrypts_and_audits(db, monkeypatch) -> None:
     assert result.provider == "openai"
     assert result.api_dialect == OPENAI_DIALECT
     assert result.default_model == OPENAI_MODEL
+    assert result.auth_strategy is None
+    assert result.api_key_header_name is None
+    assert result.extra_headers is None
     assert result.masked_key == "sk-...1234"
     assert audits[-1].event_type == "credential_create"
 

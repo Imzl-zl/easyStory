@@ -10,9 +10,10 @@ from app.modules.review.engine import ReviewExecutor
 from app.modules.review.engine.contracts import AggregatedReviewResult
 from app.modules.review.models import ReviewAction
 from app.modules.workflow.models import NodeExecution, WorkflowExecution
-from app.shared.runtime.errors import BudgetExceededError, ConfigurationError
+from app.shared.runtime.errors import BudgetExceededError, ConfigurationError, ModelFallbackExhaustedError
 
 from .snapshot_support import load_agent_snapshot, load_skill_snapshot
+from .workflow_runtime_budget_support import build_budget_review_outcome
 from .workflow_runtime_shared import ReviewCycleOutcome
 
 
@@ -33,17 +34,24 @@ class WorkflowRuntimeReviewMixin:
         if not auto_review:
             return ReviewCycleOutcome("passed", content, "generated")
         reviewers = [load_agent_snapshot(workflow.agents_snapshot or {}, item) for item in node.reviewers]
-        aggregated = await self._run_review_round(
-            db,
-            workflow,
-            workflow_config,
-            node,
-            execution,
-            content,
-            reviewers,
-            owner_id=owner_id,
-            review_type="auto_review",
-        )
+        try:
+            aggregated = await self._run_review_round(
+                db,
+                workflow,
+                workflow_config,
+                node,
+                execution,
+                content,
+                reviewers,
+                owner_id=owner_id,
+                review_type="auto_review",
+            )
+        except ModelFallbackExhaustedError as exc:
+            return self._resolve_model_fallback_review_outcome(
+                exc,
+                content=content,
+                content_source="generated",
+            )
         if aggregated.overall_status == "passed":
             return ReviewCycleOutcome("passed", content, "generated")
         if aggregated.execution_failures:
@@ -63,6 +71,38 @@ class WorkflowRuntimeReviewMixin:
             reviewers,
             owner_id,
         )
+
+    async def _resolve_review_outcome(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        execution: NodeExecution,
+        generated_content: str,
+        *,
+        prompt_bundle: dict[str, Any],
+        owner_id: uuid.UUID,
+        generation_budget_error: BudgetExceededError | None,
+    ) -> ReviewCycleOutcome:
+        if generation_budget_error is not None:
+            return build_budget_review_outcome(
+                generation_budget_error,
+                generated_content=generated_content,
+            )
+        try:
+            return await self._run_auto_review(
+                db,
+                workflow,
+                workflow_config,
+                node,
+                execution,
+                generated_content,
+                prompt_bundle=prompt_bundle,
+                owner_id=owner_id,
+            )
+        except BudgetExceededError as exc:
+            return build_budget_review_outcome(exc, generated_content=generated_content)
 
     async def _run_review_round(
         self,
@@ -172,3 +212,20 @@ class WorkflowRuntimeReviewMixin:
             usage_type="review",
         )
         return self._parse_json(raw_output["content"])
+
+    def _resolve_model_fallback_review_outcome(
+        self,
+        exc: ModelFallbackExhaustedError,
+        *,
+        content: str,
+        content_source: str,
+    ) -> ReviewCycleOutcome:
+        if exc.action == "fail":
+            return ReviewCycleOutcome("fail", content, content_source, failure_message=exc.message)
+        return ReviewCycleOutcome(
+            "pause",
+            content,
+            content_source,
+            failure_message=exc.message,
+            pause_reason="model_fallback_exhausted",
+        )

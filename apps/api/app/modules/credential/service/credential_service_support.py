@@ -1,13 +1,20 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from app.modules.credential.infrastructure import CredentialVerificationResult
 from app.modules.credential.models import ModelCredential
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm_protocol import normalize_api_dialect, normalize_custom_base_url
 
+from .credential_connection_support import (
+    copy_extra_headers,
+    normalize_api_key_header_name_override,
+    normalize_auth_strategy_override,
+    normalize_connection_settings,
+    normalize_extra_headers,
+)
 from .dto import CredentialUpdateDTO, CredentialVerifyResultDTO, CredentialViewDTO
 
 MASKED_KEY_MIN_LENGTH = 7
@@ -29,10 +36,14 @@ def apply_update_payload(
 ) -> dict[str, str]:
     changes: dict[str, str] = {}
     update_api_dialect(credential, payload, changes)
+    update_auth_strategy(credential, payload, changes)
+    update_api_key_header_name(credential, payload, changes)
+    update_extra_headers(credential, payload, changes)
     update_display_name(credential, payload, changes)
     update_base_url(credential, payload, changes)
     update_default_model(credential, payload, changes)
     rotate_api_key(credential, payload, encrypt_api_key=encrypt_api_key, changes=changes)
+    normalize_connection_settings(credential)
     return changes
 
 
@@ -46,8 +57,11 @@ def build_credential(
     encrypted_key: str,
     base_url: str | None,
     default_model: str,
+    auth_strategy: str | None,
+    api_key_header_name: str | None,
+    extra_headers: dict[str, str] | None,
 ) -> ModelCredential:
-    return ModelCredential(
+    credential = ModelCredential(
         owner_type=owner_type,
         owner_id=owner_id,
         provider=provider,
@@ -56,8 +70,13 @@ def build_credential(
         encrypted_key=encrypted_key,
         base_url=normalize_base_url(base_url),
         default_model=normalize_default_model(default_model),
+        auth_strategy=auth_strategy,
+        api_key_header_name=api_key_header_name,
+        extra_headers=extra_headers,
         is_active=True,
     )
+    normalize_connection_settings(credential)
+    return credential
 
 
 def update_api_dialect(
@@ -75,6 +94,60 @@ def update_api_dialect(
     credential.api_dialect = api_dialect
     credential.last_verified_at = None
     changes["api_dialect"] = "updated"
+
+
+def update_auth_strategy(
+    credential: ModelCredential,
+    payload: CredentialUpdateDTO,
+    changes: dict[str, str],
+) -> None:
+    if not _field_was_provided(payload, "auth_strategy"):
+        return
+    auth_strategy = normalize_auth_strategy_override(credential.api_dialect, payload.auth_strategy)
+    if auth_strategy == credential.auth_strategy:
+        return
+    credential.auth_strategy = auth_strategy
+    credential.last_verified_at = None
+    changes["auth_strategy"] = "updated"
+
+
+def update_api_key_header_name(
+    credential: ModelCredential,
+    payload: CredentialUpdateDTO,
+    changes: dict[str, str],
+) -> None:
+    if not _field_was_provided(payload, "api_key_header_name"):
+        return
+    header_name = normalize_api_key_header_name_override(
+        credential.api_dialect,
+        credential.auth_strategy,
+        payload.api_key_header_name,
+    )
+    if header_name == credential.api_key_header_name:
+        return
+    credential.api_key_header_name = header_name
+    credential.last_verified_at = None
+    changes["api_key_header_name"] = "updated"
+
+
+def update_extra_headers(
+    credential: ModelCredential,
+    payload: CredentialUpdateDTO,
+    changes: dict[str, str],
+) -> None:
+    if not _field_was_provided(payload, "extra_headers"):
+        return
+    extra_headers = normalize_extra_headers(
+        payload.extra_headers,
+        api_dialect=credential.api_dialect,
+        auth_strategy=credential.auth_strategy,
+        api_key_header_name=credential.api_key_header_name,
+    )
+    if extra_headers == credential.extra_headers:
+        return
+    credential.extra_headers = extra_headers
+    credential.last_verified_at = None
+    changes["extra_headers"] = "updated"
 
 
 def update_display_name(
@@ -155,6 +228,9 @@ def to_view(
         masked_key=mask_key(decrypt_api_key(credential.encrypted_key)),
         base_url=credential.base_url,
         default_model=credential.default_model,
+        auth_strategy=credential.auth_strategy,
+        api_key_header_name=credential.api_key_header_name,
+        extra_headers=copy_extra_headers(credential.extra_headers),
         is_active=credential.is_active,
         last_verified_at=credential.last_verified_at,
     )

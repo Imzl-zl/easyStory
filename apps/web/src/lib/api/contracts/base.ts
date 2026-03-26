@@ -72,6 +72,7 @@ export type CredentialApiDialect =
   | "openai_responses"
   | "anthropic_messages"
   | "gemini_generate_content";
+export type CredentialAuthStrategy = "bearer" | "x_api_key" | "x_goog_api_key" | "custom_header";
 
 export type CredentialView = {
   id: string;
@@ -83,6 +84,9 @@ export type CredentialView = {
   masked_key: string;
   base_url: string | null;
   default_model: string | null;
+  auth_strategy: CredentialAuthStrategy | null;
+  api_key_header_name: string | null;
+  extra_headers: Record<string, string> | null;
   is_active: boolean;
   last_verified_at: string | null;
 };
@@ -96,6 +100,9 @@ export type CredentialCreatePayload = {
   api_key: string;
   base_url?: string | null;
   default_model: string;
+  auth_strategy?: CredentialAuthStrategy | null;
+  api_key_header_name?: string | null;
+  extra_headers?: Record<string, string> | null;
 };
 
 export type CredentialUpdatePayload = {
@@ -104,6 +111,9 @@ export type CredentialUpdatePayload = {
   api_key?: string | null;
   base_url?: string | null;
   default_model?: string | null;
+  auth_strategy?: CredentialAuthStrategy | null;
+  api_key_header_name?: string | null;
+  extra_headers?: Record<string, string> | null;
 };
 
 export type CredentialVerifyResult = {

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,19 +9,18 @@ from app.modules.billing.service import BillingService
 from app.modules.config_registry.schemas.config_schemas import NodeConfig, WorkflowConfig
 from app.modules.content.service import ChapterContentService
 from app.modules.context.engine import ContextBuilder
-from app.modules.credential.models import ModelCredential
 from app.modules.credential.service import CredentialService
 from app.modules.export.service import ExportService
 from app.modules.workflow.models import WorkflowExecution
 from app.shared.runtime import SkillTemplateRenderer, ToolProvider
-from app.shared.runtime.errors import BudgetExceededError, ConfigurationError
-from app.shared.runtime.llm_tool_provider import LLM_GENERATE_TOOL
+from app.shared.runtime.errors import ConfigurationError
 
 from .snapshot_support import build_runtime_snapshot, load_workflow_snapshot, resolve_node_config
 from .workflow_runtime_chapter_candidate_mixin import WorkflowRuntimeChapterCandidateMixin
 from .workflow_runtime_execute_mixin import WorkflowRuntimeExecuteMixin
 from .workflow_runtime_export_mixin import WorkflowRuntimeExportMixin
 from .workflow_runtime_fix_mixin import WorkflowRuntimeFixMixin
+from .workflow_runtime_llm_mixin import WorkflowRuntimeLlmMixin
 from .workflow_runtime_persistence_mixin import WorkflowRuntimePersistenceMixin
 from .workflow_runtime_prompt_mixin import WorkflowRuntimePromptMixin
 from .workflow_runtime_review_mixin import WorkflowRuntimeReviewMixin
@@ -36,6 +34,7 @@ class WorkflowRuntimeService(
     WorkflowRuntimeChapterCandidateMixin,
     WorkflowRuntimeTaskMixin,
     WorkflowRuntimePromptMixin,
+    WorkflowRuntimeLlmMixin,
     WorkflowRuntimeReviewMixin,
     WorkflowRuntimeFixMixin,
     WorkflowRuntimeExportMixin,
@@ -160,75 +159,6 @@ class WorkflowRuntimeService(
         workflow.current_node_id = outcome.next_node_id
         workflow.snapshot = None
         return False
-
-    async def _call_llm(
-        self,
-        db: AsyncSession,
-        workflow: WorkflowExecution,
-        workflow_config: WorkflowConfig,
-        prompt_bundle: dict[str, Any],
-        *,
-        owner_id: uuid.UUID,
-        node_execution_id: uuid.UUID | None,
-        usage_type: str,
-        credential: ModelCredential | None = None,
-    ) -> dict[str, Any]:
-        model = prompt_bundle["model"]
-        credential_service = self._resolve_credential_service()
-        resolved_credential = credential
-        if resolved_credential is None:
-            resolved_credential = await credential_service.resolve_active_credential(
-                db,
-                provider=model.provider or "",
-                user_id=owner_id,
-                project_id=workflow.project_id,
-            )
-        raw_output = await self.tool_provider.execute(
-            LLM_GENERATE_TOOL,
-            {
-                "prompt": prompt_bundle["prompt"],
-                "system_prompt": prompt_bundle["system_prompt"],
-                "model": model.model_dump(mode="json", exclude_none=True),
-                "credential": {
-                    "api_key": credential_service.crypto.decrypt(resolved_credential.encrypted_key),
-                    "api_dialect": resolved_credential.api_dialect,
-                    "base_url": resolved_credential.base_url,
-                    "default_model": resolved_credential.default_model,
-                },
-                "response_format": prompt_bundle["response_format"],
-            },
-        )
-        budget_result = await self.billing_service.record_usage_and_check_budget(
-            db,
-            workflow_execution_id=workflow.id,
-            project_id=workflow.project_id,
-            user_id=owner_id,
-            node_execution_id=node_execution_id,
-            credential_id=resolved_credential.id,
-            usage_type=usage_type,
-            model_name=raw_output.get("model_name") or "",
-            input_tokens=raw_output.get("input_tokens"),
-            output_tokens=raw_output.get("output_tokens"),
-            budget_config=workflow_config.budget,
-        )
-        self._record_budget_warnings(
-            db,
-            workflow_execution_id=workflow.id,
-            node_execution_id=node_execution_id,
-            budget_result=budget_result,
-        )
-        exceeded = budget_result.exceeded_status
-        if exceeded is not None:
-            raise BudgetExceededError(
-                self._budget_exceeded_message(exceeded.scope, exceeded.used_tokens, exceeded.limit_tokens),
-                action=workflow_config.budget.on_exceed,
-                scope=exceeded.scope,
-                used_tokens=exceeded.used_tokens,
-                limit_tokens=exceeded.limit_tokens,
-                usage_type=usage_type,
-                raw_output=raw_output,
-            )
-        return raw_output
 
     def _resolve_credential_service(self) -> CredentialService:
         if self._credential_service is None:

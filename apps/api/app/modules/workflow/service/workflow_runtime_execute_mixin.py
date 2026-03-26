@@ -8,14 +8,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.config_registry.schemas.config_schemas import NodeConfig, WorkflowConfig
 from app.modules.credential.models import ModelCredential
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
-from app.shared.runtime.errors import BudgetExceededError, BusinessRuleError, ConfigurationError
+from app.shared.runtime.errors import (
+    BudgetExceededError,
+    BusinessRuleError,
+    ConfigurationError,
+    ModelFallbackExhaustedError,
+)
 
 from .snapshot_support import resolve_next_node_id
 from .workflow_runtime_budget_support import (
-    build_budget_review_outcome,
     build_chapter_split_budget_outcome,
     build_completed_snapshot,
     ensure_chapter_split_budget_action_supported,
+)
+from .workflow_runtime_outcome_support import (
+    build_failure_snapshot,
+    build_model_fallback_node_outcome,
+    resolve_review_pause_reason,
 )
 from .workflow_runtime_shared import NodeOutcome, ReviewCycleOutcome, WAITING_CONFIRM_TASK_STATUS
 
@@ -57,6 +66,13 @@ class WorkflowRuntimeExecuteMixin:
             except BudgetExceededError as exc:
                 budget_error = exc
                 raw_output = exc.raw_output
+            except ModelFallbackExhaustedError as exc:
+                self._fail_execution(db, execution, started_at, BusinessRuleError(exc.message))
+                return build_model_fallback_node_outcome(
+                    exc,
+                    execution_id=execution.id,
+                    next_node_id=node.id,
+                )
             chapters = self._parse_chapter_split_output(raw_output["content"])
             if budget_error is not None:
                 ensure_chapter_split_budget_action_supported(budget_error)
@@ -131,6 +147,16 @@ class WorkflowRuntimeExecuteMixin:
                 review_outcome,
             )
             return self._finalize_chapter_execution(db, task, execution, started_at, review_outcome, candidate)
+        except ModelFallbackExhaustedError as exc:
+            task.status = "failed"
+            self._fail_execution(db, execution, started_at, BusinessRuleError(exc.message))
+            return build_model_fallback_node_outcome(
+                exc,
+                execution_id=execution.id,
+                next_node_id=execution.node_id,
+                chapter_number=task.chapter_number,
+                content_id=task.content_id,
+            )
         except Exception as exc:
             task.status = "failed"
             self._fail_execution(db, execution, started_at, exc)
@@ -177,38 +203,6 @@ class WorkflowRuntimeExecuteMixin:
         if not isinstance(content, str):
             raise ConfigurationError("Chapter generate output must be plain text")
         return prompt_bundle, credential, raw_output, content, budget_error
-
-    async def _resolve_review_outcome(
-        self,
-        db: AsyncSession,
-        workflow: WorkflowExecution,
-        workflow_config: WorkflowConfig,
-        node: NodeConfig,
-        execution,
-        generated_content: str,
-        *,
-        prompt_bundle: dict,
-        owner_id: uuid.UUID,
-        generation_budget_error: BudgetExceededError | None,
-    ) -> ReviewCycleOutcome:
-        if generation_budget_error is not None:
-            return build_budget_review_outcome(
-                generation_budget_error,
-                generated_content=generated_content,
-            )
-        try:
-            return await self._run_auto_review(
-                db,
-                workflow,
-                workflow_config,
-                node,
-                execution,
-                generated_content,
-                prompt_bundle=prompt_bundle,
-                owner_id=owner_id,
-            )
-        except BudgetExceededError as exc:
-            return build_budget_review_outcome(exc, generated_content=generated_content)
 
     def _finalize_chapter_execution(
         self,
@@ -257,7 +251,7 @@ class WorkflowRuntimeExecuteMixin:
             )
             return NodeOutcome(
                 next_node_id=execution.node_id,
-                pause_reason=self._pause_reason(review_outcome),
+                pause_reason=resolve_review_pause_reason(review_outcome),
                 snapshot_extra=self._chapter_snapshot(execution, task),
             )
         task.status = "failed"
@@ -269,18 +263,10 @@ class WorkflowRuntimeExecuteMixin:
         )
         return NodeOutcome(
             next_node_id=execution.node_id,
-            snapshot_extra=self._failure_snapshot(execution, task),
+            snapshot_extra=build_failure_snapshot(
+                execution_id=execution.id,
+                chapter_number=task.chapter_number,
+                content_id=task.content_id,
+            ),
             workflow_status="failed",
         )
-
-    def _pause_reason(self, review_outcome: ReviewCycleOutcome) -> str:
-        if review_outcome.pause_reason is not None:
-            return review_outcome.pause_reason
-        return "review_failed"
-
-    def _failure_snapshot(self, execution, task: ChapterTask) -> dict[str, str | int | None]:
-        return {
-            "current_node_execution_id": str(execution.id),
-            "current_chapter_number": task.chapter_number,
-            "content_id": str(task.content_id) if task.content_id is not None else None,
-        }

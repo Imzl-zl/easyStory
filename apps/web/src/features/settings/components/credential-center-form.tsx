@@ -4,7 +4,9 @@ import { useState } from "react";
 
 import {
   API_DIALECT_OPTIONS,
+  AUTH_STRATEGY_OPTIONS,
   createInitialCredentialForm,
+  getDefaultAuthStrategy,
   getDefaultBaseUrl,
   type CredentialFormState,
 } from "@/features/settings/components/credential-center-support";
@@ -108,6 +110,64 @@ export function CredentialCenterForm({
         value={formState.defaultModel}
         onChange={(value) => setFormState((current) => ({ ...current, defaultModel: value }))}
       />
+      <div className="panel-muted space-y-4 p-4">
+        <div className="space-y-1">
+          <h4 className="font-serif text-base font-semibold">高级兼容设置</h4>
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            只在上游不是标准官方接口时再改这里。默认情况下，保持“跟随接口类型默认”即可。
+          </p>
+        </div>
+        <label className="block">
+          <span className="label-text">鉴权方式</span>
+          <select
+            className="ink-input"
+            value={formState.authStrategy}
+            onChange={(event) =>
+              setFormState((current) => {
+                const nextAuthStrategy = event.target.value;
+                return {
+                  ...current,
+                  authStrategy: nextAuthStrategy as typeof current.authStrategy,
+                  apiKeyHeaderName: nextAuthStrategy === "custom_header" ? current.apiKeyHeaderName : "",
+                };
+              })
+            }
+          >
+            {AUTH_STRATEGY_OPTIONS.map((option) => (
+              <option key={option.value || "default"} value={option.value}>
+                {option.label} · {option.description}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-xs text-[var(--text-secondary)]">
+            当前接口类型默认使用 {getDefaultAuthStrategy(formState.apiDialect)}。
+          </p>
+        </label>
+        <FieldInput
+          disabled={formState.authStrategy !== "custom_header"}
+          label="API Key Header 名称"
+          placeholder="例如：api-key"
+          value={formState.apiKeyHeaderName}
+          onChange={(value) => setFormState((current) => ({ ...current, apiKeyHeaderName: value }))}
+        />
+        <label className="block">
+          <span className="label-text">额外请求头</span>
+          <textarea
+            className="ink-input min-h-32"
+            placeholder={'例如：{\n  "HTTP-Referer": "https://app.example.com",\n  "X-Title": "easyStory"\n}'}
+            value={formState.extraHeadersText}
+            onChange={(event) =>
+              setFormState((current) => ({ ...current, extraHeadersText: event.target.value }))
+            }
+          />
+          <p className="mt-2 text-xs text-[var(--text-secondary)]">
+            请输入 JSON 对象。这里适合放 Referer、租户标识、上游要求的自定义 Header。
+          </p>
+          <p className="mt-2 text-xs text-[var(--text-secondary)]">
+            这里只支持非敏感元数据请求头；鉴权、Token、Secret 一类请求头请改用上面的鉴权方式配置。
+          </p>
+        </label>
+      </div>
       {feedback?.message ? (
         <div
           className={

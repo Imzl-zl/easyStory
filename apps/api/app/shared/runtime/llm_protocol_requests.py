@@ -3,15 +3,20 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import quote, urlsplit
 
+from .errors import ConfigurationError
 from .llm_endpoint_policy import normalize_custom_base_url
 from .llm_protocol_types import (
+    ANTHROPIC_VERSION,
     DEFAULT_BASE_URLS,
     JSON_OBJECT_RESPONSE_FORMAT,
     LLMConnection,
     LLMGenerateRequest,
     PreparedLLMHttpRequest,
+    VERIFY_MAX_TOKENS,
     VERIFY_MODEL_REPLY,
     normalize_api_dialect,
+    resolve_api_key_header_name,
+    resolve_auth_strategy,
     resolve_model_name,
 )
 
@@ -38,10 +43,10 @@ def build_verification_request(connection: LLMConnection) -> PreparedLLMHttpRequ
             connection=connection,
             model_name=model_name,
             prompt=VERIFY_MODEL_REPLY,
-            system_prompt="Reply with plain text ok.",
+            system_prompt="请直接回复这句话本身，不要添加额外内容。",
             response_format="text",
             temperature=0.0,
-            max_tokens=8,
+            max_tokens=VERIFY_MAX_TOKENS,
             top_p=1.0,
         )
     )
@@ -58,7 +63,7 @@ def _build_openai_chat_request(request: LLMGenerateRequest) -> PreparedLLMHttpRe
     return PreparedLLMHttpRequest(
         method="POST",
         url=_join_endpoint(request.connection, "/v1/chat/completions"),
-        headers=_build_bearer_headers(request.connection.api_key),
+        headers=_build_request_headers(request.connection),
         json_body=body,
     )
 
@@ -76,7 +81,7 @@ def _build_openai_responses_request(request: LLMGenerateRequest) -> PreparedLLMH
     return PreparedLLMHttpRequest(
         method="POST",
         url=_join_endpoint(request.connection, "/v1/responses"),
-        headers=_build_bearer_headers(request.connection.api_key),
+        headers=_build_request_headers(request.connection),
         json_body=body,
     )
 
@@ -88,7 +93,7 @@ def _build_anthropic_messages_request(request: LLMGenerateRequest) -> PreparedLL
         "messages": [{"role": "user", "content": request.prompt}],
     }
     if request.system_prompt:
-        body["system"] = request.system_prompt
+        body["system"] = [{"type": "text", "text": request.system_prompt}]
     if request.temperature is not None:
         body["temperature"] = request.temperature
     if request.top_p is not None:
@@ -98,7 +103,10 @@ def _build_anthropic_messages_request(request: LLMGenerateRequest) -> PreparedLL
     return PreparedLLMHttpRequest(
         method="POST",
         url=_join_endpoint(request.connection, "/v1/messages"),
-        headers=_build_anthropic_headers(request.connection.api_key),
+        headers=_build_request_headers(
+            request.connection,
+            extra_headers={"anthropic-version": ANTHROPIC_VERSION},
+        ),
         json_body=body,
     )
 
@@ -115,7 +123,7 @@ def _build_gemini_generate_content_request(request: LLMGenerateRequest) -> Prepa
     return PreparedLLMHttpRequest(
         method="POST",
         url=_build_gemini_endpoint(request.connection, request.model_name),
-        headers=_build_gemini_headers(request.connection.api_key),
+        headers=_build_request_headers(request.connection),
         json_body=body,
     )
 
@@ -193,17 +201,28 @@ def _resolve_base_path(base_url: str) -> str:
     return path or "/"
 
 
-def _build_bearer_headers(api_key: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+def _build_request_headers(
+    connection: LLMConnection,
+    *,
+    extra_headers: dict[str, str] | None = None,
+) -> dict[str, str]:
+    headers = dict(connection.extra_headers or {})
+    headers["Content-Type"] = "application/json"
+    headers.update(_build_auth_headers(connection))
+    if extra_headers:
+        headers.update(extra_headers)
+    return headers
 
 
-def _build_anthropic_headers(api_key: str) -> dict[str, str]:
-    return {
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-    }
-
-
-def _build_gemini_headers(api_key: str) -> dict[str, str]:
-    return {"x-goog-api-key": api_key, "Content-Type": "application/json"}
+def _build_auth_headers(connection: LLMConnection) -> dict[str, str]:
+    strategy = resolve_auth_strategy(connection.api_dialect, connection.auth_strategy)
+    if strategy == "bearer":
+        return {"Authorization": f"Bearer {connection.api_key}"}
+    header_name = resolve_api_key_header_name(
+        api_dialect=connection.api_dialect,
+        auth_strategy=connection.auth_strategy,
+        api_key_header_name=connection.api_key_header_name,
+    )
+    if header_name is None:
+        raise ConfigurationError("Missing API key header name for auth strategy")
+    return {header_name: connection.api_key}

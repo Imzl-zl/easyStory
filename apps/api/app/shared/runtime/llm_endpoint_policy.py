@@ -4,6 +4,7 @@ from ipaddress import ip_address
 from urllib.parse import urlsplit
 
 from app.shared.settings import (
+    ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV,
     ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV,
     get_settings,
 )
@@ -38,8 +39,7 @@ def _validate_custom_base_url(base_url: str) -> None:
     if _is_private_hostname(hostname):
         _validate_private_endpoint(parsed.scheme)
         return
-    if parsed.scheme not in PUBLIC_ENDPOINT_SCHEMES:
-        raise ConfigurationError("base_url for public model endpoints must use https")
+    _validate_public_endpoint(parsed.scheme)
 
 
 def _validate_url_structure(parsed, base_url: str) -> str:
@@ -62,6 +62,19 @@ def _validate_private_endpoint(scheme: str) -> None:
         )
     if scheme not in PRIVATE_ENDPOINT_SCHEMES:
         raise ConfigurationError("base_url for private model endpoints must use http or https")
+
+
+def _validate_public_endpoint(scheme: str) -> None:
+    if scheme in PUBLIC_ENDPOINT_SCHEMES:
+        return
+    if scheme != "http":
+        raise ConfigurationError("base_url for public model endpoints must use https")
+    if get_settings().allow_insecure_public_model_endpoints:
+        return
+    raise ConfigurationError(
+        "Public http model endpoints are disabled. "
+        f"Set {ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV}=true to allow them."
+    )
 
 
 def _is_private_hostname(hostname: str) -> bool:

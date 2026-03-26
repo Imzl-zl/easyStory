@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.config_registry import ConfigLoader
 from app.modules.config_registry.schemas.config_schemas import ModelConfig, NodeConfig, SkillConfig, WorkflowConfig
 from app.modules.credential.service import CredentialService
+from app.modules.credential.service.credential_connection_support import build_runtime_credential_payload
 from app.modules.project.models import Project
 from app.modules.project.schemas import ProjectSettingProjectionError, resolve_setting_variable
 from app.modules.project.service import ProjectService
@@ -247,12 +248,10 @@ class StoryAssetGenerationService:
                 "prompt": prompt,
                 "system_prompt": None,
                 "model": model.model_dump(mode="json", exclude_none=True),
-                "credential": {
-                    "api_key": credential_service.crypto.decrypt(credential.encrypted_key),
-                    "api_dialect": credential.api_dialect,
-                    "base_url": credential.base_url,
-                    "default_model": credential.default_model,
-                },
+                "credential": build_runtime_credential_payload(
+                    credential,
+                    decrypt_api_key=credential_service.crypto.decrypt,
+                ),
                 "response_format": "text",
             },
         )

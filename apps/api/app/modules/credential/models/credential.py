@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.shared.db.base import Base, TimestampMixin, UUIDMixin
@@ -18,5 +18,8 @@ class ModelCredential(Base, TimestampMixin, UUIDMixin):
     encrypted_key: Mapped[str] = mapped_column(Text)
     base_url: Mapped[str | None] = mapped_column(String(500))
     default_model: Mapped[str | None] = mapped_column(String(100))
+    auth_strategy: Mapped[str | None] = mapped_column(String(50))
+    api_key_header_name: Mapped[str | None] = mapped_column(String(100))
+    extra_headers: Mapped[dict[str, str] | None] = mapped_column(JSON)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
