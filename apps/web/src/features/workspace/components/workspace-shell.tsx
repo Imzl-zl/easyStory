@@ -12,9 +12,9 @@ const PROJECT_PATH_PATTERN = /^\/workspace\/project\/([^/]+)\//;
 const PROJECT_SETTINGS_PATH_PATTERN = /^\/workspace\/project\/[^/]+\/settings(?:\/|$)/;
 const LOBBY_PATH_PREFIX = "/workspace/lobby";
 const PROJECT_WORKSPACE_ITEMS = [
-  { segment: "studio", label: "Studio" },
-  { segment: "engine", label: "Engine" },
-  { segment: "lab", label: "Lab" },
+  { segment: "studio", label: "工作室" },
+  { segment: "engine", label: "引擎" },
+  { segment: "lab", label: "实验室" },
 ];
 
 export function WorkspaceShell({
@@ -31,7 +31,7 @@ export function WorkspaceShell({
   const workspaceItems = useMemo(() => {
     const projectId = currentProjectId ?? lastProjectId;
     return [
-      { href: "/workspace/lobby", label: "Lobby", segment: "lobby", disabled: false },
+      { href: "/workspace/lobby", label: "项目大厅", segment: "lobby", disabled: false },
       ...PROJECT_WORKSPACE_ITEMS.map((item) => ({
         href: projectId ? `/workspace/project/${projectId}/${item.segment}` : null,
         label: item.label,
@@ -58,7 +58,7 @@ export function WorkspaceShell({
               </p>
               <h1 className="font-serif text-3xl leading-tight font-semibold">水墨流工作台</h1>
               <p className="text-sm leading-6 text-[var(--text-secondary)]">
-                Web 版工作台，固定 `Lobby / Studio / Engine / Lab` 四柱结构。
+                项目管理、内容创作、工作流控制、风格分析，一站搞定。
               </p>
             </div>
 
@@ -75,7 +75,7 @@ export function WorkspaceShell({
                     >
                       <span>{item.label}</span>
                       <span className="text-xs uppercase tracking-[0.18em]">
-                        {item.label === "Lobby" ? "Projects" : "Project"}
+                        {item.label === "项目大厅" ? "项目" : "当前项目"}
                       </span>
                     </Link>
                   ) : (
@@ -87,7 +87,7 @@ export function WorkspaceShell({
                       type="button"
                     >
                       <span>{item.label}</span>
-                      <span className="text-xs uppercase tracking-[0.18em]">选择</span>
+                      <span className="text-xs uppercase tracking-[0.18em]">选择项目</span>
                     </button>
                   )
                 );
@@ -102,7 +102,7 @@ export function WorkspaceShell({
               </p>
               <p className="mt-2 font-medium">{user?.username ?? "未登录"}</p>
               <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
-                前端默认直连 FastAPI，未启用静默 mock。
+                点击下方按钮安全退出当前账号。
               </p>
             </div>
             <button className="ink-button-secondary w-full" onClick={() => clearSession()}>

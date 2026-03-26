@@ -57,28 +57,27 @@ export function AuthForm({ mode }: AuthFormProps) {
                 {title}
               </h1>
               <p className="max-w-2xl text-base leading-8 text-[var(--text-secondary)]">
-                当前版本按真实后端能力收口，保持 `Auth / Lobby / Studio / Engine / Lab`
-                四柱工作台。前端不假装拥有尚未落地的能力，错误会直接暴露。
+                从大纲到成稿，AI 辅助你完成整个创作流程。写作、审核、导出，一站搞定。
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="panel-muted p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-[var(--text-secondary)]">
-                  Studio
+                  工作室
                 </p>
-                <p className="mt-2 text-sm leading-6">内容资产与章节版本集中在同一张写作桌面。</p>
+                <p className="mt-2 text-sm leading-6">编写章节、管理版本，一站式内容创作。</p>
               </div>
               <div className="panel-muted p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-[var(--text-secondary)]">
-                  Engine
+                  引擎
                 </p>
-                <p className="mt-2 text-sm leading-6">执行监控、审核、账单和导出都围绕当前工作流展开。</p>
+                <p className="mt-2 text-sm leading-6">控制工作流执行，监控生成进度。</p>
               </div>
               <div className="panel-muted p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-[var(--text-secondary)]">
-                  Lab
+                  实验室
                 </p>
-                <p className="mt-2 text-sm leading-6">分析记录、结果细节与结构化建议保持独立工作台。</p>
+                <p className="mt-2 text-sm leading-6">分析文风特征，提取创作参考。</p>
               </div>
             </div>
           </div>
@@ -93,7 +92,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               <p className="text-sm leading-6 text-[var(--text-secondary)]">
                 {mode === "login"
                   ? "使用已有账号进入工作台。"
-                  : "注册成功后会直接签发 bearer token 并进入项目大厅。"}
+                  : "注册成功后即可进入项目大厅开始创作。"}
               </p>
             </div>
 

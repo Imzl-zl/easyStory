@@ -22,7 +22,7 @@ export function LobbyEntryCard({
       <div className="space-y-1">
         <h3 className="font-serif text-lg font-semibold">创建项目</h3>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          模板问答、自由描述和模板建项目已经独立出来，Lobby 不再内联承担创建状态。
+          选择模板或通过问答引导，快速创建新项目。
         </p>
       </div>
       <dl className="grid gap-3 text-sm text-[var(--text-secondary)]">
@@ -31,7 +31,7 @@ export function LobbyEntryCard({
           <dd>{templatesLoading ? "加载中..." : templateCount}</dd>
         </div>
         <div className="flex justify-between gap-4">
-          <dt>推荐入口</dt>
+          <dt>推荐方式</dt>
           <dd>模板问答 / 自由描述</dd>
         </div>
       </dl>
@@ -52,7 +52,7 @@ export function LobbyEntryCard({
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Link className="ink-button flex-1 justify-center" href="/workspace/lobby/new">
-          进入 Incubator
+          创建项目
         </Link>
         <Link className="ink-button-secondary flex-1 justify-center" href="/workspace/lobby/templates">
           模板库
