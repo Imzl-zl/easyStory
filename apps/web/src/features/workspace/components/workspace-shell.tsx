@@ -71,7 +71,11 @@ export function WorkspaceShell({
           onLogout={clearSession}
           onToggle={() => setSidebarPreference(getNextSidebarPreference(sidebarPreference))}
         />
-        <main className={`${styles.content} space-y-6`}>{children}</main>
+        <main className={styles.content}>
+          <div className={styles.contentFrame}>
+            <div className={`${styles.contentInner} space-y-6`}>{children}</div>
+          </div>
+        </main>
       </div>
     </AuthGuard>
   );
@@ -97,19 +101,28 @@ function WorkspaceSidebar({
   userName: string;
 }>) {
   return (
-    <aside className={`${styles.sidebar} panel-shell flex flex-col gap-4 p-4 lg:justify-between lg:p-5`} data-collapsed={isCollapsed}>
-      <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <WorkspaceSidebarBrand />
-          {shouldShowWorkspaceSidebarToggle(isMobileViewport) ? (
-            <WorkspaceSidebarToggle
-              isCollapsed={isCollapsed}
-              sidebarPreference={sidebarPreference}
-              onToggle={onToggle}
-            />
-          ) : null}
+    <aside
+      aria-label="工作台导航"
+      className={`${styles.sidebar} panel-shell flex flex-col gap-4 p-4 lg:justify-between lg:p-5`}
+      data-collapsed={isCollapsed}
+    >
+      <div className={styles.sidebarTop}>
+        <div className={styles.brandPanel}>
+          <div className="flex items-start justify-between gap-3">
+            <WorkspaceSidebarBrand />
+            {shouldShowWorkspaceSidebarToggle(isMobileViewport) ? (
+              <WorkspaceSidebarToggle
+                isCollapsed={isCollapsed}
+                sidebarPreference={sidebarPreference}
+                onToggle={onToggle}
+              />
+            ) : null}
+          </div>
         </div>
-        <WorkspaceSidebarNav items={items} pathname={pathname} />
+        <div className={styles.navSection}>
+          <p className={styles.sectionLabel}>主导航</p>
+          <WorkspaceSidebarNav items={items} pathname={pathname} />
+        </div>
       </div>
       <WorkspaceSidebarSession isCollapsed={isCollapsed} userName={userName} onLogout={onLogout} />
     </aside>
@@ -188,7 +201,7 @@ function WorkspaceSidebarNavItem({
       <span aria-hidden="true" className={styles.glyph}>{item.shortLabel}</span>
       <span className={styles.navCopy}>
         <span className={styles.navLabel}>{item.label}</span>
-        <span className={`${styles.navMeta} text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]`}>
+        <span className={`${styles.navMeta} text-xs`}>
           {navMeta}
         </span>
       </span>
@@ -201,6 +214,7 @@ function WorkspaceSidebarNavItem({
         aria-label={item.label}
         className={`ink-tab ${styles.navItem}`}
         data-active={isWorkspaceItemActive(item, pathname)}
+        data-disabled={false}
         href={item.href}
         title={item.label}
       >
@@ -213,6 +227,7 @@ function WorkspaceSidebarNavItem({
       aria-label={item.label}
       className={`ink-tab ${styles.navItem}`}
       data-active={false}
+      data-disabled
       disabled
       title={item.label}
       type="button"

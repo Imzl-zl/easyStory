@@ -7,9 +7,9 @@ type SectionCardProps = {
 
 export function SectionCard({ title, description, action, children }: SectionCardProps) {
   return (
-    <section className="panel-shell p-6">
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
+    <section className="section-card panel-shell">
+      <header className="section-card__header">
+        <div className="section-card__copy">
           <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)]">{title}</h2>
           {description ? (
             <p className="max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
@@ -19,7 +19,7 @@ export function SectionCard({ title, description, action, children }: SectionCar
         </div>
         {action}
       </header>
-      {children}
+      <div className="section-card__body">{children}</div>
     </section>
   );
 }

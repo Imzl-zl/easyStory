@@ -4,9 +4,9 @@ const PROJECT_PATH_PATTERN = /^\/workspace\/project\/([^/]+)\//;
 const PROJECT_SETTINGS_PATH_PATTERN = /^\/workspace\/project\/[^/]+\/settings(?:\/|$)/;
 const LOBBY_PATH_PREFIX = "/workspace/lobby";
 const PROJECT_WORKSPACE_ITEMS = [
-  { label: "工作室", meta: "当前项目", segment: "studio", shortLabel: "作" },
-  { label: "引擎", meta: "当前项目", segment: "engine", shortLabel: "引" },
-  { label: "实验室", meta: "当前项目", segment: "lab", shortLabel: "析" },
+  { label: "工作室", meta: "创作编辑", segment: "studio", shortLabel: "作" },
+  { label: "引擎", meta: "执行控制", segment: "engine", shortLabel: "控" },
+  { label: "实验室", meta: "分析结果", segment: "lab", shortLabel: "析" },
 ] as const;
 const WORKSPACE_SIDEBAR_WIDTH = {
   collapsed: "72px",
@@ -34,9 +34,9 @@ export function buildWorkspaceItems(
       disabled: false,
       href: "/workspace/lobby",
       label: "项目大厅",
-      meta: "项目",
+      meta: "项目总览",
       segment: "lobby",
-      shortLabel: "厅",
+      shortLabel: "项",
     },
     ...PROJECT_WORKSPACE_ITEMS.map((item) => ({
       disabled: projectId === null,
@@ -97,5 +97,5 @@ export function resolveWorkspaceUserBadge(username: string | null | undefined) {
 }
 
 export function shouldShowWorkspaceSidebarToggle(isMobileViewport: boolean) {
-  return true;
+  return !isMobileViewport;
 }
