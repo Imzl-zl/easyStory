@@ -13,7 +13,7 @@ test("resolveCredentialActionFeedback keeps verify success message user-facing",
   };
 
   assert.deepEqual(resolveCredentialActionFeedback(result, "verify"), {
-    message: "模型连接验证成功。",
+    message: "验证成功 · 03/25 06:08 UTC",
     tone: "info",
   });
 });
