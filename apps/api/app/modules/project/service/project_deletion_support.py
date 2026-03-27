@@ -110,13 +110,20 @@ def ensure_project_is_soft_deleted(project: Project) -> None:
         raise BusinessRuleError(PHYSICAL_DELETE_REQUIRES_SOFT_DELETE_MESSAGE)
 
 
-def build_deleted_project_statement(
+def ensure_positive_project_trash_value(value: int, *, field_name: str) -> int:
+    if value <= 0:
+        raise BusinessRuleError(f"{field_name} must be greater than 0")
+    return value
+
+
+def _apply_deleted_project_filters(
+    statement,
     *,
     owner_id: uuid.UUID | None,
     deleted_before: datetime | None = None,
     limit: int | None = None,
 ):
-    statement = select(Project).where(Project.deleted_at.is_not(None))
+    statement = statement.where(Project.deleted_at.is_not(None))
     if owner_id is not None:
         statement = statement.where(Project.owner_id == owner_id)
     if deleted_before is not None:
@@ -124,6 +131,50 @@ def build_deleted_project_statement(
     statement = statement.order_by(Project.deleted_at.asc(), Project.id.asc())
     if limit is not None:
         statement = statement.limit(limit)
+    return statement
+
+
+def build_deleted_project_statement(
+    *,
+    owner_id: uuid.UUID | None,
+    deleted_before: datetime | None = None,
+    limit: int | None = None,
+):
+    statement = select(Project)
+    return _apply_deleted_project_filters(
+        statement,
+        owner_id=owner_id,
+        deleted_before=deleted_before,
+        limit=limit,
+    )
+
+
+def build_deleted_project_id_statement(
+    *,
+    owner_id: uuid.UUID | None,
+    deleted_before: datetime | None = None,
+    limit: int | None = None,
+):
+    statement = select(Project.id)
+    return _apply_deleted_project_filters(
+        statement,
+        owner_id=owner_id,
+        deleted_before=deleted_before,
+        limit=limit,
+    )
+
+
+def build_soft_deleted_project_statement(
+    project_id: uuid.UUID,
+    *,
+    owner_id: uuid.UUID | None,
+):
+    statement = select(Project).where(
+        Project.id == project_id,
+        Project.deleted_at.is_not(None),
+    )
+    if owner_id is not None:
+        statement = statement.where(Project.owner_id == owner_id)
     return statement
 
 

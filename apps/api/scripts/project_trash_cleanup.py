@@ -25,17 +25,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--retention-days",
-        type=int,
+        type=_positive_int,
         default=DEFAULT_PROJECT_TRASH_RETENTION_DAYS,
         help="Delete projects soft-deleted for at least this many days.",
     )
     parser.add_argument(
         "--batch-size",
-        type=int,
+        type=_positive_int,
         default=DEFAULT_PROJECT_TRASH_BATCH_SIZE,
         help="Maximum number of projects to delete in one run.",
     )
     return parser
+
+
+def _positive_int(raw_value: str) -> int:
+    value = int(raw_value)
+    if value <= 0:
+        raise argparse.ArgumentTypeError("must be greater than 0")
+    return value
 
 
 def main() -> int:

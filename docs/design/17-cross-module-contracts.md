@@ -191,6 +191,8 @@ ProjectDeletionService 提供三个操作：
 - 软删除 / 恢复只作用于 **Project aggregate**
 - `Content`、`WorkflowExecution`、`Export`、`StoryFact` 等关联数据在项目进入回收站时继续保留，但不提供各自独立的“软删除/恢复”能力
 - 只有 `physical_delete` 才按依赖顺序级联清理关联数据
+- 批量清理（手动清空 / 过期清理脚本）只先枚举 `project_id`，真正删除前必须重新确认项目仍处于软删除状态；若项目已恢复，则本次清理显式跳过
+- 批量清理返回结构化结果：`deleted_count / skipped_count / failed_count` 与对应项目列表，避免“部分成功但整个请求报错”掩盖真实结果
 
 ---
 

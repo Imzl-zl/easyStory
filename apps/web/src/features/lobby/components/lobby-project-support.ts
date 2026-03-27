@@ -1,5 +1,5 @@
 import { formatObservabilityDateTime } from "@/features/observability/components/observability-datetime-support";
-import type { ProjectSummary } from "@/lib/api/types";
+import type { ProjectSummary, ProjectTrashCleanupResult } from "@/lib/api/types";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -67,9 +67,30 @@ export function resolveEmptyTrashButtonLabel(isPending: boolean): string {
   return isPending ? "清空中..." : "清空回收站";
 }
 
-export function resolveEmptyTrashFeedback(deletedCount: number): string {
-  if (deletedCount === 0) {
+export function resolveEmptyTrashFeedback(result: ProjectTrashCleanupResult): string {
+  if (
+    result.deleted_count === 0 &&
+    result.skipped_count === 0 &&
+    result.failed_count === 0
+  ) {
     return "回收站已经是空的。";
   }
-  return `已清空回收站，共彻底删除 ${deletedCount} 个项目。`;
+  if (result.failed_count === 0 && result.skipped_count === 0) {
+    return `已清空回收站，共彻底删除 ${result.deleted_count} 个项目。`;
+  }
+  const segments: string[] = [];
+  if (result.deleted_count > 0) {
+    segments.push(`已彻底删除 ${result.deleted_count} 个项目`);
+  }
+  if (result.skipped_count > 0) {
+    segments.push(`跳过 ${result.skipped_count} 个已恢复项目`);
+  }
+  if (result.failed_count > 0) {
+    segments.push(`另有 ${result.failed_count} 个项目清理异常`);
+  }
+  const summary = `${segments.join("，")}。`;
+  if (result.failed_count === 0) {
+    return summary;
+  }
+  return `${summary}请稍后重试或查看后端日志。`;
 }

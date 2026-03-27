@@ -348,7 +348,13 @@ async def test_project_api_empties_current_user_trash(monkeypatch, tmp_path) -> 
                 headers=_auth_headers(owner_id),
             )
             assert response.status_code == 200
-            assert response.json()["deleted_count"] == 2
+            assert response.json() == {
+                "deleted_count": 2,
+                "skipped_count": 0,
+                "failed_count": 0,
+                "skipped_project_ids": [],
+                "failed_items": [],
+            }
 
         with session_factory() as session:
             assert session.get(Project, first_project_id) is None
@@ -356,6 +362,8 @@ async def test_project_api_empties_current_user_trash(monkeypatch, tmp_path) -> 
             assert session.get(Project, outsider_project_id) is not None
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
 async def test_project_api_hides_other_users_project(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
     session_factory, async_session_factory, engine, async_engine, database_path = (

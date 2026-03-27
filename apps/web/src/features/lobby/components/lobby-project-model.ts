@@ -88,7 +88,7 @@ function useEmptyTrashMutation(
   return useMutation({
     mutationFn: emptyTrash,
     onSuccess: async (result) => {
-      setFeedback(resolveEmptyTrashFeedback(result.deleted_count));
+      setFeedback(resolveEmptyTrashFeedback(result));
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
     onError: (error) => setFeedback(getErrorMessage(error)),

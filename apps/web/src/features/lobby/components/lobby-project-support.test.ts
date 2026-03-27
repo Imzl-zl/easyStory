@@ -60,6 +60,34 @@ test("lobby project support resolves action and feedback copy", () => {
   assert.equal(resolveProjectActionButtonLabel("physicalDelete", false), "彻底删除");
   assert.equal(resolveProjectActionSuccessMessage("physicalDelete"), "项目已彻底删除。");
   assert.equal(resolveEmptyTrashButtonLabel(true), "清空中...");
-  assert.equal(resolveEmptyTrashFeedback(0), "回收站已经是空的。");
-  assert.equal(resolveEmptyTrashFeedback(3), "已清空回收站，共彻底删除 3 个项目。");
+  assert.equal(
+    resolveEmptyTrashFeedback({
+      deleted_count: 0,
+      skipped_count: 0,
+      failed_count: 0,
+      skipped_project_ids: [],
+      failed_items: [],
+    }),
+    "回收站已经是空的。",
+  );
+  assert.equal(
+    resolveEmptyTrashFeedback({
+      deleted_count: 3,
+      skipped_count: 0,
+      failed_count: 0,
+      skipped_project_ids: [],
+      failed_items: [],
+    }),
+    "已清空回收站，共彻底删除 3 个项目。",
+  );
+  assert.equal(
+    resolveEmptyTrashFeedback({
+      deleted_count: 1,
+      skipped_count: 1,
+      failed_count: 1,
+      skipped_project_ids: ["project-2"],
+      failed_items: [{ project_id: "project-3", message: "项目清理失败" }],
+    }),
+    "已彻底删除 1 个项目，跳过 1 个已恢复项目，另有 1 个项目清理异常。请稍后重试或查看后端日志。",
+  );
 });

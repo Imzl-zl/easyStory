@@ -64,8 +64,17 @@ export type ProjectDetail = ProjectSummary & {
   project_setting: ProjectSetting | null;
 };
 
+export type ProjectTrashCleanupFailure = {
+  project_id: string;
+  message: string;
+};
+
 export type ProjectTrashCleanupResult = {
   deleted_count: number;
+  skipped_count: number;
+  failed_count: number;
+  skipped_project_ids: string[];
+  failed_items: ProjectTrashCleanupFailure[];
 };
 
 export type SettingCompletenessIssue = {

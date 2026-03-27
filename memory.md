@@ -114,3 +114,4 @@
 - 2026-03-27：完成前端审查 follow-up 修复：`EnginePageStatusSection` 的 banner 改用稳定 `id` 作为 React key，`WorkspaceNavIcon` 改为穷尽式分支，侧栏会话按钮移除死 `data-collapsed` 属性，并删除未使用的全局 `.skip-link` 样式；前端 `tsc/lint/test:unit` 通过
 - 2026-03-27：完成 Studio 顶部 Tab 化：`StudioPage` 已改为页头 + 顶部 Tab + 右侧准备状态卡，章节目录内收至 `Chapter` 面板；同时修复章节列表状态语义，显式区分 loading / error / empty，避免假空态；前端 `tsc/lint/test:unit` 通过
 - 2026-03-27：完成 Engine 控制区压缩：`EnginePage` 已改为页头控制区 + 顶部状态区 + 全宽详情区，workflow 输入、载入动作、控制按钮与导出入口收口到页头，摘要与调试入口移出旧左侧控制栏；前端 `tsc/lint/test:unit` 通过
+- 2026-03-27：收口回收站批量清理语义：后端批量清理现改为“先列出 `project_id`、删除前重查软删除态并返回结构化 `deleted/skipped/failed` 结果”，脚本拒绝非正整数参数，前端清空反馈不再假装“全部成功”；定向 `ruff/pytest/tsc/lint/test:unit` 通过

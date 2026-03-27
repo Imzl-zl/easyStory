@@ -4,6 +4,8 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 import pytest
 
+import app.modules.project.service.project_deletion_service as project_deletion_service_module
+
 from app.modules.analysis.models import Analysis
 from app.modules.billing.models import TokenUsage
 from app.modules.content.models import Content, ContentVersion
@@ -145,10 +147,73 @@ def test_project_deletion_service_empties_only_current_owner_trash(db, tmp_path)
     result = asyncio.run(service.empty_trash(async_db(db), owner_id=owner.id))
 
     assert result.deleted_count == 2
+    assert result.skipped_count == 0
+    assert result.failed_count == 0
     assert db.get(Project, owned_first.id) is None
     assert db.get(Project, owned_second.id) is None
     assert db.get(Project, owned_active.id) is not None
     assert db.get(Project, outsider_deleted.id) is not None
+
+
+def test_project_deletion_service_skips_projects_restored_after_listing(
+    db,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    project.deleted_at = datetime.now(UTC)
+    db.commit()
+    service = create_project_deletion_service(export_root=tmp_path / "exports")
+
+    async def fake_list_deleted_project_ids(*_args, **_kwargs) -> list:
+        return [project.id]
+
+    monkeypatch.setattr(service, "_list_deleted_project_ids", fake_list_deleted_project_ids)
+    project.deleted_at = None
+    db.commit()
+
+    result = asyncio.run(service.empty_trash(async_db(db), owner_id=owner.id))
+
+    assert result.deleted_count == 0
+    assert result.skipped_count == 1
+    assert result.failed_count == 0
+    assert result.skipped_project_ids == [project.id]
+    assert db.get(Project, project.id) is not None
+
+
+def test_project_deletion_service_reports_cleanup_failures_without_aborting(
+    db,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    owner = create_user(db)
+    first_project = create_project(db, owner=owner)
+    second_project = create_project(db, owner=owner)
+    first_project.deleted_at = datetime.now(UTC)
+    second_project.deleted_at = datetime.now(UTC)
+    db.commit()
+    service = create_project_deletion_service(export_root=tmp_path / "exports")
+
+    def fake_cleanup_project_export_directory(_export_root, project_id) -> None:
+        if project_id == second_project.id:
+            raise RuntimeError("cleanup exploded")
+
+    monkeypatch.setattr(
+        project_deletion_service_module,
+        "cleanup_project_export_directory",
+        fake_cleanup_project_export_directory,
+    )
+
+    result = asyncio.run(service.empty_trash(async_db(db), owner_id=owner.id))
+
+    assert result.deleted_count == 2
+    assert result.skipped_count == 0
+    assert result.failed_count == 1
+    assert result.failed_items[0].project_id == second_project.id
+    assert "导出目录清理失败" in result.failed_items[0].message
+    assert db.get(Project, first_project.id) is None
+    assert db.get(Project, second_project.id) is None
 
 
 def test_project_deletion_service_cleans_only_expired_projects(db, tmp_path) -> None:
@@ -170,5 +235,19 @@ def test_project_deletion_service_cleans_only_expired_projects(db, tmp_path) -> 
     )
 
     assert result.deleted_count == 1
+    assert result.skipped_count == 0
+    assert result.failed_count == 0
     assert db.get(Project, expired_project.id) is None
     assert db.get(Project, retained_project.id) is not None
+
+
+def test_project_deletion_service_rejects_non_positive_cleanup_values(
+    db,
+    tmp_path,
+) -> None:
+    service = create_project_deletion_service(export_root=tmp_path / "exports")
+
+    with pytest.raises(BusinessRuleError, match="retention_days must be greater than 0"):
+        asyncio.run(service.cleanup_expired_projects(async_db(db), retention_days=0))
+    with pytest.raises(BusinessRuleError, match="batch_size must be greater than 0"):
+        asyncio.run(service.cleanup_expired_projects(async_db(db), batch_size=0))

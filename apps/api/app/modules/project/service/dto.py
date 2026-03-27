@@ -4,7 +4,7 @@ from datetime import datetime
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.modules.workflow.service.dto import WorkflowExecutionSummaryDTO
 from app.modules.project.schemas import ProjectSetting
@@ -152,8 +152,29 @@ class ProjectDetailDTO(ProjectSummaryDTO):
     project_setting: ProjectSetting | None
 
 
+class ProjectTrashCleanupFailureDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: uuid.UUID
+    message: str = Field(min_length=1)
+
+
 class ProjectTrashCleanupResultDTO(BaseModel):
-    deleted_count: int = 0
+    model_config = ConfigDict(extra="forbid")
+
+    deleted_count: int = Field(default=0, ge=0)
+    skipped_count: int = Field(default=0, ge=0)
+    failed_count: int = Field(default=0, ge=0)
+    skipped_project_ids: list[uuid.UUID] = Field(default_factory=list)
+    failed_items: list[ProjectTrashCleanupFailureDTO] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_counts(self) -> "ProjectTrashCleanupResultDTO":
+        if self.skipped_count != len(self.skipped_project_ids):
+            raise ValueError("skipped_count must match skipped_project_ids length")
+        if self.failed_count != len(self.failed_items):
+            raise ValueError("failed_count must match failed_items length")
+        return self
 
 
 class ProjectSettingUpdateDTO(BaseModel):
