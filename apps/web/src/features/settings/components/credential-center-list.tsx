@@ -26,6 +26,7 @@ type CredentialCenterListProps = {
   overrideInfoByCredentialId?: Record<string, CredentialOverrideInfo>;
   pendingAction: PendingCredentialAction | null;
   onAction: (type: PendingCredentialAction["type"], credentialId: string) => void;
+  onStartCreate?: () => void;
   onSelectCredential?: (credentialId: string) => void;
   onSelectCredentialForEdit?: (credentialId: string) => void;
 };
@@ -38,6 +39,7 @@ export function CredentialCenterList({
   overrideInfoByCredentialId = {},
   pendingAction,
   onAction,
+  onStartCreate,
   onSelectCredential,
   onSelectCredentialForEdit,
 }: CredentialCenterListProps) {
@@ -47,6 +49,22 @@ export function CredentialCenterList({
   return (
     <>
       <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">已有连接</h3>
+            <p className="text-sm text-[var(--text-secondary)]">先在这里查看和验证，想新增时点右侧按钮即可。</p>
+          </div>
+          {mode === "list" && onStartCreate ? (
+            <button
+              className="ink-button-secondary"
+              disabled={isPending}
+              onClick={onStartCreate}
+              type="button"
+            >
+              添加新连接
+            </button>
+          ) : null}
+        </div>
         {credentials.map((credential) => {
           const overrideInfo = overrideInfoByCredentialId[credential.id];
           const toggleActionType = credential.is_active ? "disable" : "enable";
@@ -87,13 +105,13 @@ export function CredentialCenterList({
                   ) : null}
                 </div>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  连接标识：{credential.provider} · 接口类型：{getApiDialectLabel(credential.api_dialect)}
+                  连接代号：{credential.provider} · 服务类型：{getApiDialectLabel(credential.api_dialect)}
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">
                   默认模型：{credential.default_model ?? "未配置"} · 密钥尾号：{credential.masked_key}
                 </p>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  接口地址：{formatCredentialBaseUrl(credential.api_dialect, credential.base_url)} · 最近验证：
+                  服务地址：{formatCredentialBaseUrl(credential.api_dialect, credential.base_url)} · 最近验证：
                   {credential.last_verified_at ? formatAuditTime(credential.last_verified_at) : "未验证"}
                 </p>
                 {overrideInfo ? (

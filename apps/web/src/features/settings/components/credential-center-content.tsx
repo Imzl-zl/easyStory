@@ -28,6 +28,7 @@ type CredentialCenterContentProps = {
   shouldShowEditLoadingState: boolean;
   onAction: (type: PendingCredentialAction["type"], credentialId: string) => void;
   onResetEditor?: () => void;
+  onStartCreate?: () => void;
   onSelectCredential?: (credentialId: string | null) => void;
   onSelectCredentialForEdit?: (credentialId: string | null) => void;
   onSubmitCreate: (formState: CredentialFormState) => void;
@@ -48,6 +49,7 @@ export function CredentialCenterContent({
   shouldShowEditLoadingState,
   onAction,
   onResetEditor,
+  onStartCreate,
   onSelectCredential,
   onSelectCredentialForEdit,
   onSubmitCreate,
@@ -66,6 +68,7 @@ export function CredentialCenterContent({
             overrideInfoByCredentialId={overrideInfoByCredentialId}
             pendingAction={pendingAction}
             onAction={onAction}
+            onStartCreate={onStartCreate}
             onSelectCredential={onSelectCredential ? (credentialId) => onSelectCredential(credentialId) : undefined}
             onSelectCredentialForEdit={
               onSelectCredentialForEdit ? (credentialId) => onSelectCredentialForEdit(credentialId) : undefined

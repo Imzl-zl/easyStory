@@ -139,6 +139,40 @@ def test_verify_openai_responses_uses_input_text_blocks() -> None:
     ]
     assert result.message == "验证成功"
 
+
+def test_verify_gemini_request_includes_user_role_and_prompt() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "candidates": [{"content": {"parts": [{"text": "今天天气真好。"}]}}],
+                "usageMetadata": {"promptTokenCount": 6, "candidatesTokenCount": 4, "totalTokenCount": 10},
+            },
+            text="",
+        )
+
+    verifier = AsyncHttpCredentialVerifier(request_sender=request_sender)
+    result = asyncio.run(
+        verifier.verify(
+            provider="gemini",
+            api_key="test-key",
+            base_url="https://proxy.example.com",
+            api_dialect="gemini_generate_content",
+            default_model="gemini-2.5-pro",
+        )
+    )
+
+    assert captured["request"].json_body["contents"] == [
+        {"role": "user", "parts": [{"text": "今天天气真好。"}]},
+    ]
+    assert captured["request"].json_body["system_instruction"] == {
+        "parts": [{"text": "请直接回复这句话本身，不要添加额外内容。"}],
+    }
+    assert result.message == "验证成功"
+
 def test_verify_credential_maps_authentication_error() -> None:
     async def request_sender(_request):
         return HttpJsonResponse(status_code=401, json_body={"error": "bad key"}, text="bad key")

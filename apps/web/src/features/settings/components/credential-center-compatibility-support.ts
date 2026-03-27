@@ -27,11 +27,11 @@ export const AUTH_STRATEGY_OPTIONS: Array<{
   label: string;
   description: string;
 }> = [
-  { value: "", label: "跟随接口类型默认", description: "按当前接口类型自动决定鉴权方式" },
-  { value: "bearer", label: "Bearer 令牌", description: "Authorization: Bearer <访问密钥>" },
-  { value: "x_api_key", label: "X-API-Key 请求头", description: "x-api-key: <访问密钥>" },
-  { value: "x_goog_api_key", label: "X-Goog-Api-Key 请求头", description: "x-goog-api-key: <访问密钥>" },
-  { value: "custom_header", label: "自定义请求头", description: "把访问密钥放入你指定的请求头" },
+  { value: "", label: "跟随默认设置", description: "按当前服务类型自动选择最常见的方式" },
+  { value: "bearer", label: "放到 Authorization", description: "常见于 OpenAI 兼容服务" },
+  { value: "x_api_key", label: "放到 x-api-key", description: "常见于 Anthropic 兼容服务" },
+  { value: "x_goog_api_key", label: "放到 x-goog-api-key", description: "常见于 Gemini 兼容服务" },
+  { value: "custom_header", label: "放到自定义请求头", description: "只有上游有特殊要求时再使用" },
 ] as const;
 
 export function getDefaultAuthStrategy(apiDialect: CredentialApiDialect) {

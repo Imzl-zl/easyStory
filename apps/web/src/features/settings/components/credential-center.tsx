@@ -270,6 +270,7 @@ export function CredentialCenter({
           shouldShowEditLoadingState={shouldShowEditLoadingState}
           onAction={(type, credentialId) => actionMutation.mutate({ type, credentialId })}
           onResetEditor={handleResetEditor}
+          onStartCreate={handleResetEditor}
           onSelectCredential={handleAuditSelect}
           onSelectCredentialForEdit={handleEditSelect}
           onSubmitCreate={(nextFormState) => {

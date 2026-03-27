@@ -118,7 +118,7 @@ def _build_anthropic_messages_request(request: LLMGenerateRequest) -> PreparedLL
 
 def _build_gemini_generate_content_request(request: LLMGenerateRequest) -> PreparedLLMHttpRequest:
     body: dict[str, Any] = {
-        "contents": [{"parts": [{"text": request.prompt}]}],
+        "contents": [{"role": "user", "parts": [{"text": request.prompt}]}],
     }
     generation_config = _build_gemini_generation_config(request)
     if generation_config:

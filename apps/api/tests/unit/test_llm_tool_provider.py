@@ -202,7 +202,7 @@ def test_execute_builds_gemini_generate_content_request() -> None:
     )
     assert request.headers["x-goog-api-key"] == "gemini-key"
     assert request.json_body["system_instruction"] == {"parts": [{"text": "中文输出"}]}
-    assert request.json_body["contents"] == [{"parts": [{"text": "给个标题"}]}]
+    assert request.json_body["contents"] == [{"role": "user", "parts": [{"text": "给个标题"}]}]
     assert request.json_body["generationConfig"]["responseMimeType"] == "application/json"
     assert result["content"] == "gemini 结果"
 

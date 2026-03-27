@@ -31,7 +31,7 @@ export function CredentialNoticeCard({
 export function ProviderSelectField({ model }: { model: IncubatorChatModel }) {
   return (
     <label className="block">
-      <span className="label-text">使用的连接</span>
+      <span className="label-text">当前使用的连接</span>
       <select
         className="ink-input"
         name="provider"

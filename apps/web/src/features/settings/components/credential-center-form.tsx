@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 
+import type { CredentialCenterFeedback } from "@/features/settings/components/credential-center-feedback";
 import {
   API_DIALECT_OPTIONS,
   AUTH_STRATEGY_OPTIONS,
@@ -10,7 +12,6 @@ import {
   getDefaultBaseUrl,
   type CredentialFormState,
 } from "@/features/settings/components/credential-center-support";
-import type { CredentialCenterFeedback } from "@/features/settings/components/credential-center-feedback";
 import type { CredentialApiDialect } from "@/lib/api/types";
 
 type CredentialCenterFormMode = "create" | "edit";
@@ -42,36 +43,62 @@ export function CredentialCenterForm({
         onSubmit(formState);
       }}
     >
-      <div className="space-y-1">
-        <h3 className="font-serif text-lg font-semibold">{mode === "edit" ? "编辑模型连接" : "新增模型连接"}</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          你可以同时添加多个模型连接。想再加一条时，换一个新的连接标识即可，例如“openai-main”“mint-backup”。
-        </p>
-      </div>
+      <FormIntro mode={mode} />
+      <BasicFields formState={formState} mode={mode} setFormState={setFormState} />
+      <CompatibilitySettings formState={formState} setFormState={setFormState} />
+      <FeedbackNotice feedback={feedback} />
+      <FormActions isPending={isPending} mode={mode} onReset={onReset} />
+    </form>
+  );
+}
+
+function FormIntro({ mode }: { mode: CredentialCenterFormMode }) {
+  return (
+    <div className="space-y-1">
+      <h3 className="font-serif text-lg font-semibold">
+        {mode === "edit" ? "修改模型连接" : "添加模型连接"}
+      </h3>
+      <p className="text-sm leading-6 text-[var(--text-secondary)]">
+        填好下面几项就能保存一条连接。以后想再接别的模型，继续添加新的连接即可。
+      </p>
+    </div>
+  );
+}
+
+function BasicFields({
+  formState,
+  mode,
+  setFormState,
+}: {
+  formState: CredentialFormState;
+  mode: CredentialCenterFormMode;
+  setFormState: Dispatch<SetStateAction<CredentialFormState>>;
+}) {
+  return (
+    <>
       {mode === "create" ? (
         <FieldInput
-          label="连接标识"
-          placeholder="openai / openrouter / volcengine / my-proxy"
+          description="用于区分不同连接，建议填英文、拼音或短横线，例如 openai-main。"
+          label="连接代号"
+          placeholder="例如：openai-main"
           required
           value={formState.provider}
           onChange={(value) => setFormState((current) => ({ ...current, provider: value }))}
         />
       ) : (
         <StaticField
-          label="连接标识"
+          description="连接代号创建后不能修改。"
+          label="连接代号"
           value={formState.provider}
-          description="连接标识创建后不可修改。"
         />
       )}
       <label className="block">
-        <span className="label-text">接口类型</span>
+        <span className="label-text">服务类型</span>
         <select
           className="ink-input"
           value={formState.apiDialect}
           onChange={(event) =>
-            setFormState((current) =>
-              updateApiDialectState(current, event.target.value as CredentialApiDialect),
-            )
+            setFormState((current) => updateApiDialectState(current, event.target.value as CredentialApiDialect))
           }
         >
           {API_DIALECT_OPTIONS.map((option) => (
@@ -82,7 +109,9 @@ export function CredentialCenterForm({
         </select>
       </label>
       <FieldInput
+        description="这个名字会显示在列表和聊天页里。"
         label="显示名称"
+        placeholder="例如：薄荷 Gemini"
         required
         value={formState.displayName}
         onChange={(value) => setFormState((current) => ({ ...current, displayName: value }))}
@@ -90,35 +119,51 @@ export function CredentialCenterForm({
       <FieldInput
         label="访问密钥"
         autoComplete="new-password"
-        placeholder={mode === "edit" ? "留空表示不更换当前访问密钥" : undefined}
+        placeholder={mode === "edit" ? "留空表示继续使用当前访问密钥" : undefined}
         required={mode === "create"}
         type="password"
         value={formState.apiKey}
         onChange={(value) => setFormState((current) => ({ ...current, apiKey: value }))}
       />
       <FieldInput
-        label="接口地址"
+        description="如果你接的是官方服务，通常保持默认地址即可。"
+        label="服务地址"
         placeholder="https://api.openai.com"
         type="url"
         value={formState.baseUrl}
         onChange={(value) => setFormState((current) => ({ ...current, baseUrl: value }))}
       />
       <FieldInput
+        description="保存后，验证和聊天会默认使用这个模型。"
         label="默认模型"
-        placeholder="gpt-4o-mini / claude-sonnet-4-20250514 / gemini-2.5-pro"
+        placeholder="例如：gpt-4.1 / gemini-2.5-pro"
         required
         value={formState.defaultModel}
         onChange={(value) => setFormState((current) => ({ ...current, defaultModel: value }))}
       />
-      <div className="panel-muted space-y-4 p-4">
-        <div className="space-y-1">
-          <h4 className="font-serif text-base font-semibold">高级兼容设置</h4>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
-            只有在上游接口有特殊要求时才需要修改。一般保持“跟随接口类型默认”即可。
-          </p>
-        </div>
+    </>
+  );
+}
+
+function CompatibilitySettings({
+  formState,
+  setFormState,
+}: {
+  formState: CredentialFormState;
+  setFormState: Dispatch<SetStateAction<CredentialFormState>>;
+}) {
+  return (
+    <details className="rounded-3xl border border-[var(--line-soft)] bg-[rgba(255,255,255,0.52)] p-4">
+      <summary className="cursor-pointer text-sm font-medium text-[var(--text-primary)]">
+        兼容设置
+        <span className="ml-2 text-xs text-[var(--text-secondary)]">大多数情况不用改</span>
+      </summary>
+      <div className="mt-4 space-y-4">
+        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          只有当上游服务要求特殊请求头或特殊密钥位置时，才需要修改这里。
+        </p>
         <label className="block">
-          <span className="label-text">鉴权方式</span>
+          <span className="label-text">密钥放置方式</span>
           <select
             className="ink-input"
             value={formState.authStrategy}
@@ -140,12 +185,13 @@ export function CredentialCenterForm({
             ))}
           </select>
           <p className="mt-2 text-xs text-[var(--text-secondary)]">
-            当前接口类型默认使用：{getDefaultAuthStrategy(formState.apiDialect)}。
+            当前服务类型默认会使用：{describeDefaultAuthStrategy(formState.apiDialect)}。
           </p>
         </label>
         <FieldInput
+          description="只有在上游明确要求自定义请求头名称时才需要填写。"
           disabled={formState.authStrategy !== "custom_header"}
-          label="访问密钥请求头名称"
+          label="自定义密钥请求头"
           placeholder="例如：api-key"
           value={formState.apiKeyHeaderName}
           onChange={(value) => setFormState((current) => ({ ...current, apiKeyHeaderName: value }))}
@@ -161,45 +207,63 @@ export function CredentialCenterForm({
             }
           />
           <p className="mt-2 text-xs text-[var(--text-secondary)]">
-            请输入 JSON 对象。这里适合填写站点来源、租户标识等非敏感请求头。
-          </p>
-          <p className="mt-2 text-xs text-[var(--text-secondary)]">
-            这里只支持非敏感请求头；鉴权、Token、Secret 等敏感信息请用上面的鉴权方式配置。
+            这里适合填写站点来源、租户标识这类补充信息。不要在这里填写 Token、Secret 或鉴权头。
           </p>
         </label>
       </div>
-      {feedback?.message ? (
-        <div
-          className={
-            feedback.tone === "danger"
-              ? "rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]"
-              : "rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]"
-          }
-          data-tone={feedback.tone}
-        >
-          {feedback.message}
-        </div>
-      ) : null}
-      <div className="flex flex-wrap gap-3">
-        <button className="ink-button flex-1" disabled={isPending} type="submit">
-          {isPending ? "提交中..." : mode === "edit" ? "保存修改" : "保存连接"}
+    </details>
+  );
+}
+
+function FeedbackNotice({ feedback }: { feedback: CredentialCenterFeedback }) {
+  if (!feedback?.message) {
+    return null;
+  }
+  return (
+    <div
+      className={
+        feedback.tone === "danger"
+          ? "rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]"
+          : "rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]"
+      }
+      data-tone={feedback.tone}
+    >
+      {feedback.message}
+    </div>
+  );
+}
+
+function FormActions({
+  isPending,
+  mode,
+  onReset,
+}: {
+  isPending: boolean;
+  mode: CredentialCenterFormMode;
+  onReset?: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-3">
+      <button className="ink-button flex-1" disabled={isPending} type="submit">
+        {isPending ? "提交中..." : mode === "edit" ? "保存修改" : "添加连接"}
+      </button>
+      {mode === "edit" && onReset ? (
+        <button className="ink-button-secondary" disabled={isPending} onClick={onReset} type="button">
+          添加另一条连接
         </button>
-        {mode === "edit" && onReset ? (
-          <button className="ink-button-secondary" disabled={isPending} onClick={onReset} type="button">
-            新增另一个连接
-          </button>
-        ) : null}
-      </div>
-    </form>
+      ) : null}
+    </div>
   );
 }
 
 function FieldInput({
+  description,
   label,
   value,
   onChange,
   ...props
 }: Omit<React.ComponentProps<"input">, "onChange" | "value"> & {
+  description?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -208,6 +272,7 @@ function FieldInput({
     <label className="block">
       <span className="label-text">{label}</span>
       <input className="ink-input" value={value} onChange={(event) => onChange(event.target.value)} {...props} />
+      {description ? <p className="mt-2 text-xs text-[var(--text-secondary)]">{description}</p> : null}
     </label>
   );
 }
@@ -242,4 +307,15 @@ function updateApiDialectState(
     apiDialect,
     baseUrl: shouldReplaceBaseUrl ? nextDefault : current.baseUrl,
   };
+}
+
+function describeDefaultAuthStrategy(apiDialect: CredentialApiDialect) {
+  const strategy = getDefaultAuthStrategy(apiDialect);
+  if (strategy === "bearer") {
+    return "Authorization";
+  }
+  if (strategy === "x_api_key") {
+    return "x-api-key";
+  }
+  return "x-goog-api-key";
 }

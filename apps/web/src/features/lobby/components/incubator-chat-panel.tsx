@@ -192,21 +192,21 @@ function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
   return (
     <details className="mt-4 rounded-3xl border border-[var(--line-soft)] bg-[rgba(255,255,255,0.5)] p-4">
       <summary className="cursor-pointer text-sm font-medium text-[var(--text-primary)]">
-        高级设置
+        聊天设置
       </summary>
       <div className="mt-4 grid gap-4">
         {model.credentialOptions.length > 0 ? (
           <ProviderSelectField model={model} />
         ) : (
           <TextSettingField
-            label="连接标识"
+            label="连接代号"
             name="provider"
             value={model.settings.provider}
             onChange={(value) => updateChatSettings(model, "provider", value)}
           />
         )}
         <TextSettingField
-          label="模型名称（可选）"
+          label="指定模型（可选）"
           name="modelName"
           placeholder="例如：gpt-4.1…"
           value={model.settings.modelName}
@@ -223,7 +223,7 @@ function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
           />
           <span className="space-y-1">
             <span className="block text-sm font-medium text-[var(--text-primary)]">
-              创建项目后允许使用系统连接池
+              创建项目后允许继续沿用系统连接
             </span>
             <span className="block text-sm leading-6 text-[var(--text-secondary)]">
               只影响创建后的项目运行，不影响当前聊天结果。

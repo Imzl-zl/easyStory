@@ -32,23 +32,23 @@ export const API_DIALECT_OPTIONS: Array<{
 }> = [
   {
     value: "openai_chat_completions",
-    label: "OpenAI 对话接口",
-    description: "聊天补全接口（/v1/chat/completions）",
+    label: "OpenAI 标准连接",
+    description: "适合大多数 OpenAI 兼容服务",
   },
   {
     value: "openai_responses",
-    label: "OpenAI 响应接口",
-    description: "统一响应接口（/v1/responses）",
+    label: "OpenAI 新版连接",
+    description: "适合使用 Responses 能力的服务",
   },
   {
     value: "anthropic_messages",
-    label: "Anthropic 消息接口",
-    description: "消息接口（/v1/messages）",
+    label: "Anthropic 标准连接",
+    description: "适合 Claude / Anthropic 兼容服务",
   },
   {
     value: "gemini_generate_content",
-    label: "Gemini 生成接口",
-    description: "内容生成接口（/v1beta/models/{model}:generateContent）",
+    label: "Gemini 标准连接",
+    description: "适合 Gemini / Google AI 兼容服务",
   },
 ] as const;
 
