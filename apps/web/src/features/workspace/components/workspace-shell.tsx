@@ -54,7 +54,7 @@ export function WorkspaceShell({
   return (
     <AuthGuard>
       <div
-        className={`${styles.shell} grid min-h-screen gap-4 p-3 lg:gap-6 lg:p-6`}
+        className={`${styles.shell} min-h-screen gap-4 p-3 lg:gap-6 lg:p-6`}
         style={
           {
             "--workspace-sidebar-width": resolveWorkspaceSidebarWidth(isSidebarCollapsed),

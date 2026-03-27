@@ -97,5 +97,5 @@ export function resolveWorkspaceUserBadge(username: string | null | undefined) {
 }
 
 export function shouldShowWorkspaceSidebarToggle(isMobileViewport: boolean) {
-  return !isMobileViewport;
+  return true;
 }
