@@ -64,6 +64,10 @@ export type ProjectDetail = ProjectSummary & {
   project_setting: ProjectSetting | null;
 };
 
+export type ProjectTrashCleanupResult = {
+  deleted_count: number;
+};
+
 export type SettingCompletenessIssue = {
   field: string;
   level: "warning" | "blocked";

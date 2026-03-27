@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.modules.analysis.models import Analysis
@@ -125,3 +126,49 @@ def test_project_deletion_service_hides_other_users_projects(db, tmp_path) -> No
         asyncio.run(
             service.physical_delete_project(async_db(db), project.id, owner_id=outsider.id)
         )
+
+
+def test_project_deletion_service_empties_only_current_owner_trash(db, tmp_path) -> None:
+    owner = create_user(db)
+    outsider = create_user(db)
+    now = datetime.now(UTC)
+    owned_first = create_project(db, owner=owner)
+    owned_second = create_project(db, owner=owner)
+    owned_active = create_project(db, owner=owner)
+    outsider_deleted = create_project(db, owner=outsider)
+    owned_first.deleted_at = now
+    owned_second.deleted_at = now
+    outsider_deleted.deleted_at = now
+    db.commit()
+    service = create_project_deletion_service(export_root=tmp_path / "exports")
+
+    result = asyncio.run(service.empty_trash(async_db(db), owner_id=owner.id))
+
+    assert result.deleted_count == 2
+    assert db.get(Project, owned_first.id) is None
+    assert db.get(Project, owned_second.id) is None
+    assert db.get(Project, owned_active.id) is not None
+    assert db.get(Project, outsider_deleted.id) is not None
+
+
+def test_project_deletion_service_cleans_only_expired_projects(db, tmp_path) -> None:
+    owner = create_user(db)
+    now = datetime.now(UTC)
+    expired_project = create_project(db, owner=owner)
+    retained_project = create_project(db, owner=owner)
+    expired_project.deleted_at = now - timedelta(days=31)
+    retained_project.deleted_at = now - timedelta(days=5)
+    db.commit()
+    service = create_project_deletion_service(export_root=tmp_path / "exports")
+
+    result = asyncio.run(
+        service.cleanup_expired_projects(
+            async_db(db),
+            now=now,
+            retention_days=30,
+        )
+    )
+
+    assert result.deleted_count == 1
+    assert db.get(Project, expired_project.id) is None
+    assert db.get(Project, retained_project.id) is not None

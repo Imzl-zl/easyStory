@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import shutil
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import delete, or_, select
@@ -28,6 +28,8 @@ from app.shared.runtime.errors import BusinessRuleError
 PROJECT_DELETE_EVENT = "project_delete"
 PROJECT_RESTORE_EVENT = "project_restore"
 PROJECT_CREDENTIAL_OWNER_TYPE = "project"
+DEFAULT_PROJECT_TRASH_RETENTION_DAYS = 30
+DEFAULT_PROJECT_TRASH_BATCH_SIZE = 100
 PHYSICAL_DELETE_REQUIRES_SOFT_DELETE_MESSAGE = (
     "Project must be soft deleted before physical delete"
 )
@@ -106,6 +108,31 @@ def restore_project_from_trash(project: Project) -> None:
 def ensure_project_is_soft_deleted(project: Project) -> None:
     if project.deleted_at is None:
         raise BusinessRuleError(PHYSICAL_DELETE_REQUIRES_SOFT_DELETE_MESSAGE)
+
+
+def build_deleted_project_statement(
+    *,
+    owner_id: uuid.UUID | None,
+    deleted_before: datetime | None = None,
+    limit: int | None = None,
+):
+    statement = select(Project).where(Project.deleted_at.is_not(None))
+    if owner_id is not None:
+        statement = statement.where(Project.owner_id == owner_id)
+    if deleted_before is not None:
+        statement = statement.where(Project.deleted_at <= deleted_before)
+    statement = statement.order_by(Project.deleted_at.asc(), Project.id.asc())
+    if limit is not None:
+        statement = statement.limit(limit)
+    return statement
+
+
+def resolve_project_trash_cutoff(
+    now: datetime,
+    *,
+    retention_days: int,
+) -> datetime:
+    return now - timedelta(days=retention_days)
 
 
 def record_project_audit(

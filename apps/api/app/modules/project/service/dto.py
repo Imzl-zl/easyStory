@@ -152,6 +152,10 @@ class ProjectDetailDTO(ProjectSummaryDTO):
     project_setting: ProjectSetting | None
 
 
+class ProjectTrashCleanupResultDTO(BaseModel):
+    deleted_count: int = 0
+
+
 class ProjectSettingUpdateDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

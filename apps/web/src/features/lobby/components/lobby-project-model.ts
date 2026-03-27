@@ -3,14 +3,26 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { buildFilteredProjects } from "@/features/lobby/components/lobby-project-support";
+import {
+  buildFilteredProjects,
+  type ProjectActionType,
+  resolveEmptyTrashFeedback,
+  resolveProjectActionSuccessMessage,
+} from "@/features/lobby/components/lobby-project-support";
 import { getErrorMessage } from "@/lib/api/client";
-import { deleteProject, listProjects, restoreProject } from "@/lib/api/projects";
+import {
+  deleteProject,
+  emptyTrash,
+  listProjects,
+  physicalDeleteProject,
+  restoreProject,
+} from "@/lib/api/projects";
 import { listTemplates } from "@/lib/api/templates";
+import type { ProjectDetail } from "@/lib/api/types";
 
 export type ProjectActionVariables = {
   projectId: string;
-  type: "delete" | "restore";
+  type: ProjectActionType;
 };
 
 export function useLobbyProjectModel({ deletedOnly }: { deletedOnly: boolean }) {
@@ -23,15 +35,8 @@ export function useLobbyProjectModel({ deletedOnly }: { deletedOnly: boolean }) 
     queryFn: () => listProjects(deletedOnly),
   });
   const templatesQuery = useQuery({ queryKey: ["templates"], queryFn: listTemplates });
-  const actionMutation = useMutation({
-    mutationFn: ({ projectId, type }: ProjectActionVariables) =>
-      type === "delete" ? deleteProject(projectId) : restoreProject(projectId),
-    onSuccess: async () => {
-      setFeedback("项目状态已更新。");
-      await queryClient.invalidateQueries({ queryKey: ["projects"] });
-    },
-    onError: (error) => setFeedback(getErrorMessage(error)),
-  });
+  const actionMutation = useProjectActionMutation(queryClient, setFeedback);
+  const emptyTrashMutation = useEmptyTrashMutation(queryClient, setFeedback);
   const filteredProjects = useMemo(
     () => buildFilteredProjects(projectsQuery.data, deferredSearchText),
     [deferredSearchText, projectsQuery.data],
@@ -48,6 +53,8 @@ export function useLobbyProjectModel({ deletedOnly }: { deletedOnly: boolean }) 
   return {
     actionMutation,
     deletedOnly,
+    deletedProjectCount: projectsQuery.data?.length ?? 0,
+    emptyTrashMutation,
     feedback,
     filteredProjects,
     projectsQuery,
@@ -58,4 +65,42 @@ export function useLobbyProjectModel({ deletedOnly }: { deletedOnly: boolean }) 
     templatePreviewNames,
     templatesQuery,
   };
+}
+
+function useProjectActionMutation(
+  queryClient: ReturnType<typeof useQueryClient>,
+  setFeedback: (value: string | null) => void,
+) {
+  return useMutation<ProjectDetail | void, unknown, ProjectActionVariables>({
+    mutationFn: ({ projectId, type }: ProjectActionVariables) => executeProjectAction(projectId, type),
+    onSuccess: async (_, variables) => {
+      setFeedback(resolveProjectActionSuccessMessage(variables.type));
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+    onError: (error) => setFeedback(getErrorMessage(error)),
+  });
+}
+
+function useEmptyTrashMutation(
+  queryClient: ReturnType<typeof useQueryClient>,
+  setFeedback: (value: string | null) => void,
+) {
+  return useMutation({
+    mutationFn: emptyTrash,
+    onSuccess: async (result) => {
+      setFeedback(resolveEmptyTrashFeedback(result.deleted_count));
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+    onError: (error) => setFeedback(getErrorMessage(error)),
+  });
+}
+
+function executeProjectAction(projectId: string, type: ProjectActionType) {
+  if (type === "delete") {
+    return deleteProject(projectId);
+  }
+  if (type === "restore") {
+    return restoreProject(projectId);
+  }
+  return physicalDeleteProject(projectId);
 }

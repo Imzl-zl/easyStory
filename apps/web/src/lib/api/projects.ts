@@ -12,6 +12,7 @@ import type {
   ProjectSetting,
   ProjectSettingSnapshot,
   ProjectSummary,
+  ProjectTrashCleanupResult,
   SettingCompletenessResult,
 } from "@/lib/api/types";
 
@@ -66,6 +67,18 @@ export function deleteProject(projectId: string) {
 export function restoreProject(projectId: string) {
   return requestJson<ProjectDetail>(`/api/v1/projects/${projectId}/restore`, {
     method: "POST",
+  });
+}
+
+export function physicalDeleteProject(projectId: string) {
+  return requestJson<void>(`/api/v1/projects/${projectId}/physical`, {
+    method: "DELETE",
+  });
+}
+
+export function emptyTrash() {
+  return requestJson<ProjectTrashCleanupResult>("/api/v1/projects/trash", {
+    method: "DELETE",
   });
 }
 

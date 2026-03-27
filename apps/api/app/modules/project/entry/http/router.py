@@ -19,6 +19,7 @@ from app.modules.project.service import (
     ProjectIncubatorService,
     ProjectManagementService,
     ProjectService,
+    ProjectTrashCleanupResultDTO,
     ProjectSettingSnapshotDTO,
     ProjectSettingUpdateDTO,
     ProjectSummaryDTO,
@@ -81,6 +82,20 @@ async def list_projects(
         db,
         owner_id=current_user.id,
         deleted_only=deleted_only,
+    )
+
+
+@router.delete("/trash", response_model=ProjectTrashCleanupResultDTO)
+async def empty_project_trash(
+    project_deletion_service: ProjectDeletionService = Depends(
+        get_project_deletion_service
+    ),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> ProjectTrashCleanupResultDTO:
+    return await project_deletion_service.empty_trash(
+        db,
+        owner_id=current_user.id,
     )
 
 

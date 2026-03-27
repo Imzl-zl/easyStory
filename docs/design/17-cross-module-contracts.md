@@ -175,6 +175,8 @@ data_retention:
     strategy: "oldest_first"
 ```
 
+当前仓库的显式执行入口为 `apps/api/scripts/project_trash_cleanup.py`；实际自动调度由部署层负责配置。
+
 ### 5.3 统一删除服务
 
 ProjectDeletionService 提供三个操作：

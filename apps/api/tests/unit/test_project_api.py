@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from app.modules.project.models import Project
 from app.main import create_app
 from tests.unit.async_api_support import (
@@ -310,6 +312,48 @@ async def test_project_api_physically_deletes_soft_deleted_project(
 
         with session_factory() as session:
             assert session.get(Project, project_id) is None
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_project_api_empties_current_user_trash(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="project-api-empty-trash")
+    )
+
+    try:
+        app = create_app(
+            async_session_factory=async_session_factory,
+        )
+        with session_factory() as session:
+            owner = create_user(session)
+            outsider = create_user(session)
+            now = datetime.now(UTC)
+            first_project = create_project(session, owner=owner)
+            second_project = create_project(session, owner=owner)
+            outsider_project = create_project(session, owner=outsider)
+            first_project.deleted_at = now
+            second_project.deleted_at = now
+            outsider_project.deleted_at = now
+            session.commit()
+            owner_id = owner.id
+            first_project_id = first_project.id
+            second_project_id = second_project.id
+            outsider_project_id = outsider_project.id
+
+        async with started_async_client(app) as client:
+            response = await client.delete(
+                "/api/v1/projects/trash",
+                headers=_auth_headers(owner_id),
+            )
+            assert response.status_code == 200
+            assert response.json()["deleted_count"] == 2
+
+        with session_factory() as session:
+            assert session.get(Project, first_project_id) is None
+            assert session.get(Project, second_project_id) is None
+            assert session.get(Project, outsider_project_id) is not None
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 async def test_project_api_hides_other_users_project(monkeypatch, tmp_path) -> None:
