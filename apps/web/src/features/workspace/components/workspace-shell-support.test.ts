@@ -42,7 +42,7 @@ test("workspace shell helpers resolve user badge and next preference determinist
   assert.equal(resolveWorkspaceUserBadge("张三"), "张");
   assert.equal(resolveWorkspaceUserBadge(""), "客");
   assert.equal(getNextSidebarPreference("expanded"), "collapsed");
-  assert.equal(resolveWorkspaceSidebarWidth(true), "72px");
+  assert.equal(resolveWorkspaceSidebarWidth(true), "88px");
 });
 
 test("resolveWorkspaceSidebarCollapsed forces mobile into collapsed mode and respects desktop preference", () => {

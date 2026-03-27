@@ -9,8 +9,8 @@ const PROJECT_WORKSPACE_ITEMS = [
   { label: "实验室", meta: "分析结果", segment: "lab" },
 ] as const;
 const WORKSPACE_SIDEBAR_WIDTH = {
-  collapsed: "72px",
-  expanded: "220px",
+  collapsed: "88px",
+  expanded: "280px",
 } as const;
 
 export type WorkspaceSegment = "lobby" | "studio" | "engine" | "lab";

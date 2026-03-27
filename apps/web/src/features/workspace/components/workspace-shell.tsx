@@ -57,7 +57,7 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
     <AuthGuard>
       <a className={styles.skipLink} href="#workspace-main">跳到主内容</a>
       <div
-        className={`${styles.shell} min-h-screen gap-4 p-3 lg:gap-6 lg:p-6`}
+        className={`${styles.shell} min-h-screen p-3 lg:p-6`}
         style={
           {
             "--workspace-sidebar-width": resolveWorkspaceSidebarWidth(isSidebarCollapsed),
@@ -75,9 +75,7 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
           onToggle={() => setSidebarPreference(getNextSidebarPreference(sidebarPreference))}
         />
         <main className={styles.content} id="workspace-main">
-          <div className={styles.contentFrame}>
-            <div className={`${styles.contentInner} space-y-6`}>{children}</div>
-          </div>
+          <div className={`${styles.contentInner} space-y-6`}>{children}</div>
         </main>
       </div>
     </AuthGuard>
@@ -106,11 +104,11 @@ function WorkspaceSidebar({
   return (
     <aside
       aria-label="工作台导航"
-      className={`${styles.sidebar} panel-shell flex flex-col gap-4 p-4 lg:justify-between lg:p-5`}
+      className={styles.sidebar}
       data-collapsed={isCollapsed}
     >
       <div className={styles.sidebarTop}>
-        <div className="flex items-start justify-between gap-3">
+        <div className={styles.brandBlock}>
           <WorkspaceSidebarBrand />
           {shouldShowWorkspaceSidebarToggle(isMobileViewport) ? (
             <WorkspaceSidebarToggle
@@ -162,16 +160,13 @@ function subscribeToMobileViewport(onStoreChange: () => void) {
 
 function WorkspaceSidebarBrand() {
   return (
-    <div className="flex min-w-0 items-start gap-3">
-      <span aria-hidden="true" className={`${styles.glyph} mt-0.5`}>
+    <div className={styles.brandHeader}>
+      <span aria-hidden="true" className={styles.glyph}>
         <WorkspaceBrandIcon />
       </span>
-      <div className={`${styles.brandCopy} min-w-0 space-y-1`}>
-        <p className="text-xs uppercase tracking-[0.3em] text-[var(--accent-ink)]">easyStory</p>
-        <h1 className="font-serif text-2xl leading-tight font-semibold lg:text-3xl">水墨流工作台</h1>
-        <p className={`${styles.brandDescription} text-sm leading-6 text-[var(--text-secondary)]`}>
-          项目管理、内容创作、工作流控制、风格分析，一站搞定。
-        </p>
+      <div className={styles.brandCopy}>
+        <p className={styles.brandEyebrow}>创作空间</p>
+        <p className={styles.brandTitle}>工作台</p>
       </div>
     </div>
   );
@@ -235,20 +230,17 @@ function WorkspaceSidebarSession({ onLogout, userName }: Readonly<{
   userName: string;
 }>) {
   return (
-    <div className={`${styles.sessionArea} space-y-3`}>
-      <div className={`${styles.sessionCard} panel-muted flex items-center gap-3 p-3`}>
+    <div className={styles.sessionArea}>
+      <div className={styles.sessionSummary}>
         <span className={`${styles.sessionBadge} font-medium`}>{resolveWorkspaceUserBadge(userName)}</span>
-        <div className={`${styles.sessionCopy} min-w-0 space-y-1`}>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-secondary)]">当前会话</p>
-          <p className="truncate font-medium text-[var(--text-primary)]">{userName}</p>
-          <p className={`${styles.sessionDescription} text-sm leading-6 text-[var(--text-secondary)]`}>
-            点击下方按钮安全退出当前账号。
-          </p>
+        <div className={styles.sessionCopy}>
+          <p className={styles.sessionLabel}>当前账号</p>
+          <p className={styles.sessionUser}>{userName}</p>
         </div>
       </div>
       <button
         aria-label="退出登录"
-        className={`ink-button-secondary ${styles.logoutButton} w-full`}
+        className={`ink-button-secondary ${styles.logoutButton}`}
         onClick={onLogout}
         type="button"
       >
