@@ -179,6 +179,7 @@ def test_verify_gemini_request_includes_user_role_and_prompt() -> None:
     }
     assert result.message == "验证成功"
 
+
 def test_verify_credential_maps_authentication_error() -> None:
     async def request_sender(_request):
         return HttpJsonResponse(status_code=401, json_body={"error": "bad key"}, text="bad key")
