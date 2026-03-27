@@ -47,6 +47,12 @@ DEFAULT_BASE_URLS: dict[LlmApiDialect, str] = {
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 60
 VERIFY_MODEL_REPLY = "今天天气真好。"
+VERIFY_USER_PROMPT = (
+    "这是一次模型连接验证。请只回复这句话，不要添加额外内容：今天天气真好。"
+)
+VERIFY_SYSTEM_PROMPT = (
+    "你正在执行模型连接验证。请严格按要求回复，不要添加解释、标点变化或额外文本。"
+)
 VERIFY_MAX_TOKENS = 32
 JSON_OBJECT_RESPONSE_FORMAT = "json_object"
 HTTP_HEADER_TOKEN_PATTERN = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")

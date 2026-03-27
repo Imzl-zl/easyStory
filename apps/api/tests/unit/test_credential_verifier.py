@@ -7,7 +7,11 @@ import pytest
 
 from app.modules.credential.infrastructure import AsyncHttpCredentialVerifier
 from app.shared.runtime.errors import BusinessRuleError
-from app.shared.runtime.llm_protocol import HttpJsonResponse
+from app.shared.runtime.llm_protocol import (
+    HttpJsonResponse,
+    VERIFY_SYSTEM_PROMPT,
+    VERIFY_USER_PROMPT,
+)
 from app.shared.settings import (
     ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV,
     ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV,
@@ -53,7 +57,8 @@ def test_verify_credential_uses_generation_probe_request() -> None:
     assert request.headers["api-key"] == "test-key"
     assert request.headers["X-Trace-Id"] == "trace-verify"
     assert request.json_body["model"] == "gpt-4o-mini"
-    assert request.json_body["messages"][-1]["content"] == "今天天气真好。"
+    assert request.json_body["messages"][-1]["content"] == VERIFY_USER_PROMPT
+    assert request.json_body["messages"][0]["content"] == VERIFY_SYSTEM_PROMPT
     assert result.message == "验证成功"
 
 
@@ -134,9 +139,10 @@ def test_verify_openai_responses_uses_input_text_blocks() -> None:
     assert captured["request"].json_body["input"] == [
         {
             "role": "user",
-            "content": [{"type": "input_text", "text": "今天天气真好。"}],
+            "content": [{"type": "input_text", "text": VERIFY_USER_PROMPT}],
         }
     ]
+    assert captured["request"].json_body["instructions"] == VERIFY_SYSTEM_PROMPT
     assert result.message == "验证成功"
 
 
@@ -166,10 +172,10 @@ def test_verify_gemini_request_includes_user_role_and_prompt() -> None:
     )
 
     assert captured["request"].json_body["contents"] == [
-        {"role": "user", "parts": [{"text": "今天天气真好。"}]},
+        {"role": "user", "parts": [{"text": VERIFY_USER_PROMPT}]},
     ]
     assert captured["request"].json_body["system_instruction"] == {
-        "parts": [{"text": "请直接回复这句话本身，不要添加额外内容。"}],
+        "parts": [{"text": VERIFY_SYSTEM_PROMPT}],
     }
     assert result.message == "验证成功"
 
