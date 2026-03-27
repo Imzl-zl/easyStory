@@ -77,7 +77,7 @@ export function ConfigRegistryDetailPanel({
         <div className="space-y-1">
           <h4 className="font-serif text-lg font-semibold">原始 JSON</h4>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">
-            这里显示后端 detail DTO 的完整响应，便于核对字段和提交前的真实结构。
+            完整的配置数据，可用于核对字段。
           </p>
         </div>
         <CodeBlock value={detail} />

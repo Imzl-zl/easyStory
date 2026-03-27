@@ -44,7 +44,7 @@ export function ConfigRegistryEditorPanel({
           </p>
           <h3 className="font-serif text-lg font-semibold">{getEditorTitle(type)}</h3>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">
-            编辑区直接提交完整 JSON DTO。保存前会先做前端 JSON 解析，字段校验继续以后端 422 为准。
+            直接编辑 JSON 格式的配置内容。保存时会校验格式是否正确。
           </p>
         </div>
         {errorMessage ? (
@@ -83,16 +83,16 @@ export function ConfigRegistryEditorPanel({
 
 function getEditorTitle(type: ConfigRegistryType): string {
   if (type === "skills") {
-    return "Skill 配置编辑";
+    return "Skill 配置";
   }
   if (type === "agents") {
-    return "Agent 配置编辑";
+    return "Agent 配置";
   }
   if (type === "hooks") {
-    return "Hook 配置编辑";
+    return "Hook 配置";
   }
   if (type === "mcp_servers") {
-    return "MCP Server 配置编辑";
+    return "MCP Server 配置";
   }
-  return "Workflow 配置编辑";
+  return "Workflow 配置";
 }

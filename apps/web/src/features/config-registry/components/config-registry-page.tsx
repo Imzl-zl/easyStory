@@ -107,7 +107,7 @@ export function ConfigRegistryPage() {
         action={
           <div className="flex flex-wrap gap-2">
             <Link className="ink-button-secondary" href="/workspace/lobby">
-              返回 Lobby
+              返回项目大厅
             </Link>
             <Link
               className="ink-button-secondary"
@@ -120,7 +120,7 @@ export function ConfigRegistryPage() {
       >
         <div className="space-y-4">
           <Banner
-            message="仅配置管理员可访问；若当前账号无权限，页面会直接显示后端返回的 403 / 401 错误。"
+            message="仅配置管理员可访问。若无权限，将显示错误提示。"
             tone="muted"
           />
           {feedback ? <Banner message={feedback.message} tone={feedback.tone} /> : null}

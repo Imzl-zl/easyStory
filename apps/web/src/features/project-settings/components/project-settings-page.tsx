@@ -132,10 +132,10 @@ function ProjectSettingsSidebar({
           </div>
           <div className="flex flex-wrap gap-2">
             <Link className="ink-button-secondary" href={`/workspace/project/${projectId}/studio?panel=setting`}>
-              进入 Studio
+              进入编辑器
             </Link>
             <Link className="ink-button-secondary" href={`/workspace/project/${projectId}/engine`}>
-              打开 Engine
+              打开执行器
             </Link>
             <Link
               className="ink-button-secondary"

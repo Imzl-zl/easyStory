@@ -171,7 +171,7 @@ function TemplateListCard({
         </div>
         <StatusBadge
           status={template.is_builtin ? "approved" : "draft"}
-          label={template.is_builtin ? "Built-in" : "Custom"}
+          label={template.is_builtin ? "内置" : "自定义"}
         />
       </div>
       <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">

@@ -21,9 +21,9 @@ const NEXT_STEP_LABELS: Record<PreparationNextStep, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  ready: "Ready",
-  warning: "Warning",
-  blocked: "Blocked",
+  ready: "就绪",
+  warning: "警告",
+  blocked: "阻塞",
   not_started: "未开始",
   draft: "草稿",
   approved: "已确认",

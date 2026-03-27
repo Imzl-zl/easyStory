@@ -147,7 +147,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
         <PreparationStatusPanel projectId={projectId} />
 
         <Link className="ink-button-secondary w-full justify-center" href={`/workspace/project/${projectId}/engine`}>
-          前往 Engine
+          前往执行器
         </Link>
       </aside>
 

@@ -43,7 +43,7 @@ export function LobbyProjectShelf({
         description={
           deletedOnly
             ? "当前没有已删除项目。"
-            : "先进入 Incubator 创建项目，再进入 Studio 开始补设定和资产。"
+            : "先进入孵化器创建项目，再进入编辑器开始补设定和资产。"
         }
       />
     );
@@ -103,13 +103,13 @@ function LobbyProjectCard({
         {!project.deleted_at ? (
           <>
             <Link className="ink-button" href={`/workspace/project/${project.id}/studio?panel=setting`}>
-              进入 Studio
+              进入编辑器
             </Link>
             <Link className="ink-button-secondary" href={`/workspace/project/${project.id}/settings`}>
               项目设置
             </Link>
             <Link className="ink-button-secondary" href={`/workspace/project/${project.id}/engine`}>
-              打开 Engine
+              打开执行器
             </Link>
             <button
               className="ink-button-danger"

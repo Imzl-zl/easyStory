@@ -59,13 +59,13 @@ function PreparationSummaryCard({
   preparation: ProjectPreparationStatus;
 }>) {
   const badgeStatus = preparation.can_start_workflow ? "ready" : preparation.next_step;
-  const badgeLabel = preparation.can_start_workflow ? "可启动 Workflow" : "待推进";
+  const badgeLabel = preparation.can_start_workflow ? "可启动工作流" : "待推进";
   return (
     <div className="rounded-2xl border border-[rgba(58,124,165,0.16)] bg-[rgba(58,124,165,0.06)] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-            Next Step
+            下一步
           </p>
           <p className="font-medium text-[var(--text-primary)]">
             {formatPreparationNextStep(preparation.next_step)}

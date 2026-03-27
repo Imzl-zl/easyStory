@@ -29,7 +29,7 @@ export type ConfigRegistryMetaRow = {
 };
 
 const CONFIG_REGISTRY_TABS: ConfigRegistryTabOption[] = [
-  { key: "skills", label: "Skills", description: "Prompt 模板、输入输出契约与模型设置。" },
+  { key: "skills", label: "Skills", description: "提示词模板、输入输出定义与模型设置。" },
   { key: "agents", label: "Agents", description: "执行角色、技能绑定与系统提示词。" },
   { key: "hooks", label: "Hooks", description: "触发条件、动作类型与重试策略。" },
   { key: "mcp_servers", label: "MCP Servers", description: "MCP 服务地址、请求头与超时配置。" },
