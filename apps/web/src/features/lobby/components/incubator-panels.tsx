@@ -74,10 +74,10 @@ function renderTemplateModeGuard(
     return (
       <EmptyState
         title="当前没有模板"
-        description="暂无可用模板，可切换到聊天创建模式继续推进项目。"
+        description="暂无可用模板，可切换到聊天共创模式继续推进项目。"
         action={
           <button className="ink-button-secondary" onClick={onSwitchToChat} type="button">
-            切换到聊天创建
+            切换到聊天共创
           </button>
         }
       />
@@ -100,7 +100,7 @@ function renderTemplateListErrorActions(
         重试模板列表
       </button>
       <button className="ink-button-secondary" onClick={onSwitchToChat} type="button">
-        切换到聊天创建
+        切换到聊天共创
       </button>
     </>
   );

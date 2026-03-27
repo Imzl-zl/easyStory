@@ -32,7 +32,7 @@ export function LobbyEntryCard({
         </div>
         <div className="flex justify-between gap-4">
           <dt>推荐方式</dt>
-          <dd>聊天创建 / 模板创建</dd>
+          <dd>聊天共创 / 模板问答</dd>
         </div>
       </dl>
       {templatePreviewNames.length > 0 ? (
