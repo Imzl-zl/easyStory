@@ -30,7 +30,7 @@
 - Credential Center 覆盖提示闭环：带项目上下文查看全局凭证时，可显式看到哪些 provider 已被项目级启用凭证接管
 - Lab 前端 MVP 闭环：`/workspace/project/:projectId/lab` 已支持 `analysis_type / content_id / generated_skill_key` 过滤、详情删除确认、创建结果反馈与组件拆分
 - Workspace Shell 折叠侧栏闭环：全局工作台侧栏现支持桌面端展开/收起、偏好持久化与小屏自动收口，相关导航纯函数已补单测
-- Workspace UI 壳层优化闭环：`WorkspaceShell` 现已改为导航面板 + 主内容舞台结构，侧栏激活态、折叠态、导航语义和共用卡片层级已统一；移动端不再显示无效的展开/收起切换按钮
+- Workspace UI 壳层优化闭环：`WorkspaceShell` 现已改为更克制的导航面板 + 主内容舞台结构，侧栏激活态、折叠态、导航语义和共用卡片层级已统一；同时补齐 `skip link`、`aria-live`、触控细节和输入提示，移动端不再显示无效的展开/收起切换按钮
 - Studio 顶部 Tab 布局闭环：`Studio` 现已改为页头操作区 + 顶部 Tab + 右侧辅助卡片，章节目录只在章节面板内部展示，章节列表已显式区分 loading / error / empty
 - Engine 控制区压缩闭环：`Engine` 现已改为页头控制区 + 顶部状态区 + 全宽详情区，workflow 输入、控制按钮、摘要与调试入口已从左侧控制栏收口
 - 数据库演进闭环：Alembic baseline，startup 与文件型 SQLite helper 优先走 Alembic
@@ -109,6 +109,8 @@
 - 2026-03-26：补齐 `mcp_servers` 配置管理闭环：`config_registry` 后端已支持 list/detail/update，Web 配置中心已新增 `mcp_servers` 类型；后端 `15` 个 config_registry 单测与前端 `tsc/lint/test:unit` 均通过
 - 2026-03-26：完成 runtime/config hardening：assistant hook-agent `response_format` 与 workflow 对齐；`McpPluginProvider` 现在会显式拒绝 disabled server 和 `is_error=true`；workflow staged validation 会在写回前拒绝 assistant-only hook 事件和 stage 错绑；最终 `ruff + 35` 项定向 pytest 通过
 - 2026-03-27：完成 Workspace Shell 全局侧栏折叠首轮改造：新增 `workspace-store.sidebarPreference + hasHydrated`，工作台壳层支持桌面 220/72 切换、小屏自动收口，并补齐 `workspace-shell-support` 单测；前端 `tsc/lint/test:unit` 通过
-- 2026-03-27：完成 Workspace UI 第二轮视觉收口：工作台左栏改为导航面板化结构，主内容区改为统一舞台容器；`panel-shell / panel-muted / ink-tab / SectionCard` 层级同步提级，并修复移动端强制折叠时仍显示侧栏切换按钮的语义问题；前端 `tsc/lint/test:unit` 通过
+- 2026-03-27：完成 Workspace UI 第二轮视觉收口：用户否定首版重装饰方案后，工作台左栏与主内容区已按 `web-design-guidelines` 改回更克制的后台风格；同步补齐 `skip link`、`aria-live`、触控细节、占位提示与省略号文案，并修复移动端强制折叠时仍显示侧栏切换按钮的语义问题；前端 `tsc/lint/test:unit` 通过
+- 2026-03-27：完成前端审查修复收口：WorkspaceShell 已把汉字图标替换为 SVG、删除无效侧栏宽度变量规则并补齐移动端滚动条隐藏与指示条 `transform-origin`；同时新增共享 `PageHeaderShell` 统一 Studio / Engine 页头骨架，`EnginePageStatusSection` 改为数组驱动 banner，前端 `tsc/lint/test:unit` 通过
+- 2026-03-27：完成前端审查 follow-up 修复：`EnginePageStatusSection` 的 banner 改用稳定 `id` 作为 React key，`WorkspaceNavIcon` 改为穷尽式分支，侧栏会话按钮移除死 `data-collapsed` 属性，并删除未使用的全局 `.skip-link` 样式；前端 `tsc/lint/test:unit` 通过
 - 2026-03-27：完成 Studio 顶部 Tab 化：`StudioPage` 已改为页头 + 顶部 Tab + 右侧准备状态卡，章节目录内收至 `Chapter` 面板；同时修复章节列表状态语义，显式区分 loading / error / empty，避免假空态；前端 `tsc/lint/test:unit` 通过
 - 2026-03-27：完成 Engine 控制区压缩：`EnginePage` 已改为页头控制区 + 顶部状态区 + 全宽详情区，workflow 输入、载入动作、控制按钮与导出入口收口到页头，摘要与调试入口移出旧左侧控制栏；前端 `tsc/lint/test:unit` 通过

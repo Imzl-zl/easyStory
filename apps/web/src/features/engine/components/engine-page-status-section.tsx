@@ -26,6 +26,12 @@ type EnginePageStatusSectionProps = {
   workflowSummary: WorkflowSummaryCardData | null;
 };
 
+type StatusBannerItem = {
+  className: string;
+  id: string;
+  message: string;
+};
+
 export function EnginePageStatusSection({
   feedback,
   isActionPending,
@@ -41,40 +47,41 @@ export function EnginePageStatusSection({
   workflowEventsErrorMessage,
   workflowSummary,
 }: Readonly<EnginePageStatusSectionProps>) {
+  const statusBanners = [
+    {
+      className: "border border-[rgba(183,121,31,0.18)] bg-[rgba(183,121,31,0.08)] text-[var(--accent-warning)]",
+      id: "start-disabled",
+      message: startWorkflowDisabledReason,
+    },
+    {
+      className: "bg-[rgba(183,121,31,0.1)] text-[var(--accent-warning)]",
+      id: "events-banner",
+      message: workflowEventsBanner,
+    },
+    {
+      className: "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]",
+      id: "events-error",
+      message: workflowEventsErrorMessage,
+    },
+    {
+      className: "bg-[rgba(58,124,165,0.1)] text-[var(--accent-info)]",
+      id: "feedback",
+      message: feedback,
+    },
+    {
+      className: "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]",
+      id: "workflow-error",
+      message: workflowErrorMessage,
+    },
+  ].filter((item): item is StatusBannerItem => item.message !== null);
+
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-4">
-        {startWorkflowDisabledReason ? (
-          <StatusBanner
-            className="border border-[rgba(183,121,31,0.18)] bg-[rgba(183,121,31,0.08)] text-[var(--accent-warning)]"
-            message={startWorkflowDisabledReason}
-          />
-        ) : null}
-        {workflowEventsBanner ? (
-          <StatusBanner
-            className="bg-[rgba(183,121,31,0.1)] text-[var(--accent-warning)]"
-            message={workflowEventsBanner}
-          />
-        ) : null}
-        {workflowEventsErrorMessage ? (
-          <StatusBanner
-            className="bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]"
-            message={workflowEventsErrorMessage}
-          />
-        ) : null}
+        {statusBanners.map((item) => (
+          <StatusBanner key={item.id} className={item.className} message={item.message} />
+        ))}
         <EngineWorkflowStatusCallout workflow={workflow} onOpenTab={onOpenTab} />
-        {feedback ? (
-          <StatusBanner
-            className="bg-[rgba(58,124,165,0.1)] text-[var(--accent-info)]"
-            message={feedback}
-          />
-        ) : null}
-        {workflowErrorMessage ? (
-          <StatusBanner
-            className="bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]"
-            message={workflowErrorMessage}
-          />
-        ) : null}
         {workflow ? (
           workflowSummary ? <EngineWorkflowSummaryCard summary={workflowSummary} /> : null
         ) : (
@@ -89,7 +96,7 @@ export function EnginePageStatusSection({
                 title={startWorkflowDisabledReason ?? undefined}
                 type="button"
               >
-                {isActionPending ? "处理中..." : primaryActionLabel}
+                {isActionPending ? "处理中…" : primaryActionLabel}
               </button>
             }
           />
@@ -114,5 +121,9 @@ function StatusBanner({
   className: string;
   message: string;
 }>) {
-  return <div className={`rounded-2xl px-4 py-3 text-sm ${className}`}>{message}</div>;
+  return (
+    <div aria-live="polite" className={`rounded-2xl px-4 py-3 text-sm ${className}`} role="status">
+      {message}
+    </div>
+  );
 }

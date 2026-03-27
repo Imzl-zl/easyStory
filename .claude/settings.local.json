@@ -20,7 +20,14 @@
       "Bash(where python:*)",
       "Bash(python:*)",
       "Bash(git diff:*)",
-      "Bash(uv run:*)"
+      "Bash(uv run:*)",
+      "Bash(python3 -m json.tool)",
+      "Bash(npx:*)",
+      "Bash(echo:*)",
+      "Read(//tmp/**)",
+      "Bash(npm install:*)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=~/.cache/ms-playwright npx @playwright/mcp@latest --help 2>&1 | grep -i 'browser\\\\|executable' | head -10)"
     ]
   }
 }

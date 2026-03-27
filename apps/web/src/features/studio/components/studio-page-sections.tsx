@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeaderShell } from "@/components/ui/page-header-shell";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PreparationStatusPanel } from "@/features/project/components/preparation-status-panel";
 import { StudioStaleChapterPanel } from "@/features/studio/components/studio-stale-chapter-panel";
@@ -49,33 +50,14 @@ export function StudioPageHeader({
   projectStatus,
 }: Readonly<StudioPageHeaderProps>) {
   return (
-    <section className="panel-shell p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.28em] text-[var(--accent-ink)]">工作室</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-serif text-3xl font-semibold text-[var(--text-primary)]">
-              {projectName}
-            </h1>
-            {projectStatus ? <StatusBadge status={projectStatus} /> : null}
-          </div>
-          <p className="max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
-            在这里维护项目设定、前置资产和章节正文，保持创作上下文集中而清晰。
-          </p>
-        </div>
-        <Link
-          className="ink-button-secondary"
-          href={`/workspace/project/${projectId}/engine`}
-        >
-          前往执行器
-        </Link>
-      </div>
-      <StudioPageTabs
-        activePanel={activePanel}
-        isPending={isPending}
-        onSelectPanel={onSelectPanel}
-      />
-    </section>
+    <PageHeaderShell
+      actions={<Link className="ink-button-secondary" href={`/workspace/project/${projectId}/engine`}>前往执行器</Link>}
+      description="在这里维护项目设定、前置资产和章节正文，保持创作上下文集中而清晰。"
+      eyebrow="工作室"
+      footer={<StudioPageTabs activePanel={activePanel} isPending={isPending} onSelectPanel={onSelectPanel} />}
+      title={projectName}
+      titleBadges={projectStatus ? <StatusBadge status={projectStatus} /> : null}
+    />
   );
 }
 
@@ -132,7 +114,7 @@ function StudioPageTabs({
   return (
     <nav
       aria-label="工作室标签"
-      className="mt-6 flex flex-wrap gap-2 border-t border-[var(--line-soft)] pt-5"
+      className="flex flex-wrap gap-2"
     >
       {listStudioPanelOptions().map((item) => (
         <button
@@ -168,13 +150,19 @@ function StudioChapterNavigatorBody({
   return (
     <>
       {errorMessage ? (
-        <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+        <div
+          aria-live="polite"
+          className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]"
+          role="status"
+        >
           {errorMessage}
         </div>
       ) : null}
 
       {listState === "loading" ? (
-        <p className="text-sm text-[var(--text-secondary)]">正在加载章节列表...</p>
+        <p aria-live="polite" className="text-sm text-[var(--text-secondary)]" role="status">
+          正在加载章节列表…
+        </p>
       ) : null}
 
       {listState === "error" ? (

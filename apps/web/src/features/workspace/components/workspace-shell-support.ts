@@ -4,16 +4,16 @@ const PROJECT_PATH_PATTERN = /^\/workspace\/project\/([^/]+)\//;
 const PROJECT_SETTINGS_PATH_PATTERN = /^\/workspace\/project\/[^/]+\/settings(?:\/|$)/;
 const LOBBY_PATH_PREFIX = "/workspace/lobby";
 const PROJECT_WORKSPACE_ITEMS = [
-  { label: "工作室", meta: "创作编辑", segment: "studio", shortLabel: "作" },
-  { label: "引擎", meta: "执行控制", segment: "engine", shortLabel: "控" },
-  { label: "实验室", meta: "分析结果", segment: "lab", shortLabel: "析" },
+  { label: "工作室", meta: "创作编辑", segment: "studio" },
+  { label: "引擎", meta: "执行控制", segment: "engine" },
+  { label: "实验室", meta: "分析结果", segment: "lab" },
 ] as const;
 const WORKSPACE_SIDEBAR_WIDTH = {
   collapsed: "72px",
   expanded: "220px",
 } as const;
 
-type WorkspaceSegment = "lobby" | "studio" | "engine" | "lab";
+export type WorkspaceSegment = "lobby" | "studio" | "engine" | "lab";
 
 export type WorkspaceNavItem = {
   disabled: boolean;
@@ -21,7 +21,6 @@ export type WorkspaceNavItem = {
   label: string;
   meta: string;
   segment: WorkspaceSegment;
-  shortLabel: string;
 };
 
 export function buildWorkspaceItems(
@@ -36,7 +35,6 @@ export function buildWorkspaceItems(
       label: "项目大厅",
       meta: "项目总览",
       segment: "lobby",
-      shortLabel: "项",
     },
     ...PROJECT_WORKSPACE_ITEMS.map((item) => ({
       disabled: projectId === null,
@@ -44,7 +42,6 @@ export function buildWorkspaceItems(
       label: item.label,
       meta: item.meta,
       segment: item.segment,
-      shortLabel: item.shortLabel,
     })),
   ];
 }

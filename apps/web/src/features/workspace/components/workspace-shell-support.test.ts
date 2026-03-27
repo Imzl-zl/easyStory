@@ -21,7 +21,7 @@ test("buildWorkspaceItems reuses the last project when route context is absent",
   const items = buildWorkspaceItems(null, "project-2");
   assert.equal(items[0]?.href, "/workspace/lobby");
   assert.equal(items[1]?.href, "/workspace/project/project-2/studio");
-  assert.equal(items[3]?.shortLabel, "析");
+  assert.equal(items[3]?.segment, "lab");
 });
 
 test("buildWorkspaceItems disables project views when no current project exists", () => {

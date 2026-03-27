@@ -19,15 +19,17 @@ import {
   shouldShowWorkspaceSidebarToggle,
   type WorkspaceNavItem,
 } from "@/features/workspace/components/workspace-shell-support";
+import {
+  WorkspaceBrandIcon,
+  WorkspaceLogoutIcon,
+  WorkspaceNavIcon,
+  WorkspaceToggleIcon,
+} from "@/features/workspace/components/workspace-shell-icons";
 import styles from "@/features/workspace/components/workspace-shell.module.css";
 
 const MOBILE_VIEWPORT_MEDIA_QUERY = "(max-width: 1023px)";
 
-export function WorkspaceShell({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
   const clearSession = useAuthStore((state) => state.clearSession);
@@ -53,6 +55,7 @@ export function WorkspaceShell({
 
   return (
     <AuthGuard>
+      <a className={styles.skipLink} href="#workspace-main">跳到主内容</a>
       <div
         className={`${styles.shell} min-h-screen gap-4 p-3 lg:gap-6 lg:p-6`}
         style={
@@ -71,7 +74,7 @@ export function WorkspaceShell({
           onLogout={clearSession}
           onToggle={() => setSidebarPreference(getNextSidebarPreference(sidebarPreference))}
         />
-        <main className={styles.content}>
+        <main className={styles.content} id="workspace-main">
           <div className={styles.contentFrame}>
             <div className={`${styles.contentInner} space-y-6`}>{children}</div>
           </div>
@@ -107,24 +110,22 @@ function WorkspaceSidebar({
       data-collapsed={isCollapsed}
     >
       <div className={styles.sidebarTop}>
-        <div className={styles.brandPanel}>
-          <div className="flex items-start justify-between gap-3">
-            <WorkspaceSidebarBrand />
-            {shouldShowWorkspaceSidebarToggle(isMobileViewport) ? (
-              <WorkspaceSidebarToggle
-                isCollapsed={isCollapsed}
-                sidebarPreference={sidebarPreference}
-                onToggle={onToggle}
-              />
-            ) : null}
-          </div>
+        <div className="flex items-start justify-between gap-3">
+          <WorkspaceSidebarBrand />
+          {shouldShowWorkspaceSidebarToggle(isMobileViewport) ? (
+            <WorkspaceSidebarToggle
+              isCollapsed={isCollapsed}
+              sidebarPreference={sidebarPreference}
+              onToggle={onToggle}
+            />
+          ) : null}
         </div>
-        <div className={styles.navSection}>
+        <div>
           <p className={styles.sectionLabel}>主导航</p>
           <WorkspaceSidebarNav items={items} pathname={pathname} />
         </div>
       </div>
-      <WorkspaceSidebarSession isCollapsed={isCollapsed} userName={userName} onLogout={onLogout} />
+      <WorkspaceSidebarSession userName={userName} onLogout={onLogout} />
     </aside>
   );
 }
@@ -162,7 +163,9 @@ function subscribeToMobileViewport(onStoreChange: () => void) {
 function WorkspaceSidebarBrand() {
   return (
     <div className="flex min-w-0 items-start gap-3">
-      <span className={`${styles.glyph} mt-0.5 font-serif text-lg font-semibold`}>易</span>
+      <span aria-hidden="true" className={`${styles.glyph} mt-0.5`}>
+        <WorkspaceBrandIcon />
+      </span>
       <div className={`${styles.brandCopy} min-w-0 space-y-1`}>
         <p className="text-xs uppercase tracking-[0.3em] text-[var(--accent-ink)]">easyStory</p>
         <h1 className="font-serif text-2xl leading-tight font-semibold lg:text-3xl">水墨流工作台</h1>
@@ -174,13 +177,7 @@ function WorkspaceSidebarBrand() {
   );
 }
 
-function WorkspaceSidebarNav({
-  items,
-  pathname,
-}: Readonly<{
-  items: WorkspaceNavItem[];
-  pathname: string;
-}>) {
+function WorkspaceSidebarNav({ items, pathname }: Readonly<{ items: WorkspaceNavItem[]; pathname: string }>) {
   return (
     <nav aria-label="主导航" className={`${styles.nav} grid gap-2`}>
       {items.map((item) => <WorkspaceSidebarNavItem item={item} key={item.label} pathname={pathname} />)}
@@ -188,17 +185,13 @@ function WorkspaceSidebarNav({
   );
 }
 
-function WorkspaceSidebarNavItem({
-  item,
-  pathname,
-}: Readonly<{
-  item: WorkspaceNavItem;
-  pathname: string;
-}>) {
+function WorkspaceSidebarNavItem({ item, pathname }: Readonly<{ item: WorkspaceNavItem; pathname: string }>) {
   const navMeta = item.disabled ? "选择项目" : item.meta;
   const navContent = (
     <>
-      <span aria-hidden="true" className={styles.glyph}>{item.shortLabel}</span>
+      <span aria-hidden="true" className={styles.glyph}>
+        <WorkspaceNavIcon segment={item.segment} />
+      </span>
       <span className={styles.navCopy}>
         <span className={styles.navLabel}>{item.label}</span>
         <span className={`${styles.navMeta} text-xs`}>
@@ -237,12 +230,7 @@ function WorkspaceSidebarNavItem({
   );
 }
 
-function WorkspaceSidebarSession({
-  isCollapsed,
-  onLogout,
-  userName,
-}: Readonly<{
-  isCollapsed: boolean;
+function WorkspaceSidebarSession({ onLogout, userName }: Readonly<{
   onLogout: () => void;
   userName: string;
 }>) {
@@ -261,22 +249,19 @@ function WorkspaceSidebarSession({
       <button
         aria-label="退出登录"
         className={`ink-button-secondary ${styles.logoutButton} w-full`}
-        data-collapsed={isCollapsed}
         onClick={onLogout}
         type="button"
       >
-        <span aria-hidden="true" className={styles.glyph}>退</span>
+        <span aria-hidden="true" className={styles.glyph}>
+          <WorkspaceLogoutIcon />
+        </span>
         <span className={styles.logoutLabel}>退出登录</span>
       </button>
     </div>
   );
 }
 
-function WorkspaceSidebarToggle({
-  isCollapsed,
-  onToggle,
-  sidebarPreference,
-}: Readonly<{
+function WorkspaceSidebarToggle({ isCollapsed, onToggle, sidebarPreference }: Readonly<{
   isCollapsed: boolean;
   onToggle: () => void;
   sidebarPreference: "expanded" | "collapsed";
@@ -291,7 +276,9 @@ function WorkspaceSidebarToggle({
       title={label}
       type="button"
     >
-      <span aria-hidden="true" className={styles.toggleIcon}>{isCollapsed ? "展" : "收"}</span>
+      <span aria-hidden="true" className={styles.toggleIcon}>
+        <WorkspaceToggleIcon collapsed={isCollapsed} />
+      </span>
     </button>
   );
 }

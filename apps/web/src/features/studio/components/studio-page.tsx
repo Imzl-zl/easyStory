@@ -79,13 +79,17 @@ export function StudioPage({ projectId }: StudioPageProps) {
           })
         }
         projectId={projectId}
-        projectName={projectQuery.data?.name ?? "正在加载项目..."}
+        projectName={projectQuery.data?.name ?? "正在加载项目…"}
         projectStatus={projectQuery.data?.status ?? null}
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
-          {projectQuery.isLoading ? <p className="text-sm text-[var(--text-secondary)]">正在加载项目...</p> : null}
+          {projectQuery.isLoading ? (
+            <p aria-live="polite" className="text-sm text-[var(--text-secondary)]" role="status">
+              正在加载项目…
+            </p>
+          ) : null}
           {projectQuery.error ? (
             <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
               {getErrorMessage(projectQuery.error)}
