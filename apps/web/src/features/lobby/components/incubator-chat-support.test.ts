@@ -9,6 +9,7 @@ import {
   createIncubatorInitialMessages,
   createIncubatorMessage,
   INCUBATOR_DEFAULT_PROVIDER,
+  resolveIncubatorAssistantReply,
   shouldShowPromptSuggestions,
   shouldSubmitIncubatorComposer,
 } from "./incubator-chat-support";
@@ -109,5 +110,17 @@ test("incubator chat support uses Enter to submit and keeps Shift+Enter for newl
   assert.equal(
     shouldSubmitIncubatorComposer({ isComposing: false, key: "a", shiftKey: false }),
     false,
+  );
+});
+
+test("incubator chat support turns retired model replies into error guidance", () => {
+  assert.deepEqual(
+    resolveIncubatorAssistantReply(
+      "Gemini 3 Pro is no longer available. Please switch to Gemini 3.1 Pro in the latest version of Antigravity.",
+    ),
+    {
+      content: "当前默认模型已不可用，请换成可用模型后再试。上游提示：Gemini 3 Pro is no longer available. Please switch to Gemini 3.1 Pro in the latest version of Antigravity. 你可以先到“模型连接”里修改默认模型，再回来继续聊天。",
+      status: "error",
+    },
   );
 });

@@ -1,3 +1,4 @@
+import { normalizeModelProviderMessage, looksLikeRetiredModelMessage } from "@/lib/api/error-copy";
 import type { AssistantMessage, AssistantModelConfig, ProjectSetting } from "@/lib/api/types";
 
 export const INCUBATOR_DEFAULT_PROVIDER = "";
@@ -72,6 +73,17 @@ export function replaceIncubatorMessage(
   nextMessage: IncubatorChatMessage,
 ): IncubatorChatMessage[] {
   return messages.map((message) => (message.id === messageId ? nextMessage : message));
+}
+
+export function resolveIncubatorAssistantReply(content: string) {
+  const trimmed = content.trim();
+  if (!looksLikeRetiredModelMessage(trimmed)) {
+    return { content, status: undefined };
+  }
+  return {
+    content: `${normalizeModelProviderMessage(trimmed)} 你可以先到“模型连接”里修改默认模型，再回来继续聊天。`,
+    status: "error" as const,
+  };
 }
 
 export function buildAssistantTurnMessages(

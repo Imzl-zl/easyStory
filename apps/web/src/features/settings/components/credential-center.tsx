@@ -9,6 +9,7 @@ import {
 import { CredentialCenterContent } from "@/features/settings/components/credential-center-content";
 import {
   resolveCredentialActionFeedback,
+  resolveCredentialActionErrorFeedback,
   type CredentialCenterFeedback,
 } from "@/features/settings/components/credential-center-feedback";
 import { buildCredentialOverrideInfoByCredentialId } from "@/features/settings/components/credential-center-override-support";
@@ -195,10 +196,7 @@ export function CredentialCenter({
       await refresh();
     },
     onError: (error) =>
-      setFeedback({
-        message: getErrorMessage(error),
-        tone: "danger",
-      }),
+      setFeedback(resolveCredentialActionErrorFeedback(error)),
   });
   const isFormPending = createMutation.isPending || updateMutation.isPending;
   const isInteractionPending = isNavigationPending || isFormPending || actionMutation.isPending;

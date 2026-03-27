@@ -22,6 +22,7 @@ import {
   INCUBATOR_CHAT_SKILL_ID,
   INITIAL_INCUBATOR_CHAT_SETTINGS,
   replaceIncubatorMessage,
+  resolveIncubatorAssistantReply,
   resolveIncubatorModelName,
   resolveIncubatorProvider,
   type IncubatorChatMessage,
@@ -216,10 +217,11 @@ async function completePromptSubmission({
   submission: NonNullable<ReturnType<typeof buildPromptSubmission>>;
 }) {
   const result = await assistantMutation.mutateAsync(submission.submittedMessages);
+  const assistantReply = resolveIncubatorAssistantReply(result.content);
   const resolvedMessages = replaceIncubatorMessage(
     submission.nextMessages,
     submission.pendingAssistant.id,
-    createIncubatorMessage("assistant", result.content),
+    createIncubatorMessage("assistant", assistantReply.content, { status: assistantReply.status }),
   );
   setMessages(resolvedMessages);
 }
