@@ -6,18 +6,10 @@ import type {
   TemplateGuidedQuestion,
 } from "@/lib/api/types";
 
-export const MAX_INCUBATOR_CONVERSATION_LENGTH = 8000;
-
 export type TemplateFormState = {
   projectName: string;
   allowSystemCredentialPool: boolean;
   answerValues: Record<string, string>;
-};
-
-export type ChatFormState = {
-  conversationText: string;
-  provider: string;
-  modelName: string;
 };
 
 export const INITIAL_TEMPLATE_FORM: TemplateFormState = {
@@ -26,24 +18,18 @@ export const INITIAL_TEMPLATE_FORM: TemplateFormState = {
   answerValues: {},
 };
 
-export const INITIAL_CHAT_FORM: ChatFormState = {
-  conversationText: "",
-  provider: "",
-  modelName: "",
-};
-
 export const EMPTY_GUIDED_QUESTIONS: TemplateGuidedQuestion[] = [];
 
 export const INCUBATOR_MODE_OPTIONS = [
   {
+    id: "chat",
+    label: "聊天创建",
+    description: "先和 AI 聊方向与故事钩子，再把对话整理成项目草稿。",
+  },
+  {
     id: "template",
     label: "模板问答",
     description: "选择模板、回答引导问题，先生成 Project Setting 草稿，再决定是否创建项目。",
-  },
-  {
-    id: "chat",
-    label: "自由描述",
-    description: "输入一段创作意图，由后端提取设定草稿并返回后续补问。",
   },
 ] as const;
 
@@ -74,14 +60,6 @@ export function buildTemplateDraftFingerprint(
   answers: ProjectIncubatorAnswer[],
 ): string {
   return JSON.stringify({ templateId, answers });
-}
-
-export function buildConversationDraftFingerprint(form: ChatFormState): string {
-  return JSON.stringify({
-    conversationText: form.conversationText.trim(),
-    provider: form.provider.trim(),
-    modelName: form.modelName.trim(),
-  });
 }
 
 export function buildTemplatePreviewEmptyMessage({

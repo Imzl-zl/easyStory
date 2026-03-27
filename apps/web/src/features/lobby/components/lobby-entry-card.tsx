@@ -22,7 +22,7 @@ export function LobbyEntryCard({
       <div className="space-y-1">
         <h3 className="font-serif text-lg font-semibold">创建项目</h3>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          选择模板或通过问答引导，快速创建新项目。
+          先和 AI 聊出方向，再把结果沉淀成项目草稿。
         </p>
       </div>
       <dl className="grid gap-3 text-sm text-[var(--text-secondary)]">
@@ -32,7 +32,7 @@ export function LobbyEntryCard({
         </div>
         <div className="flex justify-between gap-4">
           <dt>推荐方式</dt>
-          <dd>模板问答 / 自由描述</dd>
+          <dd>聊天创建 / 模板创建</dd>
         </div>
       </dl>
       {templatePreviewNames.length > 0 ? (
@@ -52,7 +52,7 @@ export function LobbyEntryCard({
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Link className="ink-button flex-1 justify-center" href="/workspace/lobby/new">
-          创建项目
+          和 AI 一起想故事
         </Link>
         <Link className="ink-button-secondary flex-1 justify-center" href="/workspace/lobby/templates">
           模板库
