@@ -45,7 +45,7 @@ class FakeVerifier:
         assert extra_headers == {"X-Trace-Id": "api-check"}
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
-            message="Credential verified",
+            message="验证成功",
         )
 
 
@@ -102,7 +102,7 @@ async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> 
             )
 
         assert verify_response.status_code == 200
-        assert verify_response.json()["message"] == "Credential verified"
+        assert verify_response.json()["message"] == "验证成功"
     finally:
         clear_settings_cache()
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)

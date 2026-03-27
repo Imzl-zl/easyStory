@@ -62,7 +62,7 @@ test("incubator chat credential support keeps only active unique providers", () 
   assert.deepEqual(options, [
     {
       defaultModel: "gpt-4.1-mini",
-      displayLabel: "OpenAI 主账号 · openai",
+      displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
       provider: "openai",
     },
   ]);
@@ -75,6 +75,6 @@ test("incubator chat credential support builds setup notice when no credential e
   assert.equal(buildIncubatorCredentialNotice(true, []), null);
   assert.equal(
     buildIncubatorCredentialNotice(false, []),
-    "当前账号还没有启用任何模型凭证。先去凭证中心启用一个 provider，再回来和 AI 聊故事。",
+    "当前账号还没有启用任何模型连接。先去模型连接里启用一条，再回来继续聊天。",
   );
 });

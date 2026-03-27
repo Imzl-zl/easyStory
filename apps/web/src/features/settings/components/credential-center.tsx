@@ -131,7 +131,7 @@ export function CredentialCenter({
       ),
     onSuccess: async () => {
       setFeedback({
-        message: scope === "project" ? "项目级凭证已创建。" : "全局凭证已创建。",
+        message: scope === "project" ? "项目级模型连接已创建。" : "全局模型连接已创建。",
         tone: "info",
       });
       setCreateFormVersion((current) => current + 1);
@@ -154,7 +154,7 @@ export function CredentialCenter({
     },
     onSuccess: async (updatedCredential) => {
       setFeedback({
-        message: "凭证已更新。",
+        message: "模型连接已更新。",
         tone: "info",
       });
       onSelectCredentialForEdit?.(updatedCredential.id);
@@ -231,8 +231,8 @@ export function CredentialCenter({
 
   return (
     <SectionCard
-      title="凭证中心"
-      description="配置 AI 模型连接，管理 API 凭证。"
+      title="模型连接"
+      description="配置并管理 AI 模型连接。可同时添加多个连接，按项目场景灵活切换。"
       action={headerAction}
     >
       <div className="space-y-5">
@@ -244,14 +244,14 @@ export function CredentialCenter({
           onScopeChange={handleScopeChange}
         />
         <CredentialModeTabs isPending={isInteractionPending} mode={mode} onModeChange={handleModeChange} />
-        {query.isLoading ? <p className="text-sm text-[var(--text-secondary)]">正在加载凭证...</p> : null}
+        {query.isLoading ? <p className="text-sm text-[var(--text-secondary)]">正在加载模型连接...</p> : null}
         {query.error ? (
           <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
             {getErrorMessage(query.error)}
           </div>
         ) : null}
         {shouldLoadOverrideHints && overrideQuery.isLoading ? (
-          <p className="text-sm text-[var(--text-secondary)]">正在检查当前项目是否存在项目级覆盖凭证...</p>
+          <p className="text-sm text-[var(--text-secondary)]">正在检查当前项目是否存在项目级覆盖连接...</p>
         ) : null}
         {shouldLoadOverrideHints && overrideQuery.error ? (
           <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">

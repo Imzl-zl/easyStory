@@ -32,7 +32,7 @@ export function IncubatorPage() {
     <div className="space-y-6">
       <PageHeaderShell
         actions={<Link className="ink-button-secondary" href="/workspace/lobby">返回项目大厅</Link>}
-        description="别先填表，先把模糊想法聊出来。聊天负责发散，右侧草稿负责收敛，确认后再创建项目。"
+        description="先把模糊想法聊开，再把已经确定的内容整理成项目草稿。聊顺了再创建项目，不用一上来就填完整设定。"
         eyebrow="创作启动台"
         footer={<ModeTabs mode={mode} onModeChange={handleModeChange} />}
         title="和 AI 一起想故事"

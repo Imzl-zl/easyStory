@@ -27,7 +27,7 @@ export function CredentialScopeTabs({
         onClick={() => onScopeChange?.("user")}
         type="button"
       >
-        全局凭证
+        全局连接
       </button>
       <button
         className="ink-tab"
@@ -36,10 +36,10 @@ export function CredentialScopeTabs({
         onClick={() => onScopeChange?.("project")}
         type="button"
       >
-        当前项目凭证
+        当前项目连接
       </button>
       {!canUseProjectScope ? (
-        <p className="text-sm text-[var(--text-secondary)]">未提供项目上下文，当前只能管理全局凭证。</p>
+        <p className="text-sm text-[var(--text-secondary)]">当前没有项目上下文，只能管理全局连接。</p>
       ) : projectId ? (
         <p className="text-sm text-[var(--text-secondary)]">项目上下文：{projectId}</p>
       ) : null}
@@ -59,7 +59,7 @@ export function CredentialModeTabs({
   return (
     <div className="flex flex-wrap gap-2">
       {[
-        ["list", "凭证列表"],
+        ["list", "连接列表"],
         ["audit", "审计日志"],
       ].map(([value, label]) => (
         <button

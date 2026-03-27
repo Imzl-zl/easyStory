@@ -26,6 +26,7 @@ import {
 } from "./incubator-page-model-support";
 
 export type IncubatorChatModel = {
+  applyPromptSuggestion: (prompt: string) => void;
   canChat: boolean;
   composerText: string;
   credentialNotice: string | null;
@@ -53,7 +54,7 @@ export function useIncubatorChatModel(
   const state = useChatState();
   const credentialModel = useIncubatorChatCredentialModel(state.settings, state.setSettings);
   const conversationFingerprint = useConversationFingerprint(state.messages, state.settings);
-  const draftMutation = useIncubatorDraftMutation(state.settings, setFeedback);
+  const draftMutation = useIncubatorDraftMutation(state.settings);
   const createMutation = useIncubatorCreateMutation({
     draftSetting: draftMutation.data?.project_setting ?? null,
     projectName: state.projectName,
@@ -63,20 +64,16 @@ export function useIncubatorChatModel(
   const assistantMutation = useIncubatorAssistantMutation(state.settings);
   const baseSubmitPrompt = useIncubatorPromptSubmit({
     assistantMutation,
-    draftMutation,
     isResponding: assistantMutation.isPending,
     messages: state.messages,
     setComposerText: state.setComposerText,
-    setDraftFingerprint: state.setDraftFingerprint,
     setFeedback,
     setMessages: state.setMessages,
-    settings: state.settings,
   });
   const syncDraft = useIncubatorDraftSync({
     draftMutation,
     messages: state.messages,
     setDraftFingerprint: state.setDraftFingerprint,
-    setFeedback,
     settings: state.settings,
   });
 
@@ -87,6 +84,7 @@ export function useIncubatorChatModel(
   );
 
   return {
+    applyPromptSuggestion: (prompt: string) => state.setComposerText(prompt),
     canChat: credentialModel.canChat,
     composerText: state.composerText,
     credentialNotice: credentialModel.credentialNotice,

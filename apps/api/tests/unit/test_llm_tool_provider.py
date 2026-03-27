@@ -92,7 +92,12 @@ def test_execute_builds_openai_responses_request() -> None:
     assert request.url == "https://api.openai.com/v1/responses"
     assert request.json_body["model"] == "gpt-4.1-mini"
     assert request.json_body["instructions"] == "保持简洁"
-    assert request.json_body["input"] == [{"role": "user", "content": "写个摘要"}]
+    assert request.json_body["input"] == [
+        {
+            "role": "user",
+            "content": [{"type": "input_text", "text": "写个摘要"}],
+        }
+    ]
     assert request.json_body["max_output_tokens"] == 128
     assert request.json_body["text"] == {"format": {"type": "json_object"}}
     assert result["content"] == "responses 结果"

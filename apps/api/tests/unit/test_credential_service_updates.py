@@ -40,7 +40,7 @@ class FakeVerifier:
         assert default_model
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
-            message="Credential verified",
+            message="验证成功",
         )
 
 

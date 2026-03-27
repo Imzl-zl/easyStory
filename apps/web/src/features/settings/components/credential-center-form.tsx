@@ -43,14 +43,14 @@ export function CredentialCenterForm({
       }}
     >
       <div className="space-y-1">
-        <h3 className="font-serif text-lg font-semibold">{mode === "edit" ? "编辑凭证" : "新增凭证"}</h3>
+        <h3 className="font-serif text-lg font-semibold">{mode === "edit" ? "编辑模型连接" : "新增模型连接"}</h3>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          所有失败会直接透出后端原因，不做静默降级。`provider` 仅作为渠道键，真正请求协议由接口类型决定。
+          你可以同时添加多个模型连接。想再加一条时，换一个新的连接标识即可，例如“openai-main”“mint-backup”。
         </p>
       </div>
       {mode === "create" ? (
         <FieldInput
-          label="渠道键 / Provider Key"
+          label="连接标识"
           placeholder="openai / openrouter / volcengine / my-proxy"
           required
           value={formState.provider}
@@ -58,9 +58,9 @@ export function CredentialCenterForm({
         />
       ) : (
         <StaticField
-          label="渠道键 / Provider Key"
+          label="连接标识"
           value={formState.provider}
-          description="渠道键创建后不可修改。"
+          description="连接标识创建后不可修改。"
         />
       )}
       <label className="block">
@@ -88,16 +88,16 @@ export function CredentialCenterForm({
         onChange={(value) => setFormState((current) => ({ ...current, displayName: value }))}
       />
       <FieldInput
-        label="API Key"
+        label="访问密钥"
         autoComplete="new-password"
-        placeholder={mode === "edit" ? "留空表示不轮换当前 API Key" : undefined}
+        placeholder={mode === "edit" ? "留空表示不更换当前访问密钥" : undefined}
         required={mode === "create"}
         type="password"
         value={formState.apiKey}
         onChange={(value) => setFormState((current) => ({ ...current, apiKey: value }))}
       />
       <FieldInput
-        label="Base URL"
+        label="接口地址"
         placeholder="https://api.openai.com"
         type="url"
         value={formState.baseUrl}
@@ -114,7 +114,7 @@ export function CredentialCenterForm({
         <div className="space-y-1">
           <h4 className="font-serif text-base font-semibold">高级兼容设置</h4>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">
-            只在上游不是标准官方接口时再改这里。默认情况下，保持“跟随接口类型默认”即可。
+            只有在上游接口有特殊要求时才需要修改。一般保持“跟随接口类型默认”即可。
           </p>
         </div>
         <label className="block">
@@ -140,12 +140,12 @@ export function CredentialCenterForm({
             ))}
           </select>
           <p className="mt-2 text-xs text-[var(--text-secondary)]">
-            当前接口类型默认使用 {getDefaultAuthStrategy(formState.apiDialect)}。
+            当前接口类型默认使用：{getDefaultAuthStrategy(formState.apiDialect)}。
           </p>
         </label>
         <FieldInput
           disabled={formState.authStrategy !== "custom_header"}
-          label="API Key Header 名称"
+          label="访问密钥请求头名称"
           placeholder="例如：api-key"
           value={formState.apiKeyHeaderName}
           onChange={(value) => setFormState((current) => ({ ...current, apiKeyHeaderName: value }))}
@@ -161,10 +161,10 @@ export function CredentialCenterForm({
             }
           />
           <p className="mt-2 text-xs text-[var(--text-secondary)]">
-            请输入 JSON 对象。这里适合放 Referer、租户标识、上游要求的自定义 Header。
+            请输入 JSON 对象。这里适合填写站点来源、租户标识等非敏感请求头。
           </p>
           <p className="mt-2 text-xs text-[var(--text-secondary)]">
-            这里只支持非敏感元数据请求头；鉴权、Token、Secret 一类请求头请改用上面的鉴权方式配置。
+            这里只支持非敏感请求头；鉴权、Token、Secret 等敏感信息请用上面的鉴权方式配置。
           </p>
         </label>
       </div>
@@ -182,11 +182,11 @@ export function CredentialCenterForm({
       ) : null}
       <div className="flex flex-wrap gap-3">
         <button className="ink-button flex-1" disabled={isPending} type="submit">
-          {isPending ? "提交中..." : mode === "edit" ? "保存修改" : "创建凭证"}
+          {isPending ? "提交中..." : mode === "edit" ? "保存修改" : "保存连接"}
         </button>
         {mode === "edit" && onReset ? (
           <button className="ink-button-secondary" disabled={isPending} onClick={onReset} type="button">
-            回到新增
+            新增另一个连接
           </button>
         ) : null}
       </div>

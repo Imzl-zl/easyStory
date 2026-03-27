@@ -23,13 +23,13 @@ export const EMPTY_GUIDED_QUESTIONS: TemplateGuidedQuestion[] = [];
 export const INCUBATOR_MODE_OPTIONS = [
   {
     id: "chat",
-    label: "聊天创建",
-    description: "先和 AI 聊方向与故事钩子，再把对话整理成项目草稿。",
+    label: "聊天共创",
+    description: "先和 AI 把方向聊顺，再把对话整理成项目草稿。",
   },
   {
     id: "template",
     label: "模板问答",
-    description: "选择模板、回答引导问题，先生成 Project Setting 草稿，再决定是否创建项目。",
+    description: "选择模板、回答引导问题，先生成项目设定草稿，再决定是否创建项目。",
   },
 ] as const;
 

@@ -51,7 +51,7 @@ class FakeVerifier:
         assert extra_headers is None
         return CredentialVerificationResult(
             verified_at=self.verified_at,
-            message="Credential verified",
+            message="验证成功",
         )
 
 

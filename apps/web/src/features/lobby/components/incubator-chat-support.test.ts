@@ -9,6 +9,8 @@ import {
   createIncubatorInitialMessages,
   createIncubatorMessage,
   INCUBATOR_DEFAULT_PROVIDER,
+  shouldShowPromptSuggestions,
+  shouldSubmitIncubatorComposer,
 } from "./incubator-chat-support";
 
 test("incubator chat support builds draft transcript from first user message onward", () => {
@@ -84,4 +86,28 @@ test("incubator chat support suggests project names from available setting signa
     "宗门弃徒成长记",
   );
   assert.equal(buildSuggestedProjectName({}), "未命名新故事");
+});
+
+test("incubator chat support only shows suggestions before the first user message", () => {
+  assert.equal(shouldShowPromptSuggestions(false), true);
+  assert.equal(shouldShowPromptSuggestions(true), false);
+});
+
+test("incubator chat support uses Enter to submit and keeps Shift+Enter for newline", () => {
+  assert.equal(
+    shouldSubmitIncubatorComposer({ isComposing: false, key: "Enter", shiftKey: false }),
+    true,
+  );
+  assert.equal(
+    shouldSubmitIncubatorComposer({ isComposing: false, key: "Enter", shiftKey: true }),
+    false,
+  );
+  assert.equal(
+    shouldSubmitIncubatorComposer({ isComposing: true, key: "Enter", shiftKey: false }),
+    false,
+  );
+  assert.equal(
+    shouldSubmitIncubatorComposer({ isComposing: false, key: "a", shiftKey: false }),
+    false,
+  );
 });

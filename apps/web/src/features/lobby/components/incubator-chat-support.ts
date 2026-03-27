@@ -38,12 +38,12 @@ const INCUBATOR_SYSTEM_MESSAGE = [
   "如果用户说不知道写什么，先给 2 到 3 个具体故事方向，每个方向都要有题材、主角钩子、核心冲突。",
   "回答保持中文、直接、有人味，避免术语堆砌。",
   "不要把回复写成表单或大纲问卷。",
-  "当信息已经足够整理项目草稿时，可以提醒用户右侧草稿已经可以创建项目。",
+  "当信息已经足够整理项目草稿时，可以提醒用户已经可以整理草稿并创建项目。",
 ].join("\n");
 
 const INCUBATOR_WELCOME_MESSAGE = [
-  "可以直接把模糊想法丢给我。",
-  "如果你现在完全没方向，也可以先问“最近什么题材更容易读下去”或者“给我 3 个适合新手的故事点子”。",
+  "把你现在脑子里的零散想法直接发给我就行。",
+  "如果你还没方向，我也可以先陪你一起找题材、开局钩子和主角路线。",
 ].join("\n");
 
 export function createIncubatorInitialMessages(): IncubatorChatMessage[] {
@@ -119,6 +119,24 @@ export function buildAssistantModelOverride(
     provider,
     name: modelName || undefined,
   };
+}
+
+export function shouldShowPromptSuggestions(hasUserMessage: boolean) {
+  return !hasUserMessage;
+}
+
+export function shouldSubmitIncubatorComposer(options: {
+  isComposing: boolean;
+  key: string;
+  shiftKey: boolean;
+}) {
+  if (options.isComposing) {
+    return false;
+  }
+  if (options.key !== "Enter") {
+    return false;
+  }
+  return !options.shiftKey;
 }
 
 export function buildSuggestedProjectName(setting: ProjectSetting): string {

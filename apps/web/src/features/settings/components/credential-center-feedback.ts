@@ -1,5 +1,4 @@
 import type { CredentialVerifyResult, CredentialView } from "@/lib/api/types";
-import { formatAuditTime } from "@/features/settings/components/credential-center-support";
 import type { CredentialCenterActionType } from "@/features/settings/components/credential-center-action-support";
 
 export type CredentialCenterFeedback = {
@@ -13,15 +12,15 @@ export function resolveCredentialActionFeedback(
 ): CredentialCenterFeedback {
   if (type === "verify" && result && "message" in result) {
     return {
-      message: `${result.message} · ${formatAuditTime(result.last_verified_at)}`,
+      message: "模型连接验证成功。",
       tone: "info",
     };
   }
   if (type === "enable") {
-    return { message: "凭证已启用。", tone: "info" };
+    return { message: "模型连接已启用。", tone: "info" };
   }
   if (type === "disable") {
-    return { message: "凭证已停用。", tone: "info" };
+    return { message: "模型连接已停用。", tone: "info" };
   }
-  return { message: "凭证已删除。", tone: "info" };
+  return { message: "模型连接已删除。", tone: "info" };
 }

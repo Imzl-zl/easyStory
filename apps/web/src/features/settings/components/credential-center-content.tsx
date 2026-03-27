@@ -55,49 +55,52 @@ export function CredentialCenterContent({
 }: Readonly<CredentialCenterContentProps>) {
   if (credentials && credentials.length > 0) {
     return (
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <CredentialCenterList
-          activeCredentialId={mode === "audit" ? activeAuditCredentialId : editableCredential?.id ?? null}
-          credentials={credentials}
-          isPending={isFormPending}
-          mode={mode}
-          overrideInfoByCredentialId={overrideInfoByCredentialId}
-          pendingAction={pendingAction}
-          onAction={onAction}
-          onSelectCredential={onSelectCredential ? (credentialId) => onSelectCredential(credentialId) : undefined}
-          onSelectCredentialForEdit={
-            onSelectCredentialForEdit ? (credentialId) => onSelectCredentialForEdit(credentialId) : undefined
-          }
-        />
-        {mode === "audit" ? (
-          <CredentialAuditPanel credentialId={activeAuditCredentialId} />
-        ) : shouldShowEditLoadingState ? (
-          <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载凭证详情...</div>
-        ) : (
-          <CredentialCenterForm
-            key={activeFormKey}
-            feedback={feedback}
-            initialState={activeInitialState}
-            mode={editableCredential ? "edit" : "create"}
+      <div className="space-y-4">
+        {feedback?.message ? <FeedbackBanner feedback={feedback} /> : null}
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <CredentialCenterList
+            activeCredentialId={mode === "audit" ? activeAuditCredentialId : editableCredential?.id ?? null}
+            credentials={credentials}
             isPending={isFormPending}
-            onReset={editableCredential ? onResetEditor : undefined}
-            onSubmit={(formState) => {
-              if (editableCredential) {
-                onSubmitUpdate(editableCredential, formState);
-                return;
-              }
-              onSubmitCreate(formState);
-            }}
+            mode={mode}
+            overrideInfoByCredentialId={overrideInfoByCredentialId}
+            pendingAction={pendingAction}
+            onAction={onAction}
+            onSelectCredential={onSelectCredential ? (credentialId) => onSelectCredential(credentialId) : undefined}
+            onSelectCredentialForEdit={
+              onSelectCredentialForEdit ? (credentialId) => onSelectCredentialForEdit(credentialId) : undefined
+            }
           />
-        )}
+          {mode === "audit" ? (
+            <CredentialAuditPanel credentialId={activeAuditCredentialId} />
+          ) : shouldShowEditLoadingState ? (
+            <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载连接详情...</div>
+          ) : (
+            <CredentialCenterForm
+              key={activeFormKey}
+              feedback={null}
+              initialState={activeInitialState}
+              mode={editableCredential ? "edit" : "create"}
+              isPending={isFormPending}
+              onReset={editableCredential ? onResetEditor : undefined}
+              onSubmit={(formState) => {
+                if (editableCredential) {
+                  onSubmitUpdate(editableCredential, formState);
+                  return;
+                }
+                onSubmitCreate(formState);
+              }}
+            />
+          )}
+        </div>
       </div>
     );
   }
   if (mode === "audit") {
-    return <EmptyState title="暂无凭证" description="创建凭证后，可以查看其审计记录。" />;
+    return <EmptyState title="暂无模型连接" description="创建模型连接后，就能在这里查看操作记录。" />;
   }
   if (shouldShowEditLoadingState) {
-    return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载凭证详情...</div>;
+    return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载连接详情...</div>;
   }
   return (
     <CredentialCenterForm
@@ -109,4 +112,13 @@ export function CredentialCenterContent({
       onSubmit={onSubmitCreate}
     />
   );
+}
+
+function FeedbackBanner({ feedback }: { feedback: NonNullable<CredentialCenterFeedback> }) {
+  const className =
+    feedback.tone === "danger"
+      ? "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]"
+      : "bg-[rgba(58,124,165,0.1)] text-[var(--accent-info)]";
+
+  return <div className={`rounded-2xl px-4 py-3 text-sm ${className}`}>{feedback.message}</div>;
 }

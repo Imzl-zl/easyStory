@@ -78,10 +78,10 @@ function ActionCardHeader({ draft }: { draft: ProjectIncubatorConversationDraft 
   return (
     <>
       <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">右侧草稿</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">项目草稿</p>
         <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)]">项目草稿</h2>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          左边聊天负责发散，右边草稿负责收敛。创建项目时只会写入这里的设定结果。
+          把聊天里已经明确的信息整理成设定草稿，确认后再创建项目。
         </p>
       </div>
       {draft ? <DraftStatusRow draft={draft} /> : null}
@@ -160,8 +160,8 @@ function NoticeList({
 }) {
   return (
     <>
-      {isDraftStale ? <NoticeCard message="左侧对话已经更新，右侧草稿还没同步，先重新整理再创建会更稳。" tone="warning" /> : null}
-      {draftMutation.error ? <NoticeCard message={getErrorMessage(draftMutation.error)} tone="danger" /> : null}
+      {isDraftStale ? <NoticeCard message="聊天内容已经更新，先重新整理草稿再创建会更稳。" tone="warning" /> : null}
+      {draftMutation.error ? <NoticeCard message={resolveDraftErrorMessage(draftMutation.error)} tone="danger" /> : null}
       {createMutation.error ? <NoticeCard message={getErrorMessage(createMutation.error)} tone="danger" /> : null}
     </>
   );
@@ -185,7 +185,7 @@ function QuestionListCard({ questions }: { questions: string[] }) {
 function SectionIndexCard({ sections }: { sections: SettingPreviewSection[] }) {
   return (
     <section className="panel-muted space-y-3 p-5">
-      <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">设定目录</h3>
+      <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">草稿目录</h3>
       <nav aria-label="项目草稿目录" className="flex flex-wrap gap-2">
         {sections.map((section, index) => (
           <a className="ink-tab" href={`#incubator-section-${index}`} key={section.title}>
@@ -202,7 +202,7 @@ function SettingSectionCard({ index, section }: { index: number; section: Settin
     <section className="panel-shell space-y-4 p-5 scroll-mt-6" id={`incubator-section-${index}`}>
       <header className="space-y-1">
         <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">{section.title}</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">当前对话里已经收拢出来的设定要点。</p>
+        <p className="text-sm leading-6 text-[var(--text-secondary)]">这里展示当前聊天里已经比较明确的设定内容。</p>
       </header>
       <dl className="grid gap-3">
         {section.items.map((item) => (
@@ -217,7 +217,9 @@ function SettingSectionCard({ index, section }: { index: number; section: Settin
 }
 
 function buildPlaceholderMessage(hasUserMessage: boolean) {
-  return hasUserMessage ? "聊天继续推进后，右侧会自动沉淀成项目草稿。" : "先在左侧和 AI 聊出一个方向，右侧草稿才会开始成形。";
+  return hasUserMessage
+    ? "聊天已经有内容了，点击“整理成项目草稿”就能把信息收拢起来。"
+    : "先和 AI 聊出方向，再把关键信息整理成项目草稿。";
 }
 
 function PlaceholderCard({ message }: { message: string }) {
@@ -234,4 +236,12 @@ function NoticeCard({ message, tone }: { message: string; tone: "danger" | "warn
     ? "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]"
     : "bg-[rgba(183,121,31,0.14)] text-[var(--accent-warning)]";
   return <div className={`rounded-2xl px-4 py-3 text-sm ${className}`}>{message}</div>;
+}
+
+function resolveDraftErrorMessage(error: unknown) {
+  const message = getErrorMessage(error);
+  if (message === "LLM 输出不是合法 JSON") {
+    return "这次还没整理出可用草稿，AI 返回的内容不是可解析的设定格式。";
+  }
+  return message;
 }

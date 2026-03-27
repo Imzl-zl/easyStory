@@ -33,7 +33,7 @@ export function CredentialDeleteConfirmDialog({
           <div className="space-y-3">
             <StatusBadge status="failed" label="删除确认" />
             <div className="rounded-2xl border border-[rgba(178,65,46,0.16)] bg-[rgba(178,65,46,0.08)] px-4 py-4 text-sm leading-6 text-[var(--accent-danger)]">
-              删除不会做静默兜底。请确认这条凭证移除后，相关 provider 的解析结果仍符合你的预期。
+              删除后不会自动补一条替代连接。请确认移除后，相关模型还能按你的预期继续使用。
             </div>
           </div>
           <div className="space-y-3 rounded-[18px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.68)] px-4 py-4">
@@ -42,10 +42,10 @@ export function CredentialDeleteConfirmDialog({
               {credential.display_name}
             </h3>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              渠道键：{credential.provider} · 接口：{credential.api_dialect}
+              连接标识：{credential.provider} · 接口类型：{credential.api_dialect}
             </p>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              当前状态：{credential.is_active ? "启用中" : "已停用"} · Key：{credential.masked_key}
+              当前状态：{credential.is_active ? "启用中" : "已停用"} · 密钥尾号：{credential.masked_key}
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -61,7 +61,7 @@ export function CredentialDeleteConfirmDialog({
           <div className="space-y-1">
             <h3 className="font-serif text-lg font-semibold">删除影响</h3>
             <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              这里只展示当前代码与文档已确认的解析规则，不替你假设未来回退结果。
+              这里只展示当前已经确认的影响，不会替你假设额外回退规则。
             </p>
           </div>
           <div className="space-y-3">

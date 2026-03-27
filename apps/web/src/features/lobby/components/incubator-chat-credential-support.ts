@@ -20,7 +20,10 @@ export function buildIncubatorCredentialOptions(
     }
     optionByProvider.set(credential.provider, {
       defaultModel: credential.default_model?.trim() ?? "",
-      displayLabel: `${credential.display_name} · ${credential.provider}`,
+      displayLabel: buildCredentialDisplayLabel(
+        credential.display_name,
+        credential.default_model,
+      ),
       provider: credential.provider,
     });
   }
@@ -49,5 +52,23 @@ export function buildIncubatorCredentialNotice(
   if (isLoading || options.length > 0) {
     return null;
   }
-  return "当前账号还没有启用任何模型凭证。先去凭证中心启用一个 provider，再回来和 AI 聊故事。";
+  return "当前账号还没有启用任何模型连接。先去模型连接里启用一条，再回来继续聊天。";
+}
+
+function buildCredentialDisplayLabel(
+  displayName: string,
+  defaultModel: string | null,
+) {
+  const normalizedDisplayName = displayName.trim();
+  const normalizedModel = defaultModel?.trim() ?? "";
+  if (!normalizedDisplayName && !normalizedModel) {
+    return "未命名连接";
+  }
+  if (!normalizedDisplayName) {
+    return normalizedModel;
+  }
+  if (!normalizedModel) {
+    return normalizedDisplayName;
+  }
+  return `${normalizedDisplayName} · ${normalizedModel}`;
 }

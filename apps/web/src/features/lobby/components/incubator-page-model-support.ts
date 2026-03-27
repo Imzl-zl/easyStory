@@ -33,13 +33,13 @@ type DraftSyncParams = {
   draftMutation: UseMutationResult<ProjectIncubatorConversationDraft, unknown, string>;
   messages: IncubatorChatMessage[];
   setDraftFingerprint: Dispatch<SetStateAction<string | null>>;
-  setFeedback?: Dispatch<SetStateAction<FeedbackState | null>>;
   settings: IncubatorChatSettings;
 };
 
-type SubmitPromptParams = DraftSyncParams & {
+type SubmitPromptParams = {
   assistantMutation: UseMutationResult<AssistantTurnResult, unknown, IncubatorChatMessage[]>;
   isResponding: boolean;
+  messages: IncubatorChatMessage[];
   setComposerText: Dispatch<SetStateAction<string>>;
   setFeedback: Dispatch<SetStateAction<FeedbackState | null>>;
   setMessages: Dispatch<SetStateAction<IncubatorChatMessage[]>>;
@@ -87,7 +87,6 @@ export function useConversationFingerprint(
 
 export function useIncubatorDraftMutation(
   settings: IncubatorChatSettings,
-  setFeedback: Dispatch<SetStateAction<FeedbackState | null>>,
 ) {
   return useMutation({
     mutationFn: (conversationText: string) =>
@@ -96,7 +95,6 @@ export function useIncubatorDraftMutation(
         provider: resolveIncubatorProvider(settings.provider),
         model_name: resolveIncubatorModelName(settings.modelName) || undefined,
       }),
-    onError: (error) => setFeedback(buildErrorFeedback(error)),
   });
 }
 
@@ -154,29 +152,25 @@ export function useIncubatorDraftSync({
   draftMutation,
   messages,
   setDraftFingerprint,
-  setFeedback,
   settings,
 }: DraftSyncParams) {
   return useCallback(async () => {
-    setFeedback?.(null);
     try {
+      draftMutation.reset();
       await syncConversationDraft({ draftMutation, messages, setDraftFingerprint, settings });
     } catch {
       return;
     }
-  }, [draftMutation, messages, setDraftFingerprint, setFeedback, settings]);
+  }, [draftMutation, messages, setDraftFingerprint, settings]);
 }
 
 export function useIncubatorPromptSubmit({
   assistantMutation,
-  draftMutation,
   isResponding,
   messages,
   setComposerText,
-  setDraftFingerprint,
   setFeedback,
   setMessages,
-  settings,
 }: SubmitPromptParams) {
   return useCallback(async (prompt: string) => {
     const submission = buildPromptSubmission(prompt, messages, isResponding);
@@ -187,10 +181,7 @@ export function useIncubatorPromptSubmit({
     try {
       await completePromptSubmission({
         assistantMutation,
-        draftMutation,
-        setDraftFingerprint,
         setMessages,
-        settings,
         submission,
       });
     } catch (error) {
@@ -198,14 +189,11 @@ export function useIncubatorPromptSubmit({
     }
   }, [
     assistantMutation,
-    draftMutation,
     isResponding,
     messages,
     setComposerText,
-    setDraftFingerprint,
     setFeedback,
     setMessages,
-    settings,
   ]);
 }
 
@@ -220,17 +208,11 @@ function buildPromptSubmission(prompt: string, messages: IncubatorChatMessage[],
 
 async function completePromptSubmission({
   assistantMutation,
-  draftMutation,
-  setDraftFingerprint,
   setMessages,
-  settings,
   submission,
 }: {
   assistantMutation: UseMutationResult<AssistantTurnResult, unknown, IncubatorChatMessage[]>;
-  draftMutation: UseMutationResult<ProjectIncubatorConversationDraft, unknown, string>;
-  setDraftFingerprint: Dispatch<SetStateAction<string | null>>;
   setMessages: Dispatch<SetStateAction<IncubatorChatMessage[]>>;
-  settings: IncubatorChatSettings;
   submission: NonNullable<ReturnType<typeof buildPromptSubmission>>;
 }) {
   const result = await assistantMutation.mutateAsync(submission.submittedMessages);
@@ -240,7 +222,6 @@ async function completePromptSubmission({
     createIncubatorMessage("assistant", result.content),
   );
   setMessages(resolvedMessages);
-  await syncConversationDraft({ draftMutation, messages: resolvedMessages, setDraftFingerprint, settings });
 }
 
 function handlePromptSubmissionError(
@@ -249,12 +230,12 @@ function handlePromptSubmissionError(
   setMessages: Dispatch<SetStateAction<IncubatorChatMessage[]>>,
   submission: NonNullable<ReturnType<typeof buildPromptSubmission>>,
 ) {
+  setFeedback(buildErrorFeedback(error));
   setMessages(replaceIncubatorMessage(
     submission.nextMessages,
     submission.pendingAssistant.id,
     createIncubatorMessage("assistant", getErrorMessage(error), { status: "error" }),
   ));
-  setFeedback(buildErrorFeedback(error));
 }
 
 async function syncConversationDraft({

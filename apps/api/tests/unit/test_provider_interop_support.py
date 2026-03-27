@@ -129,7 +129,12 @@ def test_build_provider_interop_probe_request_supports_custom_prompt(tmp_path) -
     )
 
     assert request.json_body["model"] == "gpt-5.2-codex"
-    assert request.json_body["input"] == [{"role": "user", "content": "今天有什么新闻"}]
+    assert request.json_body["input"] == [
+        {
+            "role": "user",
+            "content": [{"type": "input_text", "text": "今天有什么新闻"}],
+        }
+    ]
     assert request.json_body["instructions"] == "请直接回答用户问题。"
 
 

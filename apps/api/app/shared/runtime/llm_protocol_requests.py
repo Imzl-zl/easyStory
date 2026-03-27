@@ -71,7 +71,12 @@ def _build_openai_chat_request(request: LLMGenerateRequest) -> PreparedLLMHttpRe
 def _build_openai_responses_request(request: LLMGenerateRequest) -> PreparedLLMHttpRequest:
     body: dict[str, Any] = {
         "model": request.model_name,
-        "input": [{"role": "user", "content": request.prompt}],
+        "input": [
+            {
+                "role": "user",
+                "content": [{"type": "input_text", "text": request.prompt}],
+            }
+        ],
     }
     if request.system_prompt:
         body["instructions"] = request.system_prompt

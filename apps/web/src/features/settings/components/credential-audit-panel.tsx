@@ -16,7 +16,7 @@ export function CredentialAuditPanel({ credentialId }: { credentialId: string | 
   });
 
   if (!credentialId) {
-    return <EmptyState title="先选一个凭证" description="选择左侧凭证，查看其操作记录。" />;
+    return <EmptyState title="先选一条模型连接" description="选中左侧连接后，就能查看它的操作记录。" />;
   }
   if (query.isLoading) {
     return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载审计日志...</div>;
@@ -29,7 +29,7 @@ export function CredentialAuditPanel({ credentialId }: { credentialId: string | 
     );
   }
   if ((query.data?.length ?? 0) === 0) {
-    return <EmptyState title="暂无审计日志" description="该凭证暂无操作记录。" />;
+    return <EmptyState title="暂无审计日志" description="这条模型连接还没有操作记录。" />;
   }
   return (
     <div className="space-y-3">

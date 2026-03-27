@@ -28,10 +28,10 @@ export const AUTH_STRATEGY_OPTIONS: Array<{
   description: string;
 }> = [
   { value: "", label: "跟随接口类型默认", description: "按当前接口类型自动决定鉴权方式" },
-  { value: "bearer", label: "Bearer", description: "Authorization: Bearer <API Key>" },
-  { value: "x_api_key", label: "X-API-Key", description: "x-api-key: <API Key>" },
-  { value: "x_goog_api_key", label: "X-Goog-Api-Key", description: "x-goog-api-key: <API Key>" },
-  { value: "custom_header", label: "自定义 Header", description: "把 API Key 放入你指定的 Header" },
+  { value: "bearer", label: "Bearer 令牌", description: "Authorization: Bearer <访问密钥>" },
+  { value: "x_api_key", label: "X-API-Key 请求头", description: "x-api-key: <访问密钥>" },
+  { value: "x_goog_api_key", label: "X-Goog-Api-Key 请求头", description: "x-goog-api-key: <访问密钥>" },
+  { value: "custom_header", label: "自定义请求头", description: "把访问密钥放入你指定的请求头" },
 ] as const;
 
 export function getDefaultAuthStrategy(apiDialect: CredentialApiDialect) {
@@ -61,10 +61,10 @@ export function normalizeApiKeyHeaderName(
     return null;
   }
   if (!HTTP_HEADER_TOKEN_PATTERN.test(normalized)) {
-    throw new Error("API Key Header 名称必须是合法的 HTTP Header 名称。");
+    throw new Error("访问密钥请求头名称必须是合法的 HTTP 请求头名称。");
   }
   if (buildRuntimeManagedHeaderNames(apiDialect, "custom_header").has(normalized.toLowerCase())) {
-    throw new Error("API Key Header 名称不能覆盖系统托管的请求头。");
+    throw new Error("访问密钥请求头名称不能覆盖系统托管的请求头。");
   }
   return normalized;
 }
@@ -97,7 +97,7 @@ export function parseExtraHeadersText(
       throw new Error("额外请求头的键不能为空。");
     }
     if (!HTTP_HEADER_TOKEN_PATTERN.test(key)) {
-      throw new Error(`额外请求头 ${key} 不是合法的 HTTP Header 名称。`);
+      throw new Error(`额外请求头 ${key} 不是合法的 HTTP 请求头名称。`);
     }
     if (typeof rawValue !== "string") {
       throw new Error(`额外请求头 ${key} 的值必须是字符串。`);
@@ -107,7 +107,7 @@ export function parseExtraHeadersText(
       throw new Error(`额外请求头 ${key} 的值不能为空。`);
     }
     if (looksLikeSensitiveHeaderName(key)) {
-      throw new Error(`额外请求头 ${key} 涉及鉴权或敏感信息，请改用鉴权方式或专用凭证字段。`);
+      throw new Error(`额外请求头 ${key} 涉及鉴权或敏感信息，请改用鉴权方式或专用连接字段。`);
     }
     headers[key] = value;
   }

@@ -19,7 +19,20 @@ def test_verify_credential_uses_generation_probe_request() -> None:
 
     async def request_sender(request):
         captured["request"] = request
-        return HttpJsonResponse(status_code=200, json_body={"ok": True}, text="")
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "choices": [
+                    {
+                        "message": {
+                            "content": "今天天气真好。",
+                        }
+                    }
+                ],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            },
+            text="",
+        )
 
     verifier = AsyncHttpCredentialVerifier(request_sender=request_sender)
     result = asyncio.run(
@@ -41,8 +54,90 @@ def test_verify_credential_uses_generation_probe_request() -> None:
     assert request.headers["X-Trace-Id"] == "trace-verify"
     assert request.json_body["model"] == "gpt-4o-mini"
     assert request.json_body["messages"][-1]["content"] == "今天天气真好。"
-    assert result.message == "Credential verified"
+    assert result.message == "验证成功"
 
+
+def test_verify_credential_rejects_probe_content_mismatch() -> None:
+    async def request_sender(_request):
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "choices": [
+                    {
+                        "message": {
+                            "content": "Gemini 3 Pro is no longer available.",
+                        }
+                    }
+                ],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            },
+            text="",
+        )
+
+    verifier = AsyncHttpCredentialVerifier(request_sender=request_sender)
+
+    with pytest.raises(BusinessRuleError, match="验证响应不匹配"):
+        asyncio.run(
+            verifier.verify(
+                provider="openai",
+                api_key="test-key",
+                base_url=None,
+                api_dialect="openai_chat_completions",
+                default_model="gpt-4o-mini",
+            )
+        )
+
+
+def test_verify_credential_rejects_non_json_response_payload() -> None:
+    async def request_sender(_request):
+        return HttpJsonResponse(status_code=200, json_body=None, text="ok")
+
+    verifier = AsyncHttpCredentialVerifier(request_sender=request_sender)
+
+    with pytest.raises(BusinessRuleError, match="验证响应不是合法 JSON"):
+        asyncio.run(
+            verifier.verify(
+                provider="openai",
+                api_key="test-key",
+                base_url=None,
+                api_dialect="openai_chat_completions",
+                default_model="gpt-4o-mini",
+            )
+        )
+
+
+def test_verify_openai_responses_uses_input_text_blocks() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "output_text": "今天天气真好。",
+                "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+            },
+            text="",
+        )
+
+    verifier = AsyncHttpCredentialVerifier(request_sender=request_sender)
+    result = asyncio.run(
+        verifier.verify(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://proxy.example.com",
+            api_dialect="openai_responses",
+            default_model="gpt-4.1-mini",
+        )
+    )
+
+    assert captured["request"].json_body["input"] == [
+        {
+            "role": "user",
+            "content": [{"type": "input_text", "text": "今天天气真好。"}],
+        }
+    ]
+    assert result.message == "验证成功"
 
 def test_verify_credential_maps_authentication_error() -> None:
     async def request_sender(_request):
@@ -131,7 +226,14 @@ def test_verify_credential_allows_private_base_url_when_enabled(monkeypatch) -> 
 
     async def request_sender(request):
         captured["request"] = request
-        return HttpJsonResponse(status_code=200, json_body={"ok": True}, text="")
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "choices": [{"message": {"content": "今天天气真好。"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            },
+            text="",
+        )
 
     verifier = AsyncHttpCredentialVerifier(request_sender=request_sender)
     asyncio.run(
@@ -153,7 +255,14 @@ def test_verify_credential_allows_public_http_base_url_when_enabled(monkeypatch)
 
     async def request_sender(request):
         captured["request"] = request
-        return HttpJsonResponse(status_code=200, json_body={"ok": True}, text="")
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "choices": [{"message": {"content": "今天天气真好。"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            },
+            text="",
+        )
 
     verifier = AsyncHttpCredentialVerifier(request_sender=request_sender)
     asyncio.run(

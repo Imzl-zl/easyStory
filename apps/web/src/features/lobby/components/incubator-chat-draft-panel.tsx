@@ -36,7 +36,7 @@ export function IncubatorChatDraftPanel({
   const sections = draft ? buildSettingSections(draft.project_setting) : [];
 
   return (
-    <aside className="space-y-4 xl:sticky xl:top-6">
+    <aside className="order-2 space-y-4 xl:sticky xl:top-6 xl:order-1">
       <ActionCard
         canCreate={Boolean(draft && projectName.trim()) && !createMutation.isPending}
         canSyncDraft={hasUserMessage && !draftMutation.isPending}

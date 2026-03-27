@@ -69,7 +69,7 @@ export function CredentialCenterList({
                   {overrideInfo ? (
                     <span
                       className="rounded-full border border-[rgba(31,27,22,0.18)] bg-[rgba(31,27,22,0.06)] px-3 py-1 text-xs text-[var(--accent-ink)]"
-                      title={`当前项目已配置项目级凭证「${overrideInfo.projectCredentialDisplayName}」，运行时会优先使用项目级凭证。`}
+                      title={`当前项目已配置项目级模型连接「${overrideInfo.projectCredentialDisplayName}」，运行时会优先使用项目级连接。`}
                     >
                       已被项目级重载
                     </span>
@@ -87,18 +87,18 @@ export function CredentialCenterList({
                   ) : null}
                 </div>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  渠道键：{credential.provider} · 接口：{getApiDialectLabel(credential.api_dialect)}
+                  连接标识：{credential.provider} · 接口类型：{getApiDialectLabel(credential.api_dialect)}
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  默认模型：{credential.default_model ?? "未配置"} · Key：{credential.masked_key}
+                  默认模型：{credential.default_model ?? "未配置"} · 密钥尾号：{credential.masked_key}
                 </p>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  Base URL：{formatCredentialBaseUrl(credential.api_dialect, credential.base_url)} · 最近验证：
+                  接口地址：{formatCredentialBaseUrl(credential.api_dialect, credential.base_url)} · 最近验证：
                   {credential.last_verified_at ? formatAuditTime(credential.last_verified_at) : "未验证"}
                 </p>
                 {overrideInfo ? (
                   <p className="text-xs text-[var(--accent-ink)]">
-                    当前项目已配置同 provider 的项目级凭证「{overrideInfo.projectCredentialDisplayName}」，运行时将优先使用项目级凭证。
+                    当前项目已配置同连接标识的项目级模型连接「{overrideInfo.projectCredentialDisplayName}」，运行时将优先使用项目级连接。
                   </p>
                 ) : null}
               </div>

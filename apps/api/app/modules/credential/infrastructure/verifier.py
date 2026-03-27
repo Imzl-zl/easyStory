@@ -11,7 +11,9 @@ from app.shared.runtime.llm_protocol import (
     HttpJsonResponse,
     LLMConnection,
     PreparedLLMHttpRequest,
+    VERIFY_MODEL_REPLY,
     build_verification_request,
+    parse_generation_response,
     send_json_http_request,
 )
 
@@ -82,10 +84,31 @@ class AsyncHttpCredentialVerifier:
             raise BusinessRuleError(f"无法连接到 {provider}") from exc
         if response.status_code >= 400:
             self._raise_http_error(provider, response)
+        self._validate_probe_response(api_dialect, provider, response)
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
-            message="Credential verified",
+            message="验证成功",
         )
+
+    def _validate_probe_response(
+        self,
+        api_dialect: str,
+        provider: str,
+        response: HttpJsonResponse,
+    ) -> None:
+        payload = response.json_body
+        if payload is None:
+            raise BusinessRuleError(f"无法验证 {provider} 凭证: 验证响应不是合法 JSON")
+        try:
+            normalized = parse_generation_response(api_dialect, payload)
+        except ConfigurationError as exc:
+            raise BusinessRuleError(f"无法验证 {provider} 凭证: 验证响应结构异常") from exc
+
+        actual_reply = normalized.content.strip()
+        if actual_reply != VERIFY_MODEL_REPLY:
+            raise BusinessRuleError(
+                f"无法验证 {provider} 凭证: 验证响应不匹配，预期“{VERIFY_MODEL_REPLY}”，实际“{actual_reply or '空响应'}”"
+            )
 
     def _raise_http_error(self, provider: str, response: HttpJsonResponse) -> None:
         if response.status_code in {401, 403}:

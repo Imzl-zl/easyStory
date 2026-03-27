@@ -22,7 +22,7 @@ export function CredentialNoticeCard({
     <div className="mt-4 rounded-2xl bg-[rgba(183,121,31,0.12)] px-4 py-3 text-sm leading-6 text-[var(--accent-warning)]">
       <p>{message}</p>
       <Link className="mt-2 inline-flex text-sm font-medium text-[var(--accent-ink)] underline-offset-4 hover:underline" href={credentialSettingsHref}>
-        去凭证中心配置
+        去配置模型连接
       </Link>
     </div>
   );
@@ -31,7 +31,7 @@ export function CredentialNoticeCard({
 export function ProviderSelectField({ model }: { model: IncubatorChatModel }) {
   return (
     <label className="block">
-      <span className="label-text">模型提供商</span>
+      <span className="label-text">使用的连接</span>
       <select
         className="ink-input"
         name="provider"
@@ -84,9 +84,15 @@ export function PromptSuggestionBar({
   onSelect: (prompt: string) => void;
 }) {
   return (
-    <div className="mt-4 flex flex-wrap gap-2">
+    <div className="mt-4 flex flex-wrap gap-3">
       {INCUBATOR_PROMPT_SUGGESTIONS.map((prompt) => (
-        <button className="ink-tab" disabled={disabled} key={prompt} onClick={() => onSelect(prompt)} type="button">
+        <button
+          className="rounded-2xl border border-[var(--line-soft)] bg-[rgba(255,255,255,0.88)] px-4 py-3 text-left text-sm leading-6 text-[var(--text-primary)] transition hover:border-[rgba(46,111,106,0.2)] hover:bg-[rgba(46,111,106,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={disabled}
+          key={prompt}
+          onClick={() => onSelect(prompt)}
+          type="button"
+        >
           {prompt}
         </button>
       ))}
@@ -104,15 +110,16 @@ export function MessageBubble({
   status?: "pending" | "error";
 }) {
   const isAssistant = role === "assistant";
+  const alignmentClassName = isAssistant ? "self-start" : "self-end";
   const className = isAssistant
-    ? "bg-[rgba(255,251,245,0.94)] text-[var(--text-primary)]"
-    : "bg-[rgba(46,111,106,0.12)] text-[var(--text-primary)]";
+    ? "bg-[rgba(255,251,245,0.96)] text-[var(--text-primary)]"
+    : "bg-[rgba(46,111,106,0.14)] text-[var(--text-primary)]";
   const statusClassName = status === "error"
     ? "border-[rgba(178,65,46,0.16)] bg-[rgba(178,65,46,0.1)]"
     : "border-[var(--line-soft)]";
 
   return (
-    <article className={`rounded-3xl border p-4 ${className} ${statusClassName}`}>
+    <article className={`max-w-[88%] rounded-[26px] border px-5 py-4 ${alignmentClassName} ${className} ${statusClassName}`}>
       <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">
         {isAssistant ? "AI 助手" : "你"}
       </p>
@@ -122,7 +129,7 @@ export function MessageBubble({
 }
 
 export function buildCanSubmit(model: IncubatorChatModel) {
-  return model.canChat && model.composerText.trim().length > 0 && !model.isCredentialLoading && !model.isResponding && !model.draftMutation.isPending;
+  return model.canChat && model.composerText.trim().length > 0 && !model.isCredentialLoading && !model.isResponding;
 }
 
 export function isVisibleConversationMessage(
