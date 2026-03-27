@@ -13,7 +13,6 @@ from .llm_protocol_types import (
     LLMGenerateRequest,
     PreparedLLMHttpRequest,
     VERIFY_MAX_TOKENS,
-    VERIFY_MODEL_REPLY,
     VERIFY_SYSTEM_PROMPT,
     VERIFY_USER_PROMPT,
     normalize_api_dialect,
