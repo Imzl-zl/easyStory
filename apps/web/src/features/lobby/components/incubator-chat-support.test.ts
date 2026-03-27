@@ -55,6 +55,13 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
   );
   assert.deepEqual(
     buildAssistantModelOverride({
+      modelName: "",
+      provider: "openai",
+    }),
+    { name: undefined, provider: "openai" },
+  );
+  assert.deepEqual(
+    buildAssistantModelOverride({
       modelName: "gpt-4.1",
       provider: "openai",
     }),

@@ -1,6 +1,6 @@
 import type { AssistantMessage, AssistantModelConfig, ProjectSetting } from "@/lib/api/types";
 
-export const INCUBATOR_DEFAULT_PROVIDER = "openai";
+export const INCUBATOR_DEFAULT_PROVIDER = "";
 export const INCUBATOR_DEFAULT_MODEL_NAME = "";
 export const INCUBATOR_CHAT_SKILL_ID = "skill.assistant.general_chat";
 export const INCUBATOR_INPUT_MAX_LENGTH = 4000;
@@ -112,7 +112,7 @@ export function buildAssistantModelOverride(
 ): AssistantModelConfig | undefined {
   const provider = resolveIncubatorProvider(settings.provider);
   const modelName = resolveIncubatorModelName(settings.modelName);
-  if (!provider || (provider === INCUBATOR_DEFAULT_PROVIDER && !modelName)) {
+  if (!provider) {
     return undefined;
   }
   return {
@@ -155,7 +155,7 @@ function resolveMessageRoleLabel(role: AssistantMessage["role"]) {
 }
 
 export function resolveIncubatorProvider(provider: string) {
-  return provider.trim() || INCUBATOR_DEFAULT_PROVIDER;
+  return provider.trim();
 }
 
 export function resolveIncubatorModelName(modelName: string) {

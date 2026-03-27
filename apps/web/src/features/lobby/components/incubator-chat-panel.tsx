@@ -5,9 +5,18 @@ import type { KeyboardEvent } from "react";
 import { IncubatorChatDraftPanel } from "@/features/lobby/components/incubator-chat-draft-panel";
 import {
   INCUBATOR_INPUT_MAX_LENGTH,
-  INCUBATOR_PROMPT_SUGGESTIONS,
 } from "@/features/lobby/components/incubator-chat-support";
 import type { IncubatorChatModel } from "@/features/lobby/components/incubator-page-model";
+import {
+  buildCanSubmit,
+  CredentialNoticeCard,
+  isVisibleConversationMessage,
+  MessageBubble,
+  PromptSuggestionBar,
+  ProviderSelectField,
+  TextSettingField,
+  type VisibleChatMessage,
+} from "@/features/lobby/components/incubator-chat-panel-support";
 
 type ChatModePanelProps = {
   model: IncubatorChatModel;
@@ -19,10 +28,6 @@ type ComposerSectionProps = {
   model: IncubatorChatModel;
 };
 
-type VisibleChatMessage = IncubatorChatModel["messages"][number] & {
-  role: "assistant" | "user";
-};
-
 export function ChatModePanel({ model }: Readonly<ChatModePanelProps>) {
   const visibleMessages = model.messages.filter(isVisibleConversationMessage);
   const canSubmit = buildCanSubmit(model);
@@ -30,7 +35,12 @@ export function ChatModePanel({ model }: Readonly<ChatModePanelProps>) {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.38fr)_minmax(320px,0.92fr)]">
       <section className="panel-shell flex min-h-[720px] flex-col overflow-hidden">
-        <ChatPanelHeader onSelectPrompt={model.submitPrompt} />
+        <ChatPanelHeader
+          credentialNotice={model.credentialNotice}
+          credentialSettingsHref={model.credentialSettingsHref}
+          disablePromptSuggestions={!model.canChat || model.isCredentialLoading}
+          onSelectPrompt={model.submitPrompt}
+        />
         <ChatTranscript messages={visibleMessages} />
         <ChatComposerSection
           canSubmit={canSubmit}
@@ -52,8 +62,14 @@ export function ChatModePanel({ model }: Readonly<ChatModePanelProps>) {
 }
 
 function ChatPanelHeader({
+  credentialNotice,
+  credentialSettingsHref,
+  disablePromptSuggestions,
   onSelectPrompt,
 }: {
+  credentialNotice: string | null;
+  credentialSettingsHref: string;
+  disablePromptSuggestions: boolean;
   onSelectPrompt: (prompt: string) => Promise<void>;
 }) {
   return (
@@ -69,7 +85,13 @@ function ChatPanelHeader({
           你可以先问题材、节奏、开局钩子，也可以直接丢一个模糊想法。左边负责共创，右边负责沉淀项目草稿。
         </p>
       </div>
-      <PromptSuggestionBar onSelect={(prompt) => void onSelectPrompt(prompt)} />
+      {credentialNotice ? (
+        <CredentialNoticeCard
+          credentialSettingsHref={credentialSettingsHref}
+          message={credentialNotice}
+        />
+      ) : null}
+      <PromptSuggestionBar disabled={disablePromptSuggestions} onSelect={(prompt) => void onSelectPrompt(prompt)} />
     </header>
   );
 }
@@ -143,12 +165,16 @@ function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
         高级设置
       </summary>
       <div className="mt-4 grid gap-4">
-        <TextSettingField
-          label="模型提供商"
-          name="provider"
-          value={model.settings.provider}
-          onChange={(value) => updateChatSettings(model, "provider", value)}
-        />
+        {model.credentialOptions.length > 0 ? (
+          <ProviderSelectField model={model} />
+        ) : (
+          <TextSettingField
+            label="模型提供商"
+            name="provider"
+            value={model.settings.provider}
+            onChange={(value) => updateChatSettings(model, "provider", value)}
+          />
+        )}
         <TextSettingField
           label="模型名（可选）"
           name="modelName"
@@ -177,92 +203,6 @@ function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
       </div>
     </details>
   );
-}
-
-function TextSettingField({
-  label,
-  name,
-  onChange,
-  placeholder,
-  value,
-}: {
-  label: string;
-  name: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  value: string;
-}) {
-  return (
-    <label className="block">
-      <span className="label-text">{label}</span>
-      <input
-        autoComplete="off"
-        className="ink-input"
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
-
-function PromptSuggestionBar({
-  onSelect,
-}: {
-  onSelect: (prompt: string) => void;
-}) {
-  return (
-    <div className="mt-4 flex flex-wrap gap-2">
-      {INCUBATOR_PROMPT_SUGGESTIONS.map((prompt) => (
-        <button className="ink-tab" key={prompt} onClick={() => onSelect(prompt)} type="button">
-          {prompt}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function MessageBubble({
-  content,
-  role,
-  status,
-}: {
-  content: string;
-  role: "assistant" | "user";
-  status?: "pending" | "error";
-}) {
-  const isAssistant = role === "assistant";
-  const className = isAssistant
-    ? "bg-[rgba(255,251,245,0.94)] text-[var(--text-primary)]"
-    : "bg-[rgba(46,111,106,0.12)] text-[var(--text-primary)]";
-  const statusClassName =
-    status === "error"
-      ? "border-[rgba(178,65,46,0.16)] bg-[rgba(178,65,46,0.1)]"
-      : "border-[var(--line-soft)]";
-
-  return (
-    <article className={`rounded-3xl border p-4 ${className} ${statusClassName}`}>
-      <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-        {isAssistant ? "AI 助手" : "你"}
-      </p>
-      <p className="mt-2 whitespace-pre-wrap text-sm leading-7">{content}</p>
-    </article>
-  );
-}
-
-function buildCanSubmit(model: IncubatorChatModel) {
-  return (
-    model.composerText.trim().length > 0 &&
-    !model.isResponding &&
-    !model.draftMutation.isPending
-  );
-}
-
-function isVisibleConversationMessage(
-  message: IncubatorChatModel["messages"][number],
-): message is VisibleChatMessage {
-  return !message.hidden && (message.role === "assistant" || message.role === "user");
 }
 
 function updateChatSettings<K extends keyof IncubatorChatModel["settings"]>(

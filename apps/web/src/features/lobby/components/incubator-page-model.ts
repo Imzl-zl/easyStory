@@ -5,6 +5,8 @@ import type { UseMutationResult } from "@tanstack/react-query";
 
 import type { ProjectDetail, ProjectIncubatorConversationDraft } from "@/lib/api/types";
 
+import type { IncubatorCredentialOption } from "./incubator-chat-credential-support";
+import { useIncubatorChatCredentialModel } from "./incubator-chat-credential-model";
 import type {
   IncubatorChatMessage,
   IncubatorChatSettings,
@@ -24,10 +26,15 @@ import {
 } from "./incubator-page-model-support";
 
 export type IncubatorChatModel = {
+  canChat: boolean;
   composerText: string;
+  credentialNotice: string | null;
+  credentialOptions: IncubatorCredentialOption[];
+  credentialSettingsHref: string;
   createMutation: UseMutationResult<ProjectDetail, unknown, void>;
   draftMutation: UseMutationResult<ProjectIncubatorConversationDraft, unknown, string>;
   hasUserMessage: boolean;
+  isCredentialLoading: boolean;
   isDraftStale: boolean;
   isResponding: boolean;
   messages: IncubatorChatMessage[];
@@ -44,6 +51,7 @@ export function useIncubatorChatModel(
   setFeedback: Dispatch<SetStateAction<FeedbackState | null>>,
 ): IncubatorChatModel {
   const state = useChatState();
+  const credentialModel = useIncubatorChatCredentialModel(state.settings, state.setSettings);
   const conversationFingerprint = useConversationFingerprint(state.messages, state.settings);
   const draftMutation = useIncubatorDraftMutation(state.settings, setFeedback);
   const createMutation = useIncubatorCreateMutation({
@@ -53,7 +61,7 @@ export function useIncubatorChatModel(
     settings: state.settings,
   });
   const assistantMutation = useIncubatorAssistantMutation(state.settings);
-  const submitPrompt = useIncubatorPromptSubmit({
+  const baseSubmitPrompt = useIncubatorPromptSubmit({
     assistantMutation,
     draftMutation,
     isResponding: assistantMutation.isPending,
@@ -79,10 +87,15 @@ export function useIncubatorChatModel(
   );
 
   return {
+    canChat: credentialModel.canChat,
     composerText: state.composerText,
+    credentialNotice: credentialModel.credentialNotice,
+    credentialOptions: credentialModel.credentialOptions,
+    credentialSettingsHref: credentialModel.credentialSettingsHref,
     createMutation,
     draftMutation,
     hasUserMessage: state.messages.some((message) => message.role === "user"),
+    isCredentialLoading: credentialModel.isCredentialLoading,
     isDraftStale: isDraftStale(
       draftMutation.data,
       state.draftFingerprint,
@@ -98,7 +111,12 @@ export function useIncubatorChatModel(
       state.setProjectNameState,
     ),
     setSettings: state.setSettings,
-    submitPrompt,
+    submitPrompt: async (prompt: string) => {
+      if (!credentialModel.canChat || credentialModel.isCredentialLoading) {
+        return;
+      }
+      await baseSubmitPrompt(prompt);
+    },
     syncDraft,
   };
 }
