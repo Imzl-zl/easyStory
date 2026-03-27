@@ -65,7 +65,7 @@ export function ChapterEditor({
     return (
       <EmptyState
         title="还没有章节可编辑"
-        description="选择左侧章节，或启动工作流生成内容。"
+        description="选择章节，或启动工作流生成内容。"
       />
     );
   }

@@ -6,8 +6,8 @@
 ## 当前基线
 
 - 后端测试：最近一次已知全量 `cd apps/api && ruff check app tests && pytest -q` 通过（记录日期：2026-03-23）
-- 前端检查：最近一次已知 `pnpm --dir apps/web exec tsc --noEmit` + `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-03-25）
-- 最后更新：2026-03-26
+- 前端检查：最近一次已知 `pnpm --dir apps/web exec tsc --noEmit` + `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-03-27）
+- 最后更新：2026-03-27
 
 ## 已完成能力
 
@@ -29,6 +29,9 @@
 - Credential Center 删除确认闭环：删除前现有显式确认弹窗，影响文案对齐后端作用域优先级与 usage 历史限制
 - Credential Center 覆盖提示闭环：带项目上下文查看全局凭证时，可显式看到哪些 provider 已被项目级启用凭证接管
 - Lab 前端 MVP 闭环：`/workspace/project/:projectId/lab` 已支持 `analysis_type / content_id / generated_skill_key` 过滤、详情删除确认、创建结果反馈与组件拆分
+- Workspace Shell 折叠侧栏闭环：全局工作台侧栏现支持桌面端展开/收起、偏好持久化与小屏自动收口，相关导航纯函数已补单测
+- Studio 顶部 Tab 布局闭环：`Studio` 现已改为页头操作区 + 顶部 Tab + 右侧辅助卡片，章节目录只在章节面板内部展示，章节列表已显式区分 loading / error / empty
+- Engine 控制区压缩闭环：`Engine` 现已改为页头控制区 + 顶部状态区 + 全宽详情区，workflow 输入、控制按钮、摘要与调试入口已从左侧控制栏收口
 - 数据库演进闭环：Alembic baseline，startup 与文件型 SQLite helper 优先走 Alembic
 - Web 工作台主子视图已基本路由化：Lobby / Incubator / Config Registry / Template Library / Recycle Bin / Global Settings / Project Settings / Studio / Engine / Lab
 
@@ -60,7 +63,7 @@
 - async 语义审查不要误把基础设施命名（AsyncSessionFactory 等）当待清理对象
 - shared/runtime 改为惰性导出，避免 settings -> runtime -> llm tool provider 循环导入
 
-## 最近活跃窗口（2026-03-22 ~ 03-25）
+## 最近活跃窗口（2026-03-22 ~ 03-27）
 
 - 2026-03-22：完成 review follow-up、模型连接方言化、Alembic 初始迁移与 DB 初始化链收口
 - 2026-03-23：完成 config_registry skills / agents / hooks / workflows detail / update 闭环，并收口 strict DTO + staged validation
@@ -104,3 +107,6 @@
 - 2026-03-26：完成 assistant runtime 第一阶段：新增 `assistant` 模块与 `/api/v1/assistant/turn`，支持 skill 驱动 prompt、assistant hook 事件、`mcp_server` 配置加载、`mcp` hook provider 与 workflow `resolved_mcp_servers` snapshot；定向 `ruff + pytest` 已通过
 - 2026-03-26：补齐 `mcp_servers` 配置管理闭环：`config_registry` 后端已支持 list/detail/update，Web 配置中心已新增 `mcp_servers` 类型；后端 `15` 个 config_registry 单测与前端 `tsc/lint/test:unit` 均通过
 - 2026-03-26：完成 runtime/config hardening：assistant hook-agent `response_format` 与 workflow 对齐；`McpPluginProvider` 现在会显式拒绝 disabled server 和 `is_error=true`；workflow staged validation 会在写回前拒绝 assistant-only hook 事件和 stage 错绑；最终 `ruff + 35` 项定向 pytest 通过
+- 2026-03-27：完成 Workspace Shell 全局侧栏折叠首轮改造：新增 `workspace-store.sidebarPreference + hasHydrated`，工作台壳层支持桌面 220/72 切换、小屏自动收口，并补齐 `workspace-shell-support` 单测；前端 `tsc/lint/test:unit` 通过
+- 2026-03-27：完成 Studio 顶部 Tab 化：`StudioPage` 已改为页头 + 顶部 Tab + 右侧准备状态卡，章节目录内收至 `Chapter` 面板；同时修复章节列表状态语义，显式区分 loading / error / empty，避免假空态；前端 `tsc/lint/test:unit` 通过
+- 2026-03-27：完成 Engine 控制区压缩：`EnginePage` 已改为页头控制区 + 顶部状态区 + 全宽详情区，workflow 输入、载入动作、控制按钮与导出入口收口到页头，摘要与调试入口移出旧左侧控制栏；前端 `tsc/lint/test:unit` 通过

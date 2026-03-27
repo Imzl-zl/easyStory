@@ -1,0 +1,115 @@
+.shell {
+  --workspace-sidebar-width: 220px;
+}
+
+.sidebar {}
+
+.content {
+  min-width: 0;
+}
+
+.brandCopy {}
+
+.brandDescription {}
+
+.nav {}
+
+.navItem {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  border-radius: 24px;
+  padding: 0.75rem 0.85rem;
+}
+
+.glyph,
+.sessionBadge,
+.toggleIcon {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(46, 111, 106, 0.1);
+  color: var(--accent-ink);
+}
+
+.navCopy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.navLabel {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.navMeta {}
+
+.sessionArea {}
+
+.sessionCard {}
+
+.sessionCopy {}
+
+.sessionDescription {}
+
+.logoutButton {}
+
+.logoutLabel {}
+
+.toggleButton {}
+
+.sidebar[data-collapsed="true"] .brandCopy,
+.sidebar[data-collapsed="true"] .sessionCopy,
+.sidebar[data-collapsed="true"] .logoutLabel {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .shell {
+    grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr);
+  }
+
+  .sidebar[data-collapsed="true"] .navCopy,
+  .sidebar[data-collapsed="true"] .brandCopy {
+    display: none;
+  }
+
+  .sidebar[data-collapsed="true"] .navItem,
+  .sidebar[data-collapsed="true"] .toggleButton,
+  .sidebar[data-collapsed="true"] .logoutButton {
+    justify-content: center;
+    padding-right: 0.6rem;
+    padding-left: 0.6rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  .brandDescription,
+  .navMeta,
+  .sessionDescription {
+    display: none;
+  }
+
+  .nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .navItem {
+    min-height: 4.75rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .sidebar[data-collapsed="true"] .navCopy {
+    align-items: center;
+  }
+}

@@ -278,7 +278,7 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 
 ### 5.3 Studio
 
-- `ProjectSetting`、`Outline`、`OpeningPlan`、`Chapter` 使用同一套左侧结构导航。
+- `ProjectSetting`、`Outline`、`OpeningPlan`、`Chapter` 使用同一套顶部 Tab；章节目录只在 `Chapter` 面板内部展示，不再占用全局左侧结构导航。
 - 用户修改正文时可以做节流自动保存，但失败必须显式提示，不能静默吞掉。
 - 版本面板支持：
   - 查看版本列表
@@ -316,6 +316,8 @@ SELECT_MODE -> INPUT -> PREVIEW -> VALIDATING -> SUCCESS
 
 #### 5.4.1 基础规则
 
+- workflow 输入、主控制按钮、导出入口与返回工作室入口收口到页头控制区，不再单独占用左侧控制栏。
+- 运行 banner、暂停提示、workflow 摘要与调试入口收口到顶部状态区；详情 tab 保持全宽主内容区。
 - 工作流启动前，先展示设定完整度与前置资产状态。
 - `mode=manual|auto` 只做状态展示，不提供运行时切换。
 - `pause / resume / cancel` 使用显式按钮，不做隐式自动切换。

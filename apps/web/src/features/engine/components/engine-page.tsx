@@ -6,8 +6,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { SectionCard } from "@/components/ui/section-card";
 import { EngineDetailPanel } from "@/features/engine/components/engine-detail-panel";
-import { EnginePageHeaderActions } from "@/features/engine/components/engine-page-header-actions";
-import { EnginePageSidebar } from "@/features/engine/components/engine-page-sidebar";
+import { EnginePageHeader } from "@/features/engine/components/engine-page-header";
+import { EnginePageStatusSection } from "@/features/engine/components/engine-page-status-section";
 import { resolveEngineDetailTab } from "@/features/engine/components/engine-detail-panel-support";
 import {
   buildEnginePathWithParams,
@@ -192,96 +192,90 @@ export function EnginePage({ projectId }: EnginePageProps) {
 
   return (
     <div className="space-y-6">
-      <SectionCard
-        title="引擎"
-        description="控制工作流执行，监控生成进度。"
-        action={
-          <EnginePageHeaderActions
-            isActionPending={actionMutation.isPending}
-            onAction={(action) => actionMutation.mutate(action)}
-            primaryAction={workflowControls.primary}
-            primaryActionDisabled={primaryActionDisabled}
-            secondaryControls={workflowControls.secondary}
-            startWorkflowDisabledReason={startWorkflowDisabledReason}
-            workflowSummary={workflowSummary}
-          />
+      <EnginePageHeader
+        hasWorkflow={hasWorkflow}
+        isActionPending={actionMutation.isPending}
+        isLoadWorkflowDisabled={!workflowInput || isPending}
+        onAction={(action) => actionMutation.mutate(action)}
+        onLoadWorkflow={() => {
+          setFeedback(null);
+          setParams({
+            execution: resolveExecutionParamForWorkflow({
+              currentExecutionId: selectedExecutionId,
+              currentWorkflowId: workflowId,
+              nextWorkflowId: workflowInput,
+            }),
+            workflow: workflowInput,
+          });
+        }}
+        onOpenExport={() => setParams({ export: "1" })}
+        onWorkflowInputChange={(value) =>
+          setWorkflowInputState(createWorkflowBoundValue(workflowId, value))
         }
-      >
-        <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-          <EnginePageSidebar
-            feedback={feedback}
-            hasWorkflow={hasWorkflow}
-            isActionPending={actionMutation.isPending}
-            isLoadWorkflowDisabled={!workflowInput || isPending}
-            onLoadWorkflow={() => {
-              setFeedback(null);
-              setParams({
-                execution: resolveExecutionParamForWorkflow({
-                  currentExecutionId: selectedExecutionId,
-                  currentWorkflowId: workflowId,
-                  nextWorkflowId: workflowInput,
-                }),
-                workflow: workflowInput,
-              });
-            }}
-            onOpenExport={() => setParams({ export: "1" })}
-            onOpenTab={openEngineTab}
-            onPrimaryAction={() => actionMutation.mutate(workflowControls.primary.action)}
-            onWorkflowInputChange={(value) =>
-              setWorkflowInputState(createWorkflowBoundValue(workflowId, value))
-            }
-            primaryActionDisabled={primaryActionDisabled}
-            primaryActionLabel={workflowControls.primary.label}
-            projectId={projectId}
-            startWorkflowDisabledReason={startWorkflowDisabledReason}
-            workflow={workflowQuery.data}
-            workflowErrorMessage={
-              workflowQuery.error ? getErrorMessage(workflowQuery.error) : null
-            }
-            workflowEventsBanner={workflowEventsBanner}
-            workflowEventsErrorMessage={workflowEventsErrorMessage}
-            workflowInput={workflowInput}
-            workflowSummary={workflowSummary}
-          />
-          <EngineDetailPanel
-            activeTab={tab}
-            billing={{
-              errorMessage: billingQuery.error ? getErrorMessage(billingQuery.error) : null,
-              isLoading: billingQuery.isPending,
-              summary: billingSummary,
-              usages: billingUsages,
-            }}
-            context={{ projectId, workflowId }}
-            hasWorkflow={hasWorkflow}
-            logs={{
-              errorMessage: logsQuery.error ? getErrorMessage(logsQuery.error) : null,
-              executions: logExecutions,
-              executionLogs,
-              isLoading: logsQuery.isPending,
-            }}
-            onOpenReplayExecution={openReplayExecution}
-            onOpenTab={openEngineTab}
-            projectId={projectId}
-            replays={{
-              errorMessage: promptReplayQuery.error ? getErrorMessage(promptReplayQuery.error) : null,
-              executions: logExecutions,
-              executionsErrorMessage: logsQuery.error ? getErrorMessage(logsQuery.error) : null,
-              isExecutionsLoading: logsQuery.isPending,
-              isReplaysLoading: promptReplayQuery.isPending,
-              onSelectExecutionId: (value) => setParams({ execution: value || null }),
-              replays: promptReplayQuery.data ?? [],
-              selectedExecution,
-              selectedExecutionId: activeSelectedExecutionId,
-            }}
-            reviews={{
-              actions: reviewActions,
-              errorMessage: reviewsQuery.error ? getErrorMessage(reviewsQuery.error) : null,
-              isLoading: reviewsQuery.isPending,
-              summary: reviewSummary,
-            }}
-            workflow={workflowQuery.data}
-          />
-        </div>
+        primaryAction={workflowControls.primary}
+        primaryActionDisabled={primaryActionDisabled}
+        projectId={projectId}
+        secondaryControls={workflowControls.secondary}
+        startWorkflowDisabledReason={startWorkflowDisabledReason}
+        workflowInput={workflowInput}
+        workflowSummary={workflowSummary}
+      />
+
+      <EnginePageStatusSection
+        feedback={feedback}
+        isActionPending={actionMutation.isPending}
+        onOpenTab={openEngineTab}
+        onPrimaryAction={() => actionMutation.mutate(workflowControls.primary.action)}
+        primaryActionDisabled={primaryActionDisabled}
+        primaryActionLabel={workflowControls.primary.label}
+        projectId={projectId}
+        startWorkflowDisabledReason={startWorkflowDisabledReason}
+        workflow={workflowQuery.data}
+        workflowErrorMessage={workflowQuery.error ? getErrorMessage(workflowQuery.error) : null}
+        workflowEventsBanner={workflowEventsBanner}
+        workflowEventsErrorMessage={workflowEventsErrorMessage}
+        workflowSummary={workflowSummary}
+      />
+
+      <SectionCard title="执行详情" description="按标签查看概览、章节任务、日志、审核、账单和提示词回放。">
+        <EngineDetailPanel
+          activeTab={tab}
+          billing={{
+            errorMessage: billingQuery.error ? getErrorMessage(billingQuery.error) : null,
+            isLoading: billingQuery.isPending,
+            summary: billingSummary,
+            usages: billingUsages,
+          }}
+          context={{ projectId, workflowId }}
+          hasWorkflow={hasWorkflow}
+          logs={{
+            errorMessage: logsQuery.error ? getErrorMessage(logsQuery.error) : null,
+            executions: logExecutions,
+            executionLogs,
+            isLoading: logsQuery.isPending,
+          }}
+          onOpenReplayExecution={openReplayExecution}
+          onOpenTab={openEngineTab}
+          projectId={projectId}
+          replays={{
+            errorMessage: promptReplayQuery.error ? getErrorMessage(promptReplayQuery.error) : null,
+            executions: logExecutions,
+            executionsErrorMessage: logsQuery.error ? getErrorMessage(logsQuery.error) : null,
+            isExecutionsLoading: logsQuery.isPending,
+            isReplaysLoading: promptReplayQuery.isPending,
+            onSelectExecutionId: (value) => setParams({ execution: value || null }),
+            replays: promptReplayQuery.data ?? [],
+            selectedExecution,
+            selectedExecutionId: activeSelectedExecutionId,
+          }}
+          reviews={{
+            actions: reviewActions,
+            errorMessage: reviewsQuery.error ? getErrorMessage(reviewsQuery.error) : null,
+            isLoading: reviewsQuery.isPending,
+            summary: reviewSummary,
+          }}
+          workflow={workflowQuery.data}
+        />
       </SectionCard>
       {exportOpen ? <EngineExportPanel onClose={() => setParams({ export: null })} projectId={projectId} workflowId={workflowId} /> : null}
     </div>
