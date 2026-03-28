@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from app.shared.settings import get_settings
+from app.shared.runtime.errors import ConfigurationError
 
 from .base import Base
 
@@ -28,6 +29,9 @@ SQLITE_ASYNC_DRIVER = "sqlite+aiosqlite"
 SQLITE_DRIVER = "sqlite"
 POSTGRES_ASYNC_DRIVER = "postgresql+asyncpg"
 POSTGRES_DRIVER = "postgresql"
+LOCAL_SQLITE_RESET_HINT = (
+    "如果这是可丢弃的本地 SQLite 开发库，请先备份后删除或重命名数据库文件，再重新启动后端。"
+)
 
 
 def create_session_factory(database_url: str | None = None) -> sessionmaker[Session]:
@@ -137,7 +141,9 @@ def _is_memory_sqlite(database_url: str) -> bool:
 
 def _initialize_database_connection(connection: Connection) -> None:
     database_url = _render_connection_database_url(connection)
-    requires_legacy_bootstrap = _requires_legacy_bootstrap(connection)
+    table_names = _get_table_names(connection)
+    _validate_alembic_version_state(connection, table_names, database_url=database_url)
+    requires_legacy_bootstrap = _requires_legacy_bootstrap(table_names)
     _rollback_if_needed(connection)
     if requires_legacy_bootstrap:
         _bootstrap_legacy_database(connection)
@@ -164,9 +170,42 @@ def _commit_if_needed(connection: Connection) -> None:
         connection.commit()
 
 
-def _requires_legacy_bootstrap(connection: Connection) -> bool:
-    table_names = set(inspect(connection).get_table_names())
+def _get_table_names(connection: Connection) -> set[str]:
+    return set(inspect(connection).get_table_names())
+
+
+def _requires_legacy_bootstrap(table_names: set[str]) -> bool:
     return ALEMBIC_VERSION_TABLE not in table_names and bool(table_names)
+
+
+def _validate_alembic_version_state(
+    connection: Connection,
+    table_names: set[str],
+    *,
+    database_url: str,
+) -> None:
+    if ALEMBIC_VERSION_TABLE not in table_names:
+        return
+    if _has_alembic_revision_rows(connection):
+        return
+    if table_names == {ALEMBIC_VERSION_TABLE}:
+        return
+    raise ConfigurationError(_build_invalid_alembic_state_message(database_url))
+
+
+def _has_alembic_revision_rows(connection: Connection) -> bool:
+    rows = connection.execute(
+        text(f"SELECT version_num FROM {ALEMBIC_VERSION_TABLE} LIMIT 1")
+    ).fetchall()
+    return bool(rows)
+
+
+def _build_invalid_alembic_state_message(database_url: str) -> str:
+    return (
+        f"检测到数据库迁移状态损坏: {database_url} 中的 {ALEMBIC_VERSION_TABLE} 表已存在，"
+        "但没有任何 revision 记录，同时库里已经存在业务表。当前状态无法安全自动修复。"
+        f"{LOCAL_SQLITE_RESET_HINT}"
+    )
 
 
 def _bootstrap_legacy_database(connection: Connection) -> None:

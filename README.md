@@ -111,7 +111,7 @@
    ```bash
    cd apps/api
    uv sync --extra dev
-   uv run uvicorn app.main:app --reload --port 8000
+   uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
 
 4. 启动后可访问：
@@ -127,6 +127,22 @@
    ```bash
    uv run alembic -c alembic.ini upgrade head
    ```
+
+7. 如果后端日志长期停在 `Waiting for application startup.`，且本机访问
+   `http://127.0.0.1:8000/healthz` 失败，通常说明本地 SQLite 开发库进入了
+   “表已存在，但 Alembic revision 状态损坏”的异常状态。若这份本地库数据不重要，
+   可先备份旧库，再让后端自动重建：
+
+   ```bash
+   cd apps/api
+   mv .runtime/easystory.db .runtime/easystory.db.bak-$(date +%Y%m%d-%H%M%S)
+   uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   ```
+
+   - `mv` 是“备份并移走旧库”，不会直接删除。
+   - 新库会在下一次启动时由 Alembic 自动重建。
+   - 真正启动成功的标志是日志里出现 `Application startup complete.`，
+     并且 `http://127.0.0.1:8000/healthz` 返回 `200`。
 
 ---
 
@@ -161,4 +177,4 @@ docs/
 
 ---
 
-*最后更新: 2026-03-25*
+*最后更新: 2026-03-28*

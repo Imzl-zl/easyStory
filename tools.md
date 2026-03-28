@@ -30,6 +30,7 @@
 - 前端 support 单测命令：`pnpm --dir apps/web test:unit`
 - 定向内容模块验证：`cd apps/api && pytest -q tests/unit/test_story_asset_service.py tests/unit/test_chapter_content_service.py tests/unit/test_chapter_content_api.py`
 - Alembic 基线验证：`cd apps/api && ./.venv/bin/alembic -c alembic.ini upgrade head`
+- 本地 SQLite 开发库损坏时的恢复命令：`cd apps/api && mv .runtime/easystory.db .runtime/easystory.db.bak-$(date +%Y%m%d-%H%M%S) && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 - 项目共享 skills 目录：`.codex/skills/`
 - 已安装项目共享 skills：
   - `react-best-practices`：用于 `apps/web` 的 React / Next.js 组件、状态、渲染与性能实践
@@ -116,6 +117,7 @@
 - 涉及 DB 事务和文件系统副作用的删除/导出逻辑时，先完成 `commit`，再做不可回滚的文件删除或落盘清理；否则一旦事务失败，就会制造"数据库已回滚、文件却已经删掉"的双真值。
 - 当前项目不是"只有 docs 的空仓库"，`apps/api` 已有实装代码和通过的测试基线。
 - Alembic CLI 若不显式覆盖 `sqlalchemy.url`，默认会命中 `apps/api/.runtime/easystory.db`；做 baseline/autogenerate/临时验证时要用 `-x database_url=...` 或在 Config 里显式覆盖。
+- 如果后端日志长期停在 `Waiting for application startup.`，且 `healthz` 不通，优先怀疑本地 SQLite 开发库进入“`alembic_version` 表存在但没有 revision，业务表已存在”的损坏状态；这不是 WSL 端口转发问题，开发期可先备份并重建 `.runtime/easystory.db`。
 - 默认沙箱内，任何命中 `aiosqlite` 的 async SQLite 验证都可能挂起；需在非沙箱环境执行，不是业务回归。
 - unified exec 进程数告警是工具层会话配额问题，不是仓库代码回归。
 - `provider_interop_check.py` 会复用正式 endpoint policy：公网模型端点默认要求 `https`；若确需验证公网 `http` 代理，必须显式设置 `EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS=true`，脚本不会静默绕过。

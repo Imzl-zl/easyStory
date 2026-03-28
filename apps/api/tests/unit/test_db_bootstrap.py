@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import create_engine, inspect, text
 
 from app.shared.db import resolve_async_database_url
@@ -8,6 +9,7 @@ from app.shared.db.bootstrap import (
     is_sqlite_database_url,
     normalize_sync_database_url,
 )
+from app.shared.runtime.errors import ConfigurationError
 
 
 def test_resolve_async_database_url_upgrades_sqlite_driver() -> None:
@@ -130,6 +132,39 @@ def test_create_session_factory_bootstraps_empty_database_with_alembic(tmp_path)
         assert {"users", "projects", "alembic_version"} <= table_names
     finally:
         initialized_engine.dispose()
+
+
+def test_create_session_factory_fails_fast_on_empty_alembic_version_with_existing_tables(
+    tmp_path,
+) -> None:
+    database_path = tmp_path / "invalid-alembic-state.db"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"))
+        connection.execute(
+            text(
+                """
+                CREATE TABLE model_credentials (
+                    id TEXT PRIMARY KEY,
+                    owner_type VARCHAR(20) NOT NULL,
+                    owner_id TEXT,
+                    provider VARCHAR(50) NOT NULL,
+                    display_name VARCHAR(100) NOT NULL,
+                    encrypted_key TEXT NOT NULL,
+                    base_url VARCHAR(500),
+                    is_active BOOLEAN NOT NULL,
+                    last_verified_at DATETIME,
+                    created_at DATETIME,
+                    updated_at DATETIME
+                )
+                """
+            )
+        )
+    engine.dispose()
+
+    with pytest.raises(ConfigurationError, match="迁移状态损坏"):
+        create_session_factory(database_url)
 
 
 def test_create_session_factory_bootstraps_in_memory_database_with_alembic() -> None:
