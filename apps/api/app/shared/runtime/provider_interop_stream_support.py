@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,12 +16,26 @@ from .llm_protocol import (
 )
 
 STREAM_DONE_MARKER = "[DONE]"
+STREAM_STOP_CHECK_INTERVAL_SECONDS = 0.25
+
+StreamStopChecker = Callable[[], Awaitable[bool]]
 
 
 @dataclass
 class StreamEventBuffer:
     event_name: str | None
     data_lines: list[str]
+
+
+@dataclass(frozen=True)
+class ParsedStreamEvent:
+    event_name: str | None
+    payload: dict[str, Any]
+    delta: str
+
+
+class StreamInterruptedError(ConfigurationError):
+    """Raised when the client disconnects during streaming."""
 
 
 def build_stream_probe_request(
@@ -52,37 +68,16 @@ async def execute_stream_probe_request(
     api_dialect: str,
     print_response: bool,
 ) -> NormalizedLLMResponse:
-    buffer = StreamEventBuffer(event_name=None, data_lines=[])
     text_parts: list[str] = []
     raw_events: list[dict[str, Any]] = []
-    async with httpx.AsyncClient(timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS) as client:
-        async with client.stream(
-            request.method,
-            request.url,
-            headers=request.headers,
-            json=request.json_body,
-        ) as response:
-            print(f"HTTP {response.status_code}")
-            if response.status_code >= 400:
-                body = await response.aread()
-                raise ConfigurationError(
-                    f"Probe failed with HTTP {response.status_code}: "
-                    f"{body.decode('utf-8', errors='replace')}"
-                )
-            async for line in response.aiter_lines():
-                _consume_stream_line(
-                    line,
-                    buffer=buffer,
-                    api_dialect=api_dialect,
-                    text_parts=text_parts,
-                    raw_events=raw_events,
-                )
-    _flush_stream_event(
-        buffer,
+    async for event in iterate_stream_request(
+        request,
         api_dialect=api_dialect,
-        text_parts=text_parts,
-        raw_events=raw_events,
-    )
+        print_status=True,
+    ):
+        raw_events.append({"event": event.event_name, "data": event.payload})
+        if event.delta:
+            text_parts.append(event.delta)
     content = "".join(text_parts).strip()
     if print_response:
         print(
@@ -102,54 +97,96 @@ async def execute_stream_probe_request(
     )
 
 
+async def iterate_stream_request(
+    request: PreparedLLMHttpRequest,
+    *,
+    api_dialect: str,
+    print_status: bool = False,
+    should_stop: StreamStopChecker | None = None,
+) -> AsyncIterator[ParsedStreamEvent]:
+    buffer = StreamEventBuffer(event_name=None, data_lines=[])
+    async with httpx.AsyncClient(timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS) as client:
+        async with client.stream(
+            request.method,
+            request.url,
+            headers=request.headers,
+            json=request.json_body,
+        ) as response:
+            if print_status:
+                print(f"HTTP {response.status_code}")
+            if response.status_code >= 400:
+                body = await response.aread()
+                raise ConfigurationError(
+                    _build_stream_http_error_message(
+                        response.status_code,
+                        body.decode("utf-8", errors="replace"),
+                    )
+                )
+            line_iterator = response.aiter_lines().__aiter__()
+            while True:
+                if await _should_interrupt_stream(should_stop):
+                    raise StreamInterruptedError("Client disconnected during streaming")
+                try:
+                    line = await asyncio.wait_for(
+                        anext(line_iterator),
+                        timeout=STREAM_STOP_CHECK_INTERVAL_SECONDS,
+                    )
+                except asyncio.TimeoutError:
+                    continue
+                except StopAsyncIteration:
+                    break
+                for event in _consume_stream_line(
+                    line,
+                    buffer=buffer,
+                    api_dialect=api_dialect,
+                ):
+                    yield event
+    for event in _flush_stream_event(buffer, api_dialect=api_dialect):
+        yield event
+
+
 def _consume_stream_line(
     line: str,
     *,
     buffer: StreamEventBuffer,
     api_dialect: str,
-    text_parts: list[str],
-    raw_events: list[dict[str, Any]],
-) -> None:
+ ) -> list[ParsedStreamEvent]:
     if line.startswith("event:"):
         buffer.event_name = line.partition(":")[2].strip() or None
-        return
+        return []
     if line.startswith("data:"):
         buffer.data_lines.append(line.partition(":")[2].lstrip())
-        return
+        return []
     if line != "":
-        return
-    _flush_stream_event(
-        buffer,
-        api_dialect=api_dialect,
-        text_parts=text_parts,
-        raw_events=raw_events,
-    )
+        return []
+    return _flush_stream_event(buffer, api_dialect=api_dialect)
 
 
 def _flush_stream_event(
     buffer: StreamEventBuffer,
     *,
     api_dialect: str,
-    text_parts: list[str],
-    raw_events: list[dict[str, Any]],
-) -> None:
+ ) -> list[ParsedStreamEvent]:
     if not buffer.data_lines:
         buffer.event_name = None
-        return
+        return []
     raw_data = "\n".join(buffer.data_lines).strip()
     buffer.data_lines.clear()
     if not raw_data or raw_data == STREAM_DONE_MARKER:
         buffer.event_name = None
-        return
+        return []
     try:
         payload = json.loads(raw_data)
     except json.JSONDecodeError as exc:
         raise ConfigurationError("Streaming probe returned non-JSON SSE payload") from exc
-    raw_events.append({"event": buffer.event_name, "data": payload})
     delta = _extract_stream_delta(api_dialect, buffer.event_name, payload)
-    if delta:
-        text_parts.append(delta)
+    event = ParsedStreamEvent(
+        event_name=buffer.event_name,
+        payload=payload,
+        delta=delta,
+    )
     buffer.event_name = None
+    return [event]
 
 
 def _extract_stream_delta(
@@ -191,25 +228,7 @@ def _extract_openai_responses_delta(
 ) -> str:
     if event_name == "response.output_text.delta" and isinstance(payload.get("delta"), str):
         return payload["delta"]
-    output_text = payload.get("output_text")
-    if isinstance(output_text, str):
-        return output_text
-    output = payload.get("output")
-    if not isinstance(output, list):
-        return ""
-    parts: list[str] = []
-    for item in output:
-        if not isinstance(item, dict):
-            continue
-        content = item.get("content")
-        if not isinstance(content, list):
-            continue
-        parts.extend(
-            block.get("text", "")
-            for block in content
-            if isinstance(block, dict) and isinstance(block.get("text"), str)
-        )
-    return "".join(parts)
+    return ""
 
 
 def _extract_anthropic_delta(payload: dict[str, Any]) -> str:
@@ -244,3 +263,16 @@ def _build_gemini_stream_url(url: str) -> str:
         return url
     separator = "&" if "?" in url else "?"
     return url.replace(":generateContent", ":streamGenerateContent") + f"{separator}alt=sse"
+
+
+async def _should_interrupt_stream(should_stop: StreamStopChecker | None) -> bool:
+    if should_stop is None:
+        return False
+    return await should_stop()
+
+
+def _build_stream_http_error_message(status_code: int, response_text: str) -> str:
+    suffix = response_text.strip()
+    if suffix:
+        return f"LLM streaming request failed: HTTP {status_code} - {suffix}"
+    return f"LLM streaming request failed: HTTP {status_code}"

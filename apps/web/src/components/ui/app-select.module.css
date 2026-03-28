@@ -1,0 +1,138 @@
+.root {
+  width: 100%;
+}
+
+.root:global(.arco-select-single) :global(.arco-select-view) {
+  height: auto;
+  min-height: 2.5rem;
+  align-items: center;
+  padding: 0.48rem 0.85rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.roomy:global(.arco-select-single) :global(.arco-select-view) {
+  min-height: 2.9rem;
+  padding: 0.62rem 0.95rem;
+}
+
+.root:hover :global(.arco-select-view) {
+  border-color: rgba(46, 111, 106, 0.16);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.root:global(.arco-select-focused) :global(.arco-select-view) {
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 0 0 3px rgba(46, 111, 106, 0.12);
+}
+
+.root:global(.arco-select-disabled) :global(.arco-select-view) {
+  background: rgba(241, 235, 225, 0.92);
+  opacity: 0.7;
+}
+
+.root :global(.arco-select-view-selector),
+.root :global(.arco-select-view-value) {
+  min-width: 0;
+}
+
+.root :global(.arco-select-view-value),
+.root :global(.arco-select-view-input),
+.triggerLabel {
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.triggerLabelInvalid {
+  color: var(--accent-warning);
+}
+
+.root :global(.arco-select-arrow-icon),
+.root :global(.arco-select-expand-icon) {
+  color: var(--text-secondary);
+}
+
+.popup {
+  padding: 0.28rem;
+  border: 1px solid rgba(101, 92, 82, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 251, 245, 0.98);
+  box-shadow: 0 16px 30px rgba(58, 45, 29, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.dropdown {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.dropdown :global(.arco-select-option) {
+  min-height: unset;
+  padding: 0;
+  line-height: normal;
+  white-space: normal;
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.dropdown :global(.arco-select-option-hover),
+.dropdown :global(.arco-select-option-selected) {
+  background: transparent;
+}
+
+.option {
+  display: grid;
+  gap: 0.16rem;
+  padding: 0.62rem 0.82rem;
+  border-radius: 12px;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.dropdown :global(.arco-select-option-hover) .option {
+  background: rgba(46, 111, 106, 0.08);
+}
+
+.dropdown :global(.arco-select-option-selected) .option {
+  background: rgba(46, 111, 106, 0.12);
+}
+
+.dropdown :global(.arco-select-option-selected) .optionLabel {
+  color: var(--accent-ink);
+}
+
+.optionInvalid {
+  border: 1px dashed rgba(183, 121, 31, 0.28);
+  background: rgba(183, 121, 31, 0.08);
+}
+
+.optionInvalid .optionLabel {
+  color: var(--accent-warning);
+}
+
+.optionLabel {
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.optionDescription {
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.optionInvalid .optionDescription {
+  color: rgba(130, 88, 25, 0.9);
+}
+
+.dropdown :global(.arco-select-option-disabled) {
+  opacity: 0.85;
+}

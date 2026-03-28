@@ -30,9 +30,9 @@ export function ActionCard({
   onProjectNameChange,
   onSyncDraft,
   projectName,
-}: ActionCardProps) {
+}: Readonly<ActionCardProps>) {
   return (
-    <section className="panel-shell space-y-4 p-5">
+    <section className="panel-shell space-y-3 p-3.5">
       <ActionCardHeader draft={draft} />
       <ProjectNameField projectName={projectName} onProjectNameChange={onProjectNameChange} />
       <ActionButtons
@@ -43,8 +43,8 @@ export function ActionCard({
         draftMutation={draftMutation}
         onSyncDraft={onSyncDraft}
       />
-      <p className="text-xs leading-6 text-[var(--text-secondary)]">
-        创建后仍可在工作室继续补设定、生成大纲和推进章节。
+      <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+        整理草稿后可创建项目。
       </p>
       <NoticeList
         createMutation={createMutation}
@@ -64,28 +64,32 @@ export function DraftBody({
   hasUserMessage: boolean;
   sections: SettingPreviewSection[];
 }) {
-  if (!draft) return <PlaceholderCard message={buildPlaceholderMessage(hasUserMessage)} />;
+  if (!draft) {
+    return <PlaceholderCard message={buildPlaceholderMessage(hasUserMessage)} />;
+  }
   return (
-    <>
-      {draft.follow_up_questions.length > 0 ? <QuestionListCard questions={draft.follow_up_questions} /> : null}
+    <div className="space-y-3">
       {sections.length > 0 ? <SectionIndexCard sections={sections} /> : null}
-      {sections.map((section, index) => <SettingSectionCard index={index} key={section.title} section={section} />)}
-    </>
+      {draft.follow_up_questions.length > 0 ? <QuestionListCard questions={draft.follow_up_questions} /> : null}
+      {sections.map((section, index) => (
+        <SettingSectionCard index={index} key={section.title} section={section} />
+      ))}
+    </div>
   );
 }
 
 function ActionCardHeader({ draft }: { draft: ProjectIncubatorConversationDraft | undefined }) {
   return (
-    <>
+    <div className="space-y-1.5">
       <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">项目草稿</p>
-        <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)]">项目草稿</h2>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          把聊天里已经明确的信息整理成设定草稿，确认后再创建项目。
+        <p className="text-[10px] tracking-[0.16em] text-[var(--accent-ink)]">项目草稿</p>
+        <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">草稿预览</h2>
+        <p className="text-[13px] leading-5 text-[var(--text-secondary)]">
+          整理结果会显示为项目草稿。
         </p>
       </div>
       {draft ? <DraftStatusRow draft={draft} /> : null}
-    </>
+    </div>
   );
 }
 
@@ -93,7 +97,7 @@ function DraftStatusRow({ draft }: { draft: ProjectIncubatorConversationDraft })
   return (
     <div className="flex flex-wrap items-center gap-2">
       <StatusBadge status={draft.setting_completeness.status} />
-      <span className="text-sm text-[var(--text-secondary)]">
+      <span className="text-xs leading-5 text-[var(--text-secondary)]">
         {buildSettingIssueSummary(draft.setting_completeness)}
       </span>
     </div>
@@ -112,7 +116,7 @@ function ProjectNameField({
       <span className="label-text">项目名称</span>
       <input
         autoComplete="off"
-        className="ink-input"
+        className="ink-input min-h-[2.9rem] px-3.5 py-2 text-[14px] leading-6"
         name="projectName"
         placeholder="例如：林昭的玄幻故事…"
         value={projectName}
@@ -138,11 +142,11 @@ function ActionButtons({
   onSyncDraft: () => Promise<void>;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      <button className="ink-button-secondary" disabled={!canSyncDraft} onClick={() => void onSyncDraft()} type="button">
-        {draftMutation.isPending ? "整理中…" : draft ? "重新整理草稿" : "整理成项目草稿"}
+    <div className="grid gap-2.5 sm:grid-cols-2">
+      <button className="ink-button-secondary h-9 w-full px-4 text-sm" disabled={!canSyncDraft} onClick={() => void onSyncDraft()} type="button">
+        {draftMutation.isPending ? "整理中…" : draft ? "重新整理草稿" : "整理草稿"}
       </button>
-      <button className="ink-button" disabled={!canCreate} onClick={() => createMutation.mutate()} type="button">
+      <button className="ink-button h-9 w-full px-4 text-sm" disabled={!canCreate} onClick={() => createMutation.mutate()} type="button">
         {createMutation.isPending ? "创建中…" : "创建项目"}
       </button>
     </div>
@@ -160,7 +164,7 @@ function NoticeList({
 }) {
   return (
     <>
-      {isDraftStale ? <NoticeCard message="聊天内容已经更新，先重新整理草稿再创建会更稳。" tone="warning" /> : null}
+      {isDraftStale ? <NoticeCard message="聊天内容已更新，请先重新整理草稿。" tone="warning" /> : null}
       {draftMutation.error ? <NoticeCard message={resolveDraftErrorMessage(draftMutation.error)} tone="danger" /> : null}
       {createMutation.error ? <NoticeCard message={getErrorMessage(createMutation.error)} tone="danger" /> : null}
     </>
@@ -169,11 +173,11 @@ function NoticeList({
 
 function QuestionListCard({ questions }: { questions: string[] }) {
   return (
-    <section className="panel-muted space-y-3 p-5">
-      <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">待补问题</h3>
-      <ul className="space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
+    <section className="panel-muted space-y-2 p-3.5">
+      <h3 className="text-sm font-semibold text-[var(--text-primary)]">待补充信息</h3>
+      <ul className="space-y-2 text-[13px] leading-5 text-[var(--text-secondary)]">
         {questions.map((question) => (
-          <li className="rounded-2xl bg-[rgba(255,255,255,0.52)] px-4 py-3" key={question}>
+          <li className="rounded-xl bg-[rgba(255,255,255,0.72)] px-3 py-2" key={question}>
             {question}
           </li>
         ))}
@@ -184,12 +188,17 @@ function QuestionListCard({ questions }: { questions: string[] }) {
 
 function SectionIndexCard({ sections }: { sections: SettingPreviewSection[] }) {
   return (
-    <section className="panel-muted space-y-3 p-5">
-      <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">草稿目录</h3>
-      <nav aria-label="项目草稿目录" className="flex flex-wrap gap-2">
+    <section className="panel-muted space-y-2 p-3.5">
+      <h3 className="text-sm font-semibold text-[var(--text-primary)]">草稿目录</h3>
+      <nav aria-label="项目方案目录" className="grid gap-1.5">
         {sections.map((section, index) => (
-          <a className="ink-tab" href={`#incubator-section-${index}`} key={section.title}>
-            {section.title}
+          <a
+            className="flex items-center justify-between rounded-xl bg-[rgba(255,255,255,0.72)] px-3 py-2 text-[13px] text-[var(--text-primary)] transition hover:bg-[rgba(255,255,255,0.96)]"
+            href={`#incubator-section-${index}`}
+            key={section.title}
+          >
+            <span className="min-w-0 truncate">{section.title}</span>
+            <span className="text-xs text-[var(--text-secondary)]">查看</span>
           </a>
         ))}
       </nav>
@@ -199,16 +208,18 @@ function SectionIndexCard({ sections }: { sections: SettingPreviewSection[] }) {
 
 function SettingSectionCard({ index, section }: { index: number; section: SettingPreviewSection }) {
   return (
-    <section className="panel-shell space-y-4 p-5 scroll-mt-6" id={`incubator-section-${index}`}>
+    <section className="panel-shell space-y-2.5 p-3.5 scroll-mt-4" id={`incubator-section-${index}`}>
       <header className="space-y-1">
-        <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">{section.title}</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">这里展示当前聊天里已经比较明确的设定内容。</p>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">{section.title}</h3>
+        <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+          当前已整理内容
+        </p>
       </header>
-      <dl className="grid gap-3">
+      <dl className="grid gap-2.5">
         {section.items.map((item) => (
-          <div className="panel-muted space-y-1 p-4" key={`${section.title}-${item.label}`}>
-            <dt className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">{item.label}</dt>
-            <dd className="text-sm leading-6 text-[var(--text-primary)]">{item.value}</dd>
+          <div className="panel-muted space-y-1 p-2.5" key={`${section.title}-${item.label}`}>
+            <dt className="text-[11px] tracking-[0.14em] text-[var(--text-secondary)]">{item.label}</dt>
+            <dd className="break-words text-[13px] leading-5 text-[var(--text-primary)]">{item.value}</dd>
           </div>
         ))}
       </dl>
@@ -216,17 +227,11 @@ function SettingSectionCard({ index, section }: { index: number; section: Settin
   );
 }
 
-function buildPlaceholderMessage(hasUserMessage: boolean) {
-  return hasUserMessage
-    ? "聊天已经有内容了，点击“整理成项目草稿”就能把信息收拢起来。"
-    : "先和 AI 聊出方向，再把关键信息整理成项目草稿。";
-}
-
 function PlaceholderCard({ message }: { message: string }) {
   return (
-    <section className="panel-muted space-y-3 p-5">
-      <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">等待草稿成形</h3>
-      <p className="text-sm leading-6 text-[var(--text-secondary)]">{message}</p>
+    <section className="panel-muted space-y-2 p-3.5">
+      <h3 className="text-sm font-semibold text-[var(--text-primary)]">暂无草稿</h3>
+      <p className="text-[13px] leading-5 text-[var(--text-secondary)]">{message}</p>
     </section>
   );
 }
@@ -235,13 +240,20 @@ function NoticeCard({ message, tone }: { message: string; tone: "danger" | "warn
   const className = tone === "danger"
     ? "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]"
     : "bg-[rgba(183,121,31,0.14)] text-[var(--accent-warning)]";
-  return <div className={`rounded-2xl px-4 py-3 text-sm ${className}`}>{message}</div>;
+  return <div className={`rounded-xl px-3 py-2.5 text-[13px] leading-5 ${className}`}>{message}</div>;
+}
+
+function buildPlaceholderMessage(hasUserMessage: boolean) {
+  if (hasUserMessage) {
+    return "发送消息后，可整理当前聊天并生成草稿。";
+  }
+  return "在右侧聊天后，可整理草稿。";
 }
 
 function resolveDraftErrorMessage(error: unknown) {
   const message = getErrorMessage(error);
   if (message === "LLM 输出不是合法 JSON") {
-    return "这次还没整理出可用草稿，AI 返回的内容不是可解析的设定格式。";
+    return "这次整理失败，请调整表达后重试。";
   }
   return message;
 }

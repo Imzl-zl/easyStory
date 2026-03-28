@@ -23,13 +23,13 @@ export const EMPTY_GUIDED_QUESTIONS: TemplateGuidedQuestion[] = [];
 export const INCUBATOR_MODE_OPTIONS = [
   {
     id: "chat",
-    label: "聊天共创",
-    description: "先和 AI 把方向聊顺，再把对话整理成项目草稿。",
+    label: "AI 聊天",
+    description: "通过对话整理项目草稿。",
   },
   {
     id: "template",
-    label: "模板问答",
-    description: "选择模板、回答引导问题，先生成项目设定草稿，再决定是否创建项目。",
+    label: "模板创建",
+    description: "按模板填写信息并生成项目草稿。",
   },
 ] as const;
 
@@ -72,12 +72,12 @@ export function buildTemplatePreviewEmptyMessage({
   templateDetailError: string | null;
 }): string {
   if (templateDetailError) {
-    return "模板详情加载失败，修复后才能生成预览。";
+    return "模板内容暂未加载，无法生成草稿。";
   }
   if (!hasSelectedTemplate || isTemplateDetailLoading) {
-    return "正在准备模板详情，加载完成后再生成草稿。";
+    return "选择模板后可继续填写。";
   }
-  return "先填写模板回答，再点击“生成设定草稿”。";
+  return "填写问题后可生成项目草稿。";
 }
 
 export function buildQuestionState(
@@ -91,9 +91,11 @@ export function buildQuestionState(
 
 export function buildSettingIssueSummary(completeness?: SettingCompletenessResult): string {
   if (!completeness || completeness.issues.length === 0) {
-    return "当前没有阻塞或警告项。";
+    return "当前信息已基本完整。";
   }
-  return completeness.issues.map((issue) => `${issue.field}: ${issue.message}`).join(" / ");
+  return completeness.issues
+    .map((issue) => `${formatSettingFieldLabel(issue.field)}：${issue.message}`)
+    .join(" / ");
 }
 
 export function buildSettingSections(setting: ProjectSetting): SettingPreviewSection[] {
@@ -162,4 +164,18 @@ function normalizeSettingValue(value: SettingValue): string | null {
     return null;
   }
   return value.join(" / ");
+}
+
+export function formatSettingFieldLabel(field: string): string {
+  if (field === "genre") return "题材";
+  if (field === "sub_genre") return "子题材";
+  if (field === "target_readers") return "目标读者";
+  if (field === "tone") return "整体气质";
+  if (field === "core_conflict") return "核心冲突";
+  if (field === "plot_direction") return "剧情方向";
+  if (field === "special_requirements") return "特殊要求";
+  if (field.startsWith("protagonist.")) return "主角设定";
+  if (field.startsWith("world_setting.")) return "世界设定";
+  if (field.startsWith("scale.")) return "篇幅规划";
+  return field;
 }

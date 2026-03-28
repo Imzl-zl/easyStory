@@ -5,14 +5,16 @@
 | 文档类型 | 技术规范 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-14 |
-| 更新时间 | 2026-03-23 |
+| 更新时间 | 2026-03-28 |
 | 关联文档 | [系统架构设计](./architecture.md)、[数据库设计](./database-design.md) |
 
 ---
 
 ## 1. 配置存储位置
 
-**决策**：文件系统存储
+**决策**：文件系统分层存储
+
+### 1.1 系统内置配置（Git 管理）
 
 **目录结构**：
 ```
@@ -60,7 +62,38 @@
 - ID 在文件内部定义
 - 示例：`style-checker.yaml` → `id: "agent.style_checker"`
 
-> 本节约束的是 Git 管理的业务配置目录 `/config`。后端运行时环境配置不放在 `/config`，而是通过 `apps/api/.env` 注入，详见 [8.1 后端运行时 Settings](#81-后端运行时-settings)。
+### 1.2 用户层 / 项目层 Assistant 配置（运行时文件）
+
+当前多用户 assistant 的个人配置与项目配置，不再以数据库表作为主真值，而是写入运行时文件目录：
+
+```text
+apps/api/.runtime/assistant-config/
+├── users/
+│   └── <user_id>/
+│       ├── AGENTS.md              # 个人长期规则
+│       ├── preferences.yaml       # AI 偏好（默认连接、默认模型）
+│       ├── skills/                # 预留：个人 skills
+│       ├── agents/                # 预留：个人 agents
+│       ├── hooks/                 # 预留：个人 hooks
+│       ├── mcp_servers/           # 预留：个人 mcp_servers
+│       └── workflows/             # 预留：个人 workflows
+└── projects/
+    └── <project_id>/
+        ├── AGENTS.md              # 项目长期规则
+        ├── skills/                # 预留：项目级 skills
+        ├── agents/                # 预留：项目级 agents
+        ├── hooks/                 # 预留：项目级 hooks
+        ├── mcp_servers/           # 预留：项目级 mcp_servers
+        └── workflows/             # 预留：项目级 workflows
+```
+
+当前已正式落地并被运行时读取的文件只有：
+
+- `users/<user_id>/AGENTS.md`
+- `users/<user_id>/preferences.yaml`
+- `projects/<project_id>/AGENTS.md`
+
+> `/config` 负责系统内置能力；`apps/api/.runtime/assistant-config/` 负责用户和项目自己的 assistant 配置。后端运行时环境变量仍通过 `apps/api/.env` 注入，详见 [8.1 后端运行时 Settings](#81-后端运行时-settings)。
 
 ---
 
@@ -96,6 +129,46 @@ skill:
     temperature: 0.8
     max_tokens: 4000
 ```
+
+### 2.1 Assistant 规则文件
+
+用户层和项目层的长期规则使用 Markdown 文件，文件名固定为 `AGENTS.md`。当前 Web 设置页保存时，会写入带 YAML frontmatter 的 Markdown：
+
+```md
+---
+enabled: true
+scope: user
+---
+
+1. 先给结论，再展开。
+2. 不要先让我填一堆表单。
+3. 如果信息不足，每次只追问一个关键问题。
+```
+
+说明：
+
+- `enabled`：是否在每次聊天时自动注入这份规则
+- `scope`：`user` 或 `project`
+- 正文：真正注入到 assistant system prompt 的长期规则内容
+
+兼容规则：
+
+- 若文件只有纯 Markdown 正文、没有 frontmatter，则运行时按“已启用规则文件”处理
+- 若 frontmatter 非法或 `scope` 与目录层级不一致，运行时直接报错，不做静默降级
+
+### 2.2 Assistant 偏好文件
+
+AI 偏好使用 YAML 文件，文件名固定为 `preferences.yaml`：
+
+```yaml
+default_provider: "anthropic"
+default_model_name: "claude-sonnet-4"
+```
+
+字段说明：
+
+- `default_provider`：默认连接标识；为空表示跟随系统默认
+- `default_model_name`：默认模型；为空表示跟随该连接自己的默认模型
 
 ---
 

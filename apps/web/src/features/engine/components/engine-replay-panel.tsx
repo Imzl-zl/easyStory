@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { AppSelect } from "@/components/ui/app-select";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { NodeExecutionView, PromptReplayView } from "@/lib/api/types";
@@ -104,19 +105,18 @@ function ReplaySelection({
 }>) {
   return (
     <label className="block space-y-2">
-      <span className="label-text">选择 node execution</span>
-      <select
-        className="ink-select"
+      <span className="label-text">选择节点执行记录</span>
+      <AppSelect
+        options={[
+          { label: "先选择一个节点", value: "" },
+          ...executions.map((execution) => ({
+            label: formatReplayExecutionOptionLabel(execution),
+            value: execution.id,
+          })),
+        ]}
         value={selectedExecutionId}
-        onChange={(event) => onSelectExecutionId(event.target.value)}
-      >
-        <option value="">先选择一个节点</option>
-        {executions.map((execution) => (
-          <option key={execution.id} value={execution.id}>
-            {formatReplayExecutionOptionLabel(execution)}
-          </option>
-        ))}
-      </select>
+        onChange={onSelectExecutionId}
+      />
       <p className="text-sm leading-6 text-[var(--text-secondary)]">
         必须先从执行时间轴选中一个节点，回放面板才会展示对应的 Prompt 与响应文本；也可以从执行概览或日志直接进入。
       </p>

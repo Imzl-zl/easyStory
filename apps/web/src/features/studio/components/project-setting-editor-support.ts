@@ -26,6 +26,10 @@ export function buildSettingIssueSummary(completeness?: SettingCompletenessResul
   return completeness.issues.map((issue) => `${issue.field}: ${issue.message}`).join(" / ");
 }
 
+export function isProjectSettingDirty(currentSetting: ProjectSetting, initialSetting: ProjectSetting): boolean {
+  return JSON.stringify(currentSetting) !== JSON.stringify(initialSetting);
+}
+
 export function invalidateProjectSettingQueries(
   queryClient: QueryClient,
   projectId: string,

@@ -25,13 +25,13 @@ export function ConfigRegistryDetailPanel({
     );
   }
   if (isLoading && !detail) {
-    return <Banner tone="muted" message="正在加载配置详情..." />;
+    return <Banner tone="muted" message="正在加载内容…" />;
   }
   if (!detail) {
     return (
       <EmptyState
-        title="尚未选择配置"
-        description="选择左侧配置项，查看详情。"
+        title="选择配置项"
+        description="从左侧查看详情。"
       />
     );
   }
@@ -45,7 +45,7 @@ export function ConfigRegistryDetailPanel({
       <section className="panel-muted space-y-4 p-5">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">
-            配置详情
+            当前内容
           </p>
           <h3 className="font-serif text-xl font-semibold">{detail.name}</h3>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">
@@ -53,7 +53,7 @@ export function ConfigRegistryDetailPanel({
           </p>
         </div>
         <dl className="grid gap-3 sm:grid-cols-2">
-          <DetailRow label="ID" value={detail.id} />
+          <DetailRow label="编号" value={detail.id} />
           <DetailRow label="版本" value={detail.version} />
           <DetailRow label="作者" value={detail.author ?? "未标注"} />
           {rows.map((row) => (
@@ -75,9 +75,9 @@ export function ConfigRegistryDetailPanel({
       </section>
       <section className="panel-muted space-y-3 p-5">
         <div className="space-y-1">
-          <h4 className="font-serif text-lg font-semibold">原始 JSON</h4>
+          <h4 className="font-serif text-lg font-semibold">完整配置</h4>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">
-            完整的配置数据，可用于核对字段。
+            用于核对完整字段。
           </p>
         </div>
         <CodeBlock value={detail} />

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from app.shared.runtime.llm_protocol import PreparedLLMHttpRequest
 from app.shared.runtime import provider_interop_stream_support as stream_support
 
@@ -97,3 +99,123 @@ def test_execute_stream_probe_request_collects_openai_responses_text(monkeypatch
     )
 
     assert normalized.content == "今天有新闻"
+
+
+def test_execute_stream_probe_request_ignores_openai_completed_payload(monkeypatch) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://proxy.example.com/v1/responses",
+        headers={"Accept": "text/event-stream"},
+        json_body={"model": "gpt-5.2-codex", "stream": True},
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.output_text.delta"
+            yield 'data: {"delta":"今天"}'
+            yield ""
+            yield "event: response.completed"
+            yield 'data: {"output_text":"今天"}'
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+
+    normalized = asyncio.run(
+        stream_support.execute_stream_probe_request(
+            request,
+            api_dialect="openai_responses",
+            print_response=False,
+        )
+    )
+
+    assert normalized.content == "今天"
+
+
+def test_iterate_stream_request_stops_when_callback_requests_interrupt(monkeypatch) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://proxy.example.com/v1/responses",
+        headers={"Accept": "text/event-stream"},
+        json_body={"model": "gpt-5.2-codex", "stream": True},
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.output_text.delta"
+            yield 'data: {"delta":"今天"}'
+            yield ""
+            await asyncio.sleep(1)
+            yield "event: response.output_text.delta"
+            yield 'data: {"delta":"还有后续"}'
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    stop_checks = {"count": 0}
+
+    async def should_stop() -> bool:
+        stop_checks["count"] += 1
+        return stop_checks["count"] > 4
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+
+    async def collect() -> list[str]:
+        parts: list[str] = []
+        with pytest.raises(stream_support.StreamInterruptedError):
+            async for event in stream_support.iterate_stream_request(
+                request,
+                api_dialect="openai_responses",
+                should_stop=should_stop,
+            ):
+                parts.append(event.delta)
+        return parts
+
+    assert asyncio.run(collect()) == ["今天"]

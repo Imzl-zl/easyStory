@@ -60,10 +60,10 @@ export function ConfigRegistryStructuredEditor({
   const skillReferenceField = useMemo(
     () =>
       buildConfigRegistryReferenceFieldState({
-        defaultEmptyMessage: "暂无可用 Skill，可继续手工编辑 JSON 模式。",
-        errorMessage: skillsQuery.error ? `Skill 列表加载失败：${getErrorMessage(skillsQuery.error)}` : null,
+        defaultEmptyMessage: "暂无可选 Skills，可切换到完整配置。",
+        errorMessage: skillsQuery.error ? `Skills 列表加载失败：${getErrorMessage(skillsQuery.error)}` : null,
         isLoading: skillsQuery.isLoading,
-        loadingMessage: "正在加载可绑定 Skill…",
+        loadingMessage: "正在加载 Skills…",
         options: buildReferenceOptions(skillsQuery.data ?? []),
       }),
     [skillsQuery.data, skillsQuery.error, skillsQuery.isLoading],
@@ -71,10 +71,10 @@ export function ConfigRegistryStructuredEditor({
   const agentReferenceField = useMemo(
     () =>
       buildConfigRegistryReferenceFieldState({
-        defaultEmptyMessage: "暂无可用 Agent。",
-        errorMessage: agentsQuery.error ? `Agent 列表加载失败：${getErrorMessage(agentsQuery.error)}` : null,
+        defaultEmptyMessage: "暂无可选 Agents。",
+        errorMessage: agentsQuery.error ? `Agents 列表加载失败：${getErrorMessage(agentsQuery.error)}` : null,
         isLoading: agentsQuery.isLoading,
-        loadingMessage: "正在加载可绑定 Agent…",
+        loadingMessage: "正在加载 Agents…",
         options: buildReferenceOptions(agentsQuery.data ?? []),
       }),
     [agentsQuery.data, agentsQuery.error, agentsQuery.isLoading],
@@ -82,12 +82,12 @@ export function ConfigRegistryStructuredEditor({
   const mcpReferenceField = useMemo(
     () =>
       buildConfigRegistryReferenceFieldState({
-        defaultEmptyMessage: "暂无可用 MCP Server。",
+        defaultEmptyMessage: "暂无可选 MCP。",
         errorMessage: mcpServersQuery.error
-          ? `MCP Server 列表加载失败：${getErrorMessage(mcpServersQuery.error)}`
+          ? `MCP 列表加载失败：${getErrorMessage(mcpServersQuery.error)}`
           : null,
         isLoading: mcpServersQuery.isLoading,
-        loadingMessage: "正在加载可绑定 MCP Server…",
+        loadingMessage: "正在加载 MCP…",
         options: buildReferenceOptions(mcpServersQuery.data ?? []),
       }),
     [mcpServersQuery.data, mcpServersQuery.error, mcpServersQuery.isLoading],

@@ -4,16 +4,13 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "rea
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { GuardedLink } from "@/components/ui/guarded-link";
 import { SectionCard } from "@/components/ui/section-card";
+import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { ConfigRegistryDetailPanel } from "@/features/config-registry/components/config-registry-detail-panel";
 import { ConfigRegistryEditorPanel } from "@/features/config-registry/components/config-registry-editor-panel";
-import {
-  ConfigRegistryBanner,
-  ConfigRegistryProtectedLink,
-} from "@/features/config-registry/components/config-registry-page-primitives";
+import { ConfigRegistryBanner } from "@/features/config-registry/components/config-registry-page-primitives";
 import { ConfigRegistrySidebar } from "@/features/config-registry/components/config-registry-sidebar";
-import { ConfigRegistryUnsavedDialog } from "@/features/config-registry/components/config-registry-unsaved-dialog";
-import { useConfigRegistryNavigationGuard } from "@/features/config-registry/components/use-config-registry-navigation-guard";
 import {
   filterConfigRegistryItems,
   listConfigRegistryFilterTags,
@@ -38,12 +35,15 @@ import {
   updateConfigRegistryEntry,
 } from "@/lib/api/config-registry";
 import { getErrorMessage } from "@/lib/api/client";
+import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
 import type { ConfigRegistryDetail } from "@/lib/api/types";
 
 type Feedback = {
   message: string;
   tone: "danger" | "info";
 };
+
+const ADMIN_ONLY_MESSAGE = "Control-plane admin access required";
 
 export function ConfigRegistryPage() {
   const pathname = usePathname();
@@ -100,7 +100,7 @@ export function ConfigRegistryPage() {
     enabled: Boolean(activeItemId),
   });
   const effectiveIsDirty = detailQuery.data ? isDirty : false;
-  const navigationGuard = useConfigRegistryNavigationGuard({ currentUrl, isDirty: effectiveIsDirty, router });
+  const navigationGuard = useUnsavedChangesGuard({ currentUrl, isDirty: effectiveIsDirty, router });
 
   useEffect(() => {
     const patches = resolveConfigRegistryRoutePatches({
@@ -156,97 +156,107 @@ export function ConfigRegistryPage() {
   return (
     <div className="space-y-6">
       <SectionCard
-        title="配置中心"
-        description="管理系统配置，支持结构化表单与 JSON 双模式编辑。"
+        title="平台配置"
+        description="Skills、Agents、Hooks、MCP、Workflows"
         action={
-          <div className="flex flex-wrap gap-2">
-            <ConfigRegistryProtectedLink
+          <div className="flex flex-wrap items-center justify-end gap-2.5">
+            <GuardedLink
+              className="ink-button-secondary h-9 px-4 text-[13px]"
               href="/workspace/lobby"
               isDirty={effectiveIsDirty}
-              label="返回项目大厅"
               onNavigate={navigationGuard.attemptNavigation}
-            />
-            <ConfigRegistryProtectedLink
+            >
+              返回项目大厅
+            </GuardedLink>
+            <GuardedLink
+              className="ink-button-secondary h-9 px-4 text-[13px]"
               href="/workspace/lobby/settings?tab=credentials&sub=list"
               isDirty={effectiveIsDirty}
-              label="全局设置"
               onNavigate={navigationGuard.attemptNavigation}
-            />
+            >
+              模型连接
+            </GuardedLink>
           </div>
         }
       >
         <div className="space-y-4">
-          <ConfigRegistryBanner message="仅配置管理员可访问；若当前账号无权限，页面会直接显示后端返回的 403 / 401 错误。" tone="muted" />
+          <ConfigRegistryBanner message="仅限平台维护。" tone="muted" />
           {feedback ? <ConfigRegistryBanner ariaLive message={feedback.message} tone={feedback.tone} /> : null}
-          <div className="grid gap-6 xl:grid-cols-[320px_1fr_480px]">
-            <ConfigRegistrySidebar
-              activeItemId={activeItemId}
-              availableTags={availableTags}
-              errorMessage={listQuery.error ? getErrorMessage(listQuery.error) : null}
-              isLoading={listQuery.isLoading}
-              items={filteredItems}
-              query={query}
-              sort={sort}
-              status={status}
-              tags={tags}
-              type={type}
-              onQueryChange={(value) => setParams({ q: value.trim() ? value : null })}
-              onSelectItem={(itemId) => {
-                setFeedback(null);
-                navigationGuard.attemptNavigation(() => setParams({ item: itemId }));
-              }}
-              onSelectType={(nextType) => {
-                setFeedback(null);
-                navigationGuard.attemptNavigation(() =>
+          <div className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)] min-[1900px]:grid-cols-[320px_minmax(0,1fr)_480px]">
+            <div className="xl:sticky xl:top-6">
+              <ConfigRegistrySidebar
+                activeItemId={activeItemId}
+                availableTags={availableTags}
+                errorMessage={resolveConfigRegistryErrorMessage(listQuery.error)}
+                isLoading={listQuery.isLoading}
+                items={filteredItems}
+                query={query}
+                sort={sort}
+                status={status}
+                tags={tags}
+                type={type}
+                onQueryChange={(value) => setParams({ q: value.trim() ? value : null })}
+                onSelectItem={(itemId) => {
+                  setFeedback(null);
+                  navigationGuard.attemptNavigation(() => setParams({ item: itemId }));
+                }}
+                onSelectType={(nextType) => {
+                  setFeedback(null);
+                  navigationGuard.attemptNavigation(() =>
+                    setParams({
+                      item: null,
+                      mode: serializeConfigRegistryEditorMode(
+                        nextType,
+                        resolveConfigRegistryEditorMode(nextType, null),
+                      ),
+                      status: null,
+                      tags: null,
+                      type: nextType,
+                    }),
+                  );
+                }}
+                onSortChange={(value) => setParams({ sort: serializeConfigRegistrySortValue(value) })}
+                onStatusChange={(value) =>
+                  setParams({ status: serializeConfigRegistryStatusValue(type, value) })
+                }
+                onTagToggle={(tag) =>
                   setParams({
-                    item: null,
-                    mode: serializeConfigRegistryEditorMode(
-                      nextType,
-                      resolveConfigRegistryEditorMode(nextType, null),
+                    tags: serializeConfigRegistryCsvParam(
+                      tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag],
                     ),
-                    status: null,
-                    tags: null,
-                    type: nextType,
-                  }),
-                );
-              }}
-              onSortChange={(value) => setParams({ sort: serializeConfigRegistrySortValue(value) })}
-              onStatusChange={(value) =>
-                setParams({ status: serializeConfigRegistryStatusValue(type, value) })
-              }
-              onTagToggle={(tag) =>
-                setParams({
-                  tags: serializeConfigRegistryCsvParam(
-                    tags.includes(tag) ? tags.filter((item) => item !== tag) : [...tags, tag],
-                  ),
-                })
-              }
-            />
-            <ConfigRegistryDetailPanel
-              detail={detailQuery.data ?? null}
-              errorMessage={detailQuery.error ? getErrorMessage(detailQuery.error) : null}
-              isLoading={detailQuery.isLoading}
-              type={type}
-            />
-            <ConfigRegistryEditorPanel
-              detail={detailQuery.data ?? null}
-              isPending={updateMutation.isPending}
-              mode={mode}
-              type={type}
-              onDirtyChange={setIsDirty}
-              onModeChange={(nextMode) =>
-                setParams({ mode: serializeConfigRegistryEditorMode(type, nextMode) })
-              }
-              onSave={(payload) => {
-                setFeedback(null);
-                updateMutation.mutate(payload);
-              }}
-            />
+                  })
+                }
+              />
+            </div>
+            <div className="grid min-w-0 gap-6 min-[1900px]:contents">
+              <ConfigRegistryDetailPanel
+                detail={detailQuery.data ?? null}
+                errorMessage={resolveConfigRegistryErrorMessage(detailQuery.error)}
+                isLoading={detailQuery.isLoading}
+                type={type}
+              />
+              <div className="min-[1900px]:max-h-[calc(100vh-13rem)] min-[1900px]:overflow-y-auto min-[1900px]:overscroll-y-contain">
+                <ConfigRegistryEditorPanel
+                  detail={detailQuery.data ?? null}
+                  isPending={updateMutation.isPending}
+                  mode={mode}
+                  type={type}
+                  onDirtyChange={setIsDirty}
+                  onModeChange={(nextMode) =>
+                    setParams({ mode: serializeConfigRegistryEditorMode(type, nextMode) })
+                  }
+                  onSave={(payload) => {
+                    setFeedback(null);
+                    updateMutation.mutate(payload);
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </SectionCard>
 
-      <ConfigRegistryUnsavedDialog
+      <UnsavedChangesDialog
         isOpen={navigationGuard.isConfirmOpen}
         isPending={false}
         onClose={navigationGuard.handleDialogClose}
@@ -254,4 +264,14 @@ export function ConfigRegistryPage() {
       />
     </div>
   );
+}
+
+function resolveConfigRegistryErrorMessage(error: unknown) {
+  if (!error) {
+    return null;
+  }
+  const message = getErrorMessage(error);
+  return message === ADMIN_ONLY_MESSAGE
+    ? "当前账号无权限访问该页面。"
+    : message;
 }

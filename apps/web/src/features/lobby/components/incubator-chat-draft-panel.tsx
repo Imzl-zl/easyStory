@@ -36,7 +36,7 @@ export function IncubatorChatDraftPanel({
   const sections = draft ? buildSettingSections(draft.project_setting) : [];
 
   return (
-    <aside className="order-2 space-y-4 xl:sticky xl:top-6 xl:order-1">
+    <aside className="order-2 flex min-h-0 flex-col gap-2.5 lg:order-1 lg:h-full">
       <ActionCard
         canCreate={Boolean(draft && projectName.trim()) && !createMutation.isPending}
         canSyncDraft={hasUserMessage && !draftMutation.isPending}
@@ -48,7 +48,9 @@ export function IncubatorChatDraftPanel({
         onSyncDraft={onSyncDraft}
         projectName={projectName}
       />
-      <DraftBody draft={draft} hasUserMessage={hasUserMessage} sections={sections} />
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-0.5">
+        <DraftBody draft={draft} hasUserMessage={hasUserMessage} sections={sections} />
+      </div>
     </aside>
   );
 }

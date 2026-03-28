@@ -5,7 +5,7 @@
 | 文档类型 | 技术设计 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-14 |
-| 更新时间 | 2026-03-19 |
+| 更新时间 | 2026-03-28 |
 | 关联文档 | [系统架构设计](./architecture.md) |
 
 ---
@@ -32,6 +32,11 @@ skills (Skill，技能)
 hooks (Hook，钩子)
 agents (Agent，智能体)
 ```
+
+> Assistant 的“个人长期规则 / 项目长期规则 / AI 偏好”不再以数据库表作为主真值，而是写入文件系统：
+> `apps/api/.runtime/assistant-config/users/<user_id>/` 与
+> `apps/api/.runtime/assistant-config/projects/<project_id>/`。
+> 数据库只继续承载业务实体、审计、凭证和工作流状态等真正需要事务/查询的对象。
 
 ---
 
@@ -167,8 +172,6 @@ agents (Agent，智能体)
 > `Template.config` 只保存模板级默认值，例如推荐 workflow、引导问题、默认导出参数；不得写入项目私有数据、运行时状态或执行快照。
 >
 > `TemplateNode.config` 只保存节点静态默认配置；用户在项目内的修改应进入项目上下文或 `workflow_snapshot`，不回写模板。
-
----
 
 ### 工作流表
 

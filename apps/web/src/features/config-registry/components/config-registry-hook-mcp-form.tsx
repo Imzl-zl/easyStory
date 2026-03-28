@@ -101,7 +101,7 @@ function HookFormEditorBody({
   return (
     <div className="space-y-4">
       <FormSection title="基本信息">
-        <StaticField label="配置 ID" value={detail.id} />
+        <StaticField label="编号" value={detail.id} />
         <div className="grid gap-3 md:grid-cols-2">
           <TextField label="名称" name="hook-name" required value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} />
           <TextField label="版本" name="hook-version" required value={draft.version} onChange={(value) => setDraft({ ...draft, version: value })} />
@@ -115,12 +115,12 @@ function HookFormEditorBody({
         </label>
       </FormSection>
 
-      <FormSection title="触发条件">
+      <FormSection title="触发时机">
         <SelectField label="事件" options={HOOK_EVENT_OPTIONS.map(toSimpleOption)} value={draft.trigger.event} onChange={(value) => setDraft(sanitizeHookDraft({ ...draft, trigger: { ...draft.trigger, event: value } }))} />
         {isHookNodeEvent(draft.trigger.event) ? (
           <CheckboxListField label="节点类型过滤" emptyMessage="暂无节点类型。" options={HOOK_NODE_TYPE_OPTIONS.map(toSimpleOption)} values={draft.trigger.node_types} onChange={(values) => setDraft({ ...draft, trigger: { ...draft.trigger, node_types: values } })} />
         ) : (
-          <StaticField label="节点类型过滤" description="当前事件不消费 node_types，保存时会自动清空。" value="当前事件不适用" />
+          <StaticField label="节点类型过滤" description="当前这个事件不会用到节点类型，保存时会自动清空。" value="当前事件不适用" />
         )}
       </FormSection>
 
@@ -139,17 +139,17 @@ function HookFormEditorBody({
         }} />
         {draft.action.action_type === "script" ? (
           <div className="grid gap-3 md:grid-cols-2">
-            <TextField label="module" name="hook-script-module" value={readString(actionConfig.module)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, module: value } } })} />
-            <TextField label="function" name="hook-script-function" value={readString(actionConfig.function)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, function: value } } })} />
-            <JsonTextAreaField emptyValue={{}} label="params" parseValue={validateJsonObject} syncKey={`script-params:${jsonResetVersion}`} value={asObject(actionConfig.params)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, params: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action", message))} />
+            <TextField label="脚本模块" name="hook-script-module" value={readString(actionConfig.module)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, module: value } } })} />
+            <TextField label="执行函数" name="hook-script-function" value={readString(actionConfig.function)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, function: value } } })} />
+            <JsonTextAreaField emptyValue={{}} label="补充参数" parseValue={validateJsonObject} syncKey={`script-params:${jsonResetVersion}`} value={asObject(actionConfig.params)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, params: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action", message))} />
           </div>
         ) : null}
         {draft.action.action_type === "webhook" ? (
           <div className="grid gap-3 md:grid-cols-2">
-            <TextField label="url" name="hook-webhook-url" type="url" value={readString(actionConfig.url)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, url: value } } })} />
-            <SelectField label="method" options={WEBHOOK_METHOD_OPTIONS.map(toSimpleOption)} value={readString(actionConfig.method) || "POST"} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, method: value } } })} />
-            <JsonTextAreaField emptyValue={{}} label="headers" parseValue={validateStringMap} syncKey={`webhook-headers:${jsonResetVersion}`} value={asStringMap(actionConfig.headers)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, headers: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action", message))} />
-            <JsonTextAreaField emptyValue={{}} label="body" parseValue={validateJsonValue} syncKey={`webhook-body:${jsonResetVersion}`} value={actionConfig.body ?? {}} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, body: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action-body", message))} />
+            <TextField label="请求地址" name="hook-webhook-url" type="url" value={readString(actionConfig.url)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, url: value } } })} />
+            <SelectField label="请求方式" options={WEBHOOK_METHOD_OPTIONS.map(toSimpleOption)} value={readString(actionConfig.method) || "POST"} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, method: value } } })} />
+            <JsonTextAreaField emptyValue={{}} label="请求头" parseValue={validateStringMap} syncKey={`webhook-headers:${jsonResetVersion}`} value={asStringMap(actionConfig.headers)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, headers: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action", message))} />
+            <JsonTextAreaField emptyValue={{}} label="请求内容" parseValue={validateJsonValue} syncKey={`webhook-body:${jsonResetVersion}`} value={actionConfig.body ?? {}} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, body: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action-body", message))} />
           </div>
         ) : null}
         {draft.action.action_type === "agent" ? (
@@ -162,8 +162,8 @@ function HookFormEditorBody({
                 />
               </div>
             ) : null}
-            <SelectField label="agent_id" options={[{ label: "请选择 Agent", value: "" }, ...agentReferenceField.options]} value={readString(actionConfig.agent_id)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, agent_id: value } } })} />
-            <JsonTextAreaField emptyValue={{}} label="input_mapping" parseValue={validateJsonObject} syncKey={`agent-input:${jsonResetVersion}`} value={asObject(actionConfig.input_mapping)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, input_mapping: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action", message))} />
+            <SelectField label="Agent" options={[{ label: "请选择 Agent", value: "" }, ...agentReferenceField.options]} value={readString(actionConfig.agent_id)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, agent_id: value } } })} />
+            <JsonTextAreaField emptyValue={{}} label="输入映射" parseValue={validateJsonObject} syncKey={`agent-input:${jsonResetVersion}`} value={asObject(actionConfig.input_mapping)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, input_mapping: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action", message))} />
           </div>
         ) : null}
         {draft.action.action_type === "mcp" ? (
@@ -176,10 +176,10 @@ function HookFormEditorBody({
                 />
               </div>
             ) : null}
-            <SelectField label="server_id" options={[{ label: "请选择 MCP Server", value: "" }, ...mcpReferenceField.options]} value={readString(actionConfig.server_id)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, server_id: value } } })} />
-            <TextField label="tool_name" name="hook-tool-name" value={readString(actionConfig.tool_name)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, tool_name: value } } })} />
-            <JsonTextAreaField emptyValue={{}} label="arguments" parseValue={validateJsonObject} syncKey={`mcp-arguments:${jsonResetVersion}`} value={asObject(actionConfig.arguments)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, arguments: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action", message))} />
-            <JsonTextAreaField emptyValue={{}} label="input_mapping" parseValue={validateJsonObject} syncKey={`mcp-input:${jsonResetVersion}`} value={asObject(actionConfig.input_mapping)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, input_mapping: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action-mapping", message))} />
+            <SelectField label="MCP" options={[{ label: "请选择 MCP", value: "" }, ...mcpReferenceField.options]} value={readString(actionConfig.server_id)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, server_id: value } } })} />
+            <TextField label="工具名称" name="hook-tool-name" value={readString(actionConfig.tool_name)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, tool_name: value } } })} />
+            <JsonTextAreaField emptyValue={{}} label="调用参数" parseValue={validateJsonObject} syncKey={`mcp-arguments:${jsonResetVersion}`} value={asObject(actionConfig.arguments)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, arguments: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action", message))} />
+            <JsonTextAreaField emptyValue={{}} label="输入映射" parseValue={validateJsonObject} syncKey={`mcp-input:${jsonResetVersion}`} value={asObject(actionConfig.input_mapping)} onChange={(value) => setDraft({ ...draft, action: { ...draft.action, config: { ...actionConfig, input_mapping: value } } })} onErrorChange={(message) => setErrors((current) => updateError(current, "hook-action-mapping", message))} />
           </div>
         ) : null}
       </FormSection>
@@ -246,8 +246,8 @@ function McpFormEditorBody({
   return (
     <div className="space-y-4">
       <FormSection title="基本信息">
-        <StaticField label="配置 ID" value={detail.id} />
-        <StaticField label="传输协议" value={detail.transport} description="当前后端只支持 streamable_http。" />
+        <StaticField label="编号" value={detail.id} />
+        <StaticField label="连接方式" value={formatTransportLabel(detail.transport)} description="当前只有这一种连接方式。" />
         <div className="grid gap-3 md:grid-cols-2">
           <TextField label="名称" name="mcp-name" required value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} />
           <TextField label="版本" name="mcp-version" required value={draft.version} onChange={(value) => setDraft({ ...draft, version: value })} />
@@ -261,7 +261,7 @@ function McpFormEditorBody({
         </label>
       </FormSection>
 
-      <JsonTextAreaField emptyValue={{}} label="headers" parseValue={validateStringMap} syncKey={`headers:${jsonResetVersion}`} value={draft.headers} onChange={(value) => setDraft({ ...draft, headers: value })} onErrorChange={(message) => setErrors((current) => updateError(current, "headers", message))} />
+      <JsonTextAreaField emptyValue={{}} label="请求头" parseValue={validateStringMap} syncKey={`headers:${jsonResetVersion}`} value={draft.headers} onChange={(value) => setDraft({ ...draft, headers: value })} onErrorChange={(message) => setErrors((current) => updateError(current, "headers", message))} />
       <FormActions errorMessage={firstError(errors)} isDirty={isDirty} isPending={isPending} onReset={() => { setJsonResetVersion((current) => current + 1); setDraft(detail); setErrors({}); }} onSave={() => onSave(draft)} />
     </div>
   );
@@ -271,9 +271,9 @@ function FormActions({ errorMessage, isDirty, isPending, onReset, onSave }: Read
   return (
     <div className="space-y-3">
       {errorMessage ? <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">{errorMessage}</div> : null}
-      <div className="flex flex-wrap gap-2">
-        <button className="ink-button" disabled={isPending || !isDirty || Boolean(errorMessage)} type="button" onClick={onSave}>{isPending ? "保存中…" : "保存配置"}</button>
-        <button className="ink-button-secondary" disabled={isPending || !isDirty} type="button" onClick={onReset}>还原编辑</button>
+      <div className="flex flex-wrap items-center gap-2.5 pt-1">
+        <button className="ink-button h-9 px-4 text-[13px]" disabled={isPending || !isDirty || Boolean(errorMessage)} type="button" onClick={onSave}>{isPending ? "保存中…" : "保存修改"}</button>
+        <button className="ink-button-secondary h-9 px-4 text-[13px]" disabled={isPending || !isDirty} type="button" onClick={onReset}>撤销修改</button>
       </div>
     </div>
   );
@@ -326,4 +326,11 @@ function clearHookActionErrors(errors: Record<string, string>): Record<string, s
 
 function toSimpleOption(option: { label: string; value: string }) {
   return option;
+}
+
+function formatTransportLabel(value: string) {
+  if (value === "streamable_http") {
+    return "流式 HTTP";
+  }
+  return value;
 }

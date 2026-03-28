@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { SectionCard } from "@/components/ui/section-card";
+import { ProjectSettingField } from "@/features/studio/components/project-setting-editor-field";
 import { ProjectSettingImpactPanel } from "@/features/studio/components/project-setting-impact-panel";
 import {
   buildSettingIssueSummary,
+  isProjectSettingDirty,
   buildSettingSaveFeedback,
   EMPTY_SETTING,
   invalidateProjectSettingQueries,
@@ -21,15 +23,17 @@ import type {
 } from "@/lib/api/types";
 
 type ProjectSettingEditorProps = {
-  projectId: string;
-  initialSetting: ProjectSetting | null;
   completeness?: SettingCompletenessResult;
+  initialSetting: ProjectSetting | null;
+  onDirtyChange?: (isDirty: boolean) => void;
+  projectId: string;
 };
 
 export function ProjectSettingEditor({
   projectId,
   initialSetting,
   completeness,
+  onDirtyChange,
 }: ProjectSettingEditorProps) {
   const formKey = JSON.stringify(initialSetting ?? EMPTY_SETTING);
   const [lastImpactState, setLastImpactState] = useState<{
@@ -48,6 +52,7 @@ export function ProjectSettingEditor({
       initialSetting={initialSetting ?? EMPTY_SETTING}
       lastImpact={lastImpact}
       onImpactChange={(impact) => setLastImpactState({ projectId, impact })}
+      onDirtyChange={onDirtyChange}
       projectId={projectId}
     />
   );
@@ -59,16 +64,24 @@ function ProjectSettingEditorForm({
   completeness,
   lastImpact,
   onImpactChange,
+  onDirtyChange,
 }: {
   projectId: string;
   initialSetting: ProjectSetting;
   completeness?: SettingCompletenessResult;
   lastImpact: ProjectSettingImpactSummary | null;
   onImpactChange: (impact: ProjectSettingImpactSummary | null) => void;
+  onDirtyChange?: (isDirty: boolean) => void;
 }) {
   const queryClient = useQueryClient();
   const [setting, setSetting] = useState<ProjectSetting>(initialSetting);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const isDirty = isProjectSettingDirty(setting, initialSetting);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+    return () => onDirtyChange?.(false);
+  }, [isDirty, onDirtyChange]);
 
   const saveMutation = useMutation({
     mutationFn: () => updateProjectSetting(projectId, setting),
@@ -128,14 +141,14 @@ function ProjectSettingEditorForm({
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="题材">
+          <ProjectSettingField label="题材">
             <input
               className="ink-input"
               value={setting.genre ?? ""}
               onChange={(event) => setSetting((current) => ({ ...current, genre: event.target.value }))}
             />
-          </Field>
-          <Field label="子题材">
+          </ProjectSettingField>
+          <ProjectSettingField label="子题材">
             <input
               className="ink-input"
               value={setting.sub_genre ?? ""}
@@ -143,8 +156,8 @@ function ProjectSettingEditorForm({
                 setSetting((current) => ({ ...current, sub_genre: event.target.value }))
               }
             />
-          </Field>
-          <Field label="目标读者">
+          </ProjectSettingField>
+          <ProjectSettingField label="目标读者">
             <input
               className="ink-input"
               value={setting.target_readers ?? ""}
@@ -152,15 +165,15 @@ function ProjectSettingEditorForm({
                 setSetting((current) => ({ ...current, target_readers: event.target.value }))
               }
             />
-          </Field>
-          <Field label="整体语气">
+          </ProjectSettingField>
+          <ProjectSettingField label="整体语气">
             <input
               className="ink-input"
               value={setting.tone ?? ""}
               onChange={(event) => setSetting((current) => ({ ...current, tone: event.target.value }))}
             />
-          </Field>
-          <Field label="主角姓名">
+          </ProjectSettingField>
+          <ProjectSettingField label="主角姓名">
             <input
               className="ink-input"
               value={setting.protagonist?.name ?? ""}
@@ -171,8 +184,8 @@ function ProjectSettingEditorForm({
                 }))
               }
             />
-          </Field>
-          <Field label="主角身份">
+          </ProjectSettingField>
+          <ProjectSettingField label="主角身份">
             <input
               className="ink-input"
               value={setting.protagonist?.identity ?? ""}
@@ -183,8 +196,8 @@ function ProjectSettingEditorForm({
                 }))
               }
             />
-          </Field>
-          <Field label="世界名称">
+          </ProjectSettingField>
+          <ProjectSettingField label="世界名称">
             <input
               className="ink-input"
               value={setting.world_setting?.name ?? ""}
@@ -195,8 +208,8 @@ function ProjectSettingEditorForm({
                 }))
               }
             />
-          </Field>
-          <Field label="力量体系">
+          </ProjectSettingField>
+          <ProjectSettingField label="力量体系">
             <input
               className="ink-input"
               value={setting.world_setting?.power_system ?? ""}
@@ -207,8 +220,8 @@ function ProjectSettingEditorForm({
                 }))
               }
             />
-          </Field>
-          <Field label="目标字数">
+          </ProjectSettingField>
+          <ProjectSettingField label="目标字数">
             <input
               className="ink-input"
               inputMode="numeric"
@@ -223,8 +236,8 @@ function ProjectSettingEditorForm({
                 }))
               }
             />
-          </Field>
-          <Field label="目标章节">
+          </ProjectSettingField>
+          <ProjectSettingField label="目标章节">
             <input
               className="ink-input"
               inputMode="numeric"
@@ -239,10 +252,10 @@ function ProjectSettingEditorForm({
                 }))
               }
             />
-          </Field>
+          </ProjectSettingField>
         </div>
 
-        <Field label="核心冲突">
+        <ProjectSettingField label="核心冲突">
           <textarea
             className="ink-textarea min-h-28"
             value={setting.core_conflict ?? ""}
@@ -250,9 +263,9 @@ function ProjectSettingEditorForm({
               setSetting((current) => ({ ...current, core_conflict: event.target.value }))
             }
           />
-        </Field>
+        </ProjectSettingField>
 
-        <Field label="剧情走向">
+        <ProjectSettingField label="剧情走向">
           <textarea
             className="ink-textarea min-h-28"
             value={setting.plot_direction ?? ""}
@@ -260,9 +273,9 @@ function ProjectSettingEditorForm({
               setSetting((current) => ({ ...current, plot_direction: event.target.value }))
             }
           />
-        </Field>
+        </ProjectSettingField>
 
-        <Field label="特殊要求">
+        <ProjectSettingField label="特殊要求">
           <textarea
             className="ink-textarea min-h-24"
             value={setting.special_requirements ?? ""}
@@ -270,7 +283,7 @@ function ProjectSettingEditorForm({
               setSetting((current) => ({ ...current, special_requirements: event.target.value }))
             }
           />
-        </Field>
+        </ProjectSettingField>
 
         {feedback ? (
           <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
@@ -281,20 +294,5 @@ function ProjectSettingEditorForm({
         {lastImpact ? <ProjectSettingImpactPanel impact={lastImpact} /> : null}
       </div>
     </SectionCard>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: Readonly<{
-  label: string;
-  children: React.ReactNode;
-}>) {
-  return (
-    <label className="block space-y-2">
-      <span className="label-text">{label}</span>
-      {children}
-    </label>
   );
 }

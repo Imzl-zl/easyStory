@@ -10,10 +10,12 @@ import type { TemplateSummary } from "@/lib/api/types";
 
 export function TemplateLibrarySidebar({ model }: { model: TemplateLibraryModel }) {
   return (
-    <aside className="panel-shell space-y-4 p-5">
+    <aside className="panel-shell flex min-h-0 flex-col gap-4 p-5">
       <SidebarHeader onStartCreate={model.startCreate} />
       <SidebarFilters model={model} />
-      <SidebarBody model={model} />
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <SidebarBody model={model} />
+      </div>
     </aside>
   );
 }
@@ -23,8 +25,10 @@ function SidebarHeader({ onStartCreate }: { onStartCreate: () => void }) {
     <div className="space-y-4">
       <div className="space-y-1">
         <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">模板库</p>
-        <h2 className="font-serif text-2xl font-semibold">模板法度</h2>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">管理内建模板与自定义模板，所有节点快照都以后端展开结果为准。</p>
+        <h2 className="font-serif text-2xl font-semibold">模板列表</h2>
+        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          管理内置模板和自定义模板。
+        </p>
       </div>
       <button className="ink-button w-full justify-center" onClick={onStartCreate} type="button">
         创建模板
@@ -68,7 +72,7 @@ function VisibilityTabs({
     <div className="flex flex-wrap gap-2">
       {[
         ["all", "全部"],
-        ["builtin", "内建"],
+        ["builtin", "内置"],
         ["custom", "自定义"],
       ].map(([value, label]) => (
         <button
@@ -116,7 +120,7 @@ function GenreTabs({
 
 function SidebarBody({ model }: { model: TemplateLibraryModel }) {
   if (model.templatesQuery.isLoading) {
-    return <p className="text-sm text-[var(--text-secondary)]">正在加载模板列表...</p>;
+    return <p className="text-sm text-[var(--text-secondary)]">正在读取模板列表…</p>;
   }
   if (model.templatesQuery.error) {
     return (
@@ -135,7 +139,7 @@ function SidebarBody({ model }: { model: TemplateLibraryModel }) {
     return (
       <EmptyState
         title="暂无模板"
-        description="创建你的第一个模板，或从内置模板开始。"
+        description="创建模板，或使用内置模板。"
       />
     );
   }
@@ -167,7 +171,7 @@ function TemplateListCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="font-serif text-lg font-semibold">{template.name}</p>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">{template.description ?? "当前模板未提供额外说明。"}</p>
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">{template.description ?? "暂无说明。"}</p>
         </div>
         <StatusBadge
           status={template.is_builtin ? "approved" : "draft"}
@@ -176,7 +180,7 @@ function TemplateListCard({
       </div>
       <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">
         <span>{template.genre ?? "未设题材"}</span>
-        <span>{template.node_count} 节点</span>
+        <span>{template.node_count} 步</span>
       </div>
     </button>
   );

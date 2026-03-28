@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 
+import type { IncubatorCredentialState } from "@/features/lobby/components/incubator-chat-credential-support";
 import {
+  INCUBATOR_INPUT_MAX_LENGTH,
   INCUBATOR_PROMPT_SUGGESTIONS,
 } from "@/features/lobby/components/incubator-chat-support";
 import type { IncubatorChatModel } from "@/features/lobby/components/incubator-page-model";
@@ -19,60 +21,15 @@ export function CredentialNoticeCard({
   message: string;
 }) {
   return (
-    <div className="mt-4 rounded-2xl bg-[rgba(183,121,31,0.12)] px-4 py-3 text-sm leading-6 text-[var(--accent-warning)]">
-      <p>{message}</p>
-      <Link className="mt-2 inline-flex text-sm font-medium text-[var(--accent-ink)] underline-offset-4 hover:underline" href={credentialSettingsHref}>
-        去配置模型连接
+    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[rgba(183,121,31,0.14)] bg-[rgba(183,121,31,0.1)] px-3 py-2 text-[12px] leading-5 text-[var(--accent-warning)]">
+      <p className="min-w-0 flex-1">{message}</p>
+      <Link
+        className="inline-flex shrink-0 items-center rounded-full bg-[rgba(255,255,255,0.76)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-ink)] transition hover:bg-[rgba(255,255,255,0.96)]"
+        href={credentialSettingsHref}
+      >
+        前往模型连接
       </Link>
     </div>
-  );
-}
-
-export function ProviderSelectField({ model }: { model: IncubatorChatModel }) {
-  return (
-    <label className="block">
-      <span className="label-text">当前使用的连接</span>
-      <select
-        className="ink-input"
-        name="provider"
-        value={model.settings.provider || model.credentialOptions[0]?.provider || ""}
-        onChange={(event) => syncProviderSelection(model, event.target.value)}
-      >
-        {model.credentialOptions.map((option) => (
-          <option key={option.provider} value={option.provider}>
-            {option.displayLabel}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-export function TextSettingField({
-  label,
-  name,
-  onChange,
-  placeholder,
-  value,
-}: {
-  label: string;
-  name: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  value: string;
-}) {
-  return (
-    <label className="block">
-      <span className="label-text">{label}</span>
-      <input
-        autoComplete="off"
-        className="ink-input"
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
   );
 }
 
@@ -84,10 +41,10 @@ export function PromptSuggestionBar({
   onSelect: (prompt: string) => void;
 }) {
   return (
-    <div className="mt-4 flex flex-wrap gap-3">
+    <div className="mt-1.5 flex flex-wrap gap-1.5">
       {INCUBATOR_PROMPT_SUGGESTIONS.map((prompt) => (
         <button
-          className="rounded-2xl border border-[var(--line-soft)] bg-[rgba(255,255,255,0.88)] px-4 py-3 text-left text-sm leading-6 text-[var(--text-primary)] transition hover:border-[rgba(46,111,106,0.2)] hover:bg-[rgba(46,111,106,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-full border border-[var(--line-soft)] bg-[rgba(255,255,255,0.92)] px-2.5 py-1.5 text-left text-[11.5px] leading-5 text-[var(--text-primary)] transition hover:border-[rgba(46,111,106,0.18)] hover:bg-[rgba(46,111,106,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={disabled}
           key={prompt}
           onClick={() => onSelect(prompt)}
@@ -112,18 +69,16 @@ export function MessageBubble({
   const isAssistant = role === "assistant";
   const alignmentClassName = isAssistant ? "self-start" : "self-end";
   const className = isAssistant
-    ? "bg-[rgba(255,251,245,0.96)] text-[var(--text-primary)]"
-    : "bg-[rgba(46,111,106,0.14)] text-[var(--text-primary)]";
-  const statusClassName = status === "error"
-    ? "border-[rgba(178,65,46,0.16)] bg-[rgba(178,65,46,0.1)]"
-    : "border-[var(--line-soft)]";
+    ? "bg-[rgba(255,251,245,0.96)] text-[var(--text-primary)] shadow-[0_10px_22px_rgba(58,45,29,0.05)]"
+    : "bg-[rgba(46,111,106,0.14)] text-[var(--text-primary)] shadow-[0_10px_18px_rgba(46,111,106,0.08)]";
+  const statusClassName = resolveMessageStatusClassName(status);
 
   return (
-    <article className={`max-w-[88%] rounded-[26px] border px-5 py-4 ${alignmentClassName} ${className} ${statusClassName}`}>
-      <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-        {isAssistant ? "AI 助手" : "你"}
+    <article className={`max-w-[84%] md:max-w-[80%] xl:max-w-[76%] rounded-[16px] border px-3 py-1.5 ${alignmentClassName} ${className} ${statusClassName}`}>
+      <p className="text-[10px] font-medium tracking-[0.14em] text-[var(--text-secondary)]">
+        {isAssistant ? "AI" : "你"}
       </p>
-      <p className="mt-2 whitespace-pre-wrap text-sm leading-7">{content}</p>
+      <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-6">{content}</p>
     </article>
   );
 }
@@ -132,25 +87,49 @@ export function buildCanSubmit(model: IncubatorChatModel) {
   return model.canChat && model.composerText.trim().length > 0 && !model.isCredentialLoading && !model.isResponding;
 }
 
+export function buildComposerHint(
+  currentLength: number,
+  credentialState: IncubatorCredentialState,
+  canChat: boolean,
+  isCredentialLoading: boolean,
+) {
+  if (isCredentialLoading || credentialState === "loading") {
+    return "正在准备聊天。";
+  }
+  if (credentialState === "error") {
+    return "模型连接读取失败，请检查后重试。";
+  }
+  if (credentialState === "empty") {
+    return "请先启用模型连接。";
+  }
+  if (!canChat) {
+    return "请选择模型连接。";
+  }
+  return `${currentLength} / ${INCUBATOR_INPUT_MAX_LENGTH} · 按回车发送，Shift + 回车换行`;
+}
+
+export function resolveSubmitButtonLabel(isCredentialLoading: boolean, isResponding: boolean) {
+  if (isCredentialLoading) {
+    return "正在准备聊天…";
+  }
+  if (isResponding) {
+    return "AI 回复中…";
+  }
+  return "发送";
+}
+
 export function isVisibleConversationMessage(
   message: IncubatorChatModel["messages"][number],
 ): message is VisibleChatMessage {
   return !message.hidden && (message.role === "assistant" || message.role === "user");
 }
 
-function updateChatSettings<K extends keyof IncubatorChatModel["settings"]>(
-  model: IncubatorChatModel,
-  field: K,
-  value: IncubatorChatModel["settings"][K],
-) {
-  model.setSettings((current) => ({ ...current, [field]: value }));
-}
-
-function syncProviderSelection(model: IncubatorChatModel, provider: string) {
-  const option = model.credentialOptions.find((item) => item.provider === provider);
-  model.setSettings((current) => ({
-    ...current,
-    modelName: option?.defaultModel ?? "",
-    provider,
-  }));
+function resolveMessageStatusClassName(status: "pending" | "error" | undefined) {
+  if (status === "error") {
+    return "border-[rgba(178,65,46,0.16)] bg-[rgba(178,65,46,0.1)]";
+  }
+  if (status === "pending") {
+    return "border-[rgba(58,124,165,0.14)] bg-[rgba(58,124,165,0.08)]";
+  }
+  return "border-[var(--line-soft)]";
 }

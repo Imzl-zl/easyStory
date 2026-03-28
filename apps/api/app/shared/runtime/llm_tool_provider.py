@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from . import provider_interop_stream_support as stream_support
 from .errors import ConfigurationError
 from .llm_protocol import (
     HttpJsonResponse,
@@ -39,6 +41,12 @@ class LLMRequest:
     connection: LLMConnection
 
 
+@dataclass(frozen=True)
+class LLMStreamEvent:
+    delta: str | None = None
+    response: dict[str, Any] | None = None
+
+
 class LLMToolProvider(ToolProvider):
     def __init__(
         self,
@@ -63,6 +71,44 @@ class LLMToolProvider(ToolProvider):
             "output_tokens": normalized.output_tokens,
             "total_tokens": normalized.total_tokens,
         }
+
+    async def execute_stream(
+        self,
+        tool_name: str,
+        params: dict[str, Any],
+        *,
+        should_stop: Callable[[], Awaitable[bool]] | None = None,
+    ) -> AsyncIterator[LLMStreamEvent]:
+        if tool_name != LLM_GENERATE_TOOL:
+            raise ConfigurationError(f"Unsupported tool: {tool_name}")
+        request = _build_request(params)
+        prepared_request = stream_support.build_stream_probe_request(
+            prepare_generation_request(_to_generate_request(request)),
+            api_dialect=request.connection.api_dialect,
+        )
+        parts: list[str] = []
+        async for event in stream_support.iterate_stream_request(
+            prepared_request,
+            api_dialect=request.connection.api_dialect,
+            should_stop=should_stop,
+        ):
+            if not event.delta:
+                continue
+            parts.append(event.delta)
+            yield LLMStreamEvent(delta=event.delta)
+        content = "".join(parts)
+        if not content:
+            raise ConfigurationError("模型没有返回可展示的内容，请稍后重试。")
+        yield LLMStreamEvent(
+            response={
+                "content": content,
+                "model_name": request.model_name,
+                "provider": request.provider,
+                "input_tokens": None,
+                "output_tokens": None,
+                "total_tokens": None,
+            }
+        )
 
     def list_tools(self) -> list[str]:
         return [LLM_GENERATE_TOOL]

@@ -37,13 +37,13 @@ export function TemplateModePanel({
         <TemplateQuestionsCard model={model} />
       </div>
       <IncubatorPreview
-        title="模板草稿预览"
-        description="回答问题后生成项目设定，并评估完整度。"
+        title="项目草稿"
+        description="根据填写内容生成项目草稿。"
         emptyMessage={buildPreviewEmptyMessage(model)}
         completeness={model.draftMutation.data?.setting_completeness}
         setting={model.draftMutation.data?.project_setting}
         appliedAnswers={model.draftMutation.data?.applied_answers}
-        staleMessage={model.isDraftStale ? "你已修改模板回答，当前预览已过期，请重新生成草稿。" : null}
+        staleMessage={model.isDraftStale ? "你刚修改了回答，请先重新整理草稿。" : null}
         unmappedAnswers={model.draftMutation.data?.unmapped_answers}
       />
     </div>
@@ -57,7 +57,7 @@ function renderTemplateModeGuard(
   if (model.templatesQuery.isLoading) {
     return (
       <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">
-        正在加载模板列表...
+        正在加载模板列表…
       </div>
     );
   }
@@ -74,10 +74,10 @@ function renderTemplateModeGuard(
     return (
       <EmptyState
         title="当前没有模板"
-        description="暂无可用模板，可切换到聊天共创模式继续推进项目。"
+        description="当前没有可用模板，请使用 AI 聊天。"
         action={
           <button className="ink-button-secondary" onClick={onSwitchToChat} type="button">
-            切换到聊天共创
+            使用 AI 聊天
           </button>
         }
       />
@@ -100,7 +100,7 @@ function renderTemplateListErrorActions(
         重试模板列表
       </button>
       <button className="ink-button-secondary" onClick={onSwitchToChat} type="button">
-        切换到聊天共创
+        使用 AI 聊天
       </button>
     </>
   );

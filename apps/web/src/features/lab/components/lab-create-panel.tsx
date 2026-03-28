@@ -1,5 +1,7 @@
 "use client";
 
+import { AppSelect } from "@/components/ui/app-select";
+
 import type { LabAnalysisFormState } from "./lab-support";
 import { LAB_ANALYSIS_TYPES } from "./lab-support";
 
@@ -27,7 +29,7 @@ export function LabCreatePanel({
       <div className="space-y-1">
         <h2 className="font-serif text-xl font-semibold">新建分析</h2>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          当前表单对齐后端 DTO，显式写入 `analysis_type / source_title / generated_skill_key / result / suggestions`。
+          选择分析类型，填好来源标题和结果内容，就能把这条分析记录保存下来。
         </p>
       </div>
       <LabCreateFields formState={formState} isPending={isPending} onFieldChange={onFieldChange} />
@@ -51,29 +53,23 @@ function LabCreateFields({
     <>
       <label className="block space-y-2">
         <span className="label-text">分析类型</span>
-        <select
-          className="ink-select"
+        <AppSelect
           disabled={isPending}
+          options={LAB_ANALYSIS_TYPES.map((item) => ({ label: item, value: item }))}
           value={formState.analysisType}
-          onChange={(event) => onFieldChange({ analysisType: event.target.value as LabAnalysisFormState["analysisType"] })}
-        >
-          {LAB_ANALYSIS_TYPES.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => onFieldChange({ analysisType: value as LabAnalysisFormState["analysisType"] })}
+        />
       </label>
       <LabTextField label="来源标题" required value={formState.sourceTitle} onChange={(value) => onFieldChange({ sourceTitle: value })} />
       <LabTextField
-        label="generated_skill_key"
+        label="生成标记"
         placeholder="可选，例如 skill.style.river"
         value={formState.generatedSkillKey}
         onChange={(value) => onFieldChange({ generatedSkillKey: value })}
       />
-      <LabTextAreaField label="result JSON" value={formState.result} onChange={(value) => onFieldChange({ result: value })} />
+      <LabTextAreaField label="分析结果（JSON）" value={formState.result} onChange={(value) => onFieldChange({ result: value })} />
       <LabTextAreaField
-        label="suggestions JSON"
+        label="建议列表（JSON）"
         minHeightClassName="min-h-32"
         value={formState.suggestions}
         onChange={(value) => onFieldChange({ suggestions: value })}

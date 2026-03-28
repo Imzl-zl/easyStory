@@ -17,7 +17,7 @@ export function RecycleBinPage() {
     <div className="space-y-6">
       <SectionCard
         title="回收站"
-        description="已删除项目会先停留在这里。你可以恢复、彻底删除，或手动清空回收站。"
+        description="已删除项目会保留在回收站，可恢复、彻底删除或手动清空。"
         action={<Link className="ink-button-secondary" href="/workspace/lobby">返回项目大厅</Link>}
       >
         <div className="space-y-5">

@@ -22,7 +22,7 @@ type ConfigRegistryEditorPanelProps = {
 
 export function ConfigRegistryEditorPanel(props: Readonly<ConfigRegistryEditorPanelProps>) {
   if (!props.detail) {
-    return <EmptyState title="暂无可编辑配置" description="选择配置后，可以编辑结构化表单或 JSON。" />;
+    return <EmptyState title="选择配置项" description="从左侧选择后即可编辑。" />;
   }
   return <ConfigRegistryEditorPanelBody key={formatConfigRegistryDocument(props.detail)} {...props} detail={props.detail} />;
 }
@@ -55,14 +55,14 @@ function ConfigRegistryEditorPanelBody({
         <header className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
-              <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">编辑器</p>
+              <p className="text-xs tracking-[0.16em] text-[var(--accent-ink)]">当前编辑</p>
               <h3 className="font-serif text-lg font-semibold">{getEditorTitle(type)}</h3>
             </div>
             {supportsForm ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <ModeButton
                   isActive={mode === "form"}
-                  label="表单视图"
+                  label="常用字段"
                   onClick={() => {
                     if (!canSwitchToForm) return;
                     setStructuredDraft(parsedJson.parsed as ConfigRegistryDetail);
@@ -71,7 +71,7 @@ function ConfigRegistryEditorPanelBody({
                 />
                 <ModeButton
                   isActive={mode === "json"}
-                  label="JSON 高级模式"
+                  label="完整配置"
                   onClick={() => {
                     setJsonValue(formatConfigRegistryDocument(structuredDraft));
                     onModeChange("json");
@@ -80,14 +80,14 @@ function ConfigRegistryEditorPanelBody({
               </div>
             ) : (
               <div className="rounded-full bg-[rgba(46,111,106,0.08)] px-3 py-2 text-sm text-[var(--accent-ink)]">
-                Workflow 当前仅支持 JSON 模式
+                Workflows 当前仅支持完整配置
               </div>
             )}
           </div>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">
             {mode === "json"
-              ? "JSON 模式直接提交完整 DTO。保存前会先做前端解析，严格字段校验继续以后端 422 为准。"
-              : "表单模式按类型展开常用字段；复杂对象仍以当前 DTO 结构为真值。"}
+              ? "编辑完整配置。"
+              : "编辑常用字段。"}
           </p>
         </header>
 
@@ -145,12 +145,12 @@ function JsonEditor({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-      <div className="flex flex-wrap gap-2">
-        <button className="ink-button" disabled={isPending || !isDirty || Boolean(errorMessage)} type="button" onClick={onSave}>
-          {isPending ? "保存中…" : "保存配置"}
+      <div className="flex flex-wrap items-center gap-2.5 pt-1">
+        <button className="ink-button h-9 px-4 text-[13px]" disabled={isPending || !isDirty || Boolean(errorMessage)} type="button" onClick={onSave}>
+          {isPending ? "保存中…" : "保存修改"}
         </button>
-        <button className="ink-button-secondary" disabled={isPending || !isDirty} type="button" onClick={onReset}>
-          还原编辑
+        <button className="ink-button-secondary h-9 px-4 text-[13px]" disabled={isPending || !isDirty} type="button" onClick={onReset}>
+          撤销修改
         </button>
       </div>
     </div>
@@ -163,7 +163,7 @@ function ModeButton({
   onClick,
 }: Readonly<{ isActive: boolean; label: string; onClick: () => void }>) {
   return (
-    <button className="ink-tab" data-active={isActive} type="button" onClick={onClick}>
+    <button className="ink-tab h-9 px-4 text-[13px]" data-active={isActive} type="button" onClick={onClick}>
       {label}
     </button>
   );
@@ -178,9 +178,9 @@ function ErrorBanner({ message }: Readonly<{ message: string }>) {
 }
 
 function getEditorTitle(type: ConfigRegistryType): string {
-  if (type === "skills") return "Skill 配置编辑";
-  if (type === "agents") return "Agent 配置编辑";
-  if (type === "hooks") return "Hook 配置编辑";
-  if (type === "mcp_servers") return "MCP Server 配置编辑";
-  return "Workflow 配置编辑";
+  if (type === "skills") return "Skills";
+  if (type === "agents") return "Agents";
+  if (type === "hooks") return "Hooks";
+  if (type === "mcp_servers") return "MCP";
+  return "Workflows";
 }

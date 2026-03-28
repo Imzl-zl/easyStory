@@ -83,13 +83,18 @@
 - 当业务 service 文件超出 300 行时，优先保持公开 `Service + factory` 不变，只把"查询/权限 helper""状态变更 helper""DTO 映射与归一化 helper"下沉到 `*_support.py`；不要用改公开命名来掩盖内部结构问题。
 - `workflow events` SSE 端点需要 `Authorization: Bearer`；前端不要用原生 `EventSource`，统一走 `fetch + ReadableStream`，并区分正常 EOF 静默重连与错误重连提示。
 - `apps/web` 当前 support 纯逻辑单测走 Node 原生 `--test` + 自定义 `scripts/ts-path-alias-loader.mjs`，这样可直接执行带 `@/` 路径别名的 TypeScript 文件而不引入额外测试框架。
+- 对 query-param 驱动且带本地表单态的页面（如 Lobby Settings / Project Settings / Config Registry），统一复用 `useUnsavedChangesGuard + GuardedLink + UnsavedChangesDialog`；不要只拦本地 tab 按钮，跨页 Link 和浏览器返回也要一起拦。
 - 对 `workflow` 维度的本地 UI 状态（如当前输入框值、已选 node execution、SSE 本地信号），优先用 `{ workflowId, value }` 绑定态再在 render 时按当前 `workflowId` 取值；不要依赖 effect 在切换后“补清空”，否则 A -> B -> A 容易复活旧状态。
 - 导出口径当前已收口：`ChapterTask.status` 为 `completed | stale` 且正文状态为 `approved | stale` 时允许导出；`pending / generating / interrupted / failed` 阻断，`skipped` 直接省略，前端导出对话框必须先跑章节任务预检再发请求。
 - 对"公开 async 入口 + 内部纯规则聚合"的服务（如 review/billing），最佳拆分边界：真实 I/O（并发调度、timeout、DB flush）保留 async；纯规则 helper（归一化、状态聚合、配置校验）保持 sync。
 - `workflow hooks` 现已真实接入 runtime：通过 `PluginRegistry.execute` 分发 `script/webhook/agent/mcp`，默认事件覆盖 `before_node_start / before_generate / after_generate / before_review / after_review / on_review_fail / before_fix / after_fix / after_node_end / on_error`；新增 provider 继续沿这条 registry 抽象扩展，不要把类型判断塞回 runtime 主链。
 - `workflow` 节点级 `hooks.before/after` 现在有 staged 校验：assistant-only 事件（如 `before_assistant_response`）不能挂到 workflow node，且 hook event 必须落在匹配的 stage（如 `after_generate -> after`）。
 - `McpPluginProvider` 当前最佳实践语义：`server.enabled=false` 直接视为配置错误；上游返回 `is_error=true` 直接抛显式异常，不做“成功返回但结果里带错误”的静默降级。
-- `assistant runtime` 当前已落地：`/api/v1/assistant/turn` 支持非 workflow 对话，skill 负责 prompt、hook 负责生命周期、`mcp` 通过 PluginRegistry 执行；但还没有前端聊天 UI，也还没有 agent 通用 tool-calling 回路。
+- `assistant runtime` 当前已落地：`/api/v1/assistant/turn` 支持非 workflow 对话，skill 负责 prompt、hook 负责生命周期、`mcp` 通过 PluginRegistry 执行；agent 通用 tool-calling 仍未实现。
+- assistant 规则层当前正式口径：`/api/v1/assistant/rules/me` 管理用户长期规则，`/api/v1/assistant/rules/projects/{project_id}` 管理项目规则；运行时按 `系统提示 -> 用户规则 -> 项目规则` 顺序叠加；规则真值文件分别写入 `apps/api/.runtime/assistant-config/users/<user_id>/AGENTS.md` 与 `apps/api/.runtime/assistant-config/projects/<project_id>/AGENTS.md`
+- assistant AI 偏好当前正式口径：`/api/v1/assistant/preferences` 管理默认连接与默认模型；真值文件写入 `apps/api/.runtime/assistant-config/users/<user_id>/preferences.yaml`
+- assistant hook agent 当前也会继承用户偏好与项目规则；不要再假设只有主回复会吃到 `preferences/rules`，否则前后两次 `llm.generate` 会出现口径漂移。
+- 前端多用户切换账号时，退出登录必须同步清空 `workspace` 持久化里的 `lastProjectId / lastWorkflowByProject`；`sidebarPreference` 仍保留为设备级偏好。
 - 读取 `request.app.state`、容器字段或内存注入对象的 accessor，如果不做 I/O 就保持同步 `def`；不为"全 async"把纯 accessor 改成 coroutine。
 - async 语义审查时，不要误把基础设施事实命名当成待清理对象；`AsyncSessionFactory`、`create_async_session_factory`、`get_async_db_session`、`AsyncCredentialVerifier` 是真实底层边界，应保留。
 - 对混合 DB 编排和文件 I/O 的服务（如 export），优先把路径校验、文件写入/清理、文档渲染抽到 `*_support.py`；主服务只保留 owner 校验、装配和事务边界。

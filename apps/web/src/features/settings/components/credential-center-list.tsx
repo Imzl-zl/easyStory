@@ -52,11 +52,11 @@ export function CredentialCenterList({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">已有连接</h3>
-            <p className="text-sm text-[var(--text-secondary)]">先在这里查看和验证，想新增时点右侧按钮即可。</p>
+            <p className="text-sm text-[var(--text-secondary)]">查看、验证和管理已有连接。</p>
           </div>
           {mode === "list" && onStartCreate ? (
             <button
-              className="ink-button-secondary"
+              className="ink-button-secondary h-9 px-4 text-[13px]"
               disabled={isPending}
               onClick={onStartCreate}
               type="button"
@@ -105,7 +105,7 @@ export function CredentialCenterList({
                   ) : null}
                 </div>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  连接代号：{credential.provider} · 服务类型：{getApiDialectLabel(credential.api_dialect)}
+                  连接代号：{credential.provider} · 接入方式：{getApiDialectLabel(credential.api_dialect)}
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">
                   默认模型：{credential.default_model ?? "未配置"} · 密钥尾号：{credential.masked_key}
@@ -120,10 +120,10 @@ export function CredentialCenterList({
                   </p>
                 ) : null}
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex max-w-full flex-wrap justify-start gap-2 md:max-w-[320px] md:justify-end">
                 {isListMode ? (
                   <button
-                    className="ink-button-secondary"
+                    className="ink-button-secondary h-8 px-3.5 text-[13px]"
                     disabled={isPending}
                     onClick={() => onSelectCredentialForEdit?.(credential.id)}
                     type="button"
@@ -134,7 +134,7 @@ export function CredentialCenterList({
                 {isListMode ? (
                   <>
                     <button
-                      className="ink-button-secondary"
+                      className="ink-button-secondary h-8 px-3.5 text-[13px]"
                       disabled={isPending}
                       onClick={() => onAction("verify", credential.id)}
                       type="button"
@@ -142,7 +142,7 @@ export function CredentialCenterList({
                       {resolveCredentialActionButtonLabel("verify", isVerifyPending)}
                     </button>
                     <button
-                      className="ink-button-secondary"
+                      className="ink-button-secondary h-8 px-3.5 text-[13px]"
                       disabled={isPending}
                       onClick={() => onAction(toggleActionType, credential.id)}
                       type="button"
@@ -150,7 +150,7 @@ export function CredentialCenterList({
                       {resolveCredentialActionButtonLabel(toggleActionType, isTogglePending)}
                     </button>
                     <button
-                      className="ink-button-danger"
+                      className="ink-button-danger h-8 px-3.5 text-[13px]"
                       disabled={isPending}
                       onClick={() => setPendingDeleteCredential(credential)}
                       type="button"

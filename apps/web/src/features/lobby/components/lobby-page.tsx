@@ -15,7 +15,7 @@ export function LobbyPage() {
     <div className="space-y-6">
       <SectionCard
         title="项目大厅"
-        description="管理你的故事项目，开启创作之旅。"
+        description="查看项目、继续创作或新建项目。"
         action={<LobbyToolbar />}
       >
         <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
@@ -28,10 +28,10 @@ export function LobbyPage() {
               templatesLoading={model.templatesQuery.isLoading}
             />
             <label className="block">
-              <span className="label-text">快速搜索</span>
+              <span className="label-text">搜索项目</span>
               <input
                 className="ink-input"
-                placeholder="按项目名过滤"
+                placeholder="按项目名称搜索"
                 value={model.searchText}
                 onChange={(event) => model.setSearchText(event.target.value)}
               />
@@ -53,15 +53,15 @@ export function LobbyPage() {
 
 function LobbyToolbar() {
   return (
-    <div className="flex flex-wrap gap-2">
-      <Link className="ink-button-secondary" href="/workspace/lobby/settings?tab=credentials&sub=list">
-        全局设置
+    <div className="flex flex-wrap items-center justify-end gap-2.5">
+      <Link className="ink-button-secondary h-9 px-4 text-[13px]" href="/workspace/lobby/settings?tab=assistant">
+        AI 设置
       </Link>
-      <Link className="ink-button-secondary" href="/workspace/lobby/config-registry?type=skills">
-        配置中心
-      </Link>
-      <Link className="ink-button-secondary" href="/workspace/lobby/recycle-bin">
+      <Link className="ink-button-secondary h-9 px-4 text-[13px]" href="/workspace/lobby/recycle-bin">
         回收站
+      </Link>
+      <Link className="ink-button-secondary h-9 px-4 text-[13px]" href="/workspace/lobby/config-registry?type=skills">
+        平台配置
       </Link>
     </div>
   );

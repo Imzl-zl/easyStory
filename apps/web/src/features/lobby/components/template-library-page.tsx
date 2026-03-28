@@ -16,10 +16,12 @@ export function TemplateLibraryPage({ initialTemplateId = null }: TemplateLibrar
   const model = useTemplateLibraryModel(initialTemplateId);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4 lg:h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-3rem)] lg:overflow-hidden">
       <SectionCard
+        bodyClassName="min-h-0 flex-1"
+        className="flex min-h-0 flex-1 flex-col"
         title="模板库"
-        description="管理创作模板，为你的故事定下基调。"
+        description="查看和维护项目模板。"
         action={
           <div className="flex flex-wrap gap-2">
             <Link className="ink-button-secondary" href="/workspace/lobby">返回项目大厅</Link>
@@ -27,7 +29,7 @@ export function TemplateLibraryPage({ initialTemplateId = null }: TemplateLibrar
           </div>
         }
       >
-        <div className="grid gap-6 xl:grid-cols-[280px_1fr_360px]">
+        <div className="grid min-h-0 gap-5 xl:grid-cols-[260px_minmax(0,1fr)_340px] 2xl:grid-cols-[280px_minmax(0,1fr)_360px]">
           <TemplateLibrarySidebar model={model} />
           <TemplateLibraryDetailPanel model={model} />
           <TemplateLibraryEditorPanel model={model} />

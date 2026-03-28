@@ -1,5 +1,6 @@
 "use client";
 
+import { AppSelect } from "@/components/ui/app-select";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { AnalysisSummary } from "@/lib/api/types";
@@ -73,20 +74,16 @@ function LabFilters({
   return (
     <div className="space-y-3 rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.56)] p-4">
       <label className="block space-y-2">
-        <span className="label-text">analysis_type</span>
-        <select
-          className="ink-select"
+        <span className="label-text">分析类型</span>
+        <AppSelect
           disabled={isPending}
+          options={[
+            { label: "全部类型", value: LAB_ANALYSIS_FILTER_ALL },
+            ...LAB_ANALYSIS_TYPES.map((item) => ({ label: item, value: item })),
+          ]}
           value={filters.analysisType}
-          onChange={(event) => onFilterChange({ analysisType: event.target.value as LabAnalysisFilterState["analysisType"] })}
-        >
-          <option value={LAB_ANALYSIS_FILTER_ALL}>全部类型</option>
-          {LAB_ANALYSIS_TYPES.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => onFilterChange({ analysisType: value as LabAnalysisFilterState["analysisType"] })}
+        />
       </label>
       <label className="block space-y-2">
         <span className="label-text">content_id</span>

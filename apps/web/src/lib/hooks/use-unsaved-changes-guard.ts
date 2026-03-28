@@ -3,15 +3,17 @@
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
-export function useConfigRegistryNavigationGuard({
-  currentUrl,
-  isDirty,
-  router,
-}: Readonly<{
+type UseUnsavedChangesGuardOptions = {
   currentUrl: string;
   isDirty: boolean;
   router: AppRouterInstance;
-}>) {
+};
+
+export function useUnsavedChangesGuard({
+  currentUrl,
+  isDirty,
+  router,
+}: Readonly<UseUnsavedChangesGuardOptions>) {
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   const pendingNavigationRef = useRef<(() => void) | null>(null);
   const cancelNavigationRef = useRef<(() => void) | null>(null);

@@ -6,6 +6,7 @@ import {
   buildCredentialCreatePayload,
   buildCredentialUpdatePayload,
   createCredentialFormFromView,
+  isCredentialFormDirty,
   normalizeOptionalQueryValue,
 } from "./credential-center-support";
 
@@ -199,6 +200,19 @@ test("normalizeOptionalQueryValue trims blank query params to null", () => {
   assert.equal(normalizeOptionalQueryValue(" credential-1 "), "credential-1");
   assert.equal(normalizeOptionalQueryValue("   "), null);
   assert.equal(normalizeOptionalQueryValue(null), null);
+});
+
+test("isCredentialFormDirty compares current form against initial state", () => {
+  const initialState = createCredentialFormFromView(createCredential());
+  assert.equal(isCredentialFormDirty(initialState, initialState), false);
+  assert.equal(
+    isCredentialFormDirty({ ...initialState, displayName: "新的名称" }, initialState),
+    true,
+  );
+  assert.equal(
+    isCredentialFormDirty({ ...initialState, apiKey: "rotated-key" }, initialState),
+    true,
+  );
 });
 
 function createCredential(overrides: Partial<CredentialView> = {}): CredentialView {

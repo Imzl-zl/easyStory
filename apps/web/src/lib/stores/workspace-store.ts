@@ -6,6 +6,7 @@ import { createJSONStorage, persist, type StateStorage } from "zustand/middlewar
 export type WorkspaceSidebarPreference = "expanded" | "collapsed";
 
 type WorkspaceState = {
+  clearProjectContext: () => void;
   hasHydrated: boolean;
   lastProjectId: string | null;
   lastWorkflowByProject: Record<string, string>;
@@ -44,6 +45,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       lastProjectId: null,
       lastWorkflowByProject: {},
       sidebarPreference: "expanded",
+      clearProjectContext: () => set({ lastProjectId: null, lastWorkflowByProject: {} }),
       markHydrated: () => set({ hasHydrated: true }),
       setLastProjectId: (projectId) => set({ lastProjectId: projectId }),
       setSidebarPreference: (sidebarPreference) => set({ sidebarPreference }),

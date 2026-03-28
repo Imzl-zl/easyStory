@@ -23,6 +23,7 @@ type CredentialCenterContentProps = {
   feedback: CredentialCenterFeedback;
   isFormPending: boolean;
   mode: CredentialCenterMode;
+  onDirtyChange?: (isDirty: boolean) => void;
   overrideInfoByCredentialId: Record<string, CredentialOverrideInfo>;
   pendingAction: PendingCredentialAction | null;
   shouldShowEditLoadingState: boolean;
@@ -44,6 +45,7 @@ export function CredentialCenterContent({
   feedback,
   isFormPending,
   mode,
+  onDirtyChange,
   overrideInfoByCredentialId,
   pendingAction,
   shouldShowEditLoadingState,
@@ -59,7 +61,7 @@ export function CredentialCenterContent({
     return (
       <div className="space-y-4">
         {feedback?.message ? <FeedbackBanner feedback={feedback} /> : null}
-        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
           <CredentialCenterList
             activeCredentialId={mode === "audit" ? activeAuditCredentialId : editableCredential?.id ?? null}
             credentials={credentials}
@@ -77,14 +79,16 @@ export function CredentialCenterContent({
           {mode === "audit" ? (
             <CredentialAuditPanel credentialId={activeAuditCredentialId} />
           ) : shouldShowEditLoadingState ? (
-            <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载连接详情...</div>
+            <div className="panel-muted px-4 py-4 text-[13px] leading-5 text-[var(--text-secondary)]">正在加载连接详情…</div>
           ) : (
             <CredentialCenterForm
               key={activeFormKey}
               feedback={null}
               initialState={activeInitialState}
+              layout="split"
               mode={editableCredential ? "edit" : "create"}
               isPending={isFormPending}
+              onDirtyChange={onDirtyChange}
               onReset={editableCredential ? onResetEditor : undefined}
               onSubmit={(formState) => {
                 if (editableCredential) {
@@ -100,18 +104,20 @@ export function CredentialCenterContent({
     );
   }
   if (mode === "audit") {
-    return <EmptyState title="暂无模型连接" description="创建模型连接后，就能在这里查看操作记录。" />;
+    return <EmptyState title="暂无模型连接" description="创建模型连接后可查看操作记录。" />;
   }
   if (shouldShowEditLoadingState) {
-    return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载连接详情...</div>;
+    return <div className="panel-muted px-4 py-4 text-[13px] leading-5 text-[var(--text-secondary)]">正在加载连接详情…</div>;
   }
   return (
     <CredentialCenterForm
       key={activeFormKey}
       feedback={feedback}
       initialState={createInitialCredentialForm()}
+      layout="full"
       mode="create"
       isPending={isFormPending}
+      onDirtyChange={onDirtyChange}
       onSubmit={onSubmitCreate}
     />
   );
@@ -123,5 +129,5 @@ function FeedbackBanner({ feedback }: { feedback: NonNullable<CredentialCenterFe
       ? "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]"
       : "bg-[rgba(58,124,165,0.1)] text-[var(--accent-info)]";
 
-  return <div className={`rounded-2xl px-4 py-3 text-sm ${className}`}>{feedback.message}</div>;
+  return <div className={`rounded-xl px-3.5 py-2.5 text-[13px] leading-5 ${className}`}>{feedback.message}</div>;
 }

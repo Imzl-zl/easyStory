@@ -44,7 +44,7 @@ export function ModelConfigSection({
   return (
     <FormSection
       title="模型配置"
-      description="不填写时继续沿用全局或凭证默认。这里仅编辑当前配置自己的覆写字段。"
+      description="需要覆盖默认模型设置时再填写。"
     >
       <label className="flex items-center gap-3 text-sm text-[var(--text-primary)]">
         <input
@@ -62,68 +62,68 @@ export function ModelConfigSection({
             onChange(model);
           }}
         />
-        使用自定义模型配置
+        单独设置模型
       </label>
       {value !== null ? (
         <div className="grid gap-3 md:grid-cols-2">
           <TextField
-            label="Provider"
+            label="服务来源"
             name="model-provider"
             value={readString(model.provider)}
             onChange={(nextValue) => updateModel({ provider: nextValue })}
           />
           <TextField
-            label="Model Name"
+            label="模型名称"
             name="model-name"
             value={readString(model.name)}
             onChange={(nextValue) => updateModel({ name: nextValue })}
           />
           <TextField
-            label="Temperature"
+            label="发散程度"
             inputMode="decimal"
             name="model-temperature"
             value={readNumericString(model.temperature)}
             onChange={(nextValue) => updateModel({ temperature: parseNullableNumber(nextValue) ?? 0.7 })}
           />
           <TextField
-            label="Max Tokens"
+            label="单次回复上限"
             inputMode="numeric"
             name="model-max-tokens"
             value={readNumericString(model.max_tokens)}
             onChange={(nextValue) => updateModel({ max_tokens: parseNullableNumber(nextValue) ?? 4000 })}
           />
           <TextField
-            label="Top P"
+            label="采样范围"
             inputMode="decimal"
             name="model-top-p"
             value={topPValue}
             onChange={(nextValue) => updateModel({ top_p: parseNullableNumber(nextValue) })}
           />
           <TextField
-            label="Required Capabilities"
+            label="附加能力"
             name="model-capabilities"
-            placeholder="例如：stream, tool_use"
+            placeholder="例如：流式回复、工具调用"
             value={capabilities}
             onChange={(nextValue) => updateModel({ required_capabilities: splitCommaSeparated(nextValue) })}
           />
           <TextField
-            label="Frequency Penalty"
+            label="重复抑制"
             inputMode="decimal"
             name="model-frequency-penalty"
             value={frequencyPenaltyValue}
             onChange={(nextValue) => updateModel({ frequency_penalty: parseNullableNumber(nextValue) })}
           />
           <TextField
-            label="Presence Penalty"
+            label="新意倾向"
             inputMode="decimal"
             name="model-presence-penalty"
             value={presencePenaltyValue}
             onChange={(nextValue) => updateModel({ presence_penalty: parseNullableNumber(nextValue) })}
           />
           <TextField
-            label="Stop Sequences"
+            label="停止词"
             name="model-stop"
-            placeholder="例如：END, STOP"
+            placeholder="例如：结束、停止"
             value={stopSequences}
             onChange={(nextValue) => updateModel({ stop: splitCommaSeparated(nextValue) })}
           />
@@ -132,8 +132,8 @@ export function ModelConfigSection({
       {value !== null ? (
         <JsonTextAreaField
           emptyValue={buildDefaultModelConfig()}
-          helpText="如果需要手工保留额外模型字段，可直接编辑这段 JSON。"
-          label="模型 JSON"
+          helpText="其他字段可在下方完整配置中补充。"
+          label="完整模型配置"
           minHeightClassName="min-h-32"
           parseValue={validateJsonObject}
           syncKey={`${resetToken ?? 0}:${jsonSyncVersion}`}

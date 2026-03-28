@@ -1,3 +1,4 @@
+from app.modules.assistant.models import AssistantRuleProfile, AssistantUserPreferences
 from app.modules.analysis.models import Analysis
 from app.modules.billing.models import TokenUsage
 from app.modules.content.models import Content, ContentVersion
@@ -12,6 +13,8 @@ from app.modules.user.models import User
 from app.modules.workflow.models import Artifact, ChapterTask, NodeExecution, WorkflowExecution
 
 __all__ = [
+    "AssistantRuleProfile",
+    "AssistantUserPreferences",
     "Artifact",
     "Analysis",
     "AuditLog",

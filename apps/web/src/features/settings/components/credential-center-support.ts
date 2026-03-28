@@ -32,23 +32,23 @@ export const API_DIALECT_OPTIONS: Array<{
 }> = [
   {
     value: "openai_chat_completions",
-    label: "OpenAI 标准连接",
-    description: "适合大多数 OpenAI 兼容服务",
+    label: "OpenAI 兼容服务",
+    description: "适合大多数兼容 OpenAI 接口的模型服务",
   },
   {
     value: "openai_responses",
-    label: "OpenAI 新版连接",
-    description: "适合使用 Responses 能力的服务",
+    label: "OpenAI Responses 服务",
+    description: "适合明确要求 Responses 接口的服务",
   },
   {
     value: "anthropic_messages",
-    label: "Anthropic 标准连接",
-    description: "适合 Claude / Anthropic 兼容服务",
+    label: "Claude / Anthropic 服务",
+    description: "适合 Claude 或兼容 Anthropic 接口的服务",
   },
   {
     value: "gemini_generate_content",
-    label: "Gemini 标准连接",
-    description: "适合 Gemini / Google AI 兼容服务",
+    label: "Gemini / Google 服务",
+    description: "适合 Gemini 或兼容 Google AI 接口的服务",
   },
 ] as const;
 
@@ -97,6 +97,23 @@ export function createCredentialFormFromView(credential: CredentialView): Creden
     apiKeyHeaderName: credential.api_key_header_name ?? "",
     extraHeadersText: formatExtraHeaders(credential.extra_headers),
   };
+}
+
+export function isCredentialFormDirty(
+  formState: CredentialFormState,
+  initialState: CredentialFormState,
+): boolean {
+  return (
+    formState.provider !== initialState.provider
+    || formState.apiDialect !== initialState.apiDialect
+    || formState.displayName !== initialState.displayName
+    || formState.apiKey !== initialState.apiKey
+    || formState.baseUrl !== initialState.baseUrl
+    || formState.defaultModel !== initialState.defaultModel
+    || formState.authStrategy !== initialState.authStrategy
+    || formState.apiKeyHeaderName !== initialState.apiKeyHeaderName
+    || formState.extraHeadersText !== initialState.extraHeadersText
+  );
 }
 
 export function getApiDialectLabel(value: CredentialApiDialect) {

@@ -79,7 +79,7 @@ function SkillFormEditorBody({
   return (
     <div className="space-y-4">
       <FormSection title="基本信息">
-        <StaticField label="配置 ID" value={detail.id} />
+        <StaticField label="编号" value={detail.id} />
         <div className="grid gap-3 md:grid-cols-2">
           <TextField label="名称" name="skill-name" required value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} />
           <TextField label="版本" name="skill-version" required value={draft.version} onChange={(value) => setDraft({ ...draft, version: value })} />
@@ -89,21 +89,21 @@ function SkillFormEditorBody({
         <TextField
           label="标签"
           name="skill-tags"
-          placeholder="例如：story, generation"
+          placeholder="例如：剧情规划、人物设定"
           value={formatCommaSeparatedList(draft.tags)}
           onChange={(value) => setDraft({ ...draft, tags: parseCommaSeparatedList(value) })}
         />
         <TextAreaField label="描述" name="skill-description" value={draft.description ?? ""} onChange={(value) => setDraft({ ...draft, description: value || null })} />
       </FormSection>
 
-      <FormSection title="Prompt 模板" description="Skill prompt 支持模板变量渲染。">
-        <TextAreaField label="Prompt" minHeightClassName="min-h-64" name="skill-prompt" value={draft.prompt} onChange={(value) => setDraft({ ...draft, prompt: value })} />
+      <FormSection title="提示词" description="填写该 Skill 的提示词内容。">
+        <TextAreaField label="主要提示词" minHeightClassName="min-h-64" name="skill-prompt" value={draft.prompt} onChange={(value) => setDraft({ ...draft, prompt: value })} />
       </FormSection>
 
-      <FormSection title="输入输出契约" description="后端要求 `variables` 与 `inputs/outputs` 互斥，请只保留一侧。">
+      <FormSection title="输入与输出" description="按需填写变量、输入和输出。">
         <JsonTextAreaField
           emptyValue={{}}
-          label="variables"
+          label="可用变量"
           parseValue={validateJsonObject}
           syncKey={`variables:${jsonResetVersion}`}
           value={draft.variables}
@@ -112,7 +112,7 @@ function SkillFormEditorBody({
         />
         <JsonTextAreaField
           emptyValue={{}}
-          label="inputs"
+          label="输入内容"
           parseValue={validateJsonObject}
           syncKey={`inputs:${jsonResetVersion}`}
           value={draft.inputs}
@@ -121,7 +121,7 @@ function SkillFormEditorBody({
         />
         <JsonTextAreaField
           emptyValue={{}}
-          label="outputs"
+          label="输出内容"
           parseValue={validateJsonObject}
           syncKey={`outputs:${jsonResetVersion}`}
           value={draft.outputs}
@@ -209,12 +209,12 @@ function AgentFormEditorBody({
   return (
     <div className="space-y-4">
       <FormSection title="基本信息">
-        <StaticField label="配置 ID" value={detail.id} />
+        <StaticField label="编号" value={detail.id} />
         <div className="grid gap-3 md:grid-cols-2">
           <TextField label="名称" name="agent-name" required value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} />
           <TextField label="版本" name="agent-version" required value={draft.version} onChange={(value) => setDraft({ ...draft, version: value })} />
           <TextField label="作者" name="agent-author" value={draft.author ?? ""} onChange={(value) => setDraft({ ...draft, author: value || null })} />
-          <TextField label="标签" name="agent-tags" value={formatCommaSeparatedList(draft.tags)} onChange={(value) => setDraft({ ...draft, tags: parseCommaSeparatedList(value) })} />
+          <TextField label="标签" name="agent-tags" placeholder="例如：长篇、审稿、设定" value={formatCommaSeparatedList(draft.tags)} onChange={(value) => setDraft({ ...draft, tags: parseCommaSeparatedList(value) })} />
         </div>
         <TextAreaField label="描述" name="agent-description" value={draft.description ?? ""} onChange={(value) => setDraft({ ...draft, description: value || null })} />
         <RadioGroupField
@@ -230,23 +230,23 @@ function AgentFormEditorBody({
         />
       </FormSection>
 
-      <FormSection title="系统提示词" description="这里是纯文本，不做模板变量渲染。">
-        <TextAreaField label="System Prompt" minHeightClassName="min-h-48" name="agent-system-prompt" value={draft.system_prompt} onChange={(value) => setDraft({ ...draft, system_prompt: value })} />
+      <FormSection title="系统说明" description="填写 Agent 的系统提示词。">
+        <TextAreaField label="系统说明" minHeightClassName="min-h-48" name="agent-system-prompt" value={draft.system_prompt} onChange={(value) => setDraft({ ...draft, system_prompt: value })} />
       </FormSection>
 
       {skillReferenceField.bannerMessage && skillReferenceField.bannerTone ? (
         <FormNotice message={skillReferenceField.bannerMessage} tone={skillReferenceField.bannerTone} />
       ) : null}
-      <CheckboxListField label="绑定 Skills" description="从已注册 Skill 列表里选择。" emptyMessage={skillReferenceField.emptyMessage} options={skillReferenceField.options} values={draft.skill_ids} onChange={(values) => setDraft({ ...draft, skill_ids: values })} />
+      <CheckboxListField label="Skills" description="选择要绑定的 Skills。" emptyMessage={skillReferenceField.emptyMessage} options={skillReferenceField.options} values={draft.skill_ids} onChange={(values) => setDraft({ ...draft, skill_ids: values })} />
       {mcpReferenceField.bannerMessage && mcpReferenceField.bannerTone ? (
         <FormNotice message={mcpReferenceField.bannerMessage} tone={mcpReferenceField.bannerTone} />
       ) : null}
-      <CheckboxListField label="绑定 MCP Servers" description="仅 Agent 与 Hook 使用同一组 MCP 配置。" emptyMessage={mcpReferenceField.emptyMessage} options={mcpReferenceField.options} values={draft.mcp_servers} onChange={(values) => setDraft({ ...draft, mcp_servers: values })} />
+      <CheckboxListField label="MCP" description="选择允许调用的 MCP。" emptyMessage={mcpReferenceField.emptyMessage} options={mcpReferenceField.options} values={draft.mcp_servers} onChange={(values) => setDraft({ ...draft, mcp_servers: values })} />
 
       {draft.agent_type !== "reviewer" ? (
         <JsonTextAreaField
           emptyValue={null}
-          label="output_schema"
+          label="输出格式说明"
           parseValue={validateNullableJsonObject}
           syncKey={`output-schema:${jsonResetVersion}`}
           value={draft.output_schema}
@@ -254,8 +254,8 @@ function AgentFormEditorBody({
           onErrorChange={(message) => setErrors((current) => updateError(current, "output_schema", message))}
         />
       ) : (
-        <FormSection title="输出 Schema">
-          <StaticField label="output_schema" description="reviewer 类型不允许定义 output_schema。" value="当前类型下已禁用" />
+        <FormSection title="输出格式">
+          <StaticField label="当前状态" description="Reviewer 默认不单独限制输出格式。" value="当前类型无需设置" />
         </FormSection>
       )}
 
@@ -297,12 +297,12 @@ function FormActions({
   return (
     <div className="space-y-3">
       {errorMessage ? <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">{errorMessage}</div> : null}
-      <div className="flex flex-wrap gap-2">
-        <button className="ink-button" disabled={isPending || !isDirty || Boolean(errorMessage)} type="button" onClick={onSave}>
-          {isPending ? "保存中…" : "保存配置"}
+      <div className="flex flex-wrap items-center gap-2.5 pt-1">
+        <button className="ink-button h-9 px-4 text-[13px]" disabled={isPending || !isDirty || Boolean(errorMessage)} type="button" onClick={onSave}>
+          {isPending ? "保存中…" : "保存修改"}
         </button>
-        <button className="ink-button-secondary" disabled={isPending || !isDirty} type="button" onClick={onReset}>
-          还原编辑
+        <button className="ink-button-secondary h-9 px-4 text-[13px]" disabled={isPending || !isDirty} type="button" onClick={onReset}>
+          撤销修改
         </button>
       </div>
     </div>

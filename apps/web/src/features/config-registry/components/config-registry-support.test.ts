@@ -91,7 +91,7 @@ test("parseConfigRegistryDocument rejects malformed and non-object JSON", () => 
   assert.equal(parseConfigRegistryDocument("{").parsed, null);
   const arrayResult = parseConfigRegistryDocument("[]");
   assert.equal(arrayResult.parsed, null);
-  assert.equal(arrayResult.errorMessage, "配置内容必须是 JSON 对象。");
+  assert.equal(arrayResult.errorMessage, "完整配置需要是对象格式。");
   const objectResult = parseConfigRegistryDocument(JSON.stringify(createAgentSummary("agent.writer")));
   assert.deepEqual(objectResult.parsed, createAgentSummary("agent.writer"));
 });

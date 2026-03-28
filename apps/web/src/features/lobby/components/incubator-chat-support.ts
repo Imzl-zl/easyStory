@@ -6,6 +6,8 @@ export const INCUBATOR_DEFAULT_MODEL_NAME = "";
 export const INCUBATOR_CHAT_SKILL_ID = "skill.assistant.general_chat";
 export const INCUBATOR_INPUT_MAX_LENGTH = 4000;
 export const INCUBATOR_DEFAULT_PROJECT_NAME = "未命名新故事";
+export const INCUBATOR_PENDING_REPLY_MESSAGE = "正在整理故事方向…";
+export const INCUBATOR_INTERRUPTED_REPLY_MESSAGE = "这次回复中断了，你可以重新发送。";
 
 export const INCUBATOR_PROMPT_SUGGESTIONS = [
   "我完全不知道写什么，先给我 3 个适合新手的故事方向。",
@@ -24,12 +26,14 @@ export type IncubatorChatSettings = {
   allowSystemCredentialPool: boolean;
   modelName: string;
   provider: string;
+  streamOutput: boolean;
 };
 
 export const INITIAL_INCUBATOR_CHAT_SETTINGS: IncubatorChatSettings = {
   allowSystemCredentialPool: false,
   modelName: INCUBATOR_DEFAULT_MODEL_NAME,
   provider: INCUBATOR_DEFAULT_PROVIDER,
+  streamOutput: true,
 };
 
 const INCUBATOR_SYSTEM_MESSAGE = [
@@ -43,8 +47,8 @@ const INCUBATOR_SYSTEM_MESSAGE = [
 ].join("\n");
 
 const INCUBATOR_WELCOME_MESSAGE = [
-  "把你现在脑子里的零散想法直接发给我就行。",
-  "如果你还没方向，我也可以先陪你一起找题材、开局钩子和主角路线。",
+  "你现在想到的一点点画面、角色念头，或者一句模糊感觉，都可以先发给我。",
+  "如果你还没方向，我也可以先给你几个更容易开写的故事点子。",
 ].join("\n");
 
 export function createIncubatorInitialMessages(): IncubatorChatMessage[] {
@@ -73,6 +77,22 @@ export function replaceIncubatorMessage(
   nextMessage: IncubatorChatMessage,
 ): IncubatorChatMessage[] {
   return messages.map((message) => (message.id === messageId ? nextMessage : message));
+}
+
+export function appendIncubatorMessageDelta(
+  messages: IncubatorChatMessage[],
+  messageId: string,
+  delta: string,
+): IncubatorChatMessage[] {
+  return messages.map((message) => {
+    if (message.id !== messageId) {
+      return message;
+    }
+    const nextContent = message.status === "pending" && message.content === INCUBATOR_PENDING_REPLY_MESSAGE
+      ? delta
+      : `${message.content}${delta}`;
+    return { ...message, content: nextContent };
+  });
 }
 
 export function resolveIncubatorAssistantReply(content: string) {
@@ -131,6 +151,18 @@ export function buildAssistantModelOverride(
     provider,
     name: modelName || undefined,
   };
+}
+
+export function resolveChatOutputModeLabel(streamOutput: boolean) {
+  return streamOutput ? "边写边显示" : "生成后整体显示";
+}
+
+export function resolveInterruptedIncubatorReply(content: string) {
+  const trimmed = content.trim();
+  if (!trimmed || trimmed === INCUBATOR_PENDING_REPLY_MESSAGE) {
+    return null;
+  }
+  return `${trimmed}\n\n${INCUBATOR_INTERRUPTED_REPLY_MESSAGE}`;
 }
 
 export function shouldShowPromptSuggestions(hasUserMessage: boolean) {

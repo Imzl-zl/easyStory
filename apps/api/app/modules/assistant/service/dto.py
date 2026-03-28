@@ -25,6 +25,7 @@ class AssistantTurnRequestDTO(BaseModel):
 
     agent_id: str | None = Field(default=None, min_length=1)
     skill_id: str | None = Field(default=None, min_length=1)
+    stream: bool = False
     hook_ids: list[str] = Field(default_factory=list)
     project_id: uuid.UUID | None = None
     messages: list[AssistantMessageDTO] = Field(min_length=1, max_length=ASSISTANT_MAX_MESSAGES)

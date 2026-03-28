@@ -101,7 +101,7 @@ function JsonTextAreaFieldBody<T>({
             }
           } catch (error) {
             const nextError =
-              error instanceof Error ? `JSON 解析失败：${error.message}` : "JSON 解析失败。";
+              error instanceof Error ? `完整配置格式有误：${error.message}` : "完整配置格式有误。";
             setErrorMessage(nextError);
             onErrorChange(nextError);
           }

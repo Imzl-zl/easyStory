@@ -57,7 +57,7 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
     <AuthGuard>
       <a className={styles.skipLink} href="#workspace-main">跳到主内容</a>
       <div
-        className={`${styles.shell} min-h-screen p-3 lg:p-6`}
+        className={`${styles.shell} min-h-screen p-3 lg:p-6 xl:p-7 2xl:p-8`}
         style={
           {
             "--workspace-sidebar-width": resolveWorkspaceSidebarWidth(isSidebarCollapsed),
@@ -75,7 +75,7 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
           onToggle={() => setSidebarPreference(getNextSidebarPreference(sidebarPreference))}
         />
         <main className={styles.content} id="workspace-main">
-          <div className={`${styles.contentInner} space-y-6`}>{children}</div>
+          <div className={`${styles.contentInner} space-y-6 xl:space-y-7`}>{children}</div>
         </main>
       </div>
     </AuthGuard>
@@ -165,8 +165,8 @@ function WorkspaceSidebarBrand() {
         <WorkspaceBrandIcon />
       </span>
       <div className={styles.brandCopy}>
-        <p className={styles.brandEyebrow}>创作空间</p>
-        <p className={styles.brandTitle}>工作台</p>
+        <p className={styles.brandEyebrow}>easyStory</p>
+        <p className={styles.brandTitle}>创作空间</p>
       </div>
     </div>
   );
@@ -181,7 +181,7 @@ function WorkspaceSidebarNav({ items, pathname }: Readonly<{ items: WorkspaceNav
 }
 
 function WorkspaceSidebarNavItem({ item, pathname }: Readonly<{ item: WorkspaceNavItem; pathname: string }>) {
-  const navMeta = item.disabled ? "选择项目" : item.meta;
+  const navMeta = item.disabled ? "请先选择项目" : item.meta;
   const navContent = (
     <>
       <span aria-hidden="true" className={styles.glyph}>

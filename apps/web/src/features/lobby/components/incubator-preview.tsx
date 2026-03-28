@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import {
   buildSettingIssueSummary,
   buildSettingSections,
+  formatSettingFieldLabel,
   formatAppliedAnswerValue,
 } from "@/features/lobby/components/incubator-page-support";
 import type {
@@ -48,7 +49,7 @@ export function IncubatorPreview({
       {appliedAnswers.length > 0 ? <AppliedAnswerCard answers={appliedAnswers} /> : null}
       {unmappedAnswers.length > 0 ? <UnmappedAnswerCard answers={unmappedAnswers} /> : null}
       {followUpQuestions.length > 0 ? (
-        <QuestionListCard questions={followUpQuestions} title="建议继续补充的问题" />
+        <QuestionListCard questions={followUpQuestions} title="待补充" />
       ) : null}
     </div>
   );
@@ -85,13 +86,13 @@ function SettingPreviewCard({ setting }: { setting: ProjectSetting }) {
   return (
     <section className="panel-shell fan-panel space-y-4 p-5">
       <header className="space-y-1">
-        <h3 className="font-serif text-lg font-semibold">项目设定预览</h3>
+        <h3 className="font-serif text-lg font-semibold">草稿内容</h3>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          这里展示后端返回的草稿结果，便于继续进入编辑器精修。
+          可继续修改。
         </p>
       </header>
       {sections.length === 0 ? (
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">当前草稿还没有可展示字段。</p>
+        <p className="text-sm leading-6 text-[var(--text-secondary)]">暂无可展示内容。</p>
       ) : (
         sections.map((section) => (
           <div key={section.title} className="space-y-3">
@@ -116,14 +117,12 @@ function SettingPreviewCard({ setting }: { setting: ProjectSetting }) {
 function AppliedAnswerCard({ answers }: { answers: ProjectIncubatorAppliedAnswer[] }) {
   return (
     <section className="panel-muted space-y-3 p-5">
-      <h3 className="font-serif text-lg font-semibold">回答映射</h3>
+      <h3 className="font-serif text-lg font-semibold">已采用内容</h3>
       <div className="space-y-3">
         {answers.map((answer) => (
           <article key={`${answer.variable}-${answer.field_path}`} className="rounded-2xl bg-[rgba(255,255,255,0.52)] p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-              {answer.variable}
-              {" -> "}
-              {answer.field_path}
+            <p className="text-xs tracking-[0.12em] text-[var(--text-secondary)]">
+              已写入：{formatSettingFieldLabel(answer.field_path)}
             </p>
             <p className="mt-2 text-sm leading-6">{formatAppliedAnswerValue(answer.value)}</p>
           </article>
@@ -136,15 +135,14 @@ function AppliedAnswerCard({ answers }: { answers: ProjectIncubatorAppliedAnswer
 function UnmappedAnswerCard({ answers }: { answers: ProjectIncubatorUnmappedAnswer[] }) {
   return (
     <section className="panel-muted space-y-3 p-5">
-      <h3 className="font-serif text-lg font-semibold">未映射回答</h3>
+      <h3 className="font-serif text-lg font-semibold">未采用内容</h3>
       <div className="space-y-3">
         {answers.map((answer) => (
           <article key={`${answer.variable}-${answer.reason}`} className="rounded-2xl bg-[rgba(255,255,255,0.52)] p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-              {answer.variable}
-            </p>
             <p className="mt-2 text-sm leading-6">{answer.value}</p>
-            <p className="mt-1 text-xs text-[var(--accent-warning)]">{answer.reason}</p>
+            <p className="mt-1 text-xs text-[var(--accent-warning)]">
+              这条内容暂未写入草稿，可调整后重试。
+            </p>
           </article>
         ))}
       </div>

@@ -130,35 +130,41 @@ export function LabPage({ projectId }: LabPageProps) {
   return (
     <div className="space-y-4">
       <LabFeedbackBanner feedback={feedback} />
-      <div className="grid gap-6 xl:grid-cols-[280px_1fr_360px]">
-        <LabSidebar
-          activeId={activeId}
-          analyses={analyses}
-          errorMessage={listQuery.error ? getErrorMessage(listQuery.error) : null}
-          filters={filterState}
-          isLoading={listQuery.isLoading}
-          isPending={deleteMutation.isPending}
-          onFilterChange={(patch) => setFilterState((current) => ({ ...current, ...patch }))}
-          onSelect={setSelectedId}
-        />
-        <LabDetailPanel
-          activeId={activeId}
-          analysis={detailQuery.data}
-          errorMessage={detailQuery.error ? getErrorMessage(detailQuery.error) : null}
-          hasActiveFilters={hasActiveFilters}
-          isDeletePending={deleteMutation.isPending}
-          isLoading={detailQuery.isLoading}
-          onRequestDelete={setPendingDeleteAnalysis}
-        />
-        <LabCreatePanel
-          formState={formState}
-          isPending={createMutation.isPending}
-          onFieldChange={(patch) => setFormState((current) => ({ ...current, ...patch }))}
-          onSubmit={() => {
-            setFeedback(null);
-            createMutation.mutate();
-          }}
-        />
+      <div className="grid items-start gap-6 xl:grid-cols-[280px_minmax(0,1fr)] min-[1900px]:grid-cols-[280px_minmax(0,1fr)_360px]">
+        <div className="xl:sticky xl:top-6">
+          <LabSidebar
+            activeId={activeId}
+            analyses={analyses}
+            errorMessage={listQuery.error ? getErrorMessage(listQuery.error) : null}
+            filters={filterState}
+            isLoading={listQuery.isLoading}
+            isPending={deleteMutation.isPending}
+            onFilterChange={(patch) => setFilterState((current) => ({ ...current, ...patch }))}
+            onSelect={setSelectedId}
+          />
+        </div>
+        <div className="grid min-w-0 gap-6 min-[1900px]:contents">
+          <LabDetailPanel
+            activeId={activeId}
+            analysis={detailQuery.data}
+            errorMessage={detailQuery.error ? getErrorMessage(detailQuery.error) : null}
+            hasActiveFilters={hasActiveFilters}
+            isDeletePending={deleteMutation.isPending}
+            isLoading={detailQuery.isLoading}
+            onRequestDelete={setPendingDeleteAnalysis}
+          />
+          <div className="min-[1900px]:max-h-[calc(100vh-12rem)] min-[1900px]:overflow-y-auto min-[1900px]:overscroll-y-contain">
+            <LabCreatePanel
+              formState={formState}
+              isPending={createMutation.isPending}
+              onFieldChange={(patch) => setFormState((current) => ({ ...current, ...patch }))}
+              onSubmit={() => {
+                setFeedback(null);
+                createMutation.mutate();
+              }}
+            />
+          </div>
+        </div>
       </div>
       {pendingDeleteAnalysis ? (
         <LabDeleteConfirmDialog

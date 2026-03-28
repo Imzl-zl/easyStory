@@ -363,3 +363,76 @@ def test_execute_rejects_missing_model_name_and_default_model() -> None:
                 },
             )
         )
+
+
+def test_execute_stream_yields_chunks_and_completed_result(monkeypatch) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.output_text.delta"
+            yield 'data: {"delta":"今天"}'
+            yield ""
+            yield "event: response.output_text.delta"
+            yield 'data: {"delta":"有新方向"}'
+            yield ""
+            yield "event: response.completed"
+            yield 'data: {"output_text":"今天有新方向"}'
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    provider = LLMToolProvider()
+
+    async def collect_events():
+        return [
+            event
+            async for event in provider.execute_stream(
+                "llm.generate",
+                {
+                    "prompt": "给个方向",
+                    "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_responses",
+                    },
+                },
+            )
+        ]
+
+    events = asyncio.run(collect_events())
+
+    assert [event.delta for event in events[:-1]] == ["今天", "有新方向"]
+    assert events[-1].response == {
+        "content": "今天有新方向",
+        "model_name": "gpt-4.1-mini",
+        "provider": "openai",
+        "input_tokens": None,
+        "output_tokens": None,
+        "total_tokens": None,
+    }

@@ -8,39 +8,39 @@ import type {
 import type { JsonValue } from "@/lib/api/contracts/base";
 
 export const AGENT_TYPE_OPTIONS = [
-  { label: "writer", value: "writer" },
-  { label: "reviewer", value: "reviewer" },
-  { label: "checker", value: "checker" },
+  { label: "写作助手", value: "writer" },
+  { label: "审稿助手", value: "reviewer" },
+  { label: "检查助手", value: "checker" },
 ] as const;
 
 export const HOOK_ACTION_TYPE_OPTIONS = [
-  { label: "script", value: "script" },
-  { label: "webhook", value: "webhook" },
-  { label: "agent", value: "agent" },
-  { label: "mcp", value: "mcp" },
+  { label: "脚本", value: "script" },
+  { label: "回调请求", value: "webhook" },
+  { label: "Agent", value: "agent" },
+  { label: "MCP", value: "mcp" },
 ] as const;
 
 export const HOOK_EVENT_OPTIONS = [
-  { label: "before_workflow_start", value: "before_workflow_start" },
-  { label: "after_workflow_end", value: "after_workflow_end" },
-  { label: "before_node_start", value: "before_node_start" },
-  { label: "after_node_end", value: "after_node_end" },
-  { label: "before_generate", value: "before_generate" },
-  { label: "after_generate", value: "after_generate" },
-  { label: "before_review", value: "before_review" },
-  { label: "after_review", value: "after_review" },
-  { label: "on_review_fail", value: "on_review_fail" },
-  { label: "before_fix", value: "before_fix" },
-  { label: "after_fix", value: "after_fix" },
-  { label: "before_assistant_response", value: "before_assistant_response" },
-  { label: "after_assistant_response", value: "after_assistant_response" },
-  { label: "on_error", value: "on_error" },
+  { label: "流程开始前", value: "before_workflow_start" },
+  { label: "流程结束后", value: "after_workflow_end" },
+  { label: "节点开始前", value: "before_node_start" },
+  { label: "节点结束后", value: "after_node_end" },
+  { label: "生成前", value: "before_generate" },
+  { label: "生成后", value: "after_generate" },
+  { label: "审阅前", value: "before_review" },
+  { label: "审阅后", value: "after_review" },
+  { label: "审阅失败时", value: "on_review_fail" },
+  { label: "修复前", value: "before_fix" },
+  { label: "修复后", value: "after_fix" },
+  { label: "助手回复前", value: "before_assistant_response" },
+  { label: "助手回复后", value: "after_assistant_response" },
+  { label: "出错时", value: "on_error" },
 ] as const;
 
 export const HOOK_NODE_TYPE_OPTIONS = [
-  { label: "generate", value: "generate" },
-  { label: "review", value: "review" },
-  { label: "export", value: "export" },
+  { label: "生成", value: "generate" },
+  { label: "审阅", value: "review" },
+  { label: "导出", value: "export" },
 ] as const;
 
 export const WEBHOOK_METHOD_OPTIONS = [
@@ -73,7 +73,7 @@ export function validateJsonObject(parsed: unknown): {
   value: ConfigRegistryObject | null;
 } {
   if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-    return { errorMessage: "这里必须是 JSON 对象。", value: null };
+    return { errorMessage: "需要填写对象格式的配置。", value: null };
   }
   return { errorMessage: null, value: parsed as ConfigRegistryObject };
 }
@@ -105,7 +105,7 @@ export function validateStringMap(parsed: unknown): {
   }
   const entries = Object.entries(result.value);
   if (entries.some(([, value]) => typeof value !== "string")) {
-    return { errorMessage: "这里必须是 string:string 的 JSON 对象。", value: null };
+    return { errorMessage: "需要填写“名称: 内容”的对象格式。", value: null };
   }
   return { errorMessage: null, value: result.value as Record<string, string> };
 }

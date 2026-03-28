@@ -42,17 +42,20 @@ import { getErrorMessage } from "@/lib/api/client";
 import type { CredentialView } from "@/lib/api/types";
 
 type CredentialCenterProps = {
-  projectId?: string | null;
-  scope?: CredentialCenterScope;
-  mode?: CredentialCenterMode;
-  selectedCredentialId?: string | null;
+  headerAction?: React.ReactNode;
   isNavigationPending?: boolean;
+  mode?: CredentialCenterMode;
   onModeChange?: (mode: CredentialCenterMode) => void;
-  onScopeChange?: (scope: CredentialCenterScope) => void;
+  onDirtyChange?: (isDirty: boolean) => void;
   onSelectCredential?: (credentialId: string | null) => void;
   onSelectCredentialForEdit?: (credentialId: string | null) => void;
   onResetEditor?: () => void;
-  headerAction?: React.ReactNode;
+  onScopeChange?: (scope: CredentialCenterScope) => void;
+  onSyncCredential?: (credentialId: string | null) => void;
+  onSyncCredentialForEdit?: (credentialId: string | null) => void;
+  projectId?: string | null;
+  scope?: CredentialCenterScope;
+  selectedCredentialId?: string | null;
 };
 
 export function CredentialCenter({
@@ -62,10 +65,13 @@ export function CredentialCenter({
   selectedCredentialId = null,
   isNavigationPending = false,
   onModeChange,
+  onDirtyChange,
   onScopeChange,
   onSelectCredential,
   onSelectCredentialForEdit,
   onResetEditor,
+  onSyncCredential,
+  onSyncCredentialForEdit,
   headerAction,
 }: CredentialCenterProps) {
   const queryClient = useQueryClient();
@@ -97,22 +103,23 @@ export function CredentialCenter({
     }
     if (mode === "audit") {
       if (selectedCredentialId !== activeCredentialId) {
-        onSelectCredential?.(activeCredentialId);
+        onSyncCredential?.(activeCredentialId);
       }
       return;
     }
     if (selectedCredentialId && editableCredential === null) {
-      onSelectCredentialForEdit?.(null);
+      onSyncCredentialForEdit?.(null);
     }
   }, [
     activeCredentialId,
     editableCredential,
     mode,
-    onSelectCredential,
-    onSelectCredentialForEdit,
+    onSyncCredential,
+    onSyncCredentialForEdit,
     query.data,
     selectedCredentialId,
   ]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   const refresh = async () => {
     await Promise.all([
@@ -188,9 +195,9 @@ export function CredentialCenter({
       setFeedback(resolveCredentialActionFeedback(result, variables.type));
       if (variables.type === "delete" && variables.credentialId === selectedCredentialId) {
         if (mode === "audit") {
-          onSelectCredential?.(null);
+          onSyncCredential?.(null);
         } else {
-          onSelectCredentialForEdit?.(null);
+          onSyncCredentialForEdit?.(null);
         }
       }
       await refresh();
@@ -233,7 +240,7 @@ export function CredentialCenter({
       description="配置并管理 AI 模型连接。可同时添加多个连接，按项目场景灵活切换。"
       action={headerAction}
     >
-      <div className="space-y-5">
+      <div className="space-y-4">
         <CredentialScopeTabs
           canUseProjectScope={canUseProjectScope}
           isPending={isInteractionPending}
@@ -242,17 +249,17 @@ export function CredentialCenter({
           onScopeChange={handleScopeChange}
         />
         <CredentialModeTabs isPending={isInteractionPending} mode={mode} onModeChange={handleModeChange} />
-        {query.isLoading ? <p className="text-sm text-[var(--text-secondary)]">正在加载模型连接...</p> : null}
+        {query.isLoading ? <p className="text-[13px] text-[var(--text-secondary)]">正在加载模型连接…</p> : null}
         {query.error ? (
-          <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
-            {getErrorMessage(query.error)}
+          <div className="rounded-xl bg-[rgba(178,65,46,0.12)] px-3.5 py-2.5 text-[13px] leading-5 text-[var(--accent-danger)]">
+            读取模型连接失败：{getErrorMessage(query.error)}
           </div>
         ) : null}
         {shouldLoadOverrideHints && overrideQuery.isLoading ? (
-          <p className="text-sm text-[var(--text-secondary)]">正在检查当前项目是否存在项目级覆盖连接...</p>
+          <p className="text-[13px] text-[var(--text-secondary)]">正在检查当前项目是否存在项目级覆盖连接…</p>
         ) : null}
         {shouldLoadOverrideHints && overrideQuery.error ? (
-          <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+          <div className="rounded-xl bg-[rgba(178,65,46,0.12)] px-3.5 py-2.5 text-[13px] leading-5 text-[var(--accent-danger)]">
             项目级覆盖提示加载失败：{getErrorMessage(overrideQuery.error)}
           </div>
         ) : null}
@@ -265,6 +272,7 @@ export function CredentialCenter({
           feedback={feedback}
           isFormPending={actionMutation.isPending || isFormPending}
           mode={mode}
+          onDirtyChange={onDirtyChange}
           overrideInfoByCredentialId={overrideInfoByCredentialId}
           pendingAction={pendingAction}
           shouldShowEditLoadingState={shouldShowEditLoadingState}

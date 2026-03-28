@@ -7,11 +7,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { getErrorMessage } from "@/lib/api/client";
-import { runAssistantTurn } from "@/lib/api/assistant";
+import { runAssistantTurn, runAssistantTurnStream } from "@/lib/api/assistant";
 import { buildIncubatorConversationDraft, createProject } from "@/lib/api/projects";
 import type { AssistantTurnResult, ProjectIncubatorConversationDraft, ProjectSetting } from "@/lib/api/types";
 
 import {
+  appendIncubatorMessageDelta,
   buildAssistantModelOverride,
   buildAssistantTurnMessages,
   buildIncubatorConversationFingerprint,
@@ -20,9 +21,11 @@ import {
   createIncubatorInitialMessages,
   createIncubatorMessage,
   INCUBATOR_CHAT_SKILL_ID,
+  INCUBATOR_PENDING_REPLY_MESSAGE,
   INITIAL_INCUBATOR_CHAT_SETTINGS,
   replaceIncubatorMessage,
   resolveIncubatorAssistantReply,
+  resolveInterruptedIncubatorReply,
   resolveIncubatorModelName,
   resolveIncubatorProvider,
   type IncubatorChatMessage,
@@ -38,12 +41,18 @@ type DraftSyncParams = {
 };
 
 type SubmitPromptParams = {
-  assistantMutation: UseMutationResult<AssistantTurnResult, unknown, IncubatorChatMessage[]>;
+  assistantMutation: UseMutationResult<AssistantTurnResult, unknown, PromptSubmission>;
   isResponding: boolean;
   messages: IncubatorChatMessage[];
   setComposerText: Dispatch<SetStateAction<string>>;
   setFeedback: Dispatch<SetStateAction<FeedbackState | null>>;
   setMessages: Dispatch<SetStateAction<IncubatorChatMessage[]>>;
+};
+
+type PromptSubmission = {
+  nextMessages: IncubatorChatMessage[];
+  pendingAssistant: IncubatorChatMessage;
+  submittedMessages: IncubatorChatMessage[];
 };
 
 export function useChatState() {
@@ -127,14 +136,30 @@ export function useIncubatorCreateMutation({
   });
 }
 
-export function useIncubatorAssistantMutation(settings: IncubatorChatSettings) {
+export function useIncubatorAssistantMutation(
+  settings: IncubatorChatSettings,
+  setMessages: Dispatch<SetStateAction<IncubatorChatMessage[]>>,
+) {
   return useMutation({
-    mutationFn: (messages: IncubatorChatMessage[]) =>
-      runAssistantTurn({
+    mutationFn: (submission: PromptSubmission) => {
+      const payload = {
         skill_id: INCUBATOR_CHAT_SKILL_ID,
-        messages: buildAssistantTurnMessages(messages),
+        messages: buildAssistantTurnMessages(submission.submittedMessages),
         model: buildAssistantModelOverride(settings),
-      }),
+      };
+      if (!settings.streamOutput) {
+        return runAssistantTurn(payload);
+      }
+      return runAssistantTurnStream(payload, {
+        onChunk: (delta) => {
+          setMessages((current) => appendIncubatorMessageDelta(
+            current,
+            submission.pendingAssistant.id,
+            delta,
+          ));
+        },
+      });
+    },
   });
 }
 
@@ -202,7 +227,7 @@ function buildPromptSubmission(prompt: string, messages: IncubatorChatMessage[],
   const content = prompt.trim();
   if (!content || isResponding) return null;
   const userMessage = createIncubatorMessage("user", content);
-  const pendingAssistant = createIncubatorMessage("assistant", "正在整理故事方向…", { status: "pending" });
+  const pendingAssistant = createIncubatorMessage("assistant", INCUBATOR_PENDING_REPLY_MESSAGE, { status: "pending" });
   const submittedMessages = [...messages, userMessage];
   return { nextMessages: [...submittedMessages, pendingAssistant], pendingAssistant, submittedMessages };
 }
@@ -212,11 +237,11 @@ async function completePromptSubmission({
   setMessages,
   submission,
 }: {
-  assistantMutation: UseMutationResult<AssistantTurnResult, unknown, IncubatorChatMessage[]>;
+  assistantMutation: UseMutationResult<AssistantTurnResult, unknown, PromptSubmission>;
   setMessages: Dispatch<SetStateAction<IncubatorChatMessage[]>>;
-  submission: NonNullable<ReturnType<typeof buildPromptSubmission>>;
+  submission: PromptSubmission;
 }) {
-  const result = await assistantMutation.mutateAsync(submission.submittedMessages);
+  const result = await assistantMutation.mutateAsync(submission);
   const assistantReply = resolveIncubatorAssistantReply(result.content);
   const resolvedMessages = replaceIncubatorMessage(
     submission.nextMessages,
@@ -230,14 +255,28 @@ function handlePromptSubmissionError(
   error: unknown,
   setFeedback: Dispatch<SetStateAction<FeedbackState | null>>,
   setMessages: Dispatch<SetStateAction<IncubatorChatMessage[]>>,
-  submission: NonNullable<ReturnType<typeof buildPromptSubmission>>,
+  submission: PromptSubmission,
 ) {
+  const errorMessage = getErrorMessage(error);
   setFeedback(buildErrorFeedback(error));
-  setMessages(replaceIncubatorMessage(
-    submission.nextMessages,
-    submission.pendingAssistant.id,
-    createIncubatorMessage("assistant", getErrorMessage(error), { status: "error" }),
-  ));
+  setMessages((current) => {
+    const currentPending = current.find((message) => message.id === submission.pendingAssistant.id);
+    const interruptedReply = currentPending
+      ? resolveInterruptedIncubatorReply(currentPending.content)
+      : null;
+    if (interruptedReply) {
+      return replaceIncubatorMessage(
+        current,
+        submission.pendingAssistant.id,
+        createIncubatorMessage("assistant", interruptedReply, { status: "error" }),
+      );
+    }
+    return replaceIncubatorMessage(
+      submission.nextMessages,
+      submission.pendingAssistant.id,
+      createIncubatorMessage("assistant", errorMessage, { status: "error" }),
+    );
+  });
 }
 
 async function syncConversationDraft({

@@ -29,7 +29,7 @@ export function PreparationStatusPanel({ projectId }: PreparationStatusPanelProp
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--accent-ink)]">准备状态</p>
         <h2 className="font-serif text-lg font-semibold text-[var(--text-primary)]">创作准备</h2>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          当前准备链路的统一状态真值。优先看下一步提示，不再自己猜卡点。
+          查看当前准备进度和下一步。
         </p>
       </div>
 

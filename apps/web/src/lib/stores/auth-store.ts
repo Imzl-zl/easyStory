@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 
 import type { AuthToken } from "@/lib/api/types";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 
 type AuthUser = {
   userId: string;
@@ -39,7 +40,10 @@ export const useAuthStore = create<AuthState>()(
             username: session.username,
           },
         }),
-      clearSession: () => set({ token: null, user: null }),
+      clearSession: () => {
+        useWorkspaceStore.getState().clearProjectContext();
+        set({ token: null, user: null });
+      },
       markHydrated: () => set({ hasHydrated: true }),
     }),
     {

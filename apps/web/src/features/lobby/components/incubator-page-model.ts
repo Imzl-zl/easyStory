@@ -5,7 +5,10 @@ import type { UseMutationResult } from "@tanstack/react-query";
 
 import type { ProjectDetail, ProjectIncubatorConversationDraft } from "@/lib/api/types";
 
-import type { IncubatorCredentialOption } from "./incubator-chat-credential-support";
+import type {
+  IncubatorCredentialOption,
+  IncubatorCredentialState,
+} from "./incubator-chat-credential-support";
 import { useIncubatorChatCredentialModel } from "./incubator-chat-credential-model";
 import type {
   IncubatorChatMessage,
@@ -32,6 +35,7 @@ export type IncubatorChatModel = {
   credentialNotice: string | null;
   credentialOptions: IncubatorCredentialOption[];
   credentialSettingsHref: string;
+  credentialState: IncubatorCredentialState;
   createMutation: UseMutationResult<ProjectDetail, unknown, void>;
   draftMutation: UseMutationResult<ProjectIncubatorConversationDraft, unknown, string>;
   hasUserMessage: boolean;
@@ -61,7 +65,7 @@ export function useIncubatorChatModel(
     setFeedback,
     settings: state.settings,
   });
-  const assistantMutation = useIncubatorAssistantMutation(state.settings);
+  const assistantMutation = useIncubatorAssistantMutation(state.settings, state.setMessages);
   const baseSubmitPrompt = useIncubatorPromptSubmit({
     assistantMutation,
     isResponding: assistantMutation.isPending,
@@ -90,6 +94,7 @@ export function useIncubatorChatModel(
     credentialNotice: credentialModel.credentialNotice,
     credentialOptions: credentialModel.credentialOptions,
     credentialSettingsHref: credentialModel.credentialSettingsHref,
+    credentialState: credentialModel.credentialState,
     createMutation,
     draftMutation,
     hasUserMessage: state.messages.some((message) => message.role === "user"),

@@ -5,16 +5,22 @@ import uuid
 
 import pytest
 
+from app.modules.assistant.service.assistant_config_file_store import AssistantConfigFileStore
 from app.modules.assistant.service.assistant_hook_providers import build_assistant_plugin_registry
 from app.modules.assistant.service.assistant_service import AssistantService
+from app.modules.assistant.service.assistant_rule_dto import AssistantRuleProfileUpdateDTO
+from app.modules.assistant.service.preferences_dto import AssistantPreferencesUpdateDTO
+from app.modules.assistant.service.preferences_service import AssistantPreferencesService
 from app.modules.assistant.service.dto import AssistantMessageDTO, AssistantTurnRequestDTO
+from app.modules.assistant.service.factory import create_assistant_rule_service
 from app.modules.config_registry import ConfigLoader
 from app.modules.credential.models import ModelCredential
 from app.modules.project.service import create_project_service
 from app.shared.runtime import McpToolCallResult, SkillTemplateRenderer, ToolProvider
 from app.shared.runtime.errors import ConfigurationError
+from app.shared.runtime.llm_tool_provider import LLMStreamEvent
 from tests.unit.async_api_support import build_sqlite_session_factories, cleanup_sqlite_session_factories
-from tests.unit.models.helpers import create_user
+from tests.unit.models.helpers import create_project, create_user
 
 
 class _FakeCrypto:
@@ -43,7 +49,7 @@ class _FakeCredentialService:
 class _FakeToolProvider(ToolProvider):
     def __init__(self) -> None:
         self.prompts: list[str] = []
-        self.requests: list[dict[str, str]] = []
+        self.requests: list[dict[str, object | None]] = []
 
     async def execute(self, tool_name: str, params: dict) -> dict:
         assert tool_name == "llm.generate"
@@ -53,6 +59,8 @@ class _FakeToolProvider(ToolProvider):
             {
                 "prompt": prompt,
                 "response_format": params["response_format"],
+                "system_prompt": params.get("system_prompt"),
+                "model": params.get("model"),
             }
         )
         if "请输出结构化摘要" in prompt:
@@ -71,6 +79,15 @@ class _FakeToolProvider(ToolProvider):
             "output_tokens": 19,
             "total_tokens": 30,
         }
+
+    async def execute_stream(self, tool_name: str, params: dict, *, should_stop=None):
+        del should_stop
+        result = await self.execute(tool_name, params)
+        content = result["content"]
+        midpoint = max(1, len(content) // 2)
+        yield LLMStreamEvent(delta=content[:midpoint])
+        yield LLMStreamEvent(delta=content[midpoint:])
+        yield LLMStreamEvent(response=result)
 
     def list_tools(self) -> list[str]:
         return ["llm.generate"]
@@ -104,7 +121,9 @@ async def test_assistant_service_runs_skill_and_mcp_hook(tmp_path) -> None:
     loader = ConfigLoader(config_root)
     tool_provider = _FakeToolProvider()
     mcp_tool_caller = _FakeMcpToolCaller()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
     service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,
         project_service=create_project_service(),
@@ -143,11 +162,53 @@ async def test_assistant_service_runs_skill_and_mcp_hook(tmp_path) -> None:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
+async def test_assistant_service_stream_turn_yields_chunks_and_completed_event(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    service.plugin_registry = build_assistant_plugin_registry(service, config_loader=loader)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-stream-service")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        async with async_session_factory() as session:
+            payload = AssistantTurnRequestDTO(
+                skill_id="skill.assistant.general_chat",
+                stream=True,
+                messages=[AssistantMessageDTO(role="user", content="给我一个故事方向。")],
+            )
+            events = [
+                event async for event in service.stream_turn(session, payload, owner_id=owner_id)
+            ]
+
+        assert [event.event for event in events] == ["chunk", "chunk", "completed"]
+        assert "".join(event.data["delta"] for event in events[:-1]) == (
+            "主回复：今天的重点新闻主要集中在科技和国际动态。"
+        )
+        assert events[-1].data["content"].startswith("主回复：")
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
 async def test_assistant_service_runs_agent_hook_after_response(tmp_path) -> None:
     config_root = _build_config_root(tmp_path)
     loader = ConfigLoader(config_root)
     tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
     service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,
         project_service=create_project_service(),
@@ -175,6 +236,172 @@ async def test_assistant_service_runs_agent_hook_after_response(tmp_path) -> Non
         assert response.hook_results[0].action_type == "agent"
         assert response.hook_results[0].result == "Hook 摘要完成。"
         assert any("请根据以下内容输出一句摘要" in prompt for prompt in tool_provider.prompts)
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_applies_preferences_and_rules_to_agent_hook(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        assistant_preferences_service=AssistantPreferencesService(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    service.plugin_registry = build_assistant_plugin_registry(service, config_loader=loader)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-agent-hook-preferences")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+        async with async_session_factory() as session:
+            await service.assistant_preferences_service.update_preferences(
+                session,
+                owner.id,
+                AssistantPreferencesUpdateDTO(
+                    default_provider="anthropic",
+                    default_model_name="claude-sonnet-4",
+                ),
+            )
+            await service.assistant_rule_service.update_user_rules(
+                session,
+                payload=AssistantRuleProfileUpdateDTO(enabled=True, content="先给结论。"),
+                owner_id=owner.id,
+            )
+            await service.assistant_rule_service.update_project_rules(
+                session,
+                project.id,
+                payload=AssistantRuleProfileUpdateDTO(
+                    enabled=True,
+                    content="这个项目统一写得更温柔一点。",
+                ),
+                owner_id=owner.id,
+            )
+            payload = AssistantTurnRequestDTO(
+                skill_id="skill.assistant.general_chat",
+                project_id=project.id,
+                hook_ids=["hook.after_summary_agent"],
+                messages=[AssistantMessageDTO(role="user", content="帮我看看今天的新闻。")],
+            )
+            await service.turn(session, payload, owner_id=owner.id)
+
+        hook_request = tool_provider.requests[-1]
+        model = hook_request["model"]
+        system_prompt = hook_request["system_prompt"] or ""
+        assert isinstance(model, dict)
+        assert model["provider"] == "anthropic"
+        assert model["name"] == "claude-sonnet-4"
+        assert "【用户长期规则】" in system_prompt
+        assert "先给结论。" in system_prompt
+        assert "【当前项目规则】" in system_prompt
+        assert "这个项目统一写得更温柔一点。" in system_prompt
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_injects_user_and_project_rules(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    service.plugin_registry = build_assistant_plugin_registry(service, config_loader=loader)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-rules")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+        async with async_session_factory() as session:
+            await service.assistant_rule_service.update_user_rules(
+                session,
+                payload=AssistantRuleProfileUpdateDTO(enabled=True, content="回答时先给结论。"),
+                owner_id=owner.id,
+            )
+            await service.assistant_rule_service.update_project_rules(
+                session,
+                project.id,
+                payload=AssistantRuleProfileUpdateDTO(
+                    enabled=True,
+                    content="这个项目固定写成轻松治愈风。",
+                ),
+                owner_id=owner.id,
+            )
+            payload = AssistantTurnRequestDTO(
+                agent_id="agent.general_assistant",
+                project_id=project.id,
+                messages=[AssistantMessageDTO(role="user", content="给我一个开头方向。")],
+            )
+            await service.turn(session, payload, owner_id=owner.id)
+
+        system_prompt = tool_provider.requests[0]["system_prompt"] or ""
+        assert "【用户长期规则】" in system_prompt
+        assert "回答时先给结论。" in system_prompt
+        assert "【当前项目规则】" in system_prompt
+        assert "这个项目固定写成轻松治愈风。" in system_prompt
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_applies_user_model_preferences(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        assistant_preferences_service=AssistantPreferencesService(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    service.plugin_registry = build_assistant_plugin_registry(service, config_loader=loader)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-preferences")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+        async with async_session_factory() as session:
+            await service.assistant_preferences_service.update_preferences(
+                session,
+                owner.id,
+                AssistantPreferencesUpdateDTO(
+                    default_provider="anthropic",
+                    default_model_name="claude-sonnet-4",
+                ),
+            )
+            payload = AssistantTurnRequestDTO(
+                skill_id="skill.assistant.general_chat",
+                messages=[AssistantMessageDTO(role="user", content="给我一个故事方向。")],
+            )
+            await service.turn(session, payload, owner_id=owner.id)
+
+        model = tool_provider.requests[0]["model"]
+        assert isinstance(model, dict)
+        assert model["provider"] == "anthropic"
+        assert model["name"] == "claude-sonnet-4"
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
@@ -239,7 +466,9 @@ hook:
     )
     loader = ConfigLoader(config_root)
     tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
     service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,
         project_service=create_project_service(),
@@ -291,7 +520,9 @@ mcp_server:
     )
     loader = ConfigLoader(config_root)
     mcp_tool_caller = _FakeMcpToolCaller()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
     service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,
         project_service=create_project_service(),
@@ -327,7 +558,9 @@ async def test_assistant_service_surfaces_mcp_is_error(tmp_path) -> None:
     config_root = _build_config_root(tmp_path)
     loader = ConfigLoader(config_root)
     mcp_tool_caller = _ErrorMcpToolCaller()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
     service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,
         project_service=create_project_service(),

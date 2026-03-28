@@ -4,9 +4,9 @@ const PROJECT_PATH_PATTERN = /^\/workspace\/project\/([^/]+)\//;
 const PROJECT_SETTINGS_PATH_PATTERN = /^\/workspace\/project\/[^/]+\/settings(?:\/|$)/;
 const LOBBY_PATH_PREFIX = "/workspace/lobby";
 const PROJECT_WORKSPACE_ITEMS = [
-  { label: "工作室", meta: "创作编辑", segment: "studio" },
-  { label: "引擎", meta: "执行控制", segment: "engine" },
-  { label: "实验室", meta: "分析结果", segment: "lab" },
+  { label: "工作室", meta: "章节与版本", segment: "studio" },
+  { label: "引擎", meta: "生成与进度", segment: "engine" },
+  { label: "实验室", meta: "分析与参考", segment: "lab" },
 ] as const;
 const WORKSPACE_SIDEBAR_WIDTH = {
   collapsed: "88px",
@@ -33,7 +33,7 @@ export function buildWorkspaceItems(
       disabled: false,
       href: "/workspace/lobby",
       label: "项目大厅",
-      meta: "项目总览",
+      meta: "项目概览",
       segment: "lobby",
     },
     ...PROJECT_WORKSPACE_ITEMS.map((item) => ({

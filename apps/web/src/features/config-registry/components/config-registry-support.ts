@@ -29,11 +29,11 @@ export type ConfigRegistryMetaRow = {
 };
 
 const CONFIG_REGISTRY_TABS: ConfigRegistryTabOption[] = [
-  { key: "skills", label: "Skills", description: "提示词模板、输入输出定义与模型设置。" },
-  { key: "agents", label: "Agents", description: "执行角色、技能绑定与系统提示词。" },
-  { key: "hooks", label: "Hooks", description: "触发条件、动作类型与重试策略。" },
-  { key: "mcp_servers", label: "MCP Servers", description: "MCP 服务地址、请求头与超时配置。" },
-  { key: "workflows", label: "Workflows", description: "节点结构、默认策略与预算安全设置。" },
+  { key: "skills", label: "Skills", description: "技能配置" },
+  { key: "agents", label: "Agents", description: "角色配置" },
+  { key: "hooks", label: "Hooks", description: "触发动作" },
+  { key: "mcp_servers", label: "MCP", description: "MCP 服务" },
+  { key: "workflows", label: "Workflows", description: "流程配置" },
 ];
 
 export function listConfigRegistryTabs(): ConfigRegistryTabOption[] {
@@ -114,14 +114,14 @@ export function parseConfigRegistryDocument(value: string): {
     const parsed = JSON.parse(value) as JsonValue;
     if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
       return {
-        errorMessage: "配置内容必须是 JSON 对象。",
+        errorMessage: "完整配置需要是对象格式。",
         parsed: null,
       };
     }
     return { errorMessage: null, parsed: parsed as ConfigRegistryObject };
   } catch (error) {
     return {
-      errorMessage: error instanceof Error ? `JSON 解析失败：${error.message}` : "JSON 解析失败。",
+      errorMessage: error instanceof Error ? `完整配置格式有误：${error.message}` : "完整配置格式有误。",
       parsed: null,
     };
   }
@@ -177,23 +177,23 @@ function buildSkillSummaryRows(summary: SkillConfigSummary): ConfigRegistryMetaR
 
 function buildAgentSummaryRows(summary: AgentConfigSummary): ConfigRegistryMetaRow[] {
   return [
-    { label: "类型", value: summary.agent_type },
-    { label: "技能", value: formatList(summary.skill_ids) },
+    { label: "类型", value: formatAgentType(summary.agent_type) },
+    { label: "Skills", value: formatList(summary.skill_ids) },
     { label: "MCP", value: formatList(summary.mcp_servers) },
   ];
 }
 
 function buildHookSummaryRows(summary: HookConfigSummary): ConfigRegistryMetaRow[] {
   return [
-    { label: "触发事件", value: summary.trigger_event },
-    { label: "动作", value: summary.action_type },
+    { label: "触发事件", value: formatHookEvent(summary.trigger_event) },
+    { label: "动作", value: formatHookAction(summary.action_type) },
     { label: "状态", value: summary.enabled ? "已启用" : "已停用" },
   ];
 }
 
 function buildWorkflowSummaryRows(summary: WorkflowConfigSummary): ConfigRegistryMetaRow[] {
   return [
-    { label: "模式", value: summary.mode },
+    { label: "模式", value: formatWorkflowMode(summary.mode) },
     { label: "节点", value: `${summary.node_count} 个` },
     { label: "默认精修", value: summary.default_fix_skill ?? "未配置" },
   ];
@@ -201,9 +201,9 @@ function buildWorkflowSummaryRows(summary: WorkflowConfigSummary): ConfigRegistr
 
 function buildMcpServerSummaryRows(summary: McpServerConfigSummary): ConfigRegistryMetaRow[] {
   return [
-    { label: "传输", value: summary.transport },
+    { label: "连接方式", value: formatTransport(summary.transport) },
     { label: "状态", value: summary.enabled ? "已启用" : "已停用" },
-    { label: "超时", value: `${summary.timeout}s` },
+    { label: "超时", value: `${summary.timeout} 秒` },
   ];
 }
 
@@ -218,9 +218,9 @@ function buildSkillDetailRows(detail: SkillConfigDetail): ConfigRegistryMetaRow[
 
 function buildAgentDetailRows(detail: AgentConfigDetail): ConfigRegistryMetaRow[] {
   return [
-    { label: "类型", value: detail.agent_type },
-    { label: "技能", value: formatList(detail.skill_ids) },
-    { label: "输出 Schema", value: detail.output_schema ? `${Object.keys(detail.output_schema).length} 个字段` : "未配置" },
+    { label: "类型", value: formatAgentType(detail.agent_type) },
+    { label: "Skills", value: formatList(detail.skill_ids) },
+    { label: "输出格式", value: detail.output_schema ? `${Object.keys(detail.output_schema).length} 个字段` : "未配置" },
     { label: "MCP", value: formatList(detail.mcp_servers) },
   ];
 }
@@ -228,25 +228,25 @@ function buildAgentDetailRows(detail: AgentConfigDetail): ConfigRegistryMetaRow[
 function buildHookDetailRows(detail: HookConfigDetail): ConfigRegistryMetaRow[] {
   return [
     { label: "状态", value: detail.enabled ? "已启用" : "已停用" },
-    { label: "触发事件", value: detail.trigger.event },
-    { label: "节点类型", value: formatList(detail.trigger.node_types) },
-    { label: "重试", value: detail.retry ? `${detail.retry.max_attempts} 次 / ${detail.retry.delay}s` : "关闭" },
+    { label: "触发事件", value: formatHookEvent(detail.trigger.event) },
+    { label: "适用节点", value: formatHookNodeTypes(detail.trigger.node_types) },
+    { label: "重试", value: detail.retry ? `${detail.retry.max_attempts} 次 / ${detail.retry.delay} 秒` : "关闭" },
   ];
 }
 
 function buildMcpServerDetailRows(detail: McpServerConfigDetail): ConfigRegistryMetaRow[] {
   return [
-    { label: "传输", value: detail.transport },
+    { label: "连接方式", value: formatTransport(detail.transport) },
     { label: "地址", value: detail.url },
     { label: "请求头", value: `${Object.keys(detail.headers).length} 个` },
-    { label: "超时", value: `${detail.timeout}s` },
+    { label: "超时", value: `${detail.timeout} 秒` },
     { label: "状态", value: detail.enabled ? "已启用" : "已停用" },
   ];
 }
 
 function buildWorkflowDetailRows(detail: WorkflowConfigDetail): ConfigRegistryMetaRow[] {
   return [
-    { label: "模式", value: detail.mode },
+    { label: "模式", value: formatWorkflowMode(detail.mode) },
     { label: "节点", value: `${detail.nodes.length} 个` },
     { label: "变更记录", value: `${detail.changelog.length} 条` },
     { label: "上下文注入", value: detail.context_injection ? "已配置" : "未配置" },
@@ -267,6 +267,64 @@ function formatModelLabel(
   const name = readOptionalString(model, "name");
   const parts = [provider, name].filter(Boolean);
   return parts.length > 0 ? parts.join(" / ") : "已配置";
+}
+
+function formatAgentType(value: string): string {
+  if (value === "writer") return "写作助手";
+  if (value === "reviewer") return "审稿助手";
+  if (value === "checker") return "检查助手";
+  return value;
+}
+
+function formatHookAction(value: string): string {
+  if (value === "script") return "脚本";
+  if (value === "webhook") return "回调请求";
+  if (value === "agent") return "Agent";
+  if (value === "mcp") return "MCP";
+  return value;
+}
+
+function formatHookEvent(value: string): string {
+  if (value === "before_workflow_start") return "流程开始前";
+  if (value === "after_workflow_end") return "流程结束后";
+  if (value === "before_node_start") return "节点开始前";
+  if (value === "after_node_end") return "节点结束后";
+  if (value === "before_generate") return "生成前";
+  if (value === "after_generate") return "生成后";
+  if (value === "before_review") return "审阅前";
+  if (value === "after_review") return "审阅后";
+  if (value === "on_review_fail") return "审阅失败时";
+  if (value === "before_fix") return "修复前";
+  if (value === "after_fix") return "修复后";
+  if (value === "before_assistant_response") return "助手回复前";
+  if (value === "after_assistant_response") return "助手回复后";
+  if (value === "on_error") return "出错时";
+  return value;
+}
+
+function formatHookNodeTypes(values: string[]): string {
+  if (values.length === 0) {
+    return "未限制";
+  }
+  return values.map((value) => {
+    if (value === "generate") return "生成";
+    if (value === "review") return "审阅";
+    if (value === "export") return "导出";
+    return value;
+  }).join("、");
+}
+
+function formatTransport(value: string): string {
+  if (value === "streamable_http") {
+    return "流式 HTTP";
+  }
+  return value;
+}
+
+function formatWorkflowMode(value: string): string {
+  if (value === "manual") return "手动";
+  if (value === "auto") return "自动";
+  return value;
 }
 
 function readOptionalString(

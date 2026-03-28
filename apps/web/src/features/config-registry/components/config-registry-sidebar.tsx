@@ -1,5 +1,6 @@
 "use client";
 
+import { AppSelect } from "@/components/ui/app-select";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { ConfigRegistrySummary, ConfigRegistryType } from "@/lib/api/types";
 
@@ -59,11 +60,11 @@ export function ConfigRegistrySidebar({
 
   return (
     <aside className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2.5">
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            className="ink-tab"
+            className="ink-tab h-9 px-4 text-[13px]"
             data-active={tab.key === type}
             type="button"
             onClick={() => onSelectType(tab.key)}
@@ -75,7 +76,7 @@ export function ConfigRegistrySidebar({
 
       <div className="panel-muted space-y-4 p-4">
         <div className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">当前类型</p>
+          <p className="text-xs tracking-[0.16em] text-[var(--accent-ink)]">当前分类</p>
           <h3 className="font-serif text-lg font-semibold">{activeTab.label}</h3>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">{activeTab.description}</p>
         </div>
@@ -86,7 +87,7 @@ export function ConfigRegistrySidebar({
             autoComplete="off"
             className="ink-input"
             name="config-registry-query"
-            placeholder="搜索配置名称、ID…"
+            placeholder="搜索名称或编号…"
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
           />
@@ -94,27 +95,25 @@ export function ConfigRegistrySidebar({
 
         <label className="block space-y-2">
           <span className="label-text">排序</span>
-          <select
-            autoComplete="off"
-            className="ink-select"
-            name="config-registry-sort"
+          <AppSelect
+            options={[
+              { label: "名称 A-Z", value: "name_asc" },
+              { label: "名称 Z-A", value: "name_desc" },
+            ]}
             value={sort}
-            onChange={(event) => onSortChange(event.target.value as ConfigRegistrySortValue)}
-          >
-            <option value="name_asc">名称 A-Z</option>
-            <option value="name_desc">名称 Z-A</option>
-          </select>
+            onChange={(value) => onSortChange(value as ConfigRegistrySortValue)}
+          />
         </label>
 
         {supportsConfigRegistryTagFilter(type) ? (
           <div className="space-y-2">
             <span className="label-text">标签过滤</span>
             {availableTags.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2.5">
                 {availableTags.map((tag) => (
                   <button
                     key={tag}
-                    className="ink-tab"
+                    className="ink-tab h-9 px-4 text-[13px]"
                     data-active={tags.includes(tag)}
                     type="button"
                     onClick={() => onTagToggle(tag)}
@@ -124,7 +123,7 @@ export function ConfigRegistrySidebar({
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-[var(--text-secondary)]">当前类型暂无标签可筛选。</p>
+              <p className="text-sm text-[var(--text-secondary)]">这一类暂时没有可筛选标签。</p>
             )}
           </div>
         ) : null}
@@ -132,7 +131,7 @@ export function ConfigRegistrySidebar({
         {supportsConfigRegistryStatusFilter(type) ? (
           <div className="space-y-2">
             <span className="label-text">状态过滤</span>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2.5">
               {[
                 { label: "全部", value: "all" },
                 { label: "已启用", value: "enabled" },
@@ -140,7 +139,7 @@ export function ConfigRegistrySidebar({
               ].map((option) => (
                 <button
                   key={option.value}
-                  className="ink-tab"
+                  className="ink-tab h-9 px-4 text-[13px]"
                   data-active={status === option.value}
                   type="button"
                   onClick={() => onStatusChange(option.value as ConfigRegistryStatusValue)}
@@ -154,9 +153,9 @@ export function ConfigRegistrySidebar({
       </div>
 
       {errorMessage && items.length === 0 ? <Banner message={errorMessage} tone="danger" /> : null}
-      {isLoading && items.length === 0 ? <Banner message="正在加载配置列表…" tone="muted" /> : null}
+      {isLoading && items.length === 0 ? <Banner message="正在加载内容…" tone="muted" /> : null}
       {items.length === 0 && !isLoading && !errorMessage ? (
-        <EmptyState title="暂无配置" description="当前过滤条件下没有匹配项，或账号无访问权限。" />
+        <EmptyState title="暂时没有内容" description="当前筛选条件下没有匹配结果，或者你还没有查看权限。" />
       ) : (
         <div className="space-y-3">
           {items.map((item) => (

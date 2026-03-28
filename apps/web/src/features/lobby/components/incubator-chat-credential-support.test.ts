@@ -5,6 +5,8 @@ import {
   buildIncubatorCredentialNotice,
   buildIncubatorCredentialOptions,
   pickIncubatorCredentialOption,
+  resolveHydratedIncubatorChatSettings,
+  resolveIncubatorCredentialState,
 } from "./incubator-chat-credential-support";
 
 test("incubator chat credential support keeps only active unique providers", () => {
@@ -72,9 +74,120 @@ test("incubator chat credential support keeps only active unique providers", () 
 });
 
 test("incubator chat credential support builds setup notice when no credential exists", () => {
-  assert.equal(buildIncubatorCredentialNotice(true, []), null);
+  assert.equal(buildIncubatorCredentialNotice({
+    credentialOptions: [],
+    errorMessage: null,
+    isLoading: true,
+  }), null);
   assert.equal(
-    buildIncubatorCredentialNotice(false, []),
-    "当前账号还没有启用任何模型连接。先去模型连接里启用一条，再回来继续聊天。",
+    buildIncubatorCredentialNotice({
+      credentialOptions: [],
+      errorMessage: null,
+      isLoading: false,
+    }),
+    "当前账号没有可用模型连接，请先启用。",
+  );
+});
+
+test("incubator chat credential support distinguishes loading error empty and ready states", () => {
+  assert.equal(resolveIncubatorCredentialState({
+    credentialOptions: [],
+    errorMessage: null,
+    isLoading: true,
+  }), "loading");
+  assert.equal(resolveIncubatorCredentialState({
+    credentialOptions: [],
+    errorMessage: "network failed",
+    isLoading: false,
+  }), "error");
+  assert.equal(resolveIncubatorCredentialState({
+    credentialOptions: [],
+    errorMessage: null,
+    isLoading: false,
+  }), "empty");
+  assert.equal(resolveIncubatorCredentialState({
+    credentialOptions: [{
+      defaultModel: "gpt-4.1-mini",
+      displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
+      provider: "openai",
+    }],
+    errorMessage: null,
+    isLoading: false,
+  }), "ready");
+});
+
+test("incubator chat credential support builds readable notice for query failures", () => {
+  assert.equal(
+    buildIncubatorCredentialNotice({
+      credentialOptions: [],
+      errorMessage: "请求超时",
+      isLoading: false,
+    }),
+    "模型连接读取失败，请刷新后重试。错误信息：请求超时",
+  );
+});
+
+test("incubator chat credential support hydrates defaults after recovery and fixes stale provider", () => {
+  assert.deepEqual(
+    resolveHydratedIncubatorChatSettings(
+      { modelName: "", provider: "" },
+      {
+        defaultModel: "gpt-4.1-mini",
+        displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
+        provider: "openai",
+      },
+    ),
+    {
+      modelName: "gpt-4.1-mini",
+      provider: "openai",
+    },
+  );
+
+  assert.deepEqual(
+    resolveHydratedIncubatorChatSettings(
+      { modelName: "old-model", provider: "legacy-provider" },
+      {
+        defaultModel: "gpt-4.1-mini",
+        displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
+        provider: "openai",
+      },
+    ),
+    {
+      modelName: "gpt-4.1-mini",
+      provider: "openai",
+    },
+  );
+
+  assert.equal(
+    resolveHydratedIncubatorChatSettings(
+      { modelName: "gpt-4.1", provider: "openai" },
+      {
+        defaultModel: "gpt-4.1-mini",
+        displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
+        provider: "openai",
+      },
+    ),
+    null,
+  );
+});
+
+test("incubator chat credential support prefers saved assistant preference before fallback", () => {
+  assert.deepEqual(
+    resolveHydratedIncubatorChatSettings(
+      { modelName: "", provider: "" },
+      {
+        defaultModel: "claude-3-7-sonnet",
+        displayLabel: "Anthropic · claude-3-7-sonnet",
+        provider: "anthropic",
+      },
+      {
+        default_model_name: "claude-sonnet-4",
+        default_provider: "anthropic",
+      },
+    ),
+    {
+      modelName: "claude-sonnet-4",
+      provider: "anthropic",
+    },
   );
 });

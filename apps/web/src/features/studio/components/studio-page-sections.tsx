@@ -51,8 +51,8 @@ export function StudioPageHeader({
 }: Readonly<StudioPageHeaderProps>) {
   return (
     <PageHeaderShell
-      actions={<Link className="ink-button-secondary" href={`/workspace/project/${projectId}/engine`}>前往执行器</Link>}
-      description="在这里维护项目设定、前置资产和章节正文，保持创作上下文集中而清晰。"
+      actions={<Link className="ink-button-secondary" href={`/workspace/project/${projectId}/engine`}>前往引擎</Link>}
+      description="维护项目设定、前置资产和章节正文。"
       eyebrow="工作室"
       footer={<StudioPageTabs activePanel={activePanel} isPending={isPending} onSelectPanel={onSelectPanel} />}
       title={projectName}
@@ -200,7 +200,7 @@ function StudioChapterContent({
     return (
       <EmptyState
         title="当前还没有章节"
-        description="启动工作流后，章节内容会在这里生成。"
+        description="启动工作流后会生成章节。"
       />
     );
   }

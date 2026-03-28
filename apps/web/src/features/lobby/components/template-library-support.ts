@@ -8,6 +8,16 @@ import type {
 const LEGACY_GUIDED_QUESTION_VARIABLE_ALIASES: Record<string, string> = {
   conflict: "core_conflict",
 };
+const GUIDED_QUESTION_LABELS: Record<string, string> = {
+  protagonist: "主角",
+  world_setting: "世界设定",
+  core_conflict: "核心冲突",
+  genre: "题材",
+  tone: "整体气质",
+  target_readers: "目标读者",
+  plot_direction: "剧情方向",
+  special_requirements: "特殊要求",
+};
 
 export type TemplateEditorMode = "create" | "edit" | "duplicate";
 export type TemplateVisibilityFilter = "all" | "builtin" | "custom";
@@ -84,7 +94,7 @@ export function buildTemplateFormIssues({
     issues.push("模板名称不能为空。");
   }
   if (!normalizedWorkflowId) {
-    issues.push("workflow_id 不能为空。");
+    issues.push("请填写要使用的流程。");
   }
   if (normalizedName && hasTemplateNameConflict(templates, normalizedName, editingTemplateId)) {
     issues.push(`模板名称已存在：${normalizedName}`);
@@ -94,11 +104,11 @@ export function buildTemplateFormIssues({
     const questionText = normalizeRequiredText(question.question);
     const variable = normalizeGuidedQuestionVariable(question.variable);
     if (!questionText || !variable) {
-      issues.push(`引导问题 #${index + 1} 需要同时填写问题和变量名。`);
+      issues.push(`问题 ${index + 1} 需要同时填写问题和变量名。`);
       return;
     }
     if (seenVariables.has(variable)) {
-      issues.push(`引导问题变量重复：${variable}`);
+      issues.push(`变量名重复：${formatGuidedQuestionVariableLabel(variable)}`);
       return;
     }
     seenVariables.add(variable);
@@ -157,7 +167,7 @@ export function getTemplateEditorTitle(mode: TemplateEditorMode): string {
 
 export function getTemplateSubmitLabel(mode: TemplateEditorMode, isPending: boolean): string {
   if (isPending) {
-    return mode === "edit" ? "保存中..." : "创建中...";
+    return mode === "edit" ? "保存中…" : "创建中…";
   }
   return mode === "edit" ? "保存模板" : "创建模板";
 }
@@ -168,6 +178,14 @@ export function normalizeGuidedQuestionVariable(value: string): string {
     return "";
   }
   return LEGACY_GUIDED_QUESTION_VARIABLE_ALIASES[normalized] ?? normalized;
+}
+
+export function formatGuidedQuestionVariableLabel(value: string): string {
+  const normalized = normalizeGuidedQuestionVariable(value);
+  if (!normalized) {
+    return "未分类";
+  }
+  return GUIDED_QUESTION_LABELS[normalized] ?? normalized.replaceAll("_", " ");
 }
 
 export function formatTemplateTime(value: string): string {

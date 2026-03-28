@@ -39,7 +39,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   });
 
   const title = useMemo(
-    () => (mode === "login" ? "回到水墨工作台" : "创建新的创作席位"),
+    () => (mode === "login" ? "进入创作空间" : "创建账号"),
     [mode],
   );
 
@@ -51,13 +51,13 @@ export function AuthForm({ mode }: AuthFormProps) {
           <div className="relative space-y-8">
             <div className="space-y-4">
               <p className="text-sm uppercase tracking-[0.28em] text-[var(--accent-ink)]">
-                easyStory Web
+                easyStory
               </p>
               <h1 className="max-w-xl font-serif text-4xl leading-tight font-semibold md:text-5xl">
                 {title}
               </h1>
               <p className="max-w-2xl text-base leading-8 text-[var(--text-secondary)]">
-                从大纲到成稿，AI 辅助你完成整个创作流程。写作、审核、导出，一站搞定。
+                统一管理项目、AI 聊天和创作流程。
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
@@ -65,19 +65,19 @@ export function AuthForm({ mode }: AuthFormProps) {
                 <p className="text-xs uppercase tracking-[0.24em] text-[var(--text-secondary)]">
                   工作室
                 </p>
-                <p className="mt-2 text-sm leading-6">编写章节、管理版本，一站式内容创作。</p>
+                <p className="mt-2 text-sm leading-6">章节与版本管理。</p>
               </div>
               <div className="panel-muted p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-[var(--text-secondary)]">
                   引擎
                 </p>
-                <p className="mt-2 text-sm leading-6">控制工作流执行，监控生成进度。</p>
+                <p className="mt-2 text-sm leading-6">AI 生成与进度。</p>
               </div>
               <div className="panel-muted p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-[var(--text-secondary)]">
                   实验室
                 </p>
-                <p className="mt-2 text-sm leading-6">分析文风特征，提取创作参考。</p>
+                <p className="mt-2 text-sm leading-6">灵感与分析。</p>
               </div>
             </div>
           </div>
@@ -91,8 +91,8 @@ export function AuthForm({ mode }: AuthFormProps) {
               </h2>
               <p className="text-sm leading-6 text-[var(--text-secondary)]">
                 {mode === "login"
-                  ? "使用已有账号进入工作台。"
-                  : "注册成功后即可进入项目大厅开始创作。"}
+                  ? "登录后进入项目大厅。"
+                  : "注册后进入创作空间。"}
               </p>
             </div>
 
@@ -149,7 +149,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               ) : null}
 
               <button className="ink-button w-full" disabled={mutation.isPending} type="submit">
-                {mutation.isPending ? "处理中..." : mode === "login" ? "进入项目大厅" : "创建账号"}
+                {mutation.isPending ? "正在处理…" : mode === "login" ? "进入项目大厅" : "创建账号"}
               </button>
             </form>
 

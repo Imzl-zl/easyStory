@@ -3,6 +3,7 @@
 import { startTransition } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
+import { AppSelect } from "@/components/ui/app-select";
 import { RequestStateInline } from "@/features/lobby/components/incubator-request-state";
 import { getErrorMessage } from "@/lib/api/client";
 
@@ -22,9 +23,9 @@ export function TemplateControlCard({ model }: { model: IncubatorTemplateModel }
   return (
     <section className="panel-muted space-y-4 p-5">
       <div className="space-y-1">
-        <h3 className="font-serif text-lg font-semibold">模板入口</h3>
+        <h3 className="font-serif text-lg font-semibold">选择模板</h3>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          适合已经有明确方向的用户。先选模板和项目名，再基于引导问题生成草稿。
+          选择模板后可继续填写项目信息。
         </p>
       </div>
       <label className="block">
@@ -38,18 +39,17 @@ export function TemplateControlCard({ model }: { model: IncubatorTemplateModel }
       </label>
       <label className="block">
         <span className="label-text">创作模板</span>
-        <select
-          className="ink-input"
+        <AppSelect
+          disabled={(model.templatesQuery.data ?? []).length === 0}
+          options={(model.templatesQuery.data ?? []).map((template) => ({
+            description: template.genre || undefined,
+            label: template.name,
+            value: template.id,
+          }))}
+          placeholder="选择模板"
           value={model.selectedTemplateId}
-          onChange={(event) => startTransition(() => model.selectTemplate(event.target.value))}
-        >
-          {(model.templatesQuery.data ?? []).map((template) => (
-            <option key={template.id} value={template.id}>
-              {template.name}
-              {template.genre ? ` · ${template.genre}` : ""}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => startTransition(() => model.selectTemplate(value))}
+        />
       </label>
       <TemplateMetaCard model={model} />
       <SystemPoolField model={model} />
@@ -62,9 +62,9 @@ export function TemplateQuestionsCard({ model }: { model: IncubatorTemplateModel
   return (
     <section className="panel-shell space-y-4 p-5">
       <div className="space-y-1">
-        <h3 className="font-serif text-lg font-semibold">引导问题</h3>
+        <h3 className="font-serif text-lg font-semibold">补充信息</h3>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          留空的问题不会提交；如果你改了答案，请重新生成草稿后再确认预览。
+          按需填写后可生成项目草稿。
         </p>
       </div>
       <TemplateQuestionStatus model={model} state={detailState} />
@@ -75,7 +75,7 @@ export function TemplateQuestionsCard({ model }: { model: IncubatorTemplateModel
 }
 
 function TemplateMetaCard({ model }: { model: IncubatorTemplateModel }) {
-  if (model.templateDetailQuery.isLoading) return <MetaNoticeCard tone="neutral">正在加载模板详情...</MetaNoticeCard>;
+  if (model.templateDetailQuery.isLoading) return <MetaNoticeCard tone="neutral">正在读取模板信息…</MetaNoticeCard>;
   if (model.templateDetailQuery.error) {
     return <MetaNoticeCard tone="danger">{getErrorMessage(model.templateDetailQuery.error)}</MetaNoticeCard>;
   }
@@ -84,12 +84,12 @@ function TemplateMetaCard({ model }: { model: IncubatorTemplateModel }) {
     <div className="rounded-3xl border border-[rgba(19,19,18,0.08)] bg-[rgba(255,255,255,0.54)] px-4 py-4">
       <p className="font-serif text-base font-semibold">{model.templateDetailQuery.data.name}</p>
       <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
-        {model.templateDetailQuery.data.description ?? "当前模板未提供额外说明。"}
+        {model.templateDetailQuery.data.description ?? "暂无说明。"}
       </p>
       <dl className="mt-4 grid gap-2 text-sm text-[var(--text-secondary)]">
-        <DetailRow label="默认工作流" value={model.templateDetailQuery.data.workflow_id ?? "未配置"} />
-        <DetailRow label="引导问题" value={String(model.templateDetailQuery.data.guided_questions.length)} />
-        <DetailRow label="节点数量" value={String(model.templateDetailQuery.data.nodes.length)} />
+        <DetailRow label="流程" value={model.templateDetailQuery.data.workflow_id ?? "未设置"} />
+        <DetailRow label="问题数" value={String(model.templateDetailQuery.data.guided_questions.length)} />
+        <DetailRow label="节点数" value={String(model.templateDetailQuery.data.nodes.length)} />
       </dl>
     </div>
   );
@@ -105,9 +105,9 @@ function SystemPoolField({ model }: { model: IncubatorTemplateModel }) {
         type="checkbox"
       />
       <span className="space-y-1">
-        <span className="block font-medium">允许系统凭证池</span>
+        <span className="block font-medium">创建项目后沿用默认模型连接</span>
         <span className="block text-sm leading-6 text-[var(--text-secondary)]">
-          创建后的项目在运行期可参与系统默认凭证池策略。
+          仅影响创建后的项目。
         </span>
       </span>
     </label>
@@ -135,12 +135,12 @@ function TemplateQuestionStatus({
 }) {
   return (
     <>
-      {state.isLoading ? <MetaNoticeCard tone="neutral">模板详情加载中，加载完成后才能生成草稿或直接创建项目。</MetaNoticeCard> : null}
+      {state.isLoading ? <MetaNoticeCard tone="neutral">模板加载中。</MetaNoticeCard> : null}
       {state.errorMessage ? (
         <RequestStateInline
           action={
             <button className="ink-button-secondary" onClick={() => void model.templateDetailQuery.refetch()} type="button">
-              重试模板详情
+              重试读取模板
             </button>
           }
           message={state.errorMessage}
@@ -148,7 +148,7 @@ function TemplateQuestionStatus({
       ) : null}
       {state.isReady && state.guidedQuestions.length === 0 ? (
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          当前模板没有配置引导问题，仍可直接创建空白设定项目。
+          当前模板无需补充问题，可直接整理草稿或创建项目。
         </p>
       ) : null}
     </>
@@ -186,7 +186,7 @@ function TemplateQuestionActions({
   return (
     <div className="flex flex-wrap gap-2">
       <button className="ink-button-secondary" disabled={!state.canGenerateDraft} onClick={() => model.draftMutation.mutate()} type="button">
-        {model.draftMutation.isPending ? "生成中..." : "生成设定草稿"}
+        {model.draftMutation.isPending ? "整理中…" : "整理项目草稿"}
       </button>
       <button className="ink-button" disabled={!state.canCreate} onClick={() => model.createMutation.mutate()} type="button">
         {model.createMutation.isPending ? "创建中..." : "直接创建项目"}

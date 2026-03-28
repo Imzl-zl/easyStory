@@ -51,9 +51,17 @@ def resolve_model(
 ) -> ModelConfig:
     resolved = base_model.model_copy(deep=True) if base_model is not None else ModelConfig()
     if override is not None:
-        resolved = resolved.model_copy(
-            update=override.model_dump(mode="json", exclude_none=True)
-        )
+        if override.provider is not None and override.provider != resolved.provider:
+            resolved = resolved.model_copy(
+                update={
+                    "provider": override.provider,
+                    "name": override.name,
+                }
+            )
+        else:
+            resolved = resolved.model_copy(
+                update=override.model_dump(mode="json", exclude_none=True)
+            )
     if not resolved.provider:
         raise ConfigurationError(f"{context_label} is missing executable model provider")
     return resolved

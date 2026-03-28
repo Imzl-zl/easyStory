@@ -83,7 +83,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
         projectStatus={projectQuery.data?.status ?? null}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           {projectQuery.isLoading ? (
             <p aria-live="polite" className="text-sm text-[var(--text-secondary)]" role="status">
@@ -143,16 +143,18 @@ export function StudioPage({ projectId }: StudioPageProps) {
           ) : null}
         </div>
 
-        <StudioSidebarCards
-          onFocusStaleChapter={(chapterNumber) =>
-            updateParams({
-              chapter: String(chapterNumber),
-              panel: "chapter",
-            })
-          }
-          projectId={projectId}
-          staleChapters={staleChapters}
-        />
+        <div className="xl:sticky xl:top-6 xl:self-start">
+          <StudioSidebarCards
+            onFocusStaleChapter={(chapterNumber) =>
+              updateParams({
+                chapter: String(chapterNumber),
+                panel: "chapter",
+              })
+            }
+            projectId={projectId}
+            staleChapters={staleChapters}
+          />
+        </div>
       </div>
     </div>
   );

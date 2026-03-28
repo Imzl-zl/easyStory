@@ -20,6 +20,7 @@ export type AssistantModelConfig = {
 export type AssistantTurnPayload = {
   agent_id?: string;
   skill_id?: string;
+  stream?: boolean;
   hook_ids?: string[];
   project_id?: string | null;
   messages: AssistantMessage[];

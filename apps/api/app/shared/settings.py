@@ -21,11 +21,13 @@ CORS_ALLOWED_ORIGIN_REGEX_ENV = "EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX"
 ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV = "EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS"
 ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV = "EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS"
 CONFIG_ADMIN_USERNAMES_ENV = "EASYSTORY_CONFIG_ADMIN_USERNAMES"
+ASSISTANT_CONFIG_ROOT_ENV = "EASYSTORY_ASSISTANT_CONFIG_ROOT"
 
 DEFAULT_JWT_EXPIRE_HOURS = 24
 DEFAULT_LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 DEFAULT_ALLOW_PRIVATE_MODEL_ENDPOINTS = False
 DEFAULT_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS = False
+DEFAULT_ASSISTANT_CONFIG_ROOT = API_ROOT / ".runtime" / "assistant-config"
 ENV_SETUP_HINT = "请参考 apps/api/.env.example 创建 apps/api/.env 并填写必需项。"
 TRUTHY_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
 FALSY_ENV_VALUES = frozenset({"0", "false", "no", "off"})
@@ -68,6 +70,14 @@ def _parse_string_list_env_value(value: Any, *, env_name: str) -> list[str]:
     raise ConfigurationError(f"{env_name} must be a comma-separated string or list")
 
 
+def _parse_path_env_value(value: Any, *, env_name: str) -> Path:
+    if isinstance(value, Path):
+        return value.expanduser().resolve()
+    if isinstance(value, str) and value.strip():
+        return Path(value.strip()).expanduser().resolve()
+    raise ConfigurationError(f"{env_name} must be a non-empty filesystem path")
+
+
 class EasyStorySettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=API_ENV_FILE,
@@ -106,6 +116,10 @@ class EasyStorySettings(BaseSettings):
         default_factory=list,
         validation_alias=CONFIG_ADMIN_USERNAMES_ENV,
     )
+    assistant_config_root: Path = Field(
+        default=DEFAULT_ASSISTANT_CONFIG_ROOT,
+        validation_alias=ASSISTANT_CONFIG_ROOT_ENV,
+    )
 
     @field_validator("jwt_expire_hours", mode="before")
     @classmethod
@@ -141,6 +155,13 @@ class EasyStorySettings(BaseSettings):
     @classmethod
     def parse_config_admin_usernames(cls, value: Any) -> list[str]:
         return _parse_string_list_env_value(value, env_name=CONFIG_ADMIN_USERNAMES_ENV)
+
+    @field_validator("assistant_config_root", mode="before")
+    @classmethod
+    def parse_assistant_config_root(cls, value: Any) -> Path:
+        if value is None:
+            return DEFAULT_ASSISTANT_CONFIG_ROOT
+        return _parse_path_env_value(value, env_name=ASSISTANT_CONFIG_ROOT_ENV)
 
     def require_jwt_secret(self) -> str:
         if self.jwt_secret and self.jwt_secret.strip():

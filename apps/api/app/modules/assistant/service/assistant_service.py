@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any
 import uuid
 
@@ -13,8 +14,12 @@ from app.modules.credential.service import CredentialService
 from app.modules.credential.service.credential_connection_support import build_runtime_credential_payload
 from app.modules.project.service import ProjectService
 from app.shared.runtime import PluginRegistry, SkillTemplateRenderer, ToolProvider
-from app.shared.runtime.llm_tool_provider import LLM_GENERATE_TOOL
+from app.shared.runtime.errors import ConfigurationError
+from app.shared.runtime.llm_tool_provider import LLM_GENERATE_TOOL, LLMStreamEvent
+from app.shared.runtime.provider_interop_stream_support import StreamInterruptedError
 
+from .assistant_rule_service import AssistantRuleService
+from .assistant_rule_support import build_assistant_system_prompt
 from .assistant_hook_providers import build_assistant_plugin_registry
 from .assistant_hook_support import (
     AssistantHookExecutionContext,
@@ -30,6 +35,7 @@ from .assistant_execution_support import (
     build_turn_response,
     dump_turn_messages,
     hook_agent_response_format,
+    PreparedAssistantTurn,
     render_prompt,
     require_agent_skill,
     require_text_output,
@@ -39,12 +45,22 @@ from .assistant_execution_support import (
     validate_retry_policy,
 )
 from .dto import AssistantHookResultDTO, AssistantTurnRequestDTO, AssistantTurnResponseDTO
+from .preferences_support import apply_preferred_model
+from .preferences_service import AssistantPreferencesService
+
+
+@dataclass(frozen=True)
+class AssistantStreamEvent:
+    event: str
+    data: dict[str, Any]
 
 
 class AssistantService:
     def __init__(
         self,
         *,
+        assistant_rule_service: AssistantRuleService,
+        assistant_preferences_service: AssistantPreferencesService | None = None,
         config_loader: ConfigLoader,
         credential_service_factory: Callable[[], CredentialService],
         project_service: ProjectService,
@@ -52,6 +68,8 @@ class AssistantService:
         template_renderer: SkillTemplateRenderer,
         plugin_registry: PluginRegistry | None = None,
     ) -> None:
+        self.assistant_rule_service = assistant_rule_service
+        self.assistant_preferences_service = assistant_preferences_service or AssistantPreferencesService()
         self.config_loader = config_loader
         self.credential_service_factory = credential_service_factory
         self.project_service = project_service
@@ -67,49 +85,67 @@ class AssistantService:
         *,
         owner_id: uuid.UUID,
     ) -> AssistantTurnResponseDTO:
-        project_id = await self._resolve_project_scope(db, payload.project_id, owner_id=owner_id)
-        spec = resolve_execution_spec(self.config_loader, payload)
-        prompt = render_prompt(
-            config_loader=self.config_loader,
-            template_renderer=self.template_renderer,
-            skill=spec.skill,
-            payload=payload,
-        )
-        hooks = [self.config_loader.load_hook(hook_id) for hook_id in payload.hook_ids]
-        messages = dump_turn_messages(payload)
-        before_payload = build_before_assistant_payload(spec, payload, project_id, messages)
-        before_results = await self._run_hook_event(
-            db,
-            hooks,
-            "before_assistant_response",
-            payload=before_payload,
-            owner_id=owner_id,
-            project_id=project_id,
-            agent_id=spec.agent_id,
-            skill_id=spec.skill.id,
-        )
+        prepared = await self._prepare_turn(db, payload, owner_id=owner_id)
+        before_results = await self._run_before_turn_hooks(db, prepared, owner_id=owner_id)
         raw_output = await self._call_turn_llm(
             db,
-            hooks,
-            prompt=prompt,
-            before_payload=before_payload,
+            prepared.hooks,
+            prompt=prepared.prompt,
+            before_payload=prepared.before_payload,
             owner_id=owner_id,
-            project_id=project_id,
-            spec=spec,
+            project_id=prepared.project_id,
+            spec=prepared.spec,
+            system_prompt=prepared.system_prompt,
         )
-        content = require_text_output(raw_output.get("content"))
-        after_payload = build_after_assistant_payload(spec, payload, project_id, messages, content)
-        after_results = await self._run_hook_event(
+        return await self._finalize_turn(
             db,
-            hooks,
-            "after_assistant_response",
-            payload=after_payload,
+            payload,
+            prepared,
+            raw_output,
+            before_results=before_results,
             owner_id=owner_id,
-            project_id=project_id,
-            agent_id=spec.agent_id,
-            skill_id=spec.skill.id,
         )
-        return build_turn_response(spec, raw_output, content, before_results + after_results)
+
+    async def stream_turn(
+        self,
+        db: AsyncSession,
+        payload: AssistantTurnRequestDTO,
+        *,
+        owner_id: uuid.UUID,
+        should_stop: Callable[[], Awaitable[bool]] | None = None,
+    ) -> AsyncIterator[AssistantStreamEvent]:
+        prepared = await self._prepare_turn(db, payload, owner_id=owner_id)
+        before_results = await self._run_before_turn_hooks(db, prepared, owner_id=owner_id)
+        raw_output: dict[str, Any] | None = None
+        async for event in self._call_turn_llm_stream(
+            db,
+            prepared.hooks,
+            prompt=prepared.prompt,
+            before_payload=prepared.before_payload,
+            owner_id=owner_id,
+            project_id=prepared.project_id,
+            spec=prepared.spec,
+            system_prompt=prepared.system_prompt,
+            should_stop=should_stop,
+        ):
+            if event.delta:
+                yield AssistantStreamEvent("chunk", {"delta": event.delta})
+                continue
+            raw_output = event.response
+        if raw_output is None:
+            raise ConfigurationError("Streaming response completed without final output")
+        response = await self._finalize_turn(
+            db,
+            payload,
+            prepared,
+            raw_output,
+            before_results=before_results,
+            owner_id=owner_id,
+        )
+        yield AssistantStreamEvent(
+            "completed",
+            response.model_dump(mode="json"),
+        )
 
     async def run_agent_hook(
         self,
@@ -122,17 +158,120 @@ class AssistantService:
         skill = require_agent_skill(self.config_loader, agent)
         variables = build_hook_agent_variables(context, input_mapping)
         prompt = self.template_renderer.render(skill.prompt, variables)
-        model = resolve_model(agent.model or skill.model, None, context_label=f"Hook agent {agent.id}")
+        preferences = await self.assistant_preferences_service.get_preferences(
+            context.db,
+            context.owner_id,
+        )
+        preferred_model = apply_preferred_model(agent.model or skill.model, preferences)
+        model = resolve_model(preferred_model, None, context_label=f"Hook agent {agent.id}")
+        rule_bundle = await self.assistant_rule_service.build_rule_bundle(
+            context.db,
+            owner_id=context.owner_id,
+            project_id=context.project_id,
+        )
+        system_prompt = build_assistant_system_prompt(
+            agent.system_prompt,
+            user_content=rule_bundle.user_content,
+            project_content=rule_bundle.project_content,
+        )
         raw_output = await self._call_llm(
             context.db,
             prompt=prompt,
-            system_prompt=agent.system_prompt,
+            system_prompt=system_prompt,
             model=model,
             owner_id=context.owner_id,
             project_id=context.project_id,
             response_format=hook_agent_response_format(agent),
         )
         return resolve_hook_agent_output(agent, raw_output.get("content"))
+
+    async def _prepare_turn(
+        self,
+        db: AsyncSession,
+        payload: AssistantTurnRequestDTO,
+        *,
+        owner_id: uuid.UUID,
+    ) -> PreparedAssistantTurn:
+        project_id = await self._resolve_project_scope(db, payload.project_id, owner_id=owner_id)
+        preferences = await self.assistant_preferences_service.get_preferences(db, owner_id)
+        spec = resolve_execution_spec(self.config_loader, payload, preferences)
+        rule_bundle = await self.assistant_rule_service.build_rule_bundle(
+            db,
+            owner_id=owner_id,
+            project_id=project_id,
+        )
+        messages = dump_turn_messages(payload)
+        return PreparedAssistantTurn(
+            before_payload=build_before_assistant_payload(spec, payload, project_id, messages),
+            hooks=[self.config_loader.load_hook(hook_id) for hook_id in payload.hook_ids],
+            messages=messages,
+            project_id=project_id,
+            prompt=render_prompt(
+                config_loader=self.config_loader,
+                template_renderer=self.template_renderer,
+                skill=spec.skill,
+                payload=payload,
+            ),
+            spec=spec,
+            system_prompt=build_assistant_system_prompt(
+                spec.system_prompt,
+                user_content=rule_bundle.user_content,
+                project_content=rule_bundle.project_content,
+            ),
+        )
+
+    async def _run_before_turn_hooks(
+        self,
+        db: AsyncSession,
+        prepared: PreparedAssistantTurn,
+        *,
+        owner_id: uuid.UUID,
+    ) -> list[AssistantHookResultDTO]:
+        return await self._run_hook_event(
+            db,
+            prepared.hooks,
+            "before_assistant_response",
+            payload=prepared.before_payload,
+            owner_id=owner_id,
+            project_id=prepared.project_id,
+            agent_id=prepared.spec.agent_id,
+            skill_id=prepared.spec.skill.id,
+        )
+
+    async def _finalize_turn(
+        self,
+        db: AsyncSession,
+        payload: AssistantTurnRequestDTO,
+        prepared: PreparedAssistantTurn,
+        raw_output: dict[str, Any],
+        *,
+        before_results: list[AssistantHookResultDTO],
+        owner_id: uuid.UUID,
+    ) -> AssistantTurnResponseDTO:
+        content = require_text_output(raw_output.get("content"))
+        after_payload = build_after_assistant_payload(
+            prepared.spec,
+            payload,
+            prepared.project_id,
+            prepared.messages,
+            content,
+        )
+        after_results = await self._run_hook_event(
+            db,
+            prepared.hooks,
+            "after_assistant_response",
+            payload=after_payload,
+            owner_id=owner_id,
+            project_id=prepared.project_id,
+            agent_id=prepared.spec.agent_id,
+            skill_id=prepared.spec.skill.id,
+        )
+        return build_turn_response(
+            prepared.spec,
+            raw_output,
+            content,
+            before_results + after_results,
+        )
 
     async def _resolve_project_scope(
         self,
@@ -241,16 +380,56 @@ class AssistantService:
         owner_id: uuid.UUID,
         project_id: uuid.UUID | None,
         spec,
+        system_prompt: str | None,
     ) -> dict[str, Any]:
         try:
             return await self._call_llm(
                 db,
                 prompt=prompt,
-                system_prompt=spec.system_prompt,
+                system_prompt=system_prompt,
                 model=spec.model,
                 owner_id=owner_id,
                 project_id=project_id,
             )
+        except Exception as exc:
+            await self._run_on_error_hooks(
+                db,
+                hooks,
+                before_payload,
+                exc,
+                owner_id=owner_id,
+                project_id=project_id,
+                agent_id=spec.agent_id,
+                skill_id=spec.skill.id,
+            )
+            raise
+
+    async def _call_turn_llm_stream(
+        self,
+        db: AsyncSession,
+        hooks: list[HookConfig],
+        *,
+        prompt: str,
+        before_payload: dict[str, Any],
+        owner_id: uuid.UUID,
+        project_id: uuid.UUID | None,
+        spec,
+        system_prompt: str | None,
+        should_stop: Callable[[], Awaitable[bool]] | None = None,
+    ) -> AsyncIterator[LLMStreamEvent]:
+        try:
+            async for event in self._call_llm_stream(
+                db,
+                prompt=prompt,
+                system_prompt=system_prompt,
+                model=spec.model,
+                owner_id=owner_id,
+                project_id=project_id,
+                should_stop=should_stop,
+            ):
+                yield event
+        except StreamInterruptedError:
+            raise
         except Exception as exc:
             await self._run_on_error_hooks(
                 db,
@@ -295,6 +474,43 @@ class AssistantService:
                 "response_format": response_format,
             },
         )
+
+    async def _call_llm_stream(
+        self,
+        db: AsyncSession,
+        *,
+        prompt: str,
+        system_prompt: str | None,
+        model: ModelConfig,
+        owner_id: uuid.UUID,
+        project_id: uuid.UUID | None,
+        should_stop: Callable[[], Awaitable[bool]] | None = None,
+    ) -> AsyncIterator[LLMStreamEvent]:
+        credential_service = self._resolve_credential_service()
+        credential = await credential_service.resolve_active_credential(
+            db,
+            provider=model.provider or "",
+            user_id=owner_id,
+            project_id=project_id,
+        )
+        stream_executor = getattr(self.tool_provider, "execute_stream", None)
+        if not callable(stream_executor):
+            raise ConfigurationError("Current assistant runtime does not support streaming")
+        async for event in stream_executor(
+            LLM_GENERATE_TOOL,
+            {
+                "prompt": prompt,
+                "system_prompt": system_prompt,
+                "model": model.model_dump(mode="json", exclude_none=True),
+                "credential": build_runtime_credential_payload(
+                    credential,
+                    decrypt_api_key=credential_service.crypto.decrypt,
+                ),
+                "response_format": "text",
+            },
+            should_stop=should_stop,
+        ):
+            yield event
 
     def _resolve_credential_service(self) -> CredentialService:
         if self._credential_service is None:

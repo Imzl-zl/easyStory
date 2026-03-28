@@ -37,7 +37,7 @@ export function LobbyProjectShelf({
   templateNameById,
 }: Readonly<LobbyProjectShelfProps>) {
   if (isLoading) {
-    return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载项目列表...</div>;
+    return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载项目列表…</div>;
   }
   if (error) {
     return (
@@ -69,8 +69,8 @@ function ProjectShelfEmptyState({ deletedOnly }: Readonly<{ deletedOnly: boolean
       title={deletedOnly ? "回收站为空" : "还没有项目"}
       description={
         deletedOnly
-          ? "当前没有已删除项目。删除后的项目会先停留在这里，支持恢复或彻底删除。"
-          : "先进入孵化器创建项目，再进入编辑器开始补设定和资产。"
+          ? "当前没有已删除项目。删除后的项目会保留在回收站，支持恢复或彻底删除。"
+          : "新建项目后会显示在列表中。"
       }
     />
   );
@@ -145,7 +145,7 @@ function ProjectMetadataList({
     <dl className="grid gap-2 text-sm text-[var(--text-secondary)]">
       <ProjectMetadataRow label="目标字数" value={formatProjectTargetWords(project.target_words)} />
       <ProjectMetadataRow label="模板" value={templateName} />
-      <ProjectMetadataRow label="系统凭证池" value={project.allow_system_credential_pool ? "开启" : "关闭"} />
+      <ProjectMetadataRow label="默认模型连接" value={project.allow_system_credential_pool ? "已启用" : "未启用"} />
       {project.deleted_at ? (
         <>
           <ProjectMetadataRow label="删除时间" value={formatProjectTrashTime(project.deleted_at)} />
@@ -206,13 +206,13 @@ function ProjectActionRow({
   return (
     <div className="flex flex-wrap gap-2">
       <Link className="ink-button" href={`/workspace/project/${project.id}/studio?panel=setting`}>
-        进入编辑器
+        进入工作室
       </Link>
       <Link className="ink-button-secondary" href={`/workspace/project/${project.id}/settings`}>
         项目设置
       </Link>
       <Link className="ink-button-secondary" href={`/workspace/project/${project.id}/engine`}>
-        打开执行器
+        引擎
       </Link>
       <button
         className="ink-button-danger"

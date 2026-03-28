@@ -8,13 +8,15 @@ import uuid
 from jinja2.exceptions import SecurityError, UndefinedError
 
 from app.modules.config_registry import ConfigLoader
-from app.modules.config_registry.schemas import AgentConfig, ModelConfig, SkillConfig
+from app.modules.config_registry.schemas import AgentConfig, HookConfig, ModelConfig, SkillConfig
 from app.shared.runtime import SkillTemplateRenderer
 from app.shared.runtime.errors import ConfigurationError
 
 from .assistant_hook_support import AssistantHookExecutionContext, build_assistant_hook_payload
 from .assistant_prompt_support import build_skill_variables, resolve_model
 from .dto import AssistantHookResultDTO, AssistantTurnRequestDTO, AssistantTurnResponseDTO
+from .preferences_dto import AssistantPreferencesDTO
+from .preferences_support import apply_preferred_model
 
 
 @dataclass(frozen=True)
@@ -26,14 +28,27 @@ class AssistantExecutionSpec:
     mcp_servers: list[str]
 
 
+@dataclass(frozen=True)
+class PreparedAssistantTurn:
+    before_payload: dict[str, Any]
+    hooks: list[HookConfig]
+    messages: list[dict[str, str]]
+    project_id: uuid.UUID | None
+    prompt: str
+    spec: AssistantExecutionSpec
+    system_prompt: str | None
+
+
 def resolve_execution_spec(
     config_loader: ConfigLoader,
     payload: AssistantTurnRequestDTO,
+    preferences: AssistantPreferencesDTO,
 ) -> AssistantExecutionSpec:
     if payload.agent_id is not None:
         agent = config_loader.load_agent(payload.agent_id)
         skill = require_agent_skill(config_loader, agent)
-        model = resolve_model(agent.model or skill.model, payload.model, context_label=agent.id)
+        preferred_model = apply_preferred_model(agent.model or skill.model, preferences)
+        model = resolve_model(preferred_model, payload.model, context_label=agent.id)
         return AssistantExecutionSpec(
             agent_id=agent.id,
             skill=skill,
@@ -42,7 +57,8 @@ def resolve_execution_spec(
             mcp_servers=list(agent.mcp_servers),
         )
     skill = config_loader.load_skill(payload.skill_id or "")
-    model = resolve_model(skill.model, payload.model, context_label=skill.id)
+    preferred_model = apply_preferred_model(skill.model, preferences)
+    model = resolve_model(preferred_model, payload.model, context_label=skill.id)
     return AssistantExecutionSpec(
         agent_id=None,
         skill=skill,

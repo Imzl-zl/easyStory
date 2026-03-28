@@ -2,12 +2,24 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  isValidLobbySettingsTab,
   isValidCredentialCenterMode,
   isValidCredentialCenterScope,
   normalizeCredentialSettingsPath,
+  normalizeLobbySettingsPath,
+  resolveLobbySettingsTab,
   resolveCredentialCenterMode,
   resolveCredentialCenterScope,
 } from "./lobby-settings-support";
+
+test("lobby settings tab resolves to supported values", () => {
+  assert.equal(resolveLobbySettingsTab("assistant-rules"), "assistant");
+  assert.equal(resolveLobbySettingsTab("assistant-preferences"), "assistant");
+  assert.equal(resolveLobbySettingsTab("other"), "assistant");
+  assert.equal(isValidLobbySettingsTab("credentials"), true);
+  assert.equal(isValidLobbySettingsTab("assistant-rules"), true);
+  assert.equal(isValidLobbySettingsTab("debug"), false);
+});
 
 test("credential settings mode and scope resolve to safe defaults", () => {
   assert.equal(resolveCredentialCenterMode("audit"), "audit");
@@ -38,5 +50,15 @@ test("normalizeCredentialSettingsPath updates and removes query params while kee
       sub: "list",
     }),
     "/workspace/lobby/settings?tab=credentials&scope=user&sub=list",
+  );
+});
+
+test("normalizeLobbySettingsPath can switch top-level tabs without losing query intent", () => {
+  assert.equal(
+    normalizeLobbySettingsPath("/workspace/lobby/settings", "tab=credentials&scope=user", {
+      sub: null,
+      tab: "assistant",
+    }),
+    "/workspace/lobby/settings?tab=assistant&scope=user",
   );
 });

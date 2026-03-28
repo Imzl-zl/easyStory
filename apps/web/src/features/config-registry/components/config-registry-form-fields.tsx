@@ -2,6 +2,8 @@
 
 import { useId } from "react";
 
+import { AppSelect } from "@/components/ui/app-select";
+
 type Option = {
   description?: string;
   label: string;
@@ -116,19 +118,7 @@ export function SelectField({
   return (
     <label className="block space-y-2">
       <span className="label-text">{label}</span>
-      <select
-        autoComplete="off"
-        className="ink-select"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-            {option.description ? ` · ${option.description}` : ""}
-          </option>
-        ))}
-      </select>
+      <AppSelect options={options} value={value} onChange={onChange} />
     </label>
   );
 }

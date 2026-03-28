@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  appendIncubatorMessageDelta,
   buildAssistantModelOverride,
   buildIncubatorConversationFingerprint,
   buildIncubatorConversationText,
@@ -9,7 +10,11 @@ import {
   createIncubatorInitialMessages,
   createIncubatorMessage,
   INCUBATOR_DEFAULT_PROVIDER,
+  INCUBATOR_INTERRUPTED_REPLY_MESSAGE,
+  INCUBATOR_PENDING_REPLY_MESSAGE,
   resolveIncubatorAssistantReply,
+  resolveChatOutputModeLabel,
+  resolveInterruptedIncubatorReply,
   shouldShowPromptSuggestions,
   shouldSubmitIncubatorComposer,
 } from "./incubator-chat-support";
@@ -70,6 +75,8 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
     }),
     { name: "gpt-4.1", provider: "openai" },
   );
+  assert.equal(resolveChatOutputModeLabel(true), "边写边显示");
+  assert.equal(resolveChatOutputModeLabel(false), "生成后整体显示");
 });
 
 test("incubator chat support suggests project names from available setting signals", () => {
@@ -122,5 +129,24 @@ test("incubator chat support turns retired model replies into error guidance", (
       content: "当前默认模型已不可用，请换成可用模型后再试。上游提示：Gemini 3 Pro is no longer available. Please switch to Gemini 3.1 Pro in the latest version of Antigravity. 你可以先到“模型连接”里修改默认模型，再回来继续聊天。",
       status: "error",
     },
+  );
+});
+
+test("incubator chat support replaces pending placeholder with streamed chunks", () => {
+  const pendingMessage = createIncubatorMessage("assistant", INCUBATOR_PENDING_REPLY_MESSAGE, {
+    status: "pending",
+  });
+  const firstChunk = appendIncubatorMessageDelta([pendingMessage], pendingMessage.id, "先给你三个方向");
+  const secondChunk = appendIncubatorMessageDelta(firstChunk, pendingMessage.id, "，每个都能直接展开。");
+
+  assert.equal(firstChunk[0]?.content, "先给你三个方向");
+  assert.equal(secondChunk[0]?.content, "先给你三个方向，每个都能直接展开。");
+});
+
+test("incubator chat support keeps partial reply when streaming is interrupted", () => {
+  assert.equal(resolveInterruptedIncubatorReply(INCUBATOR_PENDING_REPLY_MESSAGE), null);
+  assert.equal(
+    resolveInterruptedIncubatorReply("先给你两个方向"),
+    `先给你两个方向\n\n${INCUBATOR_INTERRUPTED_REPLY_MESSAGE}`,
   );
 });

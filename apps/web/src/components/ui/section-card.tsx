@@ -1,25 +1,40 @@
 type SectionCardProps = {
-  title: string;
-  description?: string;
   action?: React.ReactNode;
+  bodyClassName?: string;
   children: React.ReactNode;
+  className?: string;
+  description?: string;
+  headerClassName?: string;
+  title: string;
 };
 
-export function SectionCard({ title, description, action, children }: SectionCardProps) {
+export function SectionCard({
+  action,
+  bodyClassName,
+  children,
+  className,
+  description,
+  headerClassName,
+  title,
+}: SectionCardProps) {
   return (
-    <section className="section-card panel-shell">
-      <header className="section-card__header">
+    <section className={joinClassNames("section-card panel-shell", className)}>
+      <header className={joinClassNames("section-card__header", headerClassName)}>
         <div className="section-card__copy">
-          <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)]">{title}</h2>
+          <h2 className="text-[1.02rem] font-semibold text-[var(--text-primary)] md:text-[1.12rem]">{title}</h2>
           {description ? (
-            <p className="max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="max-w-4xl text-[13px] leading-6 text-[var(--text-secondary)]">
               {description}
             </p>
           ) : null}
         </div>
         {action}
       </header>
-      <div className="section-card__body">{children}</div>
+      <div className={joinClassNames("section-card__body", bodyClassName)}>{children}</div>
     </section>
   );
+}
+
+function joinClassNames(...parts: Array<string | undefined>) {
+  return parts.filter(Boolean).join(" ");
 }

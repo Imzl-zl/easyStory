@@ -3,6 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import { AppSelect } from "@/components/ui/app-select";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { listAnalyses } from "@/lib/api/analysis";
@@ -122,18 +123,15 @@ export function EngineContextStyleReferenceHelper({
         {analyses.length > 0 ? (
           <>
             <label className="block space-y-2">
-              <span className="label-text">style analysis</span>
-              <select
-                className="ink-select"
+              <span className="label-text">风格分析记录</span>
+              <AppSelect
+                options={analyses.map((analysis) => ({
+                  label: formatAnalysisOptionLabel(analysis),
+                  value: analysis.id,
+                }))}
                 value={selectedAnalysisId}
-                onChange={(event) => setSelectedAnalysisId(event.target.value)}
-              >
-                {analyses.map((analysis) => (
-                  <option key={analysis.id} value={analysis.id}>
-                    {formatAnalysisOptionLabel(analysis)}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedAnalysisId}
+              />
             </label>
 
             {selectedAnalysis ? <SelectedAnalysisCard analysis={selectedAnalysis} /> : null}
