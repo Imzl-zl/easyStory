@@ -30,11 +30,6 @@ export type LabAnalysisFormState = {
   suggestions: string;
 };
 
-export type LabFeedback = {
-  message: string;
-  tone: "info" | "danger";
-} | null;
-
 export function createInitialLabAnalysisFilterState(): LabAnalysisFilterState {
   return {
     analysisType: LAB_ANALYSIS_FILTER_ALL,
@@ -190,13 +185,6 @@ export function removeLabAnalysisSummary(
   analysisId: string,
 ): AnalysisSummary[] {
   return (analyses ?? []).filter((analysis) => analysis.id !== analysisId);
-}
-
-export function buildLabFeedback(
-  message: string,
-  tone: "info" | "danger" = "info",
-): LabFeedback {
-  return { message, tone };
 }
 
 function normalizeOptionalText(value: string): string | undefined {

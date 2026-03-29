@@ -7,6 +7,7 @@ import type {
   ProjectIncubatorConversationDraft,
 } from "@/lib/api/types";
 
+import type { IncubatorConversationDraftMutation } from "./incubator-page-model-support";
 import { buildSettingSections } from "./incubator-page-support";
 import {
   ActionCard,
@@ -15,7 +16,8 @@ import {
 
 type IncubatorChatDraftPanelProps = {
   createMutation: UseMutationResult<ProjectDetail, unknown, void>;
-  draftMutation: UseMutationResult<ProjectIncubatorConversationDraft, unknown, string>;
+  draft: ProjectIncubatorConversationDraft | null;
+  draftMutation: IncubatorConversationDraftMutation;
   hasUserMessage: boolean;
   isDraftStale: boolean;
   onProjectNameChange: (value: string) => void;
@@ -25,6 +27,7 @@ type IncubatorChatDraftPanelProps = {
 
 export function IncubatorChatDraftPanel({
   createMutation,
+  draft,
   draftMutation,
   hasUserMessage,
   isDraftStale,
@@ -32,11 +35,10 @@ export function IncubatorChatDraftPanel({
   onSyncDraft,
   projectName,
 }: Readonly<IncubatorChatDraftPanelProps>) {
-  const draft = draftMutation.data;
   const sections = draft ? buildSettingSections(draft.project_setting) : [];
 
   return (
-    <aside className="order-2 flex min-h-0 flex-col gap-2.5 lg:order-1 lg:h-full">
+    <aside className="order-2 flex min-h-0 flex-col gap-2 lg:order-1 lg:h-full">
       <ActionCard
         canCreate={Boolean(draft && projectName.trim()) && !createMutation.isPending}
         canSyncDraft={hasUserMessage && !draftMutation.isPending}
@@ -48,7 +50,7 @@ export function IncubatorChatDraftPanel({
         onSyncDraft={onSyncDraft}
         projectName={projectName}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-0.5">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
         <DraftBody draft={draft} hasUserMessage={hasUserMessage} sections={sections} />
       </div>
     </aside>

@@ -97,6 +97,8 @@ def test_create_user_credential_encrypts_and_audits(db, monkeypatch) -> None:
     assert result.provider == "openai"
     assert result.api_dialect == OPENAI_DIALECT
     assert result.default_model == OPENAI_MODEL
+    assert result.context_window_tokens is None
+    assert result.default_max_output_tokens is None
     assert result.auth_strategy is None
     assert result.api_key_header_name is None
     assert result.extra_headers is None

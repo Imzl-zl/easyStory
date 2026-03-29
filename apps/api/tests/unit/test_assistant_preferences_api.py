@@ -39,6 +39,7 @@ async def test_assistant_preferences_api_reads_and_updates_user_preferences(
                 json={
                     "default_provider": "anthropic",
                     "default_model_name": "claude-sonnet-4",
+                    "default_max_output_tokens": 8192,
                 },
             )
             refreshed = await client.get(
@@ -50,16 +51,19 @@ async def test_assistant_preferences_api_reads_and_updates_user_preferences(
         assert initial.json() == {
             "default_provider": None,
             "default_model_name": None,
+            "default_max_output_tokens": 4096,
         }
         assert updated.status_code == 200
         assert updated.json() == {
             "default_provider": "anthropic",
             "default_model_name": "claude-sonnet-4",
+            "default_max_output_tokens": 8192,
         }
         assert refreshed.status_code == 200
         assert refreshed.json() == {
             "default_provider": "anthropic",
             "default_model_name": "claude-sonnet-4",
+            "default_max_output_tokens": 8192,
         }
         preferences_file = (
             tmp_path / "assistant-config" / "users" / str(owner_id) / "preferences.yaml"
@@ -68,5 +72,6 @@ async def test_assistant_preferences_api_reads_and_updates_user_preferences(
         file_text = preferences_file.read_text(encoding="utf-8")
         assert "default_provider: anthropic" in file_text
         assert "default_model_name: claude-sonnet-4" in file_text
+        assert "default_max_output_tokens: 8192" in file_text
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)

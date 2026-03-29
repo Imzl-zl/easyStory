@@ -21,10 +21,10 @@ export function CredentialNoticeCard({
   message: string;
 }) {
   return (
-    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[rgba(183,121,31,0.14)] bg-[rgba(183,121,31,0.1)] px-3 py-2 text-[12px] leading-5 text-[var(--accent-warning)]">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[rgba(183,121,31,0.14)] bg-[rgba(183,121,31,0.1)] px-3 py-2 text-[11.5px] leading-5 text-[var(--accent-warning)]">
       <p className="min-w-0 flex-1">{message}</p>
       <Link
-        className="inline-flex shrink-0 items-center rounded-full bg-[rgba(255,255,255,0.76)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-ink)] transition hover:bg-[rgba(255,255,255,0.96)]"
+        className="inline-flex shrink-0 items-center rounded-full bg-[rgba(255,255,255,0.76)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--accent-ink)] transition hover:bg-[rgba(255,255,255,0.96)]"
         href={credentialSettingsHref}
       >
         前往模型连接
@@ -44,7 +44,7 @@ export function PromptSuggestionBar({
     <div className="mt-1.5 flex flex-wrap gap-1.5">
       {INCUBATOR_PROMPT_SUGGESTIONS.map((prompt) => (
         <button
-          className="rounded-full border border-[var(--line-soft)] bg-[rgba(255,255,255,0.92)] px-2.5 py-1.5 text-left text-[11.5px] leading-5 text-[var(--text-primary)] transition hover:border-[rgba(46,111,106,0.18)] hover:bg-[rgba(46,111,106,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-full border border-[var(--line-soft)] bg-[rgba(255,255,255,0.92)] px-2.5 py-1 text-left text-[11px] leading-5 text-[var(--text-primary)] transition-[border-color,background-color,color] hover:border-[rgba(46,111,106,0.18)] hover:bg-[rgba(46,111,106,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={disabled}
           key={prompt}
           onClick={() => onSelect(prompt)}
@@ -74,8 +74,8 @@ export function MessageBubble({
   const statusClassName = resolveMessageStatusClassName(status);
 
   return (
-    <article className={`max-w-[84%] md:max-w-[80%] xl:max-w-[76%] rounded-[16px] border px-3 py-1.5 ${alignmentClassName} ${className} ${statusClassName}`}>
-      <p className="text-[10px] font-medium tracking-[0.14em] text-[var(--text-secondary)]">
+    <article className={`max-w-[84%] md:max-w-[80%] xl:max-w-[78%] rounded-[16px] border px-3 py-2 ${alignmentClassName} ${className} ${statusClassName}`}>
+      <p className="text-[10px] font-medium tracking-[0.12em] text-[var(--text-secondary)]">
         {isAssistant ? "AI" : "你"}
       </p>
       <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-6">{content}</p>

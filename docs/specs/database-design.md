@@ -505,6 +505,8 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | encrypted_key | TEXT | AES-256-GCM 加密后的 API Key |
 | base_url | VARCHAR(500) | 自定义 endpoint（可选；默认只允许公网 `https`，本地/私网需显式允许） |
 | default_model | VARCHAR(100) | 连接级默认模型名 |
+| context_window_tokens | INTEGER | 可选；连接级上下文窗口，用于记录该模型可容纳的输入规模 |
+| default_max_output_tokens | INTEGER | 可选；连接级默认单次回复上限，运行时可作为默认输出预算 |
 | auth_strategy | VARCHAR(50) | 可选鉴权覆盖：`bearer / x_api_key / x_goog_api_key / custom_header`；未设置时跟随 `api_dialect` 默认值 |
 | api_key_header_name | VARCHAR(100) | 可选；仅在 `custom_header` 模式下指定 API Key Header 名称 |
 | extra_headers | JSONB | 可选；附加请求头对象，不允许覆盖运行时保留头 |

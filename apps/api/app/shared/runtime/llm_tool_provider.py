@@ -87,11 +87,14 @@ class LLMToolProvider(ToolProvider):
             api_dialect=request.connection.api_dialect,
         )
         parts: list[str] = []
+        truncation_reason: str | None = None
         async for event in stream_support.iterate_stream_request(
             prepared_request,
             api_dialect=request.connection.api_dialect,
             should_stop=should_stop,
         ):
+            if truncation_reason is None:
+                truncation_reason = stream_support.extract_stream_truncation_reason(event.stop_reason)
             if not event.delta:
                 continue
             parts.append(event.delta)
@@ -99,6 +102,10 @@ class LLMToolProvider(ToolProvider):
         content = "".join(parts)
         if not content:
             raise ConfigurationError("模型没有返回可展示的内容，请稍后重试。")
+        if truncation_reason is not None:
+            raise ConfigurationError(
+                stream_support.build_truncated_stream_message(truncation_reason)
+            )
         yield LLMStreamEvent(
             response={
                 "content": content,
@@ -131,7 +138,10 @@ def _build_request(params: dict[str, Any]) -> LLMRequest:
         system_prompt=_optional_string(params.get("system_prompt")),
         response_format=_optional_string(params.get("response_format")) or "text",
         temperature=_optional_float(model.get("temperature")),
-        max_tokens=_optional_int(model.get("max_tokens")),
+        max_tokens=_resolve_max_tokens(
+            requested_value=model.get("max_tokens"),
+            default_value=credential.get("default_max_output_tokens"),
+        ),
         top_p=_optional_float(model.get("top_p")),
         stop=_optional_string_list(model.get("stop")),
         connection=_build_connection(credential),
@@ -212,6 +222,13 @@ def _optional_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigurationError("Expected integer value")
     return value
+
+
+def _resolve_max_tokens(*, requested_value: Any, default_value: Any) -> int | None:
+    requested_max_tokens = _optional_int(requested_value)
+    if requested_max_tokens is not None:
+        return requested_max_tokens
+    return _optional_int(default_value)
 
 
 def _optional_string_list(value: Any) -> list[str] | None:

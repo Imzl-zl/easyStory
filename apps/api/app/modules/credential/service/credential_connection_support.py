@@ -55,6 +55,8 @@ def build_runtime_credential_payload(
         "api_dialect": credential.api_dialect,
         "base_url": credential.base_url,
         "default_model": credential.default_model,
+        "context_window_tokens": credential.context_window_tokens,
+        "default_max_output_tokens": credential.default_max_output_tokens,
         "auth_strategy": credential.auth_strategy,
         "api_key_header_name": credential.api_key_header_name,
         "extra_headers": copy_extra_headers(credential.extra_headers),

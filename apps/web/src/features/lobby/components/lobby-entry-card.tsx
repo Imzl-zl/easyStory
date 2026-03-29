@@ -3,7 +3,6 @@
 import Link from "next/link";
 
 type LobbyEntryCardProps = {
-  feedback: string | null;
   templatesLoading: boolean;
   templateCount: number;
   templatePreviewNames: string[];
@@ -11,7 +10,6 @@ type LobbyEntryCardProps = {
 };
 
 export function LobbyEntryCard({
-  feedback,
   templatesLoading,
   templateCount,
   templatePreviewNames,
@@ -43,11 +41,6 @@ export function LobbyEntryCard({
       {templatesError ? (
         <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
           {templatesError}
-        </div>
-      ) : null}
-      {feedback ? (
-        <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
-          {feedback}
         </div>
       ) : null}
       <div className="flex flex-wrap gap-2">

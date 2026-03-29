@@ -15,7 +15,6 @@ import {
   type TemplateFormState,
   type TemplateVisibilityFilter,
 } from "@/features/lobby/components/template-library-support";
-import { getErrorMessage } from "@/lib/api/client";
 import { listTemplates } from "@/lib/api/templates";
 import type { TemplateDetail } from "@/lib/api/types";
 
@@ -248,10 +247,6 @@ export function setField<K extends keyof TemplateFormState>(
   value: TemplateFormState[K],
 ) {
   setForm((current) => ({ ...current, [field]: value }));
-}
-
-export function buildErrorFeedback(error: unknown): TemplateFeedback {
-  return { tone: "danger", message: getErrorMessage(error) };
 }
 
 export function setSearchText(setter: TemplateTextSetter, value: string) {

@@ -4,6 +4,7 @@ import type {
   TemplateSummary,
   TemplateUpsertPayload,
 } from "@/lib/api/types";
+import type { AppNoticeTone } from "@/components/ui/app-notice";
 
 const LEGACY_GUIDED_QUESTION_VARIABLE_ALIASES: Record<string, string> = {
   conflict: "core_conflict",
@@ -25,6 +26,14 @@ export type TemplateVisibilityFilter = "all" | "builtin" | "custom";
 export type TemplateFeedback = {
   tone: "info" | "danger";
   message: string;
+};
+
+export type TemplateMutationAction = "create" | "update" | "delete";
+
+type TemplateNotice = {
+  content: string;
+  title: string;
+  tone: AppNoticeTone;
 };
 
 export type TemplateFormState = {
@@ -172,6 +181,29 @@ export function getTemplateSubmitLabel(mode: TemplateEditorMode, isPending: bool
   return mode === "edit" ? "保存模板" : "创建模板";
 }
 
+export function buildTemplateMutationSuccessNotice(action: TemplateMutationAction): TemplateNotice {
+  return {
+    content: resolveTemplateMutationSuccessMessage(action),
+    title: "模板库",
+    tone: "success",
+  };
+}
+
+export function buildTemplateMutationErrorFeedback(message: string): TemplateFeedback {
+  return {
+    message: message.trim(),
+    tone: "danger",
+  };
+}
+
+export function buildTemplateMutationErrorNotice(message: string): TemplateNotice {
+  return {
+    content: message.trim(),
+    title: "模板库",
+    tone: "danger",
+  };
+}
+
 export function normalizeGuidedQuestionVariable(value: string): string {
   const normalized = normalizeRequiredText(value);
   if (!normalized) {
@@ -221,6 +253,16 @@ function hasTemplateNameConflict(
     }
     return template.name.trim().toLowerCase() === name.trim().toLowerCase();
   });
+}
+
+function resolveTemplateMutationSuccessMessage(action: TemplateMutationAction): string {
+  if (action === "create") {
+    return "模板已创建。";
+  }
+  if (action === "update") {
+    return "模板已更新。";
+  }
+  return "模板已删除。";
 }
 
 function normalizeOptionalText(value: string): string | null {

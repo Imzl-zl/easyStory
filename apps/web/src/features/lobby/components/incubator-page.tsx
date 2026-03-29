@@ -28,7 +28,7 @@ export function IncubatorPage() {
   };
 
   return (
-    <div className="flex flex-col gap-2 lg:h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-3rem)] lg:overflow-hidden">
+    <div className="flex flex-col gap-1.5 lg:h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-3rem)] lg:overflow-hidden">
       <IncubatorPageHeader mode={mode} onModeChange={handleModeChange} />
       {feedback ? <FeedbackBanner feedback={feedback} /> : null}
       <section
@@ -87,24 +87,24 @@ function IncubatorPageHeader({
   const modeSummary = mode === "chat" ? "AI 聊天" : "模板创建";
 
   return (
-    <section className="panel-shell px-3 py-2 md:px-4 md:py-2.5 xl:px-5">
-      <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+    <section className="panel-shell px-3 py-2 md:px-4 xl:px-5">
+      <div className="flex flex-col gap-1.5 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <Link className="ink-button-secondary h-8 px-3 text-[13px]" href="/workspace/lobby">
             返回项目大厅
           </Link>
           <div className="hidden h-4 w-px bg-[var(--line-soft)] xl:block" />
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-[0.98rem] font-semibold text-[var(--text-primary)] md:text-[1.04rem]">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h1 className="text-[0.97rem] font-semibold text-[var(--text-primary)] md:text-[1.02rem]">
                 创建项目
               </h1>
-              <span className="rounded-full bg-[rgba(46,111,106,0.08)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-ink)]">
+              <span className="rounded-full bg-[rgba(46,111,106,0.08)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--accent-ink)]">
                 {modeSummary}
               </span>
             </div>
-            <p className="mt-0.5 text-[11.5px] leading-5 text-[var(--text-secondary)]">
-              通过 AI 聊天或模板整理项目草稿。
+            <p className="mt-0.5 text-[11px] leading-5 text-[var(--text-secondary)]">
+              先聊想法，再整理成项目草稿。
             </p>
           </div>
         </div>
@@ -131,7 +131,7 @@ function ModeTabs({
         <button
           aria-controls={`incubator-panel-${option.id}`}
           aria-selected={mode === option.id}
-          className="ink-tab h-8 px-3 text-[12.5px]"
+          className="ink-tab h-8 px-2.5 text-[12px]"
           data-active={mode === option.id}
           id={`incubator-tab-${option.id}`}
           key={option.id}

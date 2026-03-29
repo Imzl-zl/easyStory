@@ -3,22 +3,30 @@
 import Link from "next/link";
 
 import { AppSelect } from "@/components/ui/app-select";
-import type { IncubatorCredentialState } from "@/features/lobby/components/incubator-chat-credential-support";
-import { resolveChatOutputModeLabel } from "@/features/lobby/components/incubator-chat-support";
+import {
+  prefersBufferedOutput,
+  type IncubatorCredentialState,
+} from "@/features/lobby/components/incubator-chat-credential-support";
 import type { IncubatorChatModel } from "@/features/lobby/components/incubator-page-model";
+import {
+  buildChatSettingsSummaryItems,
+  normalizeMaxOutputTokensInput,
+  syncProviderSelection,
+  updateIncubatorChatSetting,
+} from "@/features/lobby/components/incubator-chat-settings-support";
 
 export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
   const summaryItems = buildChatSettingsSummaryItems(model);
 
   return (
     <details className="overflow-hidden rounded-[16px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.76)]">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-[13px] font-medium text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-inset">
-        <span className="min-w-0">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-1.5 text-[12.5px] font-medium text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-inset">
+        <span className="min-w-0 flex-1">
           <span className="block">模型与连接</span>
           <span className="mt-1 flex flex-wrap gap-1">
             {summaryItems.map((item) => (
               <span
-                className="rounded-full bg-[rgba(248,243,235,0.96)] px-2 py-0.5 text-[10.5px] font-normal leading-4 text-[var(--text-secondary)]"
+                className="rounded-full bg-[rgba(248,243,235,0.96)] px-1.5 py-0.5 text-[10px] font-normal leading-4 text-[var(--text-secondary)]"
                 key={item}
               >
                 {item}
@@ -26,11 +34,11 @@ export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
             ))}
           </span>
         </span>
-        <span className="shrink-0 rounded-full bg-[rgba(248,243,235,0.92)] px-2.5 py-1 text-[11px] font-normal text-[var(--text-secondary)]">
-          更多
+        <span className="shrink-0 rounded-full bg-[rgba(248,243,235,0.92)] px-2 py-0.5 text-[10.5px] font-normal text-[var(--text-secondary)]">
+          设置
         </span>
       </summary>
-      <div className="border-t border-[var(--line-soft)] px-3 py-2.5">
+      <div className="border-t border-[var(--line-soft)] px-3 py-2">
         {model.credentialState === "ready" ? (
           <AdvancedSettingsForm model={model} />
         ) : (
@@ -44,20 +52,20 @@ export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
   );
 }
 
-export function updateIncubatorChatSetting<K extends keyof IncubatorChatModel["settings"]>(
-  model: IncubatorChatModel,
-  field: K,
-  value: IncubatorChatModel["settings"][K],
-) {
-  model.setSettings((current) => ({ ...current, [field]: value }));
-}
-
 function AdvancedSettingsForm({ model }: { model: IncubatorChatModel }) {
+  const currentOption = model.credentialOptions.find((option) => option.provider === model.settings.provider) ?? null;
+  const helperMaxOutputTokens = currentOption?.defaultMaxOutputTokens ?? 4096;
+
   return (
-    <div className="space-y-2.5">
-      <p className="text-[11.5px] leading-5 text-[var(--text-secondary)]">
-        仅对当前聊天生效。
+    <div className="space-y-2">
+      <p className="text-[11px] leading-5 text-[var(--text-secondary)]">
+        仅对当前聊天生效。当前连接默认回复上限为 {helperMaxOutputTokens}，想让长回答更完整时再调高。
       </p>
+      {prefersBufferedOutput(currentOption) ? (
+        <p className="rounded-[14px] bg-[rgba(58,124,165,0.08)] px-3 py-2 text-[11px] leading-5 text-[var(--accent-info)]">
+          当前这条连接更适合用“生成后整体显示”，通常会比边写边显示更稳定。
+        </p>
+      ) : null}
       <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)]">
         <ProviderSelectField model={model} />
         <TextSettingField
@@ -66,6 +74,17 @@ function AdvancedSettingsForm({ model }: { model: IncubatorChatModel }) {
           placeholder="例如：gpt-4.1"
           value={model.settings.modelName}
           onChange={(value) => updateIncubatorChatSetting(model, "modelName", value)}
+        />
+        <TextSettingField
+          label="单次回复上限"
+          name="maxOutputTokens"
+          placeholder="4096"
+          value={model.settings.maxOutputTokens}
+          onChange={(value) => updateIncubatorChatSetting(
+            model,
+            "maxOutputTokens",
+            normalizeMaxOutputTokensInput(value),
+          )}
         />
         <OutputModeField model={model} />
         <SystemCredentialPoolField model={model} />
@@ -115,7 +134,8 @@ function TextSettingField({
       <span className="label-text">{label}</span>
       <input
         autoComplete="off"
-        className="ink-input min-h-[2.5rem] min-w-0 px-3 py-2 text-[13px] leading-5"
+        className="ink-input min-h-[2.4rem] min-w-0 px-3 py-1.5 text-[12.5px] leading-5"
+        inputMode={name === "maxOutputTokens" ? "numeric" : undefined}
         name={name}
         placeholder={placeholder}
         spellCheck={false}
@@ -128,7 +148,7 @@ function TextSettingField({
 
 function OutputModeField({ model }: { model: IncubatorChatModel }) {
   return (
-    <div className="rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-3 py-2 md:col-span-2">
+    <div className="rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-2.5 py-2 md:col-span-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[12px] font-medium text-[var(--text-primary)]">回复显示方式</p>
@@ -157,7 +177,7 @@ function OutputModeField({ model }: { model: IncubatorChatModel }) {
 
 function SystemCredentialPoolField({ model }: { model: IncubatorChatModel }) {
   return (
-    <label className="flex items-start gap-2.5 rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-3 py-2 md:col-span-2">
+    <label className="flex items-start gap-2.5 rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-2.5 py-2 md:col-span-2">
       <input
         checked={model.settings.allowSystemCredentialPool}
         className="mt-0.5 size-4 shrink-0 accent-[var(--accent-ink)]"
@@ -201,48 +221,6 @@ function OutputModeButton({
       {label}
     </button>
   );
-}
-
-function syncProviderSelection(model: IncubatorChatModel, provider: string) {
-  const option = model.credentialOptions.find((item) => item.provider === provider);
-  model.setSettings((current) => ({
-    ...current,
-    modelName: option?.defaultModel ?? "",
-    provider,
-  }));
-}
-
-function buildChatSettingsSummaryItems(model: IncubatorChatModel) {
-  if (model.credentialState === "loading") {
-    return ["正在读取模型连接"];
-  }
-  if (model.credentialState === "error") {
-    return ["模型连接读取失败"];
-  }
-  if (model.credentialState === "empty") {
-    return ["暂无可用模型连接"];
-  }
-  const option = model.credentialOptions.find((item) => item.provider === model.settings.provider)
-    ?? model.credentialOptions[0];
-  if (!option) {
-    return ["请选择模型连接"];
-  }
-  const modelName = model.settings.modelName.trim() || option.defaultModel || "跟随连接默认模型";
-  return [
-    stripDefaultModelSuffix(option),
-    modelName,
-    resolveChatOutputModeLabel(model.settings.streamOutput),
-  ];
-}
-
-function stripDefaultModelSuffix(option: IncubatorChatModel["credentialOptions"][number]) {
-  if (!option.defaultModel) {
-    return option.displayLabel;
-  }
-  const suffix = ` · ${option.defaultModel}`;
-  return option.displayLabel.endsWith(suffix)
-    ? option.displayLabel.slice(0, -suffix.length)
-    : option.displayLabel;
 }
 
 function CredentialSettingsEmptyState({

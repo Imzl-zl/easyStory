@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { CodeBlock } from "@/components/ui/code-block";
 import { EmptyState } from "@/components/ui/empty-state";
-import { formatAuditTime } from "@/features/settings/components/credential-center-support";
+import { formatAuditTime } from "@/features/settings/components/credential-center-display-support";
 import { getErrorMessage } from "@/lib/api/client";
 import { listCredentialAuditLogs } from "@/lib/api/observability";
 

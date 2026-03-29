@@ -4,11 +4,17 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "rea
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { showAppNotice } from "@/components/ui/app-notice";
 import { GuardedLink } from "@/components/ui/guarded-link";
 import { SectionCard } from "@/components/ui/section-card";
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { ConfigRegistryDetailPanel } from "@/features/config-registry/components/config-registry-detail-panel";
 import { ConfigRegistryEditorPanel } from "@/features/config-registry/components/config-registry-editor-panel";
+import {
+  buildConfigRegistrySaveErrorFeedback,
+  buildConfigRegistrySaveErrorNotice,
+  buildConfigRegistrySaveSuccessNotice,
+} from "@/features/config-registry/components/config-registry-notice-support";
 import { ConfigRegistryBanner } from "@/features/config-registry/components/config-registry-page-primitives";
 import { ConfigRegistrySidebar } from "@/features/config-registry/components/config-registry-sidebar";
 import {
@@ -38,12 +44,11 @@ import { getErrorMessage } from "@/lib/api/client";
 import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
 import type { ConfigRegistryDetail } from "@/lib/api/types";
 
-type Feedback = {
-  message: string;
-  tone: "danger" | "info";
-};
-
 const ADMIN_ONLY_MESSAGE = "Control-plane admin access required";
+
+type ScopedConfigRegistryFeedback = ReturnType<typeof buildConfigRegistrySaveErrorFeedback> & {
+  scopeKey: string;
+};
 
 export function ConfigRegistryPage() {
   const pathname = usePathname();
@@ -66,7 +71,7 @@ export function ConfigRegistryPage() {
   const status = resolveConfigRegistryStatusValue(type, routeStatus);
   const tags = parseConfigRegistryCsvParam(routeTags);
   const deferredQuery = useDeferredValue(query);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [feedback, setFeedback] = useState<ScopedConfigRegistryFeedback | null>(null);
   const [isDirty, setIsDirty] = useState(false);
 
   const setParams = useCallback(
@@ -99,6 +104,8 @@ export function ConfigRegistryPage() {
     queryFn: () => getConfigRegistryEntry(type, activeItemId as string),
     enabled: Boolean(activeItemId),
   });
+  const feedbackScopeKey = `${type}:${activeItemId ?? "none"}`;
+  const visibleFeedback = feedback?.scopeKey === feedbackScopeKey ? feedback : null;
   const effectiveIsDirty = detailQuery.data ? isDirty : false;
   const navigationGuard = useUnsavedChangesGuard({ currentUrl, isDirty: effectiveIsDirty, router });
 
@@ -146,11 +153,19 @@ export function ConfigRegistryPage() {
     mutationFn: (payload: ConfigRegistryDetail) =>
       updateConfigRegistryEntry(type, activeItemId as string, payload),
     onSuccess: async (result) => {
-      setFeedback({ tone: "info", message: "配置已保存。" });
+      setFeedback(null);
+      showAppNotice(buildConfigRegistrySaveSuccessNotice());
       queryClient.setQueryData(["config-registry", type, result.id, "detail"], result);
       await queryClient.invalidateQueries({ queryKey: ["config-registry", type, "list"] });
     },
-    onError: (error) => setFeedback({ tone: "danger", message: getErrorMessage(error) }),
+    onError: (error) => {
+      const message = getErrorMessage(error);
+      setFeedback({
+        ...buildConfigRegistrySaveErrorFeedback(message),
+        scopeKey: feedbackScopeKey,
+      });
+      showAppNotice(buildConfigRegistrySaveErrorNotice(message));
+    },
   });
 
   return (
@@ -181,7 +196,13 @@ export function ConfigRegistryPage() {
       >
         <div className="space-y-4">
           <ConfigRegistryBanner message="仅限平台维护。" tone="muted" />
-          {feedback ? <ConfigRegistryBanner ariaLive message={feedback.message} tone={feedback.tone} /> : null}
+          {visibleFeedback ? (
+            <ConfigRegistryBanner
+              ariaLive
+              message={visibleFeedback.message}
+              tone={visibleFeedback.tone}
+            />
+          ) : null}
           <div className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)] min-[1900px]:grid-cols-[320px_minmax(0,1fr)_480px]">
             <div className="xl:sticky xl:top-6">
               <ConfigRegistrySidebar
@@ -196,12 +217,8 @@ export function ConfigRegistryPage() {
                 tags={tags}
                 type={type}
                 onQueryChange={(value) => setParams({ q: value.trim() ? value : null })}
-                onSelectItem={(itemId) => {
-                  setFeedback(null);
-                  navigationGuard.attemptNavigation(() => setParams({ item: itemId }));
-                }}
+                onSelectItem={(itemId) => navigationGuard.attemptNavigation(() => setParams({ item: itemId }))}
                 onSelectType={(nextType) => {
-                  setFeedback(null);
                   navigationGuard.attemptNavigation(() =>
                     setParams({
                       item: null,
@@ -245,10 +262,7 @@ export function ConfigRegistryPage() {
                   onModeChange={(nextMode) =>
                     setParams({ mode: serializeConfigRegistryEditorMode(type, nextMode) })
                   }
-                  onSave={(payload) => {
-                    setFeedback(null);
-                    updateMutation.mutate(payload);
-                  }}
+                  onSave={(payload) => updateMutation.mutate(payload)}
                 />
               </div>
             </div>

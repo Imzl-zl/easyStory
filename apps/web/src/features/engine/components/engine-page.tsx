@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { showAppNotice } from "@/components/ui/app-notice";
 import { SectionCard } from "@/components/ui/section-card";
 import { EngineDetailPanel } from "@/features/engine/components/engine-detail-panel";
 import { EnginePageHeader } from "@/features/engine/components/engine-page-header";
@@ -46,7 +47,6 @@ export function EnginePage({ projectId }: EnginePageProps) {
   const workflowId = searchParams.get("workflow") ?? lastWorkflowByProject[projectId] ?? "";
   const selectedExecutionId = searchParams.get("execution") ?? "";
   const [workflowInputState, setWorkflowInputState] = useState(() => createWorkflowBoundValue(workflowId, workflowId));
-  const [feedback, setFeedback] = useState<string | null>(null);
   const workflowInput = resolveWorkflowBoundValue(workflowInputState, workflowId, workflowId);
   const setParams = (patches: Record<string, string | null>) => startTransition(() => router.replace(buildEnginePathWithParams(pathname, searchParams.toString(), patches)));
 
@@ -110,8 +110,12 @@ export function EnginePage({ projectId }: EnginePageProps) {
       }
       return cancelWorkflow(workflowId);
     },
-    onSuccess: (result) => {
-      setFeedback("工作流状态已更新。");
+    onSuccess: (result, action) => {
+      showAppNotice({
+        content: resolveWorkflowActionNoticeMessage(action),
+        title: "工作流",
+        tone: "success",
+      });
       setLastWorkflow(projectId, result.execution_id);
       setWorkflowInputState(createWorkflowBoundValue(result.execution_id, result.execution_id));
       setParams({
@@ -127,7 +131,12 @@ export function EnginePage({ projectId }: EnginePageProps) {
       queryClient.invalidateQueries({ queryKey: ["workflow-observability"] });
       queryClient.invalidateQueries({ queryKey: ["project-preparation-status", projectId] });
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) =>
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "工作流",
+        tone: "danger",
+      }),
   });
 
   const selectedExecution = logExecutions.find((item) => item.id === activeSelectedExecutionId) ?? null;
@@ -197,8 +206,7 @@ export function EnginePage({ projectId }: EnginePageProps) {
         isActionPending={actionMutation.isPending}
         isLoadWorkflowDisabled={!workflowInput || isPending}
         onAction={(action) => actionMutation.mutate(action)}
-        onLoadWorkflow={() => {
-          setFeedback(null);
+        onLoadWorkflow={() =>
           setParams({
             execution: resolveExecutionParamForWorkflow({
               currentExecutionId: selectedExecutionId,
@@ -206,8 +214,8 @@ export function EnginePage({ projectId }: EnginePageProps) {
               nextWorkflowId: workflowInput,
             }),
             workflow: workflowInput,
-          });
-        }}
+          })
+        }
         onOpenExport={() => setParams({ export: "1" })}
         onWorkflowInputChange={(value) =>
           setWorkflowInputState(createWorkflowBoundValue(workflowId, value))
@@ -222,7 +230,6 @@ export function EnginePage({ projectId }: EnginePageProps) {
       />
 
       <EnginePageStatusSection
-        feedback={feedback}
         isActionPending={actionMutation.isPending}
         onOpenTab={openEngineTab}
         onPrimaryAction={() => actionMutation.mutate(workflowControls.primary.action)}
@@ -280,4 +287,17 @@ export function EnginePage({ projectId }: EnginePageProps) {
       {exportOpen ? <EngineExportPanel onClose={() => setParams({ export: null })} projectId={projectId} workflowId={workflowId} /> : null}
     </div>
   );
+}
+
+function resolveWorkflowActionNoticeMessage(action: "start" | "pause" | "resume" | "cancel") {
+  if (action === "start") {
+    return "工作流已启动。";
+  }
+  if (action === "pause") {
+    return "工作流已暂停。";
+  }
+  if (action === "resume") {
+    return "工作流已恢复。";
+  }
+  return "工作流已取消。";
 }

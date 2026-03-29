@@ -115,11 +115,15 @@ export function SelectField({
   options: Option[];
   value: string;
 }>) {
+  const fieldId = useId();
+
   return (
-    <label className="block space-y-2">
-      <span className="label-text">{label}</span>
-      <AppSelect options={options} value={value} onChange={onChange} />
-    </label>
+    <div className="space-y-2">
+      <label className="label-text inline-flex" htmlFor={fieldId}>
+        {label}
+      </label>
+      <AppSelect id={fieldId} options={options} value={value} onChange={onChange} />
+    </div>
   );
 }
 

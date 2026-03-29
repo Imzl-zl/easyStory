@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SectionCard } from "@/components/ui/section-card";
+import { showAppNotice } from "@/components/ui/app-notice";
 import {
   resolvePendingCredentialAction,
   type PendingCredentialAction,
@@ -138,18 +139,30 @@ export function CredentialCenter({
         }),
       ),
     onSuccess: async () => {
+      const message = scope === "project" ? "项目级模型连接已创建。" : "全局模型连接已创建。";
       setFeedback({
-        message: scope === "project" ? "项目级模型连接已创建。" : "全局模型连接已创建。",
+        message,
         tone: "info",
+      });
+      showAppNotice({
+        content: message,
+        title: scope === "project" ? "项目模型连接" : "全局模型连接",
+        tone: "success",
       });
       setCreateFormVersion((current) => current + 1);
       await refresh();
     },
-    onError: (error) =>
+    onError: (error) => {
+      const message = getErrorMessage(error);
       setFeedback({
-        message: getErrorMessage(error),
+        message,
         tone: "danger",
-      }),
+      });
+      showAppNotice({
+        content: message,
+        tone: "danger",
+      });
+    },
   });
 
   const updateMutation = useMutation({
@@ -161,18 +174,30 @@ export function CredentialCenter({
       return updateCredential(credential.id, payload);
     },
     onSuccess: async (updatedCredential) => {
+      const message = "模型连接已更新。";
       setFeedback({
-        message: "模型连接已更新。",
+        message,
         tone: "info",
+      });
+      showAppNotice({
+        content: message,
+        title: "模型连接",
+        tone: "success",
       });
       onSelectCredentialForEdit?.(updatedCredential.id);
       await refresh();
     },
-    onError: (error) =>
+    onError: (error) => {
+      const message = getErrorMessage(error);
       setFeedback({
-        message: getErrorMessage(error),
+        message,
         tone: "danger",
-      }),
+      });
+      showAppNotice({
+        content: message,
+        tone: "danger",
+      });
+    },
   });
 
   const actionMutation = useMutation({
@@ -192,7 +217,15 @@ export function CredentialCenter({
       return deleteCredential(credentialId);
     },
     onSuccess: async (result, variables) => {
-      setFeedback(resolveCredentialActionFeedback(result, variables.type));
+      const nextFeedback = resolveCredentialActionFeedback(result, variables.type);
+      setFeedback(nextFeedback);
+      if (nextFeedback) {
+        showAppNotice({
+          content: nextFeedback.message,
+          title: resolveCredentialNoticeTitle(variables.type),
+          tone: nextFeedback.tone === "danger" ? "danger" : "success",
+        });
+      }
       if (variables.type === "delete" && variables.credentialId === selectedCredentialId) {
         if (mode === "audit") {
           onSyncCredential?.(null);
@@ -202,8 +235,16 @@ export function CredentialCenter({
       }
       await refresh();
     },
-    onError: (error) =>
-      setFeedback(resolveCredentialActionErrorFeedback(error)),
+    onError: (error) => {
+      const nextFeedback = resolveCredentialActionErrorFeedback(error);
+      setFeedback(nextFeedback);
+      if (nextFeedback) {
+        showAppNotice({
+          content: nextFeedback.message,
+          tone: "danger",
+        });
+      }
+    },
   });
   const isFormPending = createMutation.isPending || updateMutation.isPending;
   const isInteractionPending = isNavigationPending || isFormPending || actionMutation.isPending;
@@ -269,7 +310,6 @@ export function CredentialCenter({
           activeInitialState={activeInitialState}
           credentials={query.data}
           editableCredential={editableCredential}
-          feedback={feedback}
           isFormPending={actionMutation.isPending || isFormPending}
           mode={mode}
           onDirtyChange={onDirtyChange}
@@ -296,4 +336,17 @@ export function CredentialCenter({
       </div>
     </SectionCard>
   );
+}
+
+function resolveCredentialNoticeTitle(type: PendingCredentialAction["type"]) {
+  if (type === "verify") {
+    return "模型连接验证";
+  }
+  if (type === "enable") {
+    return "模型连接状态";
+  }
+  if (type === "disable") {
+    return "模型连接状态";
+  }
+  return "模型连接";
 }

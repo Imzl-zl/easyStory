@@ -34,6 +34,8 @@ function createCredential(overrides: Partial<CredentialView> = {}): CredentialVi
     masked_key: "sk-...1234",
     base_url: null,
     default_model: "gpt-4o-mini",
+    context_window_tokens: null,
+    default_max_output_tokens: null,
     auth_strategy: null,
     api_key_header_name: null,
     extra_headers: null,

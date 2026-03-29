@@ -13,6 +13,7 @@ import {
   StaticField,
   updateApiDialectState,
 } from "@/features/settings/components/credential-center-form-fields";
+import { CredentialTokenFields } from "@/features/settings/components/credential-center-token-fields";
 import {
   createInitialCredentialForm,
   isCredentialFormDirty,
@@ -53,7 +54,7 @@ export function CredentialCenterForm({
 
   return (
     <form
-      className="panel-muted space-y-3.5 p-4 sm:p-[1.125rem]"
+      className="panel-muted space-y-4 p-4 sm:p-5"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit(formState);
@@ -71,10 +72,10 @@ export function CredentialCenterForm({
 function FormIntro({ mode }: { mode: CredentialCenterFormMode }) {
   return (
     <div className="space-y-1">
-      <h3 className="text-base font-semibold text-[var(--text-primary)]">
+      <h3 className="text-[1.02rem] font-semibold text-[var(--text-primary)]">
         {mode === "edit" ? "修改模型连接" : "添加模型连接"}
       </h3>
-      <p className="text-[13px] leading-5 text-[var(--text-secondary)]">
+      <p className="text-[13px] leading-6 text-[var(--text-secondary)]">
         填好下面几项就能保存一条连接。以后想再接别的模型，继续添加新的连接即可。
       </p>
     </div>
@@ -95,7 +96,7 @@ function BasicFields({
   const fieldClassName = layout === "full" ? "xl:col-span-1" : undefined;
 
   return (
-    <div className={layout === "full" ? "grid gap-3 sm:gap-4 xl:grid-cols-2" : "grid gap-3"}>
+    <div className={layout === "full" ? "grid gap-4 xl:grid-cols-2" : "grid gap-4"}>
       {mode === "create" ? (
         <FieldInput
           autoComplete="off"
@@ -150,7 +151,7 @@ function BasicFields({
       <FieldInput
         autoComplete="url"
         className={fieldClassName}
-        description="如果你接的是官方服务，通常保持默认地址即可。"
+        description="官方服务通常保持默认地址即可。自建代理如果使用特殊地址，请先确认后端已允许该地址类型。"
         label="服务地址"
         name="baseUrl"
         placeholder="https://api.openai.com"
@@ -169,6 +170,11 @@ function BasicFields({
         value={formState.defaultModel}
         onChange={(value) => setFormState((current) => ({ ...current, defaultModel: value }))}
       />
+      <CredentialTokenFields
+        className={fieldClassName}
+        formState={formState}
+        setFormState={setFormState}
+      />
     </div>
   );
 }
@@ -186,13 +192,13 @@ function CompatibilitySettings({
   const descriptionClassName = layout === "full" ? "xl:col-span-2" : undefined;
 
   return (
-    <details className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.56)] p-3.5">
-      <summary className="cursor-pointer text-[13px] font-medium text-[var(--text-primary)]">
+    <details className="rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.56)] p-4">
+      <summary className="cursor-pointer text-[13px] font-medium leading-5 text-[var(--text-primary)]">
         兼容设置
         <span className="ml-2 text-xs text-[var(--text-secondary)]">大多数情况不用改</span>
       </summary>
-      <div className={layout === "full" ? "mt-3 grid gap-3 sm:gap-4 xl:grid-cols-2" : "mt-3 grid gap-3"}>
-        <p className={`text-[13px] leading-5 text-[var(--text-secondary)] ${descriptionClassName ?? ""}`}>
+      <div className={layout === "full" ? "mt-4 grid gap-4 xl:grid-cols-2" : "mt-4 grid gap-4"}>
+        <p className={`text-[13px] leading-6 text-[var(--text-secondary)] ${descriptionClassName ?? ""}`}>
           只有当上游服务要求特殊请求头或特殊密钥位置时，才需要修改这里。
         </p>
         <CredentialSelectField
@@ -272,12 +278,12 @@ function FormActions({
   onReset?: () => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2.5">
-      <button className="ink-button flex-1" disabled={isPending} type="submit">
+    <div className="flex flex-wrap gap-3 pt-1">
+      <button className="ink-button min-w-[140px] flex-1" disabled={isPending} type="submit">
         {isPending ? "提交中…" : mode === "edit" ? "保存修改" : "添加连接"}
       </button>
       {mode === "edit" && onReset ? (
-        <button className="ink-button-secondary" disabled={isPending} onClick={onReset} type="button">
+        <button className="ink-button-secondary min-w-[140px]" disabled={isPending} onClick={onReset} type="button">
           添加另一条连接
         </button>
       ) : null}

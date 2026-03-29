@@ -76,6 +76,8 @@ async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> 
                     "display_name": "我的 OpenAI",
                     "api_key": "sk-secret-1234",
                     "default_model": OPENAI_MODEL,
+                    "context_window_tokens": 128000,
+                    "default_max_output_tokens": 8192,
                     "auth_strategy": "custom_header",
                     "api_key_header_name": "api-key",
                     "extra_headers": {"X-Trace-Id": "api-check"},
@@ -87,6 +89,8 @@ async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> 
             assert payload["provider"] == "openai"
             assert payload["api_dialect"] == OPENAI_DIALECT
             assert payload["default_model"] == OPENAI_MODEL
+            assert payload["context_window_tokens"] == 128000
+            assert payload["default_max_output_tokens"] == 8192
             assert payload["auth_strategy"] == "custom_header"
             assert payload["api_key_header_name"] == "api-key"
             assert payload["extra_headers"] == {"X-Trace-Id": "api-check"}

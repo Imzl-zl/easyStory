@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { showAppNotice } from "@/components/ui/app-notice";
 import { DialogShell } from "@/components/ui/dialog-shell";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -31,7 +32,6 @@ export function EngineExportPanel({
   workflowId,
 }: EngineExportPanelProps) {
   const queryClient = useQueryClient();
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [selectedFormats, setSelectedFormats] = useState<string[]>([...DEFAULT_EXPORT_FORMATS]);
   const tasksQuery = useQuery({
     queryKey: ["workflow-tasks", workflowId],
@@ -45,16 +45,35 @@ export function EngineExportPanel({
   });
   const downloadMutation = useMutation({
     mutationFn: (item: ExportView) => downloadExportFile(item),
-    onSuccess: (_, item) => setFeedback(`已开始下载 ${item.filename}。`),
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onSuccess: (_, item) =>
+      showAppNotice({
+        content: `已开始下载 ${item.filename}。`,
+        title: "导出成稿",
+        tone: "success",
+      }),
+    onError: (error) =>
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "导出成稿",
+        tone: "danger",
+      }),
   });
   const createMutation = useMutation({
     mutationFn: () => createWorkflowExports(workflowId, { formats: selectedFormats }),
     onSuccess: (items) => {
-      setFeedback(`已创建 ${items.length} 份导出文件。`);
+      showAppNotice({
+        content: `已创建 ${items.length} 份导出文件。`,
+        title: "导出成稿",
+        tone: "success",
+      });
       queryClient.invalidateQueries({ queryKey: ["project-exports", projectId] });
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) =>
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "导出成稿",
+        tone: "danger",
+      }),
   });
   const tasks = tasksQuery.data ?? [];
   const precheck = buildExportPrecheck(tasks);
@@ -88,11 +107,6 @@ export function EngineExportPanel({
                 selectedFormats={selectedFormats}
                 onToggle={(value) => setSelectedFormats((current) => toggleExportFormat(current, value))}
               />
-              {feedback ? (
-                <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
-                  {feedback}
-                </div>
-              ) : null}
               {tasksQuery.isPending ? <p className="text-sm text-[var(--text-secondary)]">正在检查章节状态...</p> : null}
               {tasksQuery.error ? (
                 <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">

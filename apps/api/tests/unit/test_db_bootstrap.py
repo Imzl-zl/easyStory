@@ -91,7 +91,12 @@ def test_create_session_factory_reconciles_legacy_model_credentials_table(tmp_pa
     reconciled_engine = create_engine(database_url)
     assert "alembic_version" in inspect(reconciled_engine).get_table_names()
     columns = {column["name"] for column in inspect(reconciled_engine).get_columns("model_credentials")}
-    assert {"api_dialect", "default_model"} <= columns
+    assert {
+        "api_dialect",
+        "context_window_tokens",
+        "default_max_output_tokens",
+        "default_model",
+    } <= columns
 
     with reconciled_engine.connect() as connection:
         rows = connection.execute(

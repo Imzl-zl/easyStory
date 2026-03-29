@@ -157,6 +157,46 @@ def test_execute_stream_probe_request_ignores_openai_completed_payload(monkeypat
     assert normalized.content == "今天"
 
 
+def test_flush_stream_event_extracts_openai_chat_truncation_reason() -> None:
+    buffer = stream_support.StreamEventBuffer(
+        event_name=None,
+        data_lines=[
+            json_line('{"choices":[{"delta":{"content":"今天"},"finish_reason":"length"}]}'),
+        ],
+    )
+
+    events = stream_support._flush_stream_event(
+        buffer,
+        api_dialect="openai_chat_completions",
+    )
+
+    assert len(events) == 1
+    assert events[0].delta == "今天"
+    assert events[0].stop_reason == "length"
+    assert stream_support.extract_stream_truncation_reason(events[0].stop_reason) == "length"
+
+
+def test_flush_stream_event_extracts_gemini_max_tokens_reason() -> None:
+    buffer = stream_support.StreamEventBuffer(
+        event_name=None,
+        data_lines=[
+            json_line(
+                '{"candidates":[{"finishReason":"MAX_TOKENS","content":{"parts":[{"text":"今天"}]}}]}'
+            ),
+        ],
+    )
+
+    events = stream_support._flush_stream_event(
+        buffer,
+        api_dialect="gemini_generate_content",
+    )
+
+    assert len(events) == 1
+    assert events[0].delta == "今天"
+    assert events[0].stop_reason == "MAX_TOKENS"
+    assert stream_support.extract_stream_truncation_reason(events[0].stop_reason) == "MAX_TOKENS"
+
+
 def test_iterate_stream_request_stops_when_callback_requests_interrupt(monkeypatch) -> None:
     request = PreparedLLMHttpRequest(
         method="POST",
@@ -219,3 +259,7 @@ def test_iterate_stream_request_stops_when_callback_requests_interrupt(monkeypat
         return parts
 
     assert asyncio.run(collect()) == ["今天"]
+
+
+def json_line(value: str) -> str:
+    return value

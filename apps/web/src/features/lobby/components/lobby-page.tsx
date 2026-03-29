@@ -21,7 +21,6 @@ export function LobbyPage() {
         <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
           <div className="space-y-4">
             <LobbyEntryCard
-              feedback={model.feedback}
               templateCount={model.templateCount}
               templatePreviewNames={model.templatePreviewNames}
               templatesError={model.templatesQuery.error ? getErrorMessage(model.templatesQuery.error) : null}

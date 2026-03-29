@@ -8,9 +8,9 @@ import {
   formatProjectTrashDeadline,
   formatProjectTrashTime,
   resolveEmptyTrashButtonLabel,
-  resolveEmptyTrashFeedback,
+  resolveEmptyTrashNotice,
   resolveProjectActionButtonLabel,
-  resolveProjectActionSuccessMessage,
+  resolveProjectActionNotice,
 } from "./lobby-project-support";
 
 test("lobby project support filters by keyword and formats target words", () => {
@@ -58,36 +58,52 @@ test("lobby project support resolves action and feedback copy", () => {
   assert.equal(resolveProjectActionButtonLabel("delete", false), "移入回收站");
   assert.equal(resolveProjectActionButtonLabel("restore", true), "恢复中...");
   assert.equal(resolveProjectActionButtonLabel("physicalDelete", false), "彻底删除");
-  assert.equal(resolveProjectActionSuccessMessage("physicalDelete"), "项目已彻底删除。");
+  assert.deepEqual(resolveProjectActionNotice("physicalDelete"), {
+    content: "项目已彻底删除。",
+    title: "项目",
+    tone: "success",
+  });
   assert.equal(resolveEmptyTrashButtonLabel(true), "清空中...");
-  assert.equal(
-    resolveEmptyTrashFeedback({
+  assert.deepEqual(
+    resolveEmptyTrashNotice({
       deleted_count: 0,
       skipped_count: 0,
       failed_count: 0,
       skipped_project_ids: [],
       failed_items: [],
     }),
-    "回收站已经是空的。",
+    {
+      content: "回收站已经是空的。",
+      title: "回收站",
+      tone: "info",
+    },
   );
-  assert.equal(
-    resolveEmptyTrashFeedback({
+  assert.deepEqual(
+    resolveEmptyTrashNotice({
       deleted_count: 3,
       skipped_count: 0,
       failed_count: 0,
       skipped_project_ids: [],
       failed_items: [],
     }),
-    "已清空回收站，共彻底删除 3 个项目。",
+    {
+      content: "已清空回收站，共彻底删除 3 个项目。",
+      title: "回收站",
+      tone: "success",
+    },
   );
-  assert.equal(
-    resolveEmptyTrashFeedback({
+  assert.deepEqual(
+    resolveEmptyTrashNotice({
       deleted_count: 1,
       skipped_count: 1,
       failed_count: 1,
       skipped_project_ids: ["project-2"],
       failed_items: [{ project_id: "project-3", message: "项目清理失败" }],
     }),
-    "已彻底删除 1 个项目，跳过 1 个已恢复项目，另有 1 个项目清理异常。请稍后重试或查看后端日志。",
+    {
+      content: "已彻底删除 1 个项目，跳过 1 个已恢复项目，另有 1 个项目清理异常。请稍后重试或查看后端日志。",
+      title: "回收站",
+      tone: "warning",
+    },
   );
 });

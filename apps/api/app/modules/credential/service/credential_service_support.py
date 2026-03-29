@@ -15,6 +15,12 @@ from .credential_connection_support import (
     normalize_connection_settings,
     normalize_extra_headers,
 )
+from .credential_token_support import (
+    normalize_context_window_tokens,
+    normalize_default_max_output_tokens,
+    update_context_window_tokens,
+    update_default_max_output_tokens,
+)
 from .dto import CredentialUpdateDTO, CredentialVerifyResultDTO, CredentialViewDTO
 
 MASKED_KEY_MIN_LENGTH = 7
@@ -42,6 +48,8 @@ def apply_update_payload(
     update_display_name(credential, payload, changes)
     update_base_url(credential, payload, changes)
     update_default_model(credential, payload, changes)
+    update_context_window_tokens(credential, payload, changes)
+    update_default_max_output_tokens(credential, payload, changes)
     rotate_api_key(credential, payload, encrypt_api_key=encrypt_api_key, changes=changes)
     normalize_connection_settings(credential)
     return changes
@@ -57,6 +65,8 @@ def build_credential(
     encrypted_key: str,
     base_url: str | None,
     default_model: str,
+    context_window_tokens: int | None,
+    default_max_output_tokens: int | None,
     auth_strategy: str | None,
     api_key_header_name: str | None,
     extra_headers: dict[str, str] | None,
@@ -70,6 +80,8 @@ def build_credential(
         encrypted_key=encrypted_key,
         base_url=normalize_base_url(base_url),
         default_model=normalize_default_model(default_model),
+        context_window_tokens=normalize_context_window_tokens(context_window_tokens),
+        default_max_output_tokens=normalize_default_max_output_tokens(default_max_output_tokens),
         auth_strategy=auth_strategy,
         api_key_header_name=api_key_header_name,
         extra_headers=extra_headers,
@@ -228,6 +240,8 @@ def to_view(
         masked_key=mask_key(decrypt_api_key(credential.encrypted_key)),
         base_url=credential.base_url,
         default_model=credential.default_model,
+        context_window_tokens=credential.context_window_tokens,
+        default_max_output_tokens=credential.default_max_output_tokens,
         auth_strategy=credential.auth_strategy,
         api_key_header_name=credential.api_key_header_name,
         extra_headers=copy_extra_headers(credential.extra_headers),

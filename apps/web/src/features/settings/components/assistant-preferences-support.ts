@@ -3,9 +3,15 @@ import type {
   AssistantPreferencesUpdatePayload,
   CredentialView,
 } from "@/lib/api/types";
+import {
+  DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS,
+  sanitizeAssistantOutputTokenInput,
+  toAssistantOutputTokenDraft,
+} from "@/features/shared/assistant/assistant-output-token-support";
 
 export type AssistantPreferencesDraft = {
   defaultModelName: string;
+  defaultMaxOutputTokens: string;
   defaultProvider: string;
 };
 
@@ -26,6 +32,7 @@ export function toAssistantPreferencesDraft(
 ): AssistantPreferencesDraft {
   return {
     defaultModelName: preferences.default_model_name ?? "",
+    defaultMaxOutputTokens: toAssistantOutputTokenDraft(preferences.default_max_output_tokens),
     defaultProvider: preferences.default_provider ?? "",
   };
 }
@@ -35,6 +42,7 @@ export function buildAssistantPreferencesPayload(
 ): AssistantPreferencesUpdatePayload {
   return {
     default_model_name: normalizeDraftValue(draft.defaultModelName),
+    default_max_output_tokens: normalizeTokenDraftValue(draft.defaultMaxOutputTokens),
     default_provider: normalizeDraftValue(draft.defaultProvider),
   };
 }
@@ -46,6 +54,7 @@ export function isAssistantPreferencesDirty(
   return (
     normalizeDraftValue(draft.defaultProvider) !== preferences.default_provider
     || normalizeDraftValue(draft.defaultModelName) !== preferences.default_model_name
+    || resolveDraftMaxOutputTokens(draft.defaultMaxOutputTokens) !== preferences.default_max_output_tokens
   );
 }
 
@@ -80,6 +89,26 @@ export function buildAssistantProviderOptions(
 function normalizeDraftValue(value: string) {
   const normalized = value.trim();
   return normalized ? normalized : null;
+}
+
+export function normalizeAssistantMaxOutputTokenDraft(value: string) {
+  return sanitizeAssistantOutputTokenInput(value);
+}
+
+function normalizeTokenDraftValue(value: string) {
+  const normalized = sanitizeAssistantOutputTokenInput(value);
+  if (!normalized) {
+    return null;
+  }
+  const parsed = Number.parseInt(normalized, 10);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS;
+  }
+  return parsed;
+}
+
+function resolveDraftMaxOutputTokens(value: string) {
+  return normalizeTokenDraftValue(value) ?? DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS;
 }
 
 function buildProviderDescription(provider: string, defaultModel: string | null) {

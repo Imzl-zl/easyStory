@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { showAppNotice } from "@/components/ui/app-notice";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -37,7 +38,6 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
   const taskListSectionRef = useRef<HTMLElement | null>(null);
   const regenerateButtonRef = useRef<HTMLButtonElement | null>(null);
   const dialogRestoreFocusRef = useRef<HTMLElement | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const [selectedTaskNumber, setSelectedTaskNumber] = useState<number | null>(null);
   const [editor, setEditor] = useState<ChapterTaskEditorState | null>(null);
   const [draftRows, setDraftRows] = useState(buildDraftRows([]));
@@ -62,20 +62,33 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
       return updateChapterTask(workflowId, selectedTaskNumber, toTaskUpdatePayload(editor));
     },
     onSuccess: (result) => {
-      setFeedback(`第 ${result.chapter_number} 章任务已更新。`);
+      showAppNotice({
+        content: `第 ${result.chapter_number} 章任务已更新。`,
+        title: "章节任务",
+        tone: "success",
+      });
       setSelectedTaskNumber(result.chapter_number);
       setEditor(buildTaskEditorState(result));
       queryClient.invalidateQueries({ queryKey: ["workflow-tasks", workflowId] });
       queryClient.invalidateQueries({ queryKey: ["project-preparation-status", projectId] });
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) =>
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "章节任务",
+        tone: "danger",
+      }),
   });
 
   const regenerateMutation = useMutation({
     mutationFn: (payload: ChapterTaskDraft[]) => regenerateChapterTasks(projectId, payload),
     onSuccess: (result) => {
       const firstTask = result.tasks[0];
-      setFeedback(`章节任务计划已重建，当前共 ${result.tasks.length} 章。`);
+      showAppNotice({
+        content: `章节任务计划已重建，当前共 ${result.tasks.length} 章。`,
+        title: "章节任务",
+        tone: "success",
+      });
       dialogRestoreFocusRef.current = taskListSectionRef.current;
       setRegenerateConfirmOpen(false);
       setPendingRegeneratePayload(null);
@@ -87,7 +100,12 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
       queryClient.invalidateQueries({ queryKey: ["workflow-observability", workflowId] });
       queryClient.invalidateQueries({ queryKey: ["project-preparation-status", projectId] });
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) =>
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "章节任务",
+        tone: "danger",
+      }),
   });
 
   const tasks = tasksQuery.data ?? [];
@@ -100,7 +118,11 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
     }
     const disabledReason = getTaskEditDisabledReason(task.status);
     if (disabledReason) {
-      setFeedback(disabledReason);
+      showAppNotice({
+        content: disabledReason,
+        title: "章节任务",
+        tone: "warning",
+      });
       return;
     }
     setSelectedTaskNumber(task.chapter_number);
@@ -119,12 +141,15 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
     try {
       const payload = toRegeneratePayload(draftRows);
       dialogRestoreFocusRef.current = regenerateButtonRef.current;
-      setFeedback(null);
       regenerateMutation.reset();
       setPendingRegeneratePayload(payload);
       setRegenerateConfirmOpen(true);
     } catch (error) {
-      setFeedback(getErrorMessage(error));
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "章节任务",
+        tone: "danger",
+      });
     }
   };
 
@@ -160,12 +185,6 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
             </div>
             <StatusBadge status={workflow.status} label={workflow.status} />
           </div>
-
-          {feedback ? (
-            <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
-              {feedback}
-            </div>
-          ) : null}
 
           {tasksQuery.isLoading ? (
             <p className="text-sm text-[var(--text-secondary)]">正在加载章节任务...</p>

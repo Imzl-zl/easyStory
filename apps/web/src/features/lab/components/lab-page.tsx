@@ -3,6 +3,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { showAppNotice } from "@/components/ui/app-notice";
 import { createAnalysis, deleteAnalysis, getAnalysis, listAnalyses } from "@/lib/api/analysis";
 import { getErrorMessage } from "@/lib/api/client";
 import type { AnalysisDetail, AnalysisSummary } from "@/lib/api/types";
@@ -10,14 +11,12 @@ import type { AnalysisDetail, AnalysisSummary } from "@/lib/api/types";
 import { LabCreatePanel } from "./lab-create-panel";
 import { LabDeleteConfirmDialog } from "./lab-delete-confirm-dialog";
 import { LabDetailPanel } from "./lab-detail-panel";
-import { LabFeedbackBanner } from "./lab-feedback-banner";
 import { LabSidebar } from "./lab-sidebar";
 import {
   buildLabAnalysisSummary,
   buildLabAnalysisListOptions,
   buildLabAnalysisQueryKey,
   buildLabCreatePayload,
-  buildLabFeedback,
   createInitialLabAnalysisFilterState,
   createInitialLabAnalysisFormState,
   hasActiveLabAnalysisListOptions,
@@ -26,7 +25,6 @@ import {
   removeLabAnalysisSummary,
   resolveActiveLabAnalysisId,
   resolveNextLabSelectedIdAfterDelete,
-  type LabFeedback,
 } from "./lab-support";
 
 type LabPageProps = {
@@ -43,7 +41,6 @@ export function LabPage({ projectId }: LabPageProps) {
   const [filterState, setFilterState] = useState(createInitialLabAnalysisFilterState);
   const [formState, setFormState] = useState(createInitialLabAnalysisFormState);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<LabFeedback>(null);
   const [pendingDeleteAnalysis, setPendingDeleteAnalysis] = useState<AnalysisSummary | AnalysisDetail | null>(null);
   const deferredContentId = useDeferredValue(filterState.contentId.trim());
   const deferredGeneratedSkillKey = useDeferredValue(filterState.generatedSkillKey.trim());
@@ -85,6 +82,9 @@ export function LabPage({ projectId }: LabPageProps) {
       createAnalysis(projectId, buildLabCreatePayload(formState)),
     onSuccess: async (result) => {
       const matchesFilters = matchesLabAnalysisListOptions(result, listOptions);
+      const message = matchesFilters
+        ? "分析记录已创建。"
+        : "分析记录已创建，但当前筛选条件里还看不到，清除筛选后即可查看。";
       if (matchesFilters) {
         const createdSummary = buildLabAnalysisSummary(result);
         queryClient.setQueryData<AnalysisSummary[]>(listQueryKey, (current) =>
@@ -92,18 +92,21 @@ export function LabPage({ projectId }: LabPageProps) {
         );
         queryClient.setQueryData(["analysis-detail", projectId, result.id], result);
       }
-      setFeedback(
-        buildLabFeedback(
-          matchesFilters
-            ? "分析记录已创建。"
-            : "分析记录已创建，但当前过滤条件未包含它；清除过滤后可查看。",
-        ),
-      );
+      showAppNotice({
+        content: message,
+        title: "分析记录",
+        tone: "success",
+      });
       setSelectedId(matchesFilters ? result.id : activeId);
       setFormState(createInitialLabAnalysisFormState());
       await refreshAnalyses();
     },
-    onError: (error) => setFeedback(buildLabFeedback(getErrorMessage(error), "danger")),
+    onError: (error) =>
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "分析记录",
+        tone: "danger",
+      }),
   });
 
   const deleteMutation = useMutation({
@@ -117,19 +120,26 @@ export function LabPage({ projectId }: LabPageProps) {
         queryKey: ["analysis-detail", projectId, variables.analysisId],
       });
       setSelectedId(resolveNextLabSelectedIdAfterDelete(analyses, activeId, variables.analysisId));
-      setFeedback(buildLabFeedback(`分析记录「${variables.analysisTitle}」已删除。`));
+      showAppNotice({
+        content: `分析记录「${variables.analysisTitle}」已删除。`,
+        title: "分析记录",
+        tone: "success",
+      });
       setPendingDeleteAnalysis(null);
       await refreshAnalyses();
     },
     onError: (error) => {
-      setFeedback(buildLabFeedback(getErrorMessage(error), "danger"));
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "分析记录",
+        tone: "danger",
+      });
       setPendingDeleteAnalysis(null);
     },
   });
 
   return (
     <div className="space-y-4">
-      <LabFeedbackBanner feedback={feedback} />
       <div className="grid items-start gap-6 xl:grid-cols-[280px_minmax(0,1fr)] min-[1900px]:grid-cols-[280px_minmax(0,1fr)_360px]">
         <div className="xl:sticky xl:top-6">
           <LabSidebar
@@ -158,10 +168,7 @@ export function LabPage({ projectId }: LabPageProps) {
               formState={formState}
               isPending={createMutation.isPending}
               onFieldChange={(patch) => setFormState((current) => ({ ...current, ...patch }))}
-              onSubmit={() => {
-                setFeedback(null);
-                createMutation.mutate();
-              }}
+              onSubmit={() => createMutation.mutate()}
             />
           </div>
         </div>

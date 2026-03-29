@@ -22,6 +22,8 @@ ALEMBIC_VERSION_TABLE = "alembic_version"
 MODEL_CREDENTIALS_TABLE = "model_credentials"
 API_DIALECT_COLUMN = "api_dialect"
 DEFAULT_MODEL_COLUMN = "default_model"
+CONTEXT_WINDOW_TOKENS_COLUMN = "context_window_tokens"
+DEFAULT_MAX_OUTPUT_TOKENS_COLUMN = "default_max_output_tokens"
 OPENAI_CHAT_DIALECT = "openai_chat_completions"
 ANTHROPIC_MESSAGES_DIALECT = "anthropic_messages"
 ANTHROPIC_PROVIDER = "anthropic"
@@ -270,6 +272,22 @@ def _add_missing_model_credential_columns(
             )
         )
         columns.add(DEFAULT_MODEL_COLUMN)
+    if CONTEXT_WINDOW_TOKENS_COLUMN not in columns:
+        connection.execute(
+            text(
+                f"ALTER TABLE {MODEL_CREDENTIALS_TABLE} "
+                f"ADD COLUMN {CONTEXT_WINDOW_TOKENS_COLUMN} INTEGER"
+            )
+        )
+        columns.add(CONTEXT_WINDOW_TOKENS_COLUMN)
+    if DEFAULT_MAX_OUTPUT_TOKENS_COLUMN not in columns:
+        connection.execute(
+            text(
+                f"ALTER TABLE {MODEL_CREDENTIALS_TABLE} "
+                f"ADD COLUMN {DEFAULT_MAX_OUTPUT_TOKENS_COLUMN} INTEGER"
+            )
+        )
+        columns.add(DEFAULT_MAX_OUTPUT_TOKENS_COLUMN)
 
 
 def _backfill_model_credential_api_dialect(connection: Connection) -> None:

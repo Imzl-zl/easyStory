@@ -57,6 +57,43 @@ def test_execute_builds_openai_chat_request_with_default_model_fallback() -> Non
     assert result["content"] == "生成结果"
 
 
+def test_execute_falls_back_to_credential_default_max_output_tokens() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "choices": [{"message": {"content": "生成结果"}}],
+                "usage": {
+                    "prompt_tokens": 12,
+                    "completion_tokens": 34,
+                    "total_tokens": 46,
+                },
+            },
+            text="",
+        )
+
+    provider = LLMToolProvider(request_sender=request_sender)
+    asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "测试提示词",
+                "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                "credential": {
+                    "api_key": "test-key",
+                    "api_dialect": "openai_chat_completions",
+                    "default_max_output_tokens": 2048,
+                },
+            },
+        )
+    )
+
+    assert captured["request"].json_body["max_tokens"] == 2048
+
+
 def test_execute_builds_openai_responses_request() -> None:
     captured = {}
 
@@ -436,3 +473,66 @@ def test_execute_stream_yields_chunks_and_completed_result(monkeypatch) -> None:
         "output_tokens": None,
         "total_tokens": None,
     }
+
+
+def test_execute_stream_raises_when_upstream_reports_truncation(monkeypatch) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield 'data: {"choices":[{"delta":{"content":"今天"},"finish_reason":null}]}'
+            yield ""
+            yield 'data: {"choices":[{"delta":{"content":"还有后续"},"finish_reason":"length"}]}'
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    provider = LLMToolProvider()
+
+    async def collect_parts():
+        parts: list[str] = []
+        with pytest.raises(
+            ConfigurationError,
+            match="上游在输出尚未完成时提前停止了这次回复",
+        ):
+            async for event in provider.execute_stream(
+                "llm.generate",
+                {
+                    "prompt": "给个方向",
+                    "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_chat_completions",
+                    },
+                },
+            ):
+                if event.delta:
+                    parts.append(event.delta)
+        return parts
+
+    assert asyncio.run(collect_parts()) == ["今天", "还有后续"]

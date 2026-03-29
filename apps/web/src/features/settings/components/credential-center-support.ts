@@ -1,4 +1,3 @@
-import { formatObservabilityDateTime } from "@/features/observability/components/observability-datetime-support";
 import {
   areHeaderMapsEqual,
   AUTH_STRATEGY_OPTIONS,
@@ -9,6 +8,11 @@ import {
   parseExtraHeadersText,
   type CredentialAuthStrategyValue,
 } from "@/features/settings/components/credential-center-compatibility-support";
+import {
+  parseContextWindowTokensDraft,
+  parseDefaultMaxOutputTokensDraft,
+  toCredentialTokenDraft,
+} from "@/features/settings/components/credential-center-token-support";
 import type {
   CredentialApiDialect,
   CredentialCreatePayload,
@@ -66,6 +70,8 @@ export type CredentialFormState = {
   apiKey: string;
   baseUrl: string;
   defaultModel: string;
+  contextWindowTokens: string;
+  defaultMaxOutputTokens: string;
   authStrategy: CredentialAuthStrategyValue;
   apiKeyHeaderName: string;
   extraHeadersText: string;
@@ -79,6 +85,8 @@ export function createInitialCredentialForm(): CredentialFormState {
     apiKey: "",
     baseUrl: DEFAULT_BASE_URLS.openai_chat_completions,
     defaultModel: "",
+    contextWindowTokens: "",
+    defaultMaxOutputTokens: "",
     authStrategy: "",
     apiKeyHeaderName: "",
     extraHeadersText: "",
@@ -93,6 +101,8 @@ export function createCredentialFormFromView(credential: CredentialView): Creden
     apiKey: "",
     baseUrl: credential.base_url ?? getDefaultBaseUrl(credential.api_dialect),
     defaultModel: credential.default_model ?? "",
+    contextWindowTokens: toCredentialTokenDraft(credential.context_window_tokens),
+    defaultMaxOutputTokens: toCredentialTokenDraft(credential.default_max_output_tokens),
     authStrategy: credential.auth_strategy ?? "",
     apiKeyHeaderName: credential.api_key_header_name ?? "",
     extraHeadersText: formatExtraHeaders(credential.extra_headers),
@@ -110,6 +120,8 @@ export function isCredentialFormDirty(
     || formState.apiKey !== initialState.apiKey
     || formState.baseUrl !== initialState.baseUrl
     || formState.defaultModel !== initialState.defaultModel
+    || formState.contextWindowTokens !== initialState.contextWindowTokens
+    || formState.defaultMaxOutputTokens !== initialState.defaultMaxOutputTokens
     || formState.authStrategy !== initialState.authStrategy
     || formState.apiKeyHeaderName !== initialState.apiKeyHeaderName
     || formState.extraHeadersText !== initialState.extraHeadersText
@@ -166,6 +178,8 @@ export function buildCredentialCreatePayload(options: {
     api_key: formState.apiKey,
     base_url: normalizeCredentialBaseUrl(formState.apiDialect, formState.baseUrl),
     default_model: formState.defaultModel.trim(),
+    context_window_tokens: parseContextWindowTokensDraft(formState.contextWindowTokens),
+    default_max_output_tokens: parseDefaultMaxOutputTokensDraft(formState.defaultMaxOutputTokens),
     auth_strategy: authStrategy,
     api_key_header_name: apiKeyHeaderName,
     extra_headers: parseExtraHeadersText(formState.extraHeadersText, {
@@ -184,6 +198,8 @@ export function buildCredentialUpdatePayload(
   const displayName = formState.displayName.trim();
   const nextBaseUrl = normalizeCredentialBaseUrl(formState.apiDialect, formState.baseUrl);
   const nextDefaultModel = formState.defaultModel.trim();
+  const nextContextWindowTokens = parseContextWindowTokensDraft(formState.contextWindowTokens);
+  const nextDefaultMaxOutputTokens = parseDefaultMaxOutputTokensDraft(formState.defaultMaxOutputTokens);
   const nextAuthStrategy = normalizeCredentialAuthStrategy(formState.apiDialect, formState.authStrategy);
   const nextApiKeyHeaderName = normalizeApiKeyHeaderName(
     formState.apiDialect,
@@ -205,6 +221,12 @@ export function buildCredentialUpdatePayload(
     payload.base_url = nextBaseUrl;
   }
   appendDefaultModelUpdate(payload, credential.default_model, nextDefaultModel);
+  if (nextContextWindowTokens !== credential.context_window_tokens) {
+    payload.context_window_tokens = nextContextWindowTokens;
+  }
+  if (nextDefaultMaxOutputTokens !== credential.default_max_output_tokens) {
+    payload.default_max_output_tokens = nextDefaultMaxOutputTokens;
+  }
   if (nextAuthStrategy !== credential.auth_strategy) {
     payload.auth_strategy = nextAuthStrategy;
   }
@@ -250,10 +272,6 @@ export function resolveEditableCredential(
 export function normalizeOptionalQueryValue(value: string | null): string | null {
   const normalized = value?.trim() ?? "";
   return normalized ? normalized : null;
-}
-
-export function formatAuditTime(value: string) {
-  return formatObservabilityDateTime(value);
 }
 
 function appendDefaultModelUpdate(

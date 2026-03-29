@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { showAppNotice } from "@/components/ui/app-notice";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -117,7 +118,7 @@ function ChapterEditorForm({
   const [title, setTitle] = useState(detail?.title ?? "");
   const [contentText, setContentText] = useState(detail?.content_text ?? "");
   const [changeSummary, setChangeSummary] = useState(detail?.change_summary ?? "");
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const noticeTitle = `第 ${chapterNumber} 章`;
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -127,23 +128,41 @@ function ChapterEditorForm({
         change_summary: changeSummary || undefined,
       }),
     onSuccess: (result) => {
+      const message = buildChapterMutationFeedback("save", result.impact);
       onImpactChange(result.impact);
-      setFeedback(buildChapterMutationFeedback("save", result.impact));
+      showAppNotice({
+        content: message,
+        title: noticeTitle,
+        tone: "success",
+      });
       invalidateChapterQueries(queryClient, projectId, chapterNumber);
     },
     onError: (error) => {
       onImpactChange(null);
-      setFeedback(getErrorMessage(error));
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: noticeTitle,
+        tone: "danger",
+      });
     },
   });
 
   const approveMutation = useMutation({
     mutationFn: () => approveChapter(projectId, chapterNumber),
     onSuccess: () => {
-      setFeedback("章节已确认。");
+      showAppNotice({
+        content: "章节已确认。",
+        title: noticeTitle,
+        tone: "success",
+      });
       invalidateChapterQueries(queryClient, projectId, chapterNumber);
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) =>
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: noticeTitle,
+        tone: "danger",
+      }),
   });
 
   const versionMutation = useMutation({
@@ -166,19 +185,32 @@ function ChapterEditorForm({
     },
     onSuccess: (result, variables) => {
       if (variables.action === "rollback" && "impact" in result) {
+        const message = buildChapterMutationFeedback("rollback", result.impact);
         onImpactChange(result.impact);
-        setFeedback(buildChapterMutationFeedback("rollback", result.impact));
+        showAppNotice({
+          content: message,
+          title: noticeTitle,
+          tone: "success",
+        });
         invalidateChapterQueries(queryClient, projectId, chapterNumber);
         return;
       }
-      setFeedback("版本面板已更新。");
+      showAppNotice({
+        content: variables.action === "mark" ? "已标记为最佳版本。" : "已取消最佳版本。",
+        title: noticeTitle,
+        tone: "success",
+      });
       invalidateChapterQueries(queryClient, projectId, chapterNumber);
     },
     onError: (error, variables) => {
       if (variables.action === "rollback") {
         onImpactChange(null);
       }
-      setFeedback(getErrorMessage(error));
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: noticeTitle,
+        tone: "danger",
+      });
     },
   });
 
@@ -227,11 +259,6 @@ function ChapterEditorForm({
               onChange={(event) => setContentText(event.target.value)}
             />
           </label>
-          {feedback ? (
-            <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
-              {feedback}
-            </div>
-          ) : null}
           {detail?.status === "stale" ? (
             <ChapterStaleNotice chapterNumber={chapterNumber} projectId={projectId} />
           ) : null}

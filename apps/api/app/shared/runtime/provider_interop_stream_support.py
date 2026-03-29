@@ -32,6 +32,7 @@ class ParsedStreamEvent:
     event_name: str | None
     payload: dict[str, Any]
     delta: str
+    stop_reason: str | None = None
 
 
 class StreamInterruptedError(ConfigurationError):
@@ -184,6 +185,7 @@ def _flush_stream_event(
         event_name=buffer.event_name,
         payload=payload,
         delta=delta,
+        stop_reason=_extract_stream_stop_reason(api_dialect, buffer.event_name, payload),
     )
     buffer.event_name = None
     return [event]
@@ -201,6 +203,41 @@ def _extract_stream_delta(
     if api_dialect == "anthropic_messages":
         return _extract_anthropic_delta(payload)
     return _extract_gemini_delta(payload)
+
+
+def extract_stream_truncation_reason(stop_reason: str | None) -> str | None:
+    if stop_reason is None:
+        return None
+    normalized = stop_reason.strip()
+    if not normalized:
+        return None
+    if normalized.lower() in {"length", "max_tokens", "max_output_tokens"}:
+        return normalized
+    if normalized.upper() == "MAX_TOKENS":
+        return normalized
+    return None
+
+
+def build_truncated_stream_message(stop_reason: str) -> str:
+    return (
+        "上游在输出尚未完成时提前停止了这次回复，"
+        f"当前只收到部分内容（stop_reason={stop_reason}）。"
+        "请缩短问题、关闭流式，或切换更稳定的连接后重试。"
+    )
+
+
+def _extract_stream_stop_reason(
+    api_dialect: str,
+    event_name: str | None,
+    payload: dict[str, Any],
+) -> str | None:
+    if api_dialect == "openai_chat_completions":
+        return _extract_openai_chat_stop_reason(payload)
+    if api_dialect == "openai_responses":
+        return _extract_openai_responses_stop_reason(event_name, payload)
+    if api_dialect == "anthropic_messages":
+        return _extract_anthropic_stop_reason(payload)
+    return _extract_gemini_stop_reason(payload)
 
 
 def _extract_openai_chat_delta(payload: dict[str, Any]) -> str:
@@ -222,6 +259,17 @@ def _extract_openai_chat_delta(payload: dict[str, Any]) -> str:
     )
 
 
+def _extract_openai_chat_stop_reason(payload: dict[str, Any]) -> str | None:
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return None
+    first_choice = choices[0]
+    if not isinstance(first_choice, dict):
+        return None
+    finish_reason = first_choice.get("finish_reason")
+    return finish_reason if isinstance(finish_reason, str) else None
+
+
 def _extract_openai_responses_delta(
     event_name: str | None,
     payload: dict[str, Any],
@@ -231,11 +279,40 @@ def _extract_openai_responses_delta(
     return ""
 
 
+def _extract_openai_responses_stop_reason(
+    event_name: str | None,
+    payload: dict[str, Any],
+) -> str | None:
+    if event_name != "response.completed":
+        return None
+    incomplete_details = payload.get("incomplete_details")
+    if isinstance(incomplete_details, dict):
+        reason = incomplete_details.get("reason")
+        if isinstance(reason, str):
+            return reason
+    response = payload.get("response")
+    if isinstance(response, dict):
+        incomplete_details = response.get("incomplete_details")
+        if isinstance(incomplete_details, dict):
+            reason = incomplete_details.get("reason")
+            if isinstance(reason, str):
+                return reason
+    return None
+
+
 def _extract_anthropic_delta(payload: dict[str, Any]) -> str:
     delta = payload.get("delta")
     if isinstance(delta, dict) and isinstance(delta.get("text"), str):
         return delta["text"]
     return ""
+
+
+def _extract_anthropic_stop_reason(payload: dict[str, Any]) -> str | None:
+    delta = payload.get("delta")
+    if isinstance(delta, dict) and isinstance(delta.get("stop_reason"), str):
+        return delta["stop_reason"]
+    stop_reason = payload.get("stop_reason")
+    return stop_reason if isinstance(stop_reason, str) else None
 
 
 def _extract_gemini_delta(payload: dict[str, Any]) -> str:
@@ -256,6 +333,17 @@ def _extract_gemini_delta(payload: dict[str, Any]) -> str:
         for part in parts
         if isinstance(part, dict) and isinstance(part.get("text"), str)
     )
+
+
+def _extract_gemini_stop_reason(payload: dict[str, Any]) -> str | None:
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        return None
+    candidate = candidates[0]
+    if not isinstance(candidate, dict):
+        return None
+    finish_reason = candidate.get("finishReason")
+    return finish_reason if isinstance(finish_reason, str) else None
 
 
 def _build_gemini_stream_url(url: str) -> str:

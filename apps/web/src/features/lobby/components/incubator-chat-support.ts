@@ -1,5 +1,8 @@
 import { normalizeModelProviderMessage, looksLikeRetiredModelMessage } from "@/lib/api/error-copy";
 import type { AssistantMessage, AssistantModelConfig, ProjectSetting } from "@/lib/api/types";
+import {
+  resolveAssistantMaxOutputTokens,
+} from "@/features/shared/assistant/assistant-output-token-support";
 
 export const INCUBATOR_DEFAULT_PROVIDER = "";
 export const INCUBATOR_DEFAULT_MODEL_NAME = "";
@@ -24,6 +27,7 @@ export type IncubatorChatMessage = AssistantMessage & {
 
 export type IncubatorChatSettings = {
   allowSystemCredentialPool: boolean;
+  maxOutputTokens: string;
   modelName: string;
   provider: string;
   streamOutput: boolean;
@@ -31,6 +35,7 @@ export type IncubatorChatSettings = {
 
 export const INITIAL_INCUBATOR_CHAT_SETTINGS: IncubatorChatSettings = {
   allowSystemCredentialPool: false,
+  maxOutputTokens: "",
   modelName: INCUBATOR_DEFAULT_MODEL_NAME,
   provider: INCUBATOR_DEFAULT_PROVIDER,
   streamOutput: true,
@@ -140,7 +145,7 @@ export function buildIncubatorConversationFingerprint(
 }
 
 export function buildAssistantModelOverride(
-  settings: Pick<IncubatorChatSettings, "modelName" | "provider">,
+  settings: Pick<IncubatorChatSettings, "maxOutputTokens" | "modelName" | "provider">,
 ): AssistantModelConfig | undefined {
   const provider = resolveIncubatorProvider(settings.provider);
   const modelName = resolveIncubatorModelName(settings.modelName);
@@ -148,6 +153,7 @@ export function buildAssistantModelOverride(
     return undefined;
   }
   return {
+    max_tokens: resolveAssistantMaxOutputTokens(settings.maxOutputTokens),
     provider,
     name: modelName || undefined,
   };

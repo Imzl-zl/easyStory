@@ -75,6 +75,7 @@
 - 所有业务模块公开面已收敛为 async-only：统一 `Service + create_*_service` 命名，不保留 `Async*` 镜像类或 `create_async_*` 第二导出面。内部若只剩 async 一套实现，把 `*_async` 名称改回业务语义名。
 - LLM 供应商兼容层当前最佳实践入口：`api_dialect` 只决定协议格式与解析；鉴权方式由 `auth_strategy` / `api_key_header_name` 显式 override，不再硬绑在 dialect 上。
 - Credential Center 当前正式支持的高级兼容字段只保留三类：`auth_strategy`、`api_key_header_name`、`extra_headers`；这三项同时作用于保存、验证和运行时请求，不引入 2API 风格的 prefix / alias / provider 路由复杂度。
+- `model_credentials` 当前额外支持两类连接级 token 配置：`context_window_tokens` 只记录模型上下文窗口，不伪造成通用上游请求参数；`default_max_output_tokens` 会作为 runtime 的默认输出预算 fallback。
 - `extra_headers` 只用于非敏感元数据头（如 Referer、租户标识）；鉴权类 header 不允许塞进这里，必须走 `auth_strategy / api_key_header_name`。
 - provider interop 本地 probe 若使用 `--model` 覆写，最终请求体中的探测模型也必须同步覆写，不能只改展示值。
 - Anthropic Messages 请求当前默认把 `system_prompt` 编码为 text block 数组，而不是裸字符串；官方两种都允许，但兼容代理对数组更稳。

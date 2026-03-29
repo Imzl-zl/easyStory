@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { showAppNotice } from "@/components/ui/app-notice";
 import { SectionCard } from "@/components/ui/section-card";
 import { ProjectSettingField } from "@/features/studio/components/project-setting-editor-field";
 import { ProjectSettingImpactPanel } from "@/features/studio/components/project-setting-impact-panel";
@@ -75,7 +76,6 @@ function ProjectSettingEditorForm({
 }) {
   const queryClient = useQueryClient();
   const [setting, setSetting] = useState<ProjectSetting>(initialSetting);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const isDirty = isProjectSettingDirty(setting, initialSetting);
 
   useEffect(() => {
@@ -86,24 +86,42 @@ function ProjectSettingEditorForm({
   const saveMutation = useMutation({
     mutationFn: () => updateProjectSetting(projectId, setting),
     onSuccess: (result) => {
+      const message = buildSettingSaveFeedback(result.impact);
       onImpactChange(result.impact);
-      setFeedback(buildSettingSaveFeedback(result.impact));
+      showAppNotice({
+        content: message,
+        title: "项目设定",
+        tone: "success",
+      });
       invalidateProjectSettingQueries(queryClient, projectId, result.impact);
     },
     onError: (error) => {
       onImpactChange(null);
-      setFeedback(getErrorMessage(error));
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "项目设定",
+        tone: "danger",
+      });
     },
   });
 
   const checkMutation = useMutation({
     mutationFn: () => checkProjectSetting(projectId),
     onSuccess: (result) => {
-      setFeedback(`完整度检查完成：${result.status}`);
+      showAppNotice({
+        content: "完整度检查已完成。",
+        title: "项目设定",
+        tone: "success",
+      });
       queryClient.setQueryData(["setting-check", projectId], result);
       queryClient.invalidateQueries({ queryKey: ["project-preparation-status", projectId] });
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) =>
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "项目设定",
+        tone: "danger",
+      }),
   });
 
   const issueSummary = buildSettingIssueSummary(completeness);
@@ -284,13 +302,6 @@ function ProjectSettingEditorForm({
             }
           />
         </ProjectSettingField>
-
-        {feedback ? (
-          <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
-            {feedback}
-          </div>
-        ) : null}
-
         {lastImpact ? <ProjectSettingImpactPanel impact={lastImpact} /> : null}
       </div>
     </SectionCard>

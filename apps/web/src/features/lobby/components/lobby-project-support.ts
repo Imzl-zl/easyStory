@@ -1,4 +1,5 @@
 import { formatObservabilityDateTime } from "@/features/observability/components/observability-datetime-support";
+import type { AppNoticeTone } from "@/components/ui/app-notice";
 import type { ProjectSummary, ProjectTrashCleanupResult } from "@/lib/api/types";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -6,6 +7,12 @@ const DAY_IN_MS = 24 * 60 * 60 * 1000;
 export const PROJECT_TRASH_RETENTION_DAYS = 30;
 
 export type ProjectActionType = "delete" | "restore" | "physicalDelete";
+
+type ProjectNotice = {
+  content: string;
+  title: string;
+  tone: AppNoticeTone;
+};
 
 export function buildFilteredProjects(
   projects: ProjectSummary[] | undefined,
@@ -53,21 +60,27 @@ export function resolveProjectActionButtonLabel(
   return isPending ? "删除中..." : "彻底删除";
 }
 
-export function resolveProjectActionSuccessMessage(type: ProjectActionType): string {
-  if (type === "delete") {
-    return "项目已移入回收站。";
-  }
-  if (type === "restore") {
-    return "项目已恢复。";
-  }
-  return "项目已彻底删除。";
+export function resolveProjectActionNotice(type: ProjectActionType): ProjectNotice {
+  return {
+    content: resolveProjectActionMessage(type),
+    title: "项目",
+    tone: "success",
+  };
 }
 
 export function resolveEmptyTrashButtonLabel(isPending: boolean): string {
   return isPending ? "清空中..." : "清空回收站";
 }
 
-export function resolveEmptyTrashFeedback(result: ProjectTrashCleanupResult): string {
+export function resolveEmptyTrashNotice(result: ProjectTrashCleanupResult): ProjectNotice {
+  return {
+    content: buildEmptyTrashFeedback(result),
+    title: "回收站",
+    tone: resolveEmptyTrashNoticeTone(result),
+  };
+}
+
+function buildEmptyTrashFeedback(result: ProjectTrashCleanupResult): string {
   if (
     result.deleted_count === 0 &&
     result.skipped_count === 0 &&
@@ -93,4 +106,24 @@ export function resolveEmptyTrashFeedback(result: ProjectTrashCleanupResult): st
     return summary;
   }
   return `${summary}请稍后重试或查看后端日志。`;
+}
+
+function resolveProjectActionMessage(type: ProjectActionType): string {
+  if (type === "delete") {
+    return "项目已移入回收站。";
+  }
+  if (type === "restore") {
+    return "项目已恢复。";
+  }
+  return "项目已彻底删除。";
+}
+
+function resolveEmptyTrashNoticeTone(result: ProjectTrashCleanupResult): AppNoticeTone {
+  if (result.failed_count > 0) {
+    return "warning";
+  }
+  if (result.deleted_count > 0) {
+    return "success";
+  }
+  return "info";
 }

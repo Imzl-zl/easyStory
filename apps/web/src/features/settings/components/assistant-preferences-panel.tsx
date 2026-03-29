@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { showAppNotice } from "@/components/ui/app-notice";
 import { AppSelect } from "@/components/ui/app-select";
 import { SectionCard } from "@/components/ui/section-card";
 import {
@@ -17,6 +18,7 @@ import {
   buildAssistantPreferencesPayload,
   buildAssistantProviderOptions,
   isAssistantPreferencesDirty,
+  normalizeAssistantMaxOutputTokenDraft,
   toAssistantPreferencesDraft,
   type AssistantPreferencesDraft,
 } from "./assistant-preferences-support";
@@ -44,10 +46,23 @@ export function AssistantPreferencesPanel({
     mutationFn: (nextDraft: AssistantPreferencesDraft) =>
       updateMyAssistantPreferences(buildAssistantPreferencesPayload(nextDraft)),
     onSuccess: async () => {
-      setFeedback("AI 偏好已保存。");
+      const message = "AI 偏好已保存。";
+      setFeedback(message);
+      showAppNotice({
+        content: message,
+        title: "AI 偏好",
+        tone: "success",
+      });
       await queryClient.invalidateQueries({ queryKey: ["assistant-preferences", "me"] });
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) => {
+      const message = getErrorMessage(error);
+      setFeedback(message);
+      showAppNotice({
+        content: message,
+        tone: "danger",
+      });
+    },
   });
   const formKey = useMemo(
     () => buildAssistantPreferencesFormKey(preferencesQuery.data),
@@ -69,9 +84,6 @@ export function AssistantPreferencesPanel({
       title="AI 偏好"
     >
       <div className="space-y-4">
-        {feedback ? (
-          <div className="panel-muted px-4 py-3 text-sm text-[var(--text-secondary)]">{feedback}</div>
-        ) : null}
         {preferencesQuery.isLoading && !preferencesQuery.data ? (
           <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载 AI 偏好...</div>
         ) : null}
@@ -134,11 +146,12 @@ function AssistantPreferencesForm({
       }}
     >
       <div className="rounded-2xl bg-[rgba(58,124,165,0.06)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">
-        保存当前账号的默认聊天设置，项目规则会单独生效。
+        保存当前账号的新聊天默认值。这里只控制默认连接、默认模型和单次回复上限；输入容量仍由模型本身决定。
       </div>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid gap-4 xl:grid-cols-[repeat(3,minmax(0,1fr))]">
         <AssistantProviderField draft={draft} providerOptions={providerOptions} setDraft={setDraft} />
         <AssistantModelField draft={draft} setDraft={setDraft} />
+        <AssistantMaxOutputTokensField draft={draft} setDraft={setDraft} />
       </div>
       {showCredentialEmptyState ? (
         <div className="rounded-2xl bg-[rgba(183,121,31,0.08)] px-4 py-3 text-sm text-[var(--accent-warning)]">
@@ -230,11 +243,48 @@ function AssistantModelField({
   );
 }
 
+function AssistantMaxOutputTokensField({
+  draft,
+  setDraft,
+}: Readonly<{
+  draft: AssistantPreferencesDraft;
+  setDraft: Dispatch<SetStateAction<AssistantPreferencesDraft>>;
+}>) {
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium text-[var(--text-primary)]" htmlFor="assistant-default-max-output-tokens">
+        默认单次回复上限
+      </label>
+      <input
+        className="ink-input"
+        id="assistant-default-max-output-tokens"
+        inputMode="numeric"
+        min={128}
+        onChange={(event) =>
+          setDraft((current) => ({
+            ...current,
+            defaultMaxOutputTokens: normalizeAssistantMaxOutputTokenDraft(event.target.value),
+          }))
+        }
+        placeholder="4096"
+        value={draft.defaultMaxOutputTokens}
+      />
+      <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+        默认值是 4096。想让长回答更完整时再调高，留空会恢复到系统默认值。
+      </p>
+    </div>
+  );
+}
+
 function buildAssistantPreferencesFormKey(
   preferences: Awaited<ReturnType<typeof getMyAssistantPreferences>> | undefined,
 ) {
   if (!preferences) {
     return "assistant-preferences:empty";
   }
-  return `${preferences.default_provider ?? "none"}:${preferences.default_model_name ?? "none"}`;
+  return [
+    preferences.default_provider ?? "none",
+    preferences.default_model_name ?? "none",
+    String(preferences.default_max_output_tokens),
+  ].join(":");
 }

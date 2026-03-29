@@ -84,6 +84,8 @@ export type CredentialView = {
   masked_key: string;
   base_url: string | null;
   default_model: string | null;
+  context_window_tokens: number | null;
+  default_max_output_tokens: number | null;
   auth_strategy: CredentialAuthStrategy | null;
   api_key_header_name: string | null;
   extra_headers: Record<string, string> | null;
@@ -100,6 +102,8 @@ export type CredentialCreatePayload = {
   api_key: string;
   base_url?: string | null;
   default_model: string;
+  context_window_tokens?: number | null;
+  default_max_output_tokens?: number | null;
   auth_strategy?: CredentialAuthStrategy | null;
   api_key_header_name?: string | null;
   extra_headers?: Record<string, string> | null;
@@ -111,6 +115,8 @@ export type CredentialUpdatePayload = {
   api_key?: string | null;
   base_url?: string | null;
   default_model?: string | null;
+  context_window_tokens?: number | null;
+  default_max_output_tokens?: number | null;
   auth_strategy?: CredentialAuthStrategy | null;
   api_key_header_name?: string | null;
   extra_headers?: Record<string, string> | null;

@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { showAppNotice } from "@/components/ui/app-notice";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StoryAssetImpactPanel } from "@/features/studio/components/story-asset-impact-panel";
 import {
   buildStoryAssetMutationFeedback,
+  getStoryAssetLabel,
   invalidateStoryAssetQueries,
 } from "@/features/studio/components/story-asset-editor-support";
 import { ApiError, getErrorMessage } from "@/lib/api/client";
@@ -86,7 +88,7 @@ function StoryAssetEditorForm({
   const [title, setTitle] = useState(asset?.title ?? (assetType === "outline" ? "主线大纲" : "开篇设计"));
   const [contentText, setContentText] = useState(asset?.content_text ?? "");
   const [changeSummary, setChangeSummary] = useState("");
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const noticeTitle = getStoryAssetLabel(assetType);
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -96,26 +98,44 @@ function StoryAssetEditorForm({
         change_summary: changeSummary || undefined,
       }),
     onSuccess: (result) => {
+      const message = buildStoryAssetMutationFeedback(assetType, "save", result.impact);
       onImpactChange(result.impact);
-      setFeedback(buildStoryAssetMutationFeedback(assetType, "save", result.impact));
+      showAppNotice({
+        content: message,
+        title: noticeTitle,
+        tone: "success",
+      });
       invalidateStoryAssetQueries(queryClient, projectId, assetType, result.impact);
     },
     onError: (error) => {
       onImpactChange(null);
-      setFeedback(getErrorMessage(error));
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: noticeTitle,
+        tone: "danger",
+      });
     },
   });
 
   const approveMutation = useMutation({
     mutationFn: () => (assetType === "outline" ? approveOutline : approveOpeningPlan)(projectId),
     onSuccess: (result) => {
+      const message = buildStoryAssetMutationFeedback(assetType, "approve", result.impact);
       onImpactChange(result.impact);
-      setFeedback(buildStoryAssetMutationFeedback(assetType, "approve", result.impact));
+      showAppNotice({
+        content: message,
+        title: noticeTitle,
+        tone: "success",
+      });
       invalidateStoryAssetQueries(queryClient, projectId, assetType, result.impact);
     },
     onError: (error) => {
       onImpactChange(null);
-      setFeedback(getErrorMessage(error));
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: noticeTitle,
+        tone: "danger",
+      });
     },
   });
 
@@ -169,11 +189,6 @@ function StoryAssetEditorForm({
             onChange={(event) => setContentText(event.target.value)}
           />
         </label>
-        {feedback ? (
-          <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
-            {feedback}
-          </div>
-        ) : null}
         {lastImpact ? <StoryAssetImpactPanel assetType={assetType} impact={lastImpact} /> : null}
       </div>
     </SectionCard>

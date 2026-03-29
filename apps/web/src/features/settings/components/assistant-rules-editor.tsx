@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { showAppNotice } from "@/components/ui/app-notice";
 import { SectionCard } from "@/components/ui/section-card";
 import {
   getMyAssistantRules,
@@ -49,11 +50,24 @@ export function AssistantRulesEditor({
       scope === "user"
         ? updateMyAssistantRules(nextDraft)
         : updateProjectAssistantRules(projectId ?? "", nextDraft),
-    onSuccess: async (result) => {
-      setFeedback(scope === "user" ? "个人规则已保存。" : "项目规则已保存。");
+    onSuccess: async () => {
+      const message = scope === "user" ? "个人规则已保存。" : "项目规则已保存。";
+      setFeedback(message);
+      showAppNotice({
+        content: message,
+        title: scope === "user" ? "个人长期规则" : "项目长期规则",
+        tone: "success",
+      });
       await queryClient.invalidateQueries({ queryKey: ["assistant-rules", scope, projectId] });
     },
-    onError: (error) => setFeedback(getErrorMessage(error)),
+    onError: (error) => {
+      const message = getErrorMessage(error);
+      setFeedback(message);
+      showAppNotice({
+        content: message,
+        tone: "danger",
+      });
+    },
   });
   const formKey = useMemo(
     () => buildAssistantRuleFormKey(query.data),
@@ -65,9 +79,6 @@ export function AssistantRulesEditor({
   return (
     <SectionCard action={headerAction} description={description} title={title}>
       <div className="space-y-4">
-        {feedback ? (
-          <div className="panel-muted px-4 py-3 text-sm text-[var(--text-secondary)]">{feedback}</div>
-        ) : null}
         {query.isLoading && !query.data ? (
           <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载规则...</div>
         ) : null}

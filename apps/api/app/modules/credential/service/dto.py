@@ -10,6 +10,10 @@ from app.shared.runtime.llm_protocol import LlmApiDialect, LlmAuthStrategy
 
 CredentialOwnerType = Literal["system", "user", "project"]
 CredentialExtraHeaders = dict[str, str]
+CREDENTIAL_CONTEXT_WINDOW_TOKENS_MIN = 256
+CREDENTIAL_CONTEXT_WINDOW_TOKENS_MAX = 2_000_000
+CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MIN = 128
+CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MAX = 131_072
 
 
 class CredentialCreateDTO(BaseModel):
@@ -23,6 +27,16 @@ class CredentialCreateDTO(BaseModel):
     api_key: str = Field(min_length=1, max_length=500)
     base_url: str | None = Field(default=None, max_length=500)
     default_model: str = Field(min_length=1, max_length=100)
+    context_window_tokens: int | None = Field(
+        default=None,
+        ge=CREDENTIAL_CONTEXT_WINDOW_TOKENS_MIN,
+        le=CREDENTIAL_CONTEXT_WINDOW_TOKENS_MAX,
+    )
+    default_max_output_tokens: int | None = Field(
+        default=None,
+        ge=CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MIN,
+        le=CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MAX,
+    )
     auth_strategy: LlmAuthStrategy | None = None
     api_key_header_name: str | None = Field(default=None, max_length=100)
     extra_headers: CredentialExtraHeaders | None = None
@@ -36,6 +50,16 @@ class CredentialUpdateDTO(BaseModel):
     api_key: str | None = Field(default=None, min_length=1, max_length=500)
     base_url: str | None = Field(default=None, max_length=500)
     default_model: str | None = Field(default=None, min_length=1, max_length=100)
+    context_window_tokens: int | None = Field(
+        default=None,
+        ge=CREDENTIAL_CONTEXT_WINDOW_TOKENS_MIN,
+        le=CREDENTIAL_CONTEXT_WINDOW_TOKENS_MAX,
+    )
+    default_max_output_tokens: int | None = Field(
+        default=None,
+        ge=CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MIN,
+        le=CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MAX,
+    )
     auth_strategy: LlmAuthStrategy | None = None
     api_key_header_name: str | None = Field(default=None, max_length=100)
     extra_headers: CredentialExtraHeaders | None = None
@@ -51,6 +75,8 @@ class CredentialViewDTO(BaseModel):
     masked_key: str
     base_url: str | None
     default_model: str | None
+    context_window_tokens: int | None
+    default_max_output_tokens: int | None
     auth_strategy: LlmAuthStrategy | None
     api_key_header_name: str | None
     extra_headers: CredentialExtraHeaders | None

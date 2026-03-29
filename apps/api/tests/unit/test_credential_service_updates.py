@@ -141,6 +141,57 @@ def test_create_credential_persists_connection_overrides(db, monkeypatch) -> Non
     assert created.extra_headers == {"X-Trace-Id": "story-run"}
 
 
+def test_create_credential_persists_token_limits(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+
+    created = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(
+                context_window_tokens=128000,
+                default_max_output_tokens=8192,
+            ),
+            actor_user_id=user.id,
+        )
+    )
+
+    assert created.context_window_tokens == 128000
+    assert created.default_max_output_tokens == 8192
+
+
+def test_update_credential_can_clear_token_limits(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+    credential = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(
+                context_window_tokens=128000,
+                default_max_output_tokens=8192,
+            ),
+            actor_user_id=user.id,
+        )
+    )
+
+    updated = asyncio.run(
+        service.update_credential(
+            async_db(db),
+            credential.id,
+            CredentialUpdateDTO(
+                context_window_tokens=None,
+                default_max_output_tokens=None,
+            ),
+            actor_user_id=user.id,
+        )
+    )
+
+    assert updated.context_window_tokens is None
+    assert updated.default_max_output_tokens is None
+
+
 def test_update_credential_rejects_runtime_managed_extra_headers(db, monkeypatch) -> None:
     monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
     user = create_user(db)

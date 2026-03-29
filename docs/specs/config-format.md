@@ -163,12 +163,14 @@ AI 偏好使用 YAML 文件，文件名固定为 `preferences.yaml`：
 ```yaml
 default_provider: "anthropic"
 default_model_name: "claude-sonnet-4"
+default_max_output_tokens: 4096
 ```
 
 字段说明：
 
 - `default_provider`：默认连接标识；为空表示跟随系统默认
 - `default_model_name`：默认模型；为空表示跟随该连接自己的默认模型
+- `default_max_output_tokens`：默认单次回复上限；为空或缺省时按系统默认 `4096`
 
 ---
 
@@ -733,6 +735,11 @@ workflow:
 ## 7. 模型配置与凭证（约束）
 
 **决策**：任何 API Key/凭证不允许出现在 YAML（包括 `${ENV}` 引用）。凭证统一存于数据库 `model_credentials`（AES-256-GCM 加密），通过 Web UI 管理，详见 `docs/design/10-user-and-credentials.md`。
+
+补充：
+
+- 连接级 `default_model / context_window_tokens / default_max_output_tokens` 也属于凭证中心的数据库字段，不写入 YAML。
+- 其中 `context_window_tokens` 用于记录模型上下文窗口；`default_max_output_tokens` 可作为运行时默认输出预算。
 
 ### 7.1 model 对象（在 Skill/Agent/Workflow/Node 中复用）
 

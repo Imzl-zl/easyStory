@@ -91,6 +91,8 @@
   - `EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX`
   - `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS`
     默认只允许公网 `https` 模型 endpoint；只有确实需要访问本地 / 私网模型网关时才显式开启。
+  - `EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS`
+    默认不允许公网 `http` 模型 endpoint；只有在受控代理或兼容测试环境下才显式开启。
   - `EASYSTORY_CONFIG_ADMIN_USERNAMES`
     逗号分隔的控制面管理员用户名白名单；只有命中的用户才能访问 `/api/v1/config/*` 和模板写接口，默认空列表表示全部拒绝控制面写权限。
 

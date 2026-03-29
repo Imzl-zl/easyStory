@@ -13,12 +13,13 @@ import {
   buildIncubatorCredentialNotice,
   buildIncubatorCredentialOptions,
   INCUBATOR_CREDENTIAL_SETTINGS_HREF,
-  pickIncubatorCredentialOption,
+  resolveSelectedIncubatorCredentialOption,
   resolveHydratedIncubatorChatSettings,
   resolveIncubatorCredentialState,
 } from "./incubator-chat-credential-support";
 
 export function useIncubatorChatCredentialModel(
+  hasUserMessage: boolean,
   settings: IncubatorChatSettings,
   setSettings: Dispatch<SetStateAction<IncubatorChatSettings>>,
 ) {
@@ -36,12 +37,13 @@ export function useIncubatorChatCredentialModel(
   );
   const preferredProvider = preferencesQuery.data?.default_provider?.trim() ?? "";
   const selectedCredential = useMemo(
-    () => {
-      const currentProvider = settings.provider.trim();
-      const currentOption = credentialOptions.find((option) => option.provider === currentProvider);
-      return currentOption ?? pickIncubatorCredentialOption(credentialOptions, preferredProvider);
-    },
-    [credentialOptions, preferredProvider, settings.provider],
+    () => resolveSelectedIncubatorCredentialOption({
+      currentProvider: settings.provider,
+      hasUserMessage,
+      options: credentialOptions,
+      preferredProvider,
+    }),
+    [credentialOptions, hasUserMessage, preferredProvider, settings.provider],
   );
   const credentialErrorMessage = credentialQuery.error ? getErrorMessage(credentialQuery.error) : null;
   const credentialState = resolveIncubatorCredentialState({

@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 import { AppSelect } from "@/components/ui/app-select";
 import type { AppSelectOption } from "@/components/ui/app-select";
 import {
@@ -89,12 +91,16 @@ export function CredentialSelectField({
   value,
   onChange,
 }: Readonly<CredentialSelectFieldProps>) {
+  const fieldId = useId();
+
   return (
-    <label className={`block ${className ?? ""}`}>
-      <span className="label-text">{label}</span>
-      <AppSelect disabled={disabled} options={options} value={value} onChange={onChange} />
+    <div className={`space-y-2 ${className ?? ""}`}>
+      <label className="label-text inline-flex" htmlFor={fieldId}>
+        {label}
+      </label>
+      <AppSelect density="roomy" disabled={disabled} id={fieldId} options={options} value={value} onChange={onChange} />
       {description ? <p className="mt-1.5 text-[12px] leading-5 text-[var(--text-secondary)]">{description}</p> : null}
-    </label>
+    </div>
   );
 }
 

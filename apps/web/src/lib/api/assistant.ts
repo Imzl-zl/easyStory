@@ -49,21 +49,26 @@ export async function runAssistantTurnStream(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let streamedContent = "";
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
+      buffer += normalizeStreamChunk(decoder.decode());
       const bufferedEvent = parseAssistantTurnStreamEvent(buffer.trim());
       if (bufferedEvent?.event === "chunk" && bufferedEvent.data.delta) {
         options.onChunk(bufferedEvent.data.delta);
-        buffer = "";
-        continue;
+        streamedContent += bufferedEvent.data.delta;
+        return buildAssistantStreamFallbackResult(payload, streamedContent);
       }
       if (bufferedEvent?.event === "error") {
         throw new Error(bufferedEvent.data.message?.trim() || "实时回复失败，请稍后重试。");
       }
       if (bufferedEvent?.event === "completed") {
         return bufferedEvent.data;
+      }
+      if (streamedContent.trim()) {
+        return buildAssistantStreamFallbackResult(payload, streamedContent);
       }
       throw new Error("实时回复意外中断，请重试。");
     }
@@ -77,6 +82,7 @@ export async function runAssistantTurnStream(
       }
       if (event.event === "chunk") {
         if (event.data.delta) {
+          streamedContent += event.data.delta;
           options.onChunk(event.data.delta);
         }
         continue;
@@ -183,4 +189,22 @@ async function toAssistantStreamError(response: Response): Promise<Error> {
       ? detail
       : `实时回复失败，状态码 ${response.status}`;
   return new ApiError(message, response.status, detail);
+}
+
+function buildAssistantStreamFallbackResult(
+  payload: AssistantTurnPayload,
+  content: string,
+): AssistantTurnResult {
+  return {
+    agent_id: payload.agent_id ?? null,
+    content,
+    hook_results: [],
+    input_tokens: null,
+    mcp_servers: [],
+    model_name: payload.model?.name?.trim() || "",
+    output_tokens: null,
+    provider: payload.model?.provider?.trim() || "",
+    skill_id: payload.skill_id ?? "",
+    total_tokens: null,
+  };
 }

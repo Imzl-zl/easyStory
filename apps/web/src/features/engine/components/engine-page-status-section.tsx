@@ -11,7 +11,6 @@ import type { WorkflowSummaryCardData } from "./engine-workflow-summary-support"
 import type { EngineTabKey } from "./engine-workflow-status-support";
 
 type EnginePageStatusSectionProps = {
-  feedback: string | null;
   isActionPending: boolean;
   onOpenTab: (tab: EngineTabKey) => void;
   onPrimaryAction: () => void;
@@ -33,7 +32,6 @@ type StatusBannerItem = {
 };
 
 export function EnginePageStatusSection({
-  feedback,
   isActionPending,
   onOpenTab,
   onPrimaryAction,
@@ -62,11 +60,6 @@ export function EnginePageStatusSection({
       className: "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]",
       id: "events-error",
       message: workflowEventsErrorMessage,
-    },
-    {
-      className: "bg-[rgba(58,124,165,0.1)] text-[var(--accent-info)]",
-      id: "feedback",
-      message: feedback,
     },
     {
       className: "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]",

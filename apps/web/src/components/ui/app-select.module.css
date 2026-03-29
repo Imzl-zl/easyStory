@@ -44,12 +44,25 @@
   min-width: 0;
 }
 
+.root :global(.arco-select-view-selector),
+.root :global(.arco-select-view-value),
+.root :global(.arco-select-suffix),
+.root :global(.arco-select-arrow-icon),
+.root :global(.arco-select-expand-icon),
+.triggerLabel {
+  pointer-events: none;
+}
+
 .root :global(.arco-select-view-value),
 .root :global(.arco-select-view-input),
 .triggerLabel {
   color: var(--text-primary);
   font-size: 0.88rem;
   line-height: 1.5;
+}
+
+.root :global(.arco-select-view) {
+  cursor: pointer;
 }
 
 .triggerLabelInvalid {

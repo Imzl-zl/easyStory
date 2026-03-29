@@ -26,11 +26,6 @@ export function RecycleBinPage() {
             isPending={model.emptyTrashMutation.isPending}
             onClear={() => setClearDialogOpen(true)}
           />
-          {model.feedback ? (
-            <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
-              {model.feedback}
-            </div>
-          ) : null}
           <label className="block">
             <span className="label-text">快速搜索</span>
             <input

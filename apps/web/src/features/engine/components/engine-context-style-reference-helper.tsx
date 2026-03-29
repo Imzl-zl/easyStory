@@ -4,6 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { AppSelect } from "@/components/ui/app-select";
+import { showAppNotice } from "@/components/ui/app-notice";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { listAnalyses } from "@/lib/api/analysis";
@@ -32,7 +33,6 @@ export function EngineContextStyleReferenceHelper({
   const [generatedSkillKey, setGeneratedSkillKey] = useState("");
   const [selectedAnalysisId, setSelectedAnalysisId] = useState("");
   const [injectFieldsInput, setInjectFieldsInput] = useState("writing_style");
-  const [feedback, setFeedback] = useState<string | null>(null);
   const deferredGeneratedSkillKey = useDeferredValue(generatedSkillKey.trim());
 
   const analysesQuery = useQuery({
@@ -70,9 +70,17 @@ export function EngineContextStyleReferenceHelper({
         injectFields: parseInjectFields(injectFieldsInput),
       });
       onApply(nextValue);
-      setFeedback("已写入 style_reference 到 extra_inject。");
+      showAppNotice({
+        content: "已写入 style_reference。",
+        title: "风格参考助手",
+        tone: "success",
+      });
     } catch (error) {
-      setFeedback(getErrorMessage(error));
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "风格参考助手",
+        tone: "danger",
+      });
     }
   };
 
@@ -112,7 +120,7 @@ export function EngineContextStyleReferenceHelper({
           <p className="text-sm text-[var(--text-secondary)]">正在加载 style 分析列表…</p>
         ) : null}
         {analysesQuery.error ? (
-          <FeedbackMessage message={getErrorMessage(analysesQuery.error)} tone="danger" />
+          <FeedbackMessage message={getErrorMessage(analysesQuery.error)} />
         ) : null}
         {!analysesQuery.isLoading && !analysesQuery.error && analyses.length === 0 ? (
           <EmptyState
@@ -141,8 +149,6 @@ export function EngineContextStyleReferenceHelper({
             </button>
           </>
         ) : null}
-
-        {feedback ? <FeedbackMessage message={feedback} tone="info" /> : null}
       </div>
     </section>
   );
@@ -169,21 +175,11 @@ function SelectedAnalysisCard({ analysis }: Readonly<{ analysis: AnalysisSummary
 
 function FeedbackMessage({
   message,
-  tone,
 }: Readonly<{
   message: string;
-  tone: "danger" | "info";
 }>) {
-  if (tone === "danger") {
-    return (
-      <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
-        {message}
-      </div>
-    );
-  }
-
   return (
-    <div className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]">
+    <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
       {message}
     </div>
   );

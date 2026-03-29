@@ -1,82 +1,76 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
-import { getErrorMessage } from "@/lib/api/client";
+import { showAppNotice } from "@/components/ui/app-notice";
 import { runAssistantTurn, runAssistantTurnStream } from "@/lib/api/assistant";
 import { buildIncubatorConversationDraft, createProject } from "@/lib/api/projects";
 import type { AssistantTurnResult, ProjectIncubatorConversationDraft, ProjectSetting } from "@/lib/api/types";
 
 import {
+  buildAssistantRetryFailure,
+  buildAssistantStreamRecoveryNotice,
+  buildIncubatorAssistantTurnPayload,
+  shouldRetryAssistantWithoutStream,
+} from "./incubator-assistant-request-support";
+import { useChatState } from "./incubator-chat-state";
+import {
   appendIncubatorMessageDelta,
-  buildAssistantModelOverride,
-  buildAssistantTurnMessages,
   buildIncubatorConversationFingerprint,
-  buildIncubatorConversationText,
   buildSuggestedProjectName,
-  createIncubatorInitialMessages,
-  createIncubatorMessage,
-  INCUBATOR_CHAT_SKILL_ID,
-  INCUBATOR_PENDING_REPLY_MESSAGE,
-  INITIAL_INCUBATOR_CHAT_SETTINGS,
-  replaceIncubatorMessage,
-  resolveIncubatorAssistantReply,
-  resolveInterruptedIncubatorReply,
   resolveIncubatorModelName,
   resolveIncubatorProvider,
   type IncubatorChatMessage,
   type IncubatorChatSettings,
 } from "./incubator-chat-support";
+import {
+  buildPromptSubmission,
+  completePromptSubmission,
+  handlePromptSubmissionError,
+  isDraftStale,
+  syncConversationDraft,
+  type PromptSubmission,
+} from "./incubator-chat-submit-support";
+import type { IncubatorChatSession } from "./incubator-chat-store";
 import { buildErrorFeedback, type FeedbackState } from "./incubator-feedback-support";
 
+type DraftSyncSubmission = {
+  conversationFingerprint: string;
+  conversationId: string;
+  conversationText: string;
+};
+
+export type IncubatorConversationDraftMutation = UseMutationResult<
+  ProjectIncubatorConversationDraft,
+  unknown,
+  DraftSyncSubmission
+>;
+
 type DraftSyncParams = {
-  draftMutation: UseMutationResult<ProjectIncubatorConversationDraft, unknown, string>;
+  activeConversationId: string;
+  draftMutation: IncubatorConversationDraftMutation;
   messages: IncubatorChatMessage[];
-  setDraftFingerprint: Dispatch<SetStateAction<string | null>>;
   settings: IncubatorChatSettings;
 };
 
 type SubmitPromptParams = {
+  activeConversationId: string;
   assistantMutation: UseMutationResult<AssistantTurnResult, unknown, PromptSubmission>;
   isResponding: boolean;
   messages: IncubatorChatMessage[];
-  setComposerText: Dispatch<SetStateAction<string>>;
+  patchConversationSession: (
+    conversationId: string,
+    updater: (current: IncubatorChatSession) => IncubatorChatSession,
+  ) => void;
   setFeedback: Dispatch<SetStateAction<FeedbackState | null>>;
-  setMessages: Dispatch<SetStateAction<IncubatorChatMessage[]>>;
 };
 
-type PromptSubmission = {
-  nextMessages: IncubatorChatMessage[];
-  pendingAssistant: IncubatorChatMessage;
-  submittedMessages: IncubatorChatMessage[];
-};
-
-export function useChatState() {
-  const [composerText, setComposerText] = useState("");
-  const [messages, setMessages] = useState<IncubatorChatMessage[]>(createIncubatorInitialMessages);
-  const [settings, setSettings] = useState(INITIAL_INCUBATOR_CHAT_SETTINGS);
-  const [projectName, setProjectNameState] = useState("");
-  const [hasCustomProjectName, setHasCustomProjectName] = useState(false);
-  const [draftFingerprint, setDraftFingerprint] = useState<string | null>(null);
-  return {
-    composerText,
-    draftFingerprint,
-    hasCustomProjectName,
-    messages,
-    projectName,
-    setComposerText,
-    setDraftFingerprint,
-    setHasCustomProjectName,
-    setMessages,
-    setProjectNameState,
-    settings,
-    setSettings,
-  };
-}
+export { useChatState };
+export { isDraftStale } from "./incubator-chat-submit-support";
 
 export function useProjectNameSetter(
   setHasCustomProjectName: Dispatch<SetStateAction<boolean>>,
@@ -97,38 +91,50 @@ export function useConversationFingerprint(
 
 export function useIncubatorDraftMutation(
   settings: IncubatorChatSettings,
-) {
+  patchConversationSession: SubmitPromptParams["patchConversationSession"],
+): IncubatorConversationDraftMutation {
   return useMutation({
-    mutationFn: (conversationText: string) =>
+    mutationFn: ({ conversationText }: DraftSyncSubmission) =>
       buildIncubatorConversationDraft({
         conversation_text: conversationText,
-        provider: resolveIncubatorProvider(settings.provider),
         model_name: resolveIncubatorModelName(settings.modelName) || undefined,
+        provider: resolveIncubatorProvider(settings.provider),
       }),
+    onSuccess: (draft, variables) => {
+      patchConversationSession(variables.conversationId, (current) => ({
+        ...current,
+        draft,
+        draftFingerprint: variables.conversationFingerprint,
+      }));
+    },
   });
 }
 
 export function useIncubatorCreateMutation({
   draftSetting,
+  onCreated,
   projectName,
   setFeedback,
   settings,
 }: {
   draftSetting: ProjectSetting | null;
+  onCreated: () => void;
   projectName: string;
   setFeedback: Dispatch<SetStateAction<FeedbackState | null>>;
   settings: IncubatorChatSettings;
 }) {
   const queryClient = useQueryClient();
   const router = useRouter();
+
   return useMutation({
     mutationFn: () =>
       createProject({
+        allow_system_credential_pool: settings.allowSystemCredentialPool,
         name: projectName.trim(),
         project_setting: draftSetting,
-        allow_system_credential_pool: settings.allowSystemCredentialPool,
       }),
     onSuccess: async (result) => {
+      onCreated();
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
       router.push(`/workspace/project/${result.id}/studio?panel=setting`);
     },
@@ -138,27 +144,39 @@ export function useIncubatorCreateMutation({
 
 export function useIncubatorAssistantMutation(
   settings: IncubatorChatSettings,
-  setMessages: Dispatch<SetStateAction<IncubatorChatMessage[]>>,
+  patchConversationSession: SubmitPromptParams["patchConversationSession"],
 ) {
   return useMutation({
-    mutationFn: (submission: PromptSubmission) => {
-      const payload = {
-        skill_id: INCUBATOR_CHAT_SKILL_ID,
-        messages: buildAssistantTurnMessages(submission.submittedMessages),
-        model: buildAssistantModelOverride(settings),
-      };
+    mutationFn: async (submission: PromptSubmission) => {
+      const payload = buildIncubatorAssistantTurnPayload(settings, submission.submittedMessages);
       if (!settings.streamOutput) {
         return runAssistantTurn(payload);
       }
-      return runAssistantTurnStream(payload, {
-        onChunk: (delta) => {
-          setMessages((current) => appendIncubatorMessageDelta(
-            current,
-            submission.pendingAssistant.id,
-            delta,
-          ));
-        },
-      });
+      try {
+        return await runAssistantTurnStream(payload, {
+          onChunk: (delta) => {
+            patchConversationSession(submission.conversationId, (current) => ({
+              ...current,
+              messages: appendIncubatorMessageDelta(current.messages, submission.pendingAssistant.id, delta),
+            }));
+          },
+        });
+      } catch (error) {
+        if (!shouldRetryAssistantWithoutStream(error)) {
+          throw error;
+        }
+        try {
+          const result = await runAssistantTurn(payload);
+          showAppNotice({
+            content: buildAssistantStreamRecoveryNotice(),
+            title: "聊天提示",
+            tone: "info",
+          });
+          return result;
+        } catch (retryError) {
+          throw buildAssistantRetryFailure(error, retryError);
+        }
+      }
     },
   });
 }
@@ -169,132 +187,59 @@ export function useSuggestedProjectName(
   setProjectNameState: Dispatch<SetStateAction<string>>,
 ) {
   useEffect(() => {
-    if (!draftSetting || hasCustomProjectName) return;
+    if (!draftSetting || hasCustomProjectName) {
+      return;
+    }
     setProjectNameState(buildSuggestedProjectName(draftSetting));
   }, [draftSetting, hasCustomProjectName, setProjectNameState]);
 }
 
 export function useIncubatorDraftSync({
+  activeConversationId,
   draftMutation,
   messages,
-  setDraftFingerprint,
   settings,
 }: DraftSyncParams) {
   return useCallback(async () => {
     try {
       draftMutation.reset();
-      await syncConversationDraft({ draftMutation, messages, setDraftFingerprint, settings });
+      await syncConversationDraft(activeConversationId, draftMutation, messages, settings);
     } catch {
       return;
     }
-  }, [draftMutation, messages, setDraftFingerprint, settings]);
+  }, [activeConversationId, draftMutation, messages, settings]);
 }
 
 export function useIncubatorPromptSubmit({
+  activeConversationId,
   assistantMutation,
   isResponding,
   messages,
-  setComposerText,
+  patchConversationSession,
   setFeedback,
-  setMessages,
 }: SubmitPromptParams) {
   return useCallback(async (prompt: string) => {
-    const submission = buildPromptSubmission(prompt, messages, isResponding);
-    if (!submission) return;
+    const submission = buildPromptSubmission(prompt, messages, isResponding, activeConversationId);
+    if (!submission) {
+      return;
+    }
     setFeedback(null);
-    setComposerText("");
-    setMessages(submission.nextMessages);
+    patchConversationSession(submission.conversationId, (current) => ({
+      ...current,
+      composerText: "",
+      messages: submission.nextMessages,
+    }));
     try {
-      await completePromptSubmission({
-        assistantMutation,
-        setMessages,
-        submission,
-      });
+      await completePromptSubmission(assistantMutation, patchConversationSession, submission);
     } catch (error) {
-      handlePromptSubmissionError(error, setFeedback, setMessages, submission);
+      handlePromptSubmissionError(error, patchConversationSession, setFeedback, submission);
     }
   }, [
+    activeConversationId,
     assistantMutation,
     isResponding,
     messages,
-    setComposerText,
+    patchConversationSession,
     setFeedback,
-    setMessages,
   ]);
-}
-
-function buildPromptSubmission(prompt: string, messages: IncubatorChatMessage[], isResponding: boolean) {
-  const content = prompt.trim();
-  if (!content || isResponding) return null;
-  const userMessage = createIncubatorMessage("user", content);
-  const pendingAssistant = createIncubatorMessage("assistant", INCUBATOR_PENDING_REPLY_MESSAGE, { status: "pending" });
-  const submittedMessages = [...messages, userMessage];
-  return { nextMessages: [...submittedMessages, pendingAssistant], pendingAssistant, submittedMessages };
-}
-
-async function completePromptSubmission({
-  assistantMutation,
-  setMessages,
-  submission,
-}: {
-  assistantMutation: UseMutationResult<AssistantTurnResult, unknown, PromptSubmission>;
-  setMessages: Dispatch<SetStateAction<IncubatorChatMessage[]>>;
-  submission: PromptSubmission;
-}) {
-  const result = await assistantMutation.mutateAsync(submission);
-  const assistantReply = resolveIncubatorAssistantReply(result.content);
-  const resolvedMessages = replaceIncubatorMessage(
-    submission.nextMessages,
-    submission.pendingAssistant.id,
-    createIncubatorMessage("assistant", assistantReply.content, { status: assistantReply.status }),
-  );
-  setMessages(resolvedMessages);
-}
-
-function handlePromptSubmissionError(
-  error: unknown,
-  setFeedback: Dispatch<SetStateAction<FeedbackState | null>>,
-  setMessages: Dispatch<SetStateAction<IncubatorChatMessage[]>>,
-  submission: PromptSubmission,
-) {
-  const errorMessage = getErrorMessage(error);
-  setFeedback(buildErrorFeedback(error));
-  setMessages((current) => {
-    const currentPending = current.find((message) => message.id === submission.pendingAssistant.id);
-    const interruptedReply = currentPending
-      ? resolveInterruptedIncubatorReply(currentPending.content)
-      : null;
-    if (interruptedReply) {
-      return replaceIncubatorMessage(
-        current,
-        submission.pendingAssistant.id,
-        createIncubatorMessage("assistant", interruptedReply, { status: "error" }),
-      );
-    }
-    return replaceIncubatorMessage(
-      submission.nextMessages,
-      submission.pendingAssistant.id,
-      createIncubatorMessage("assistant", errorMessage, { status: "error" }),
-    );
-  });
-}
-
-async function syncConversationDraft({
-  draftMutation,
-  messages,
-  setDraftFingerprint,
-  settings,
-}: DraftSyncParams) {
-  const conversationText = buildIncubatorConversationText(messages);
-  if (!conversationText) return;
-  await draftMutation.mutateAsync(conversationText);
-  setDraftFingerprint(buildIncubatorConversationFingerprint(messages, settings));
-}
-
-export function isDraftStale(
-  draft: ProjectIncubatorConversationDraft | undefined,
-  draftFingerprint: string | null,
-  conversationFingerprint: string,
-) {
-  return Boolean(draft) && draftFingerprint !== null && draftFingerprint !== conversationFingerprint;
 }

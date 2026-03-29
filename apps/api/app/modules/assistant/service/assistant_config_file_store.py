@@ -11,8 +11,16 @@ from app.shared.runtime.errors import ConfigurationError
 
 from .assistant_rule_dto import AssistantRuleProfileDTO, AssistantRuleProfileUpdateDTO
 from .assistant_rule_support import normalize_rule_content
-from .preferences_dto import AssistantPreferencesDTO, AssistantPreferencesUpdateDTO
-from .preferences_support import build_preferences_dto, build_updated_preferences
+from .preferences_dto import (
+    AssistantPreferencesDTO,
+    AssistantPreferencesUpdateDTO,
+    DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS,
+)
+from .preferences_support import (
+    build_preferences_dto,
+    build_updated_preferences,
+    has_custom_preferences,
+)
 
 RULE_FILE_NAME = "AGENTS.md"
 PREFERENCES_FILE_NAME = "preferences.yaml"
@@ -62,9 +70,9 @@ class AssistantConfigFileStore:
     ) -> AssistantPreferencesDTO:
         path = self._user_preferences_path(user_id)
         preferences = build_updated_preferences(payload)
-        if preferences.default_provider is None and preferences.default_model_name is None:
+        if not has_custom_preferences(preferences):
             _delete_if_exists(path)
-            return AssistantPreferencesDTO()
+            return build_preferences_dto()
         _write_preferences_file(path, preferences)
         return _read_preferences_file(path)
 
@@ -158,21 +166,25 @@ def _write_rule_file(path: Path, *, enabled: bool, scope: str, content: str) -> 
 
 def _read_preferences_file(path: Path) -> AssistantPreferencesDTO:
     if not path.exists():
-        return AssistantPreferencesDTO()
+        return build_preferences_dto()
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(raw, dict):
         raise ConfigurationError(f"Assistant preferences file must be a YAML object: {path}")
     return build_preferences_dto(
         default_provider=raw.get("default_provider"),
         default_model_name=raw.get("default_model_name"),
+        default_max_output_tokens=raw.get("default_max_output_tokens"),
     )
 
 
 def _write_preferences_file(path: Path, preferences: AssistantPreferencesDTO) -> None:
-    payload = {
-        "default_provider": preferences.default_provider,
-        "default_model_name": preferences.default_model_name,
-    }
+    payload: dict[str, str | int] = {}
+    if preferences.default_provider is not None:
+        payload["default_provider"] = preferences.default_provider
+    if preferences.default_model_name is not None:
+        payload["default_model_name"] = preferences.default_model_name
+    if preferences.default_max_output_tokens != DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS:
+        payload["default_max_output_tokens"] = preferences.default_max_output_tokens
     _ensure_parent_dir(path)
     path.write_text(
         yaml.safe_dump(payload, allow_unicode=True, sort_keys=False),

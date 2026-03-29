@@ -4,10 +4,14 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 
+import { showAppNotice } from "@/components/ui/app-notice";
 import {
   buildTemplateFormIssues,
   buildTemplateFormState,
   buildTemplateLibraryPath,
+  buildTemplateMutationErrorFeedback,
+  buildTemplateMutationErrorNotice,
+  buildTemplateMutationSuccessNotice,
   buildTemplatePayload,
   createEmptyTemplateFormState,
   filterTemplates,
@@ -17,13 +21,13 @@ import {
   type TemplateVisibilityFilter,
 } from "@/features/lobby/components/template-library-support";
 import {
-  buildErrorFeedback,
   refreshTemplateQueries,
   resetEditorState,
   resolveActiveTemplateId,
   shouldSyncTemplateRoute,
 } from "@/features/lobby/components/template-library-model-support";
 import { buildTemplateLibraryModel } from "@/features/lobby/components/template-library-model-view";
+import { getErrorMessage } from "@/lib/api/client";
 import {
   createTemplate,
   deleteTemplate,
@@ -154,12 +158,17 @@ function useCreateTemplateMutation(
     mutationFn: () => createTemplate(buildTemplatePayload(state.form)),
     onSuccess: async (result) => {
       await refreshTemplateQueries(queryClient, result.id, result);
-      state.setFeedback({ tone: "info", message: "模板已创建。" });
+      state.setFeedback(null);
+      showAppNotice(buildTemplateMutationSuccessNotice("create"));
       state.setEditorMode("edit");
       state.setForm(buildTemplateFormState(result));
       router.push(buildTemplateLibraryPath(result.id));
     },
-    onError: (error) => state.setFeedback(buildErrorFeedback(error)),
+    onError: (error) => {
+      const message = getErrorMessage(error);
+      state.setFeedback(buildTemplateMutationErrorFeedback(message));
+      showAppNotice(buildTemplateMutationErrorNotice(message));
+    },
   });
 }
 
@@ -172,11 +181,16 @@ function useUpdateTemplateMutation(
     mutationFn: () => updateTemplate(activeTemplateId as string, buildTemplatePayload(state.form)),
     onSuccess: async (result) => {
       await refreshTemplateQueries(queryClient, result.id, result);
-      state.setFeedback({ tone: "info", message: "模板已更新。" });
+      state.setFeedback(null);
+      showAppNotice(buildTemplateMutationSuccessNotice("update"));
       state.setEditorMode("edit");
       state.setForm(buildTemplateFormState(result));
     },
-    onError: (error) => state.setFeedback(buildErrorFeedback(error)),
+    onError: (error) => {
+      const message = getErrorMessage(error);
+      state.setFeedback(buildTemplateMutationErrorFeedback(message));
+      showAppNotice(buildTemplateMutationErrorNotice(message));
+    },
   });
 }
 
@@ -190,7 +204,8 @@ function useDeleteTemplateMutation(
     mutationFn: () => deleteTemplate(activeTemplateId as string),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["templates"] });
-      state.setFeedback({ tone: "info", message: "模板已删除。" });
+      state.setFeedback(null);
+      showAppNotice(buildTemplateMutationSuccessNotice("delete"));
       resetEditorState({
         setEditorMode: state.setEditorMode,
         setFeedback: state.setFeedback,
@@ -198,6 +213,10 @@ function useDeleteTemplateMutation(
       });
       router.push(buildTemplateLibraryPath());
     },
-    onError: (error) => state.setFeedback(buildErrorFeedback(error)),
+    onError: (error) => {
+      const message = getErrorMessage(error);
+      state.setFeedback(buildTemplateMutationErrorFeedback(message));
+      showAppNotice(buildTemplateMutationErrorNotice(message));
+    },
   });
 }

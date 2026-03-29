@@ -4,6 +4,10 @@ import { useState } from "react";
 
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
+  formatAuditTime,
+  formatCredentialTokenSummary,
+} from "@/features/settings/components/credential-center-display-support";
+import {
   isPendingCredentialAction,
   resolveCredentialActionButtonLabel,
   type PendingCredentialAction,
@@ -11,7 +15,6 @@ import {
 import { CredentialDeleteConfirmDialog } from "@/features/settings/components/credential-delete-confirm-dialog";
 import type { CredentialOverrideInfo } from "@/features/settings/components/credential-center-override-support";
 import {
-  formatAuditTime,
   formatCredentialBaseUrl,
   getApiDialectLabel,
   type CredentialCenterMode,
@@ -48,11 +51,11 @@ export function CredentialCenterList({
 
   return (
     <>
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3.5">
           <div className="space-y-1">
             <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">已有连接</h3>
-            <p className="text-sm text-[var(--text-secondary)]">查看、验证和管理已有连接。</p>
+            <p className="text-sm leading-6 text-[var(--text-secondary)]">查看、验证和管理已有连接。</p>
           </div>
           {mode === "list" && onStartCreate ? (
             <button
@@ -74,10 +77,10 @@ export function CredentialCenterList({
           return (
             <article
               key={credential.id}
-              className="panel-muted flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between"
+              className="panel-muted grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start"
               data-active={credential.id === activeCredentialId}
             >
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="font-medium">{credential.display_name}</h3>
                   <StatusBadge
@@ -110,20 +113,21 @@ export function CredentialCenterList({
                 <p className="text-sm text-[var(--text-secondary)]">
                   默认模型：{credential.default_model ?? "未配置"} · 密钥尾号：{credential.masked_key}
                 </p>
-                <p className="text-xs text-[var(--text-secondary)]">
+                <p className="text-sm text-[var(--text-secondary)]">{formatCredentialTokenSummary(credential)}</p>
+                <p className="text-xs leading-5 text-[var(--text-secondary)]">
                   服务地址：{formatCredentialBaseUrl(credential.api_dialect, credential.base_url)} · 最近验证：
                   {credential.last_verified_at ? formatAuditTime(credential.last_verified_at) : "未验证"}
                 </p>
                 {overrideInfo ? (
-                  <p className="text-xs text-[var(--accent-ink)]">
+                  <p className="text-xs leading-5 text-[var(--accent-ink)]">
                     当前项目已配置同连接标识的项目级模型连接「{overrideInfo.projectCredentialDisplayName}」，运行时将优先使用项目级连接。
                   </p>
                 ) : null}
               </div>
-              <div className="flex max-w-full flex-wrap justify-start gap-2 md:max-w-[320px] md:justify-end">
+              <div className="flex max-w-full flex-wrap justify-start gap-2.5 lg:max-w-[340px] lg:justify-end">
                 {isListMode ? (
                   <button
-                    className="ink-button-secondary h-8 px-3.5 text-[13px]"
+                    className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"
                     disabled={isPending}
                     onClick={() => onSelectCredentialForEdit?.(credential.id)}
                     type="button"
@@ -134,7 +138,7 @@ export function CredentialCenterList({
                 {isListMode ? (
                   <>
                     <button
-                      className="ink-button-secondary h-8 px-3.5 text-[13px]"
+                      className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"
                       disabled={isPending}
                       onClick={() => onAction("verify", credential.id)}
                       type="button"
@@ -142,7 +146,7 @@ export function CredentialCenterList({
                       {resolveCredentialActionButtonLabel("verify", isVerifyPending)}
                     </button>
                     <button
-                      className="ink-button-secondary h-8 px-3.5 text-[13px]"
+                      className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"
                       disabled={isPending}
                       onClick={() => onAction(toggleActionType, credential.id)}
                       type="button"
@@ -150,7 +154,7 @@ export function CredentialCenterList({
                       {resolveCredentialActionButtonLabel(toggleActionType, isTogglePending)}
                     </button>
                     <button
-                      className="ink-button-danger h-8 px-3.5 text-[13px]"
+                      className="ink-button-danger h-9 min-w-[84px] px-3.5 text-[13px]"
                       disabled={isPending}
                       onClick={() => setPendingDeleteCredential(credential)}
                       type="button"
