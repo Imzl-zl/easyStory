@@ -2,8 +2,13 @@
 
 import { CodeBlock } from "@/components/ui/code-block";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { ConfigRegistryDetail, ConfigRegistryType } from "@/lib/api/types";
+import type {
+  ConfigRegistryDetail,
+  ConfigRegistryType,
+  SkillConfigDetail,
+} from "@/lib/api/types";
 
+import { ConfigRegistrySkillReader } from "./config-registry-skill-reader";
 import { buildConfigRegistryDetailRows } from "./config-registry-support";
 
 type ConfigRegistryDetailPanelProps = {
@@ -38,6 +43,15 @@ export function ConfigRegistryDetailPanel({
 
   const rows = buildConfigRegistryDetailRows(type, detail);
   const tags = "tags" in detail && Array.isArray(detail.tags) ? detail.tags : [];
+
+  if (type === "skills") {
+    return (
+      <div className="space-y-4">
+        {errorMessage ? <Banner tone="danger" message={errorMessage} /> : null}
+        <ConfigRegistrySkillReader detail={detail as SkillConfigDetail} key={(detail as SkillConfigDetail).id} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

@@ -59,10 +59,12 @@ export function PromptSuggestionBar({
 
 export function MessageBubble({
   content,
+  hookResults,
   role,
   status,
 }: {
   content: string;
+  hookResults?: IncubatorChatModel["messages"][number]["hookResults"];
   role: "assistant" | "user";
   status?: "pending" | "error";
 }) {
@@ -79,6 +81,11 @@ export function MessageBubble({
         {isAssistant ? "AI" : "你"}
       </p>
       <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-6">{content}</p>
+      {isAssistant && hookResults && hookResults.length > 0 ? (
+        <p className="mt-2 rounded-[12px] bg-[rgba(248,243,235,0.72)] px-2.5 py-1.5 text-[11px] leading-5 text-[var(--text-secondary)]">
+          已执行 {hookResults.length} 个自动动作
+        </p>
+      ) : null}
     </article>
   );
 }

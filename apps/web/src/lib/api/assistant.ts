@@ -2,6 +2,12 @@ import { getAuthToken } from "@/lib/stores/auth-store";
 
 import { ApiError, getApiBaseUrl, requestJson } from "@/lib/api/client";
 import type {
+  AssistantAgentDetail,
+  AssistantAgentPayload,
+  AssistantAgentSummary,
+  AssistantHookDetail,
+  AssistantHookPayload,
+  AssistantHookSummary,
   AssistantPreferences,
   AssistantPreferencesUpdatePayload,
   AssistantRuleProfile,
@@ -9,6 +15,9 @@ import type {
   AssistantTurnPayload,
   AssistantTurnResult,
 } from "@/lib/api/types";
+
+export * from "./assistant-mcp";
+export * from "./assistant-skills";
 
 type AssistantTurnStreamEvent =
   | { event: "chunk"; data: { delta: string } }
@@ -108,6 +117,20 @@ export function updateMyAssistantPreferences(
   });
 }
 
+export function getProjectAssistantPreferences(projectId: string) {
+  return requestJson<AssistantPreferences>(`/api/v1/assistant/preferences/projects/${projectId}`);
+}
+
+export function updateProjectAssistantPreferences(
+  projectId: string,
+  payload: AssistantPreferencesUpdatePayload,
+) {
+  return requestJson<AssistantPreferences>(`/api/v1/assistant/preferences/projects/${projectId}`, {
+    method: "PUT",
+    body: payload,
+  });
+}
+
 export function getMyAssistantRules() {
   return requestJson<AssistantRuleProfile>("/api/v1/assistant/rules/me");
 }
@@ -127,6 +150,62 @@ export function updateProjectAssistantRules(projectId: string, payload: Assistan
   return requestJson<AssistantRuleProfile>(`/api/v1/assistant/rules/projects/${projectId}`, {
     method: "PUT",
     body: payload,
+  });
+}
+
+export function listMyAssistantAgents() {
+  return requestJson<AssistantAgentSummary[]>("/api/v1/assistant/agents");
+}
+
+export function listMyAssistantHooks() {
+  return requestJson<AssistantHookSummary[]>("/api/v1/assistant/hooks");
+}
+
+export function createMyAssistantAgent(payload: AssistantAgentPayload) {
+  return requestJson<AssistantAgentDetail>("/api/v1/assistant/agents", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function createMyAssistantHook(payload: AssistantHookPayload) {
+  return requestJson<AssistantHookDetail>("/api/v1/assistant/hooks", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function getMyAssistantAgent(agentId: string) {
+  return requestJson<AssistantAgentDetail>(`/api/v1/assistant/agents/${agentId}`);
+}
+
+export function getMyAssistantHook(hookId: string) {
+  return requestJson<AssistantHookDetail>(`/api/v1/assistant/hooks/${hookId}`);
+}
+
+export function updateMyAssistantAgent(agentId: string, payload: AssistantAgentPayload) {
+  return requestJson<AssistantAgentDetail>(`/api/v1/assistant/agents/${agentId}`, {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export function updateMyAssistantHook(hookId: string, payload: AssistantHookPayload) {
+  return requestJson<AssistantHookDetail>(`/api/v1/assistant/hooks/${hookId}`, {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export function deleteMyAssistantAgent(agentId: string) {
+  return requestJson<void>(`/api/v1/assistant/agents/${agentId}`, {
+    method: "DELETE",
+  });
+}
+
+export function deleteMyAssistantHook(hookId: string) {
+  return requestJson<void>(`/api/v1/assistant/hooks/${hookId}`, {
+    method: "DELETE",
   });
 }
 

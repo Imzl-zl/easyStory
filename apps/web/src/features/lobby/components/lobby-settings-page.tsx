@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { GuardedLink } from "@/components/ui/guarded-link";
-import { SectionCard } from "@/components/ui/section-card";
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import {
   useLobbySettingsRouteState,
@@ -12,8 +10,15 @@ import {
   type LobbySettingsRouteState,
 } from "@/features/lobby/components/lobby-settings-route";
 import { type LobbySettingsTab } from "@/features/lobby/components/lobby-settings-support";
+import { LobbySettingsSidebar } from "@/features/lobby/components/lobby-settings-sidebar";
+import { AssistantAgentsPanel } from "@/features/settings/components/assistant-agents-panel";
+import { AssistantConfigFileMapPanel } from "@/features/settings/components/assistant-config-file-map-panel";
+import { AssistantGettingStartedPanel } from "@/features/settings/components/assistant-getting-started-panel";
+import { AssistantHooksPanel } from "@/features/settings/components/assistant-hooks-panel";
+import { AssistantMcpPanel } from "@/features/settings/components/assistant-mcp-panel";
 import { AssistantPreferencesPanel } from "@/features/settings/components/assistant-preferences-panel";
 import { AssistantRulesEditor } from "@/features/settings/components/assistant-rules-editor";
+import { AssistantSkillsPanel } from "@/features/settings/components/assistant-skills-panel";
 import { CredentialCenter } from "@/features/settings/components/credential-center";
 import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
 
@@ -22,12 +27,21 @@ export function LobbySettingsPage() {
   const route = useLobbySettingsRouteState();
   const [assistantPreferencesDirty, setAssistantPreferencesDirty] = useState(false);
   const [assistantRulesDirty, setAssistantRulesDirty] = useState(false);
+  const [assistantAgentsDirty, setAssistantAgentsDirty] = useState(false);
+  const [assistantSkillsDirty, setAssistantSkillsDirty] = useState(false);
+  const [assistantHooksDirty, setAssistantHooksDirty] = useState(false);
+  const [assistantMcpDirty, setAssistantMcpDirty] = useState(false);
   const [credentialDirty, setCredentialDirty] = useState(false);
   useNormalizeLobbySettingsRoute(route);
   const currentUrl = route.currentSearch ? `${route.pathname}?${route.currentSearch}` : route.pathname;
-  const isDirty = route.tab === "assistant"
-    ? assistantPreferencesDirty || assistantRulesDirty
-    : credentialDirty;
+  const isDirty = resolveLobbySettingsDirtyState(route.tab, {
+    assistant: assistantPreferencesDirty || assistantRulesDirty,
+    agents: assistantAgentsDirty,
+    credentials: credentialDirty,
+    hooks: assistantHooksDirty,
+    mcp: assistantMcpDirty,
+    skills: assistantSkillsDirty,
+  });
   const navigationGuard = useUnsavedChangesGuard({ currentUrl, isDirty, router });
 
   return (
@@ -36,7 +50,7 @@ export function LobbySettingsPage() {
         <LobbySettingsSidebar
           isDirty={isDirty}
           isPending={route.isPending}
-          onNavigate={navigationGuard.attemptNavigation}
+          onNavigateAway={navigationGuard.attemptNavigation}
           onSelectTab={(tab) =>
             navigationGuard.attemptNavigation(() => handleLobbySettingsTabChange(tab, route.setParams))
           }
@@ -47,6 +61,10 @@ export function LobbySettingsPage() {
           route={route}
           onAssistantPreferencesDirtyChange={setAssistantPreferencesDirty}
           onAssistantRulesDirtyChange={setAssistantRulesDirty}
+          onAssistantAgentsDirtyChange={setAssistantAgentsDirty}
+          onAssistantHooksDirtyChange={setAssistantHooksDirty}
+          onAssistantMcpDirtyChange={setAssistantMcpDirty}
+          onAssistantSkillsDirtyChange={setAssistantSkillsDirty}
           onCredentialDirtyChange={setCredentialDirty}
         />
       </div>
@@ -60,105 +78,37 @@ export function LobbySettingsPage() {
   );
 }
 
-function LobbySettingsSidebar({
-  isDirty,
-  isPending,
-  onNavigate,
-  onSelectTab,
-  tab,
-}: Readonly<{
-  isDirty: boolean;
-  isPending: boolean;
-  onNavigate: (onConfirm: () => void) => void;
-  onSelectTab: (tab: LobbySettingsTab) => void;
-  tab: LobbySettingsTab;
-}>) {
-  return (
-    <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-      <SectionCard
-        action={
-          <GuardedLink
-            className="ink-button-secondary"
-            href="/workspace/lobby"
-            isDirty={isDirty}
-            onNavigate={onNavigate}
-          >
-            返回项目大厅
-          </GuardedLink>
-        }
-        description="管理模型连接、默认模型和长期规则。"
-        title="AI 设置"
-      >
-        <div className="space-y-3">
-          <LobbySettingsNavButton
-            active={tab === "assistant"}
-            description="默认连接、默认模型、长期规则"
-            disabled={isPending}
-            label="AI 助手"
-            onClick={() => onSelectTab("assistant")}
-          />
-          <LobbySettingsNavButton
-            active={tab === "credentials"}
-            description="添加、验证、启用或切换模型连接"
-            disabled={isPending}
-            label="模型连接"
-            onClick={() => onSelectTab("credentials")}
-          />
-        </div>
-      </SectionCard>
-      <div className="panel-muted space-y-2 px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">
-        <p>管理个人默认设置。</p>
-        <p>项目专属规则请前往“项目设置”。</p>
-      </div>
-    </aside>
-  );
-}
-
-function LobbySettingsNavButton({
-  active,
-  description,
-  disabled,
-  label,
-  onClick,
-}: Readonly<{
-  active: boolean;
-  description: string;
-  disabled: boolean;
-  label: string;
-  onClick: () => void;
-}>) {
-  return (
-    <button
-      className="ink-tab w-full justify-start rounded-[20px] px-4 py-3 text-left"
-      data-active={active}
-      disabled={disabled}
-      onClick={onClick}
-      type="button"
-    >
-      <span className="flex flex-col items-start gap-1">
-        <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
-        <span className="text-[12px] leading-5 text-[var(--text-secondary)]">{description}</span>
-      </span>
-    </button>
-  );
-}
-
 function LobbySettingsContent({
   navigationGuard,
   route,
   onAssistantPreferencesDirtyChange,
   onAssistantRulesDirtyChange,
+  onAssistantAgentsDirtyChange,
+  onAssistantHooksDirtyChange,
+  onAssistantMcpDirtyChange,
+  onAssistantSkillsDirtyChange,
   onCredentialDirtyChange,
 }: Readonly<{
   navigationGuard: (onConfirm: () => void) => void;
   route: LobbySettingsRouteState;
   onAssistantPreferencesDirtyChange: (isDirty: boolean) => void;
   onAssistantRulesDirtyChange: (isDirty: boolean) => void;
+  onAssistantAgentsDirtyChange: (isDirty: boolean) => void;
+  onAssistantHooksDirtyChange: (isDirty: boolean) => void;
+  onAssistantMcpDirtyChange: (isDirty: boolean) => void;
+  onAssistantSkillsDirtyChange: (isDirty: boolean) => void;
   onCredentialDirtyChange: (isDirty: boolean) => void;
 }>) {
   if (route.tab === "assistant") {
     return (
       <div className="space-y-4">
+        <AssistantGettingStartedPanel
+          onOpenCredentials={() =>
+            navigationGuard(() => handleLobbySettingsTabChange("credentials", route.setParams))
+          }
+          onOpenSkills={() => navigationGuard(() => handleLobbySettingsTabChange("skills", route.setParams))}
+        />
+        <AssistantConfigFileMapPanel />
         <AssistantPreferencesPanel onDirtyChange={onAssistantPreferencesDirtyChange} />
         <AssistantRulesEditor
           description="保存后，新聊天会自动带上这些规则。"
@@ -168,6 +118,22 @@ function LobbySettingsContent({
         />
       </div>
     );
+  }
+
+  if (route.tab === "agents") {
+    return <AssistantAgentsPanel onDirtyChange={onAssistantAgentsDirtyChange} />;
+  }
+
+  if (route.tab === "skills") {
+    return <AssistantSkillsPanel onDirtyChange={onAssistantSkillsDirtyChange} />;
+  }
+
+  if (route.tab === "hooks") {
+    return <AssistantHooksPanel onDirtyChange={onAssistantHooksDirtyChange} />;
+  }
+
+  if (route.tab === "mcp") {
+    return <AssistantMcpPanel onDirtyChange={onAssistantMcpDirtyChange} />;
   }
 
   return (
@@ -256,6 +222,46 @@ function handleLobbySettingsTabChange(
     setParams({ tab: "credentials" });
     return;
   }
+  if (tab === "skills") {
+    setParams({
+      credential: null,
+      project: null,
+      scope: null,
+      sub: null,
+      tab: "skills",
+    });
+    return;
+  }
+  if (tab === "hooks") {
+    setParams({
+      credential: null,
+      project: null,
+      scope: null,
+      sub: null,
+      tab: "hooks",
+    });
+    return;
+  }
+  if (tab === "mcp") {
+    setParams({
+      credential: null,
+      project: null,
+      scope: null,
+      sub: null,
+      tab: "mcp",
+    });
+    return;
+  }
+  if (tab === "agents") {
+    setParams({
+      credential: null,
+      project: null,
+      scope: null,
+      sub: null,
+      tab: "agents",
+    });
+    return;
+  }
   setParams({
     credential: null,
     project: null,
@@ -263,4 +269,11 @@ function handleLobbySettingsTabChange(
     sub: null,
     tab: "assistant",
   });
+}
+
+function resolveLobbySettingsDirtyState(
+  tab: LobbySettingsTab,
+  values: Readonly<Record<LobbySettingsTab, boolean>>,
+) {
+  return values[tab];
 }

@@ -367,7 +367,7 @@ def test_execute_reports_gemini_finish_reason_when_response_has_no_parts() -> No
 
     provider = LLMToolProvider(request_sender=request_sender)
 
-    with pytest.raises(ConfigurationError, match="finishReason=MAX_TOKENS"):
+    with pytest.raises(ConfigurationError, match="上游在输出尚未完成时提前停止了这次回复"):
         asyncio.run(
             provider.execute(
                 "llm.generate",

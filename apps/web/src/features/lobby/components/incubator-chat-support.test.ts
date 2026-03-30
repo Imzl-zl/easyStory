@@ -7,6 +7,7 @@ import {
   buildIncubatorConversationFingerprint,
   buildIncubatorConversationText,
   buildSuggestedProjectName,
+  INCUBATOR_CHAT_SKILL_ID,
   createIncubatorInitialMessages,
   createIncubatorMessage,
   INCUBATOR_DEFAULT_PROVIDER,
@@ -14,9 +15,16 @@ import {
   INCUBATOR_PENDING_REPLY_MESSAGE,
   resolveIncubatorAssistantReply,
   resolveChatOutputModeLabel,
+  resolveFailedIncubatorReply,
+  resolveIncubatorAgentId,
+  resolveIncubatorAgentLabel,
+  resolveIncubatorHookIds,
   resolveInterruptedIncubatorReply,
+  resolveIncubatorSkillLabel,
+  resolveIncubatorSkillId,
   shouldShowPromptSuggestions,
   shouldSubmitIncubatorComposer,
+  toggleIncubatorHookId,
 } from "./incubator-chat-support";
 
 test("incubator chat support builds draft transcript from first user message onward", () => {
@@ -43,16 +51,22 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
     createIncubatorMessage("user", "给我三个方向"),
   ];
 
-  assert.equal(
-    buildIncubatorConversationFingerprint(messages, {
+  assert.deepEqual(
+    JSON.parse(buildIncubatorConversationFingerprint(messages, {
+      agentId: "",
+      hookIds: [],
       modelName: "",
       provider: INCUBATOR_DEFAULT_PROVIDER,
-    }),
-    JSON.stringify({
+      skillId: INCUBATOR_CHAT_SKILL_ID,
+    })),
+    {
+      agentId: "",
       conversationText: "用户：给我三个方向",
+      hookIds: [],
       modelName: "",
       provider: INCUBATOR_DEFAULT_PROVIDER,
-    }),
+      skillId: INCUBATOR_CHAT_SKILL_ID,
+    },
   );
   assert.equal(
     buildAssistantModelOverride({
@@ -80,6 +94,25 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
   );
   assert.equal(resolveChatOutputModeLabel(true), "边写边显示");
   assert.equal(resolveChatOutputModeLabel(false), "生成后整体显示");
+  assert.equal(resolveIncubatorSkillId(undefined), INCUBATOR_CHAT_SKILL_ID);
+  assert.equal(resolveIncubatorAgentId(undefined), "");
+  assert.deepEqual(resolveIncubatorHookIds(["hook.b", " hook.a ", "hook.b"]), ["hook.a", "hook.b"]);
+  assert.deepEqual(toggleIncubatorHookId(["hook.a"], "hook.b"), ["hook.a", "hook.b"]);
+  assert.deepEqual(toggleIncubatorHookId(["hook.a", "hook.b"], "hook.a"), ["hook.b"]);
+  assert.equal(
+    resolveIncubatorSkillLabel(
+      [{ label: "默认聊天助手", value: INCUBATOR_CHAT_SKILL_ID }],
+      "skill.user.story-helper-a1b2c3",
+    ),
+    "当前 Skill 不可用：skill.user.story-helper-a1b2c3",
+  );
+  assert.equal(
+    resolveIncubatorAgentLabel(
+      [{ label: "温柔陪跑", value: "agent.user.story-coach-a1b2c3" }],
+      "agent.user.missing-a1b2c3",
+    ),
+    "当前 Agent 不可用：agent.user.missing-a1b2c3",
+  );
 });
 
 test("incubator chat support suggests project names from available setting signals", () => {
@@ -151,5 +184,15 @@ test("incubator chat support keeps partial reply when streaming is interrupted",
   assert.equal(
     resolveInterruptedIncubatorReply("先给你两个方向"),
     `先给你两个方向\n\n${INCUBATOR_INTERRUPTED_REPLY_MESSAGE}`,
+  );
+});
+
+test("incubator chat support preserves truncation reason when partial content already exists", () => {
+  assert.equal(
+    resolveFailedIncubatorReply(
+      "4. **情感与宿命感更强：**\n不",
+      "上游在输出尚未完成时提前停止了这次回复，当前只收到部分内容（stop_reason=length）。请在“模型与连接”里调高单次回复上限，或切换更稳定的连接后重试。",
+    ),
+    "4. **情感与宿命感更强：**\n不\n\n上游在输出尚未完成时提前停止了这次回复，当前只收到部分内容（stop_reason=length）。请在“模型与连接”里调高单次回复上限，或切换更稳定的连接后重试。",
   );
 });

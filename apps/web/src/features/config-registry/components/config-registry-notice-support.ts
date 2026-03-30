@@ -14,7 +14,7 @@ type ConfigRegistryNotice = {
 export function buildConfigRegistrySaveSuccessNotice(): ConfigRegistryNotice {
   return {
     content: "配置已保存。",
-    title: "平台配置",
+    title: "系统配置",
     tone: "success",
   };
 }
@@ -29,7 +29,7 @@ export function buildConfigRegistrySaveErrorFeedback(message: string): ConfigReg
 export function buildConfigRegistrySaveErrorNotice(message: string): ConfigRegistryNotice {
   return {
     content: message.trim(),
-    title: "平台配置",
+    title: "系统配置",
     tone: "danger",
   };
 }

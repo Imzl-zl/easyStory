@@ -15,9 +15,17 @@ import {
 test("lobby settings tab resolves to supported values", () => {
   assert.equal(resolveLobbySettingsTab("assistant-rules"), "assistant");
   assert.equal(resolveLobbySettingsTab("assistant-preferences"), "assistant");
+  assert.equal(resolveLobbySettingsTab("assistant-agents"), "agents");
+  assert.equal(resolveLobbySettingsTab("assistant-hooks"), "hooks");
+  assert.equal(resolveLobbySettingsTab("assistant-mcp"), "mcp");
+  assert.equal(resolveLobbySettingsTab("assistant-skills"), "skills");
   assert.equal(resolveLobbySettingsTab("other"), "assistant");
+  assert.equal(isValidLobbySettingsTab("agents"), true);
   assert.equal(isValidLobbySettingsTab("credentials"), true);
+  assert.equal(isValidLobbySettingsTab("hooks"), true);
+  assert.equal(isValidLobbySettingsTab("mcp"), true);
   assert.equal(isValidLobbySettingsTab("assistant-rules"), true);
+  assert.equal(isValidLobbySettingsTab("skills"), true);
   assert.equal(isValidLobbySettingsTab("debug"), false);
 });
 

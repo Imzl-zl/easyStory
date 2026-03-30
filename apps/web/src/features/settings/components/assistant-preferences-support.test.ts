@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildAssistantPreferencesPayload,
+  buildAssistantPreferencesFormKey,
   buildAssistantProviderOptions,
   isAssistantPreferencesDirty,
   toAssistantPreferencesDraft,
@@ -11,13 +12,13 @@ import {
 test("assistant preferences support maps api data to editable draft", () => {
   assert.deepEqual(
     toAssistantPreferencesDraft({
-      default_max_output_tokens: 4096,
+      default_max_output_tokens: null,
       default_model_name: "gpt-4o-mini",
       default_provider: "openai",
     }),
     {
       defaultModelName: "gpt-4o-mini",
-      defaultMaxOutputTokens: "4096",
+      defaultMaxOutputTokens: "",
       defaultProvider: "openai",
     },
   );
@@ -70,5 +71,60 @@ test("assistant preferences support builds provider options from active connecti
         value: "openai",
       },
     ],
+  );
+});
+
+test("assistant preferences support marks nullable token drafts and project scope options correctly", () => {
+  const options = buildAssistantProviderOptions(
+    [
+      {
+        id: "p1",
+        owner_type: "project",
+        provider: "anthropic",
+        display_name: "项目 Anthropic",
+        default_model: "claude-3-7-sonnet",
+        is_active: true,
+      },
+      {
+        id: "u1",
+        owner_type: "user",
+        provider: "openai",
+        display_name: "个人 OpenAI",
+        default_model: "gpt-4.1-mini",
+        is_active: true,
+      },
+    ] as never,
+    "project",
+  );
+
+  assert.deepEqual(options[0], {
+    description: "不单独指定这个项目的连接，继续跟随个人 AI 偏好。",
+    label: "跟随个人 AI 偏好",
+    value: "",
+  });
+  assert.equal(options[1].description, "个人连接 · openai · 默认模型：gpt-4.1-mini");
+  assert.equal(options[2].description, "项目连接 · anthropic · 默认模型：claude-3-7-sonnet");
+  assert.equal(
+    isAssistantPreferencesDirty(
+      {
+        defaultModelName: "",
+        defaultMaxOutputTokens: "",
+        defaultProvider: "",
+      },
+      {
+        default_max_output_tokens: null,
+        default_model_name: null,
+        default_provider: null,
+      },
+    ),
+    false,
+  );
+  assert.equal(
+    buildAssistantPreferencesFormKey({
+      default_max_output_tokens: null,
+      default_model_name: null,
+      default_provider: null,
+    }),
+    "none:none:none",
   );
 });

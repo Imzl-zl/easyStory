@@ -3,7 +3,7 @@ import type {
   CredentialCenterScope,
 } from "@/features/settings/components/credential-center-support";
 
-export type LobbySettingsTab = "assistant" | "credentials";
+export type LobbySettingsTab = "assistant" | "agents" | "skills" | "hooks" | "mcp" | "credentials";
 
 const CREDENTIAL_CENTER_MODES: CredentialCenterMode[] = ["list", "audit"];
 const CREDENTIAL_CENTER_SCOPES: CredentialCenterScope[] = ["user", "project"];
@@ -11,7 +11,15 @@ const LOBBY_SETTINGS_TAB_ALIASES = {
   assistant: "assistant",
   "assistant-preferences": "assistant",
   "assistant-rules": "assistant",
+  "assistant-agents": "agents",
+  "assistant-hooks": "hooks",
+  "assistant-mcp": "mcp",
+  "assistant-skills": "skills",
+  agents: "agents",
   credentials: "credentials",
+  hooks: "hooks",
+  mcp: "mcp",
+  skills: "skills",
 } as const;
 
 export function resolveLobbySettingsTab(value: string | null): LobbySettingsTab {

@@ -32,31 +32,80 @@ export function LobbySettingsSidebar({
             返回项目大厅
           </GuardedLink>
         }
-        description="管理模型连接、默认模型和长期规则。"
+        description="先完成长期规则、Skills 和模型连接；进阶能力按需要再添加。"
         title="AI 设置"
       >
-        <div className="space-y-3">
-          <LobbySettingsNavButton
-            active={tab === "assistant"}
-            description="默认连接、默认模型、长期规则"
-            disabled={isPending}
-            label="AI 助手"
-            onClick={() => onSelectTab("assistant")}
-          />
-          <LobbySettingsNavButton
-            active={tab === "credentials"}
-            description="添加、验证、启用或切换模型连接"
-            disabled={isPending}
-            label="模型连接"
-            onClick={() => onSelectTab("credentials")}
-          />
+        <div className="space-y-4">
+          <LobbySettingsNavGroup title="先从这里开始">
+            <LobbySettingsNavButton
+              active={tab === "assistant"}
+              description="长期规则、默认方式"
+              disabled={isPending}
+              label="AI 助手"
+              onClick={() => onSelectTab("assistant")}
+            />
+            <LobbySettingsNavButton
+              active={tab === "skills"}
+              description="保存常用聊天方式"
+              disabled={isPending}
+              label="Skills"
+              onClick={() => onSelectTab("skills")}
+            />
+            <LobbySettingsNavButton
+              active={tab === "credentials"}
+              description="选择默认连接和模型"
+              disabled={isPending}
+              label="模型连接"
+              onClick={() => onSelectTab("credentials")}
+            />
+          </LobbySettingsNavGroup>
+          <LobbySettingsNavGroup title="高级能力">
+            <LobbySettingsNavButton
+              active={tab === "agents"}
+              description="进阶：固定助手角色"
+              disabled={isPending}
+              label="Agents"
+              onClick={() => onSelectTab("agents")}
+            />
+            <LobbySettingsNavButton
+              active={tab === "hooks"}
+              description="进阶：自动动作"
+              disabled={isPending}
+              label="Hooks"
+              onClick={() => onSelectTab("hooks")}
+            />
+            <LobbySettingsNavButton
+              active={tab === "mcp"}
+              description="进阶：外部工具连接"
+              disabled={isPending}
+              label="MCP"
+              onClick={() => onSelectTab("mcp")}
+            />
+          </LobbySettingsNavGroup>
         </div>
       </SectionCard>
       <div className="panel-muted space-y-2 px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">
-        <p>管理个人默认设置。</p>
+        <p>这里只管理你自己的默认设置。</p>
         <p>项目专属规则请前往“项目设置”。</p>
       </div>
     </aside>
+  );
+}
+
+function LobbySettingsNavGroup({
+  children,
+  title,
+}: Readonly<{
+  children: React.ReactNode;
+  title: string;
+}>) {
+  return (
+    <div className="space-y-2">
+      <p className="px-1 text-[11px] font-medium tracking-[0.08em] text-[var(--text-tertiary)] uppercase">
+        {title}
+      </p>
+      <div className="space-y-3">{children}</div>
+    </div>
   );
 }
 

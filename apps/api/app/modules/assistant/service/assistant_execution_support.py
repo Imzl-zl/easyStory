@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-from typing import Any
+from typing import Any, Callable
 import uuid
 
 from jinja2.exceptions import SecurityError, UndefinedError
@@ -13,7 +13,7 @@ from app.shared.runtime import SkillTemplateRenderer
 from app.shared.runtime.errors import ConfigurationError
 
 from .assistant_hook_support import AssistantHookExecutionContext, build_assistant_hook_payload
-from .assistant_prompt_support import build_skill_variables, resolve_model
+from .assistant_prompt_support import build_skill_variables, resolve_model, validate_skill_input
 from .dto import AssistantHookResultDTO, AssistantTurnRequestDTO, AssistantTurnResponseDTO
 from .preferences_dto import AssistantPreferencesDTO
 from .preferences_support import apply_preferred_model
@@ -43,10 +43,15 @@ def resolve_execution_spec(
     config_loader: ConfigLoader,
     payload: AssistantTurnRequestDTO,
     preferences: AssistantPreferencesDTO,
+    *,
+    load_agent: Callable[[str], AgentConfig] | None = None,
+    load_skill: Callable[[str], SkillConfig] | None = None,
 ) -> AssistantExecutionSpec:
     if payload.agent_id is not None:
-        agent = config_loader.load_agent(payload.agent_id)
-        skill = require_agent_skill(config_loader, agent)
+        agent_loader = load_agent or config_loader.load_agent
+        skill_loader = load_skill or config_loader.load_skill
+        agent = agent_loader(payload.agent_id)
+        skill = require_agent_skill(skill_loader, agent)
         preferred_model = apply_preferred_model(agent.model or skill.model, preferences)
         model = resolve_model(preferred_model, payload.model, context_label=agent.id)
         return AssistantExecutionSpec(
@@ -56,7 +61,8 @@ def resolve_execution_spec(
             model=model,
             mcp_servers=list(agent.mcp_servers),
         )
-    skill = config_loader.load_skill(payload.skill_id or "")
+    skill_loader = load_skill or config_loader.load_skill
+    skill = skill_loader(payload.skill_id or "")
     preferred_model = apply_preferred_model(skill.model, preferences)
     model = resolve_model(preferred_model, payload.model, context_label=skill.id)
     return AssistantExecutionSpec(
@@ -70,23 +76,22 @@ def resolve_execution_spec(
 
 def render_prompt(
     *,
-    config_loader: ConfigLoader,
     template_renderer: SkillTemplateRenderer,
     skill: SkillConfig,
     payload: AssistantTurnRequestDTO,
 ) -> str:
     variables = build_skill_variables(skill, payload.messages, payload.input_data)
-    config_loader.validate_skill_input(skill, variables)
+    validate_skill_input(skill, variables)
     try:
         return template_renderer.render(skill.prompt, variables)
     except (SecurityError, UndefinedError) as exc:
         raise ConfigurationError(f"Assistant prompt render failed: {exc}") from exc
 
 
-def require_agent_skill(config_loader: ConfigLoader, agent: AgentConfig) -> SkillConfig:
+def require_agent_skill(skill_loader: Callable[[str], SkillConfig], agent: AgentConfig) -> SkillConfig:
     if not agent.skills:
         raise ConfigurationError(f"Agent {agent.id} has no skills configured")
-    return config_loader.load_skill(agent.skills[0])
+    return skill_loader(agent.skills[0])
 
 
 def build_hook_agent_variables(
@@ -99,10 +104,27 @@ def build_hook_agent_variables(
         "event": context.event,
         "assistant_agent_id": context.assistant_agent_id,
         "assistant_skill_id": context.assistant_skill_id,
+        "user_input": _resolve_hook_user_input(context),
+        "conversation_history": _render_hook_conversation_history(context),
+        "response_content": _read_optional_hook_text(context, "response.content"),
     }
     for target, source in input_mapping.items():
         variables[target] = context.read_path(source)
     return variables
+
+
+def resolve_hook_agent_model(
+    *,
+    agent: AgentConfig,
+    skill: SkillConfig,
+    preferences: AssistantPreferencesDTO,
+    assistant_model: ModelConfig,
+) -> ModelConfig:
+    hook_base_model = agent.model or skill.model
+    if hook_base_model is None:
+        return assistant_model.model_copy(deep=True)
+    preferred_model = apply_preferred_model(hook_base_model, preferences)
+    return resolve_model(preferred_model, None, context_label=f"Hook agent {agent.id}")
 
 
 def dump_turn_messages(payload: AssistantTurnRequestDTO) -> list[dict[str, str]]:
@@ -205,3 +227,47 @@ def _load_json_output(content: str) -> Any:
         return json.loads(content)
     except json.JSONDecodeError as exc:
         raise ConfigurationError("Hook agent JSON output must be valid JSON") from exc
+
+
+def _resolve_hook_user_input(context: AssistantHookExecutionContext) -> str:
+    if context.event == "after_assistant_response":
+        response_content = _read_optional_hook_text(context, "response.content")
+        if response_content:
+            return response_content
+    return _read_optional_hook_text(context, "request.user_input")
+
+
+def _render_hook_conversation_history(context: AssistantHookExecutionContext) -> str:
+    messages = _read_optional_hook_messages(context)
+    if not messages:
+        return ""
+    return "\n\n".join(
+        f"{_resolve_hook_message_role(message.get('role'))}：{message.get('content', '')}"
+        for message in messages
+    )
+
+
+def _read_optional_hook_messages(context: AssistantHookExecutionContext) -> list[dict[str, Any]]:
+    try:
+        value = context.read_path("conversation.messages")
+    except ConfigurationError:
+        return []
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _read_optional_hook_text(context: AssistantHookExecutionContext, path: str) -> str:
+    try:
+        value = context.read_path(path)
+    except ConfigurationError:
+        return ""
+    return value if isinstance(value, str) else ""
+
+
+def _resolve_hook_message_role(role: object) -> str:
+    if role == "assistant":
+        return "助手"
+    if role == "system":
+        return "系统"
+    return "用户"

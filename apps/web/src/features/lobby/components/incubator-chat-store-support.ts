@@ -419,10 +419,13 @@ function generateConversationId() {
 }
 
 function areIncubatorSettingsEqual(left: IncubatorChatSettings, right: IncubatorChatSettings) {
-  return left.allowSystemCredentialPool === right.allowSystemCredentialPool
+  return left.agentId === right.agentId
+    && left.allowSystemCredentialPool === right.allowSystemCredentialPool
+    && JSON.stringify(left.hookIds) === JSON.stringify(right.hookIds)
     && left.maxOutputTokens === right.maxOutputTokens
     && left.modelName === right.modelName
     && left.provider === right.provider
+    && left.skillId === right.skillId
     && left.streamOutput === right.streamOutput;
 }
 

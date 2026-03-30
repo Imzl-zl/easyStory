@@ -18,6 +18,13 @@ export function updateIncubatorChatSetting<K extends keyof IncubatorChatModel["s
 }
 
 export function buildChatSettingsSummaryItems(model: IncubatorChatModel) {
+  return buildChatSettingsSummaryItemsWithSkill(model, null);
+}
+
+export function buildChatSettingsSummaryItemsWithSkill(
+  model: IncubatorChatModel,
+  skillLabel: string | null,
+) {
   if (model.credentialState === "loading") {
     return ["正在读取模型连接"];
   }
@@ -35,6 +42,8 @@ export function buildChatSettingsSummaryItems(model: IncubatorChatModel) {
   const modelName = model.settings.modelName.trim() || option.defaultModel || "跟随连接默认模型";
   const maxOutputTokens = model.settings.maxOutputTokens.trim() || resolveOptionMaxOutputTokensDraft(option);
   return [
+    ...(skillLabel ? [skillLabel] : []),
+    ...(model.settings.hookIds.length > 0 ? [`自动动作 ${model.settings.hookIds.length}`] : []),
     stripDefaultModelSuffix(option),
     modelName,
     `上限 ${resolveAssistantMaxOutputTokens(maxOutputTokens)}`,

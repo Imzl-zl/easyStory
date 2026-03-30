@@ -160,6 +160,7 @@ function ChatTranscript({
         {messages.map((message) => (
           <MessageBubble
             content={message.content}
+            hookResults={message.hookResults}
             key={message.id}
             role={message.role}
             status={message.status}

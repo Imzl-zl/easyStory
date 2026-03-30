@@ -10,7 +10,7 @@ import {
 test("config registry save helpers return success and error states", () => {
   assert.deepEqual(buildConfigRegistrySaveSuccessNotice(), {
     content: "配置已保存。",
-    title: "平台配置",
+    title: "系统配置",
     tone: "success",
   });
   assert.deepEqual(buildConfigRegistrySaveErrorFeedback("  保存失败  "), {
@@ -19,7 +19,7 @@ test("config registry save helpers return success and error states", () => {
   });
   assert.deepEqual(buildConfigRegistrySaveErrorNotice("  保存失败  "), {
     content: "保存失败",
-    title: "平台配置",
+    title: "系统配置",
     tone: "danger",
   });
 });

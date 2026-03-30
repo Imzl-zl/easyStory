@@ -1,16 +1,31 @@
 import { normalizeModelProviderMessage, looksLikeRetiredModelMessage } from "@/lib/api/error-copy";
-import type { AssistantMessage, AssistantModelConfig, ProjectSetting } from "@/lib/api/types";
+import type {
+  AssistantHookResult,
+  AssistantMessage,
+  AssistantModelConfig,
+  ProjectSetting,
+} from "@/lib/api/types";
 import {
   resolveAssistantMaxOutputTokens,
 } from "@/features/shared/assistant/assistant-output-token-support";
+import {
+  ASSISTANT_DEFAULT_CHAT_SKILL_ID,
+  ASSISTANT_DEFAULT_CHAT_SKILL_LABEL,
+} from "@/features/shared/assistant/assistant-defaults";
 
 export const INCUBATOR_DEFAULT_PROVIDER = "";
 export const INCUBATOR_DEFAULT_MODEL_NAME = "";
-export const INCUBATOR_CHAT_SKILL_ID = "skill.assistant.general_chat";
+export const INCUBATOR_CHAT_SKILL_ID = ASSISTANT_DEFAULT_CHAT_SKILL_ID;
+export const INCUBATOR_DEFAULT_CHAT_SKILL_LABEL = ASSISTANT_DEFAULT_CHAT_SKILL_LABEL;
+export const INCUBATOR_NO_AGENT_ID = "";
+export const INCUBATOR_NO_AGENT_LABEL = "直接聊天";
+export const INCUBATOR_UNAVAILABLE_SKILL_LABEL_PREFIX = "当前 Skill 不可用";
+export const INCUBATOR_UNAVAILABLE_AGENT_LABEL_PREFIX = "当前 Agent 不可用";
 export const INCUBATOR_INPUT_MAX_LENGTH = 4000;
 export const INCUBATOR_DEFAULT_PROJECT_NAME = "未命名新故事";
 export const INCUBATOR_PENDING_REPLY_MESSAGE = "正在整理故事方向…";
 export const INCUBATOR_INTERRUPTED_REPLY_MESSAGE = "这次回复中断了，你可以重新发送。";
+const TRUNCATED_REPLY_ERROR_PATTERN = /提前停止了这次回复|stop_reason=(length|max_tokens|max_output_tokens|MAX_TOKENS)/i;
 
 export const INCUBATOR_PROMPT_SUGGESTIONS = [
   "我完全不知道写什么，先给我 3 个适合新手的故事方向。",
@@ -21,23 +36,30 @@ export const INCUBATOR_PROMPT_SUGGESTIONS = [
 
 export type IncubatorChatMessage = AssistantMessage & {
   id: string;
+  hookResults?: AssistantHookResult[];
   hidden?: boolean;
   status?: "pending" | "error";
 };
 
 export type IncubatorChatSettings = {
+  agentId: string;
   allowSystemCredentialPool: boolean;
+  hookIds: string[];
   maxOutputTokens: string;
   modelName: string;
   provider: string;
+  skillId: string;
   streamOutput: boolean;
 };
 
 export const INITIAL_INCUBATOR_CHAT_SETTINGS: IncubatorChatSettings = {
+  agentId: INCUBATOR_NO_AGENT_ID,
   allowSystemCredentialPool: false,
+  hookIds: [],
   maxOutputTokens: "",
   modelName: INCUBATOR_DEFAULT_MODEL_NAME,
   provider: INCUBATOR_DEFAULT_PROVIDER,
+  skillId: INCUBATOR_CHAT_SKILL_ID,
   streamOutput: true,
 };
 
@@ -66,7 +88,7 @@ export function createIncubatorInitialMessages(): IncubatorChatMessage[] {
 export function createIncubatorMessage(
   role: IncubatorChatMessage["role"],
   content: string,
-  options: Pick<IncubatorChatMessage, "hidden" | "status"> = {},
+  options: Pick<IncubatorChatMessage, "hidden" | "hookResults" | "status"> = {},
 ): IncubatorChatMessage {
   return {
     id: `${role}-${Math.random().toString(36).slice(2, 10)}`,
@@ -135,12 +157,15 @@ export function buildIncubatorConversationText(
 
 export function buildIncubatorConversationFingerprint(
   messages: IncubatorChatMessage[],
-  settings: Pick<IncubatorChatSettings, "modelName" | "provider">,
+  settings: Pick<IncubatorChatSettings, "agentId" | "hookIds" | "modelName" | "provider" | "skillId">,
 ): string {
   return JSON.stringify({
+    agentId: resolveIncubatorAgentId(settings.agentId),
     conversationText: buildIncubatorConversationText(messages),
+    hookIds: resolveIncubatorHookIds(settings.hookIds),
     modelName: resolveIncubatorModelName(settings.modelName),
     provider: resolveIncubatorProvider(settings.provider),
+    skillId: resolveIncubatorSkillId(settings.skillId),
   });
 }
 
@@ -169,6 +194,21 @@ export function resolveInterruptedIncubatorReply(content: string) {
     return null;
   }
   return `${trimmed}\n\n${INCUBATOR_INTERRUPTED_REPLY_MESSAGE}`;
+}
+
+export function resolveFailedIncubatorReply(
+  content: string,
+  errorMessage: string,
+) {
+  const trimmedContent = content.trim();
+  const trimmedError = errorMessage.trim();
+  if (!trimmedContent || trimmedContent === INCUBATOR_PENDING_REPLY_MESSAGE) {
+    return trimmedError || null;
+  }
+  if (TRUNCATED_REPLY_ERROR_PATTERN.test(trimmedError)) {
+    return `${trimmedContent}\n\n${trimmedError}`;
+  }
+  return resolveInterruptedIncubatorReply(trimmedContent) ?? (trimmedError || null);
 }
 
 export function shouldShowPromptSuggestions(hasUserMessage: boolean) {
@@ -222,12 +262,74 @@ function resolveMessageRoleLabel(role: AssistantMessage["role"]) {
   return "用户";
 }
 
-export function resolveIncubatorProvider(provider: string) {
-  return provider.trim();
+export function resolveIncubatorProvider(provider: string | null | undefined) {
+  return typeof provider === "string" ? provider.trim() : "";
 }
 
-export function resolveIncubatorModelName(modelName: string) {
-  return modelName.trim();
+export function resolveIncubatorModelName(modelName: string | null | undefined) {
+  return typeof modelName === "string" ? modelName.trim() : "";
+}
+
+export function resolveIncubatorSkillId(skillId: string | null | undefined) {
+  const normalized = typeof skillId === "string" ? skillId.trim() : "";
+  return normalized || INCUBATOR_CHAT_SKILL_ID;
+}
+
+export function resolveIncubatorSkillLabel(
+  options: ReadonlyArray<{ label: string; value: string }>,
+  skillId: string | null | undefined,
+) {
+  const resolvedSkillId = resolveIncubatorSkillId(skillId);
+  const matchedOption = options.find((option) => option.value === resolvedSkillId);
+  if (matchedOption) {
+    return matchedOption.label;
+  }
+  return resolvedSkillId === INCUBATOR_CHAT_SKILL_ID
+    ? INCUBATOR_DEFAULT_CHAT_SKILL_LABEL
+    : `${INCUBATOR_UNAVAILABLE_SKILL_LABEL_PREFIX}：${resolvedSkillId}`;
+}
+
+export function resolveIncubatorAgentId(agentId: string | null | undefined) {
+  return typeof agentId === "string" ? agentId.trim() : "";
+}
+
+export function resolveIncubatorHookIds(hookIds: string[] | null | undefined) {
+  if (!Array.isArray(hookIds)) {
+    return [];
+  }
+  return Array.from(new Set(
+    hookIds
+      .map((item) => (typeof item === "string" ? item.trim() : ""))
+      .filter(Boolean),
+  )).sort();
+}
+
+export function toggleIncubatorHookId(
+  currentHookIds: string[],
+  hookId: string,
+) {
+  const normalizedHookId = hookId.trim();
+  if (!normalizedHookId) {
+    return resolveIncubatorHookIds(currentHookIds);
+  }
+  const nextHookIds = currentHookIds.includes(normalizedHookId)
+    ? currentHookIds.filter((item) => item !== normalizedHookId)
+    : [...currentHookIds, normalizedHookId];
+  return resolveIncubatorHookIds(nextHookIds);
+}
+
+export function resolveIncubatorAgentLabel(
+  options: ReadonlyArray<{ label: string; value: string }>,
+  agentId: string | null | undefined,
+) {
+  const resolvedAgentId = resolveIncubatorAgentId(agentId);
+  if (!resolvedAgentId) {
+    return INCUBATOR_NO_AGENT_LABEL;
+  }
+  const matchedOption = options.find((option) => option.value === resolvedAgentId);
+  return matchedOption
+    ? matchedOption.label
+    : `${INCUBATOR_UNAVAILABLE_AGENT_LABEL_PREFIX}：${resolvedAgentId}`;
 }
 
 function normalizeText(value: string | undefined) {

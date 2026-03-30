@@ -6,7 +6,9 @@ import type { AssistantTurnPayload } from "@/lib/api/types";
 import {
   buildAssistantModelOverride,
   buildAssistantTurnMessages,
-  INCUBATOR_CHAT_SKILL_ID,
+  resolveIncubatorAgentId,
+  resolveIncubatorHookIds,
+  resolveIncubatorSkillId,
   type IncubatorChatMessage,
   type IncubatorChatSettings,
 } from "./incubator-chat-support";
@@ -17,10 +19,14 @@ export function buildIncubatorAssistantTurnPayload(
   settings: IncubatorChatSettings,
   messages: IncubatorChatMessage[],
 ): AssistantTurnPayload {
+  const agentId = resolveIncubatorAgentId(settings.agentId);
   return {
+    hook_ids: resolveIncubatorHookIds(settings.hookIds),
     messages: buildAssistantTurnMessages(messages),
     model: buildAssistantModelOverride(settings),
-    skill_id: INCUBATOR_CHAT_SKILL_ID,
+    ...(agentId
+      ? { agent_id: agentId }
+      : { skill_id: resolveIncubatorSkillId(settings.skillId) }),
   };
 }
 

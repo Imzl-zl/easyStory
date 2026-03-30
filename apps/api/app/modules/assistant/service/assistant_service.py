@@ -20,6 +20,10 @@ from app.shared.runtime.provider_interop_stream_support import StreamInterrupted
 
 from .assistant_rule_service import AssistantRuleService
 from .assistant_rule_support import build_assistant_system_prompt
+from .assistant_agent_service import AssistantAgentService
+from .assistant_hook_service import AssistantHookService
+from .assistant_mcp_service import AssistantMcpService
+from .assistant_skill_service import AssistantSkillService
 from .assistant_hook_providers import build_assistant_plugin_registry
 from .assistant_hook_support import (
     AssistantHookExecutionContext,
@@ -41,11 +45,10 @@ from .assistant_execution_support import (
     require_text_output,
     resolve_execution_spec,
     resolve_hook_agent_output,
-    resolve_model,
+    resolve_hook_agent_model,
     validate_retry_policy,
 )
 from .dto import AssistantHookResultDTO, AssistantTurnRequestDTO, AssistantTurnResponseDTO
-from .preferences_support import apply_preferred_model
 from .preferences_service import AssistantPreferencesService
 
 
@@ -60,7 +63,11 @@ class AssistantService:
         self,
         *,
         assistant_rule_service: AssistantRuleService,
+        assistant_agent_service: AssistantAgentService | None = None,
+        assistant_hook_service: AssistantHookService | None = None,
+        assistant_mcp_service: AssistantMcpService | None = None,
         assistant_preferences_service: AssistantPreferencesService | None = None,
+        assistant_skill_service: AssistantSkillService | None = None,
         config_loader: ConfigLoader,
         credential_service_factory: Callable[[], CredentialService],
         project_service: ProjectService,
@@ -69,13 +76,39 @@ class AssistantService:
         plugin_registry: PluginRegistry | None = None,
     ) -> None:
         self.assistant_rule_service = assistant_rule_service
-        self.assistant_preferences_service = assistant_preferences_service or AssistantPreferencesService()
         self.config_loader = config_loader
-        self.credential_service_factory = credential_service_factory
         self.project_service = project_service
+        self.assistant_preferences_service = assistant_preferences_service or AssistantPreferencesService(
+            project_service=project_service
+        )
+        self.assistant_skill_service = assistant_skill_service or AssistantSkillService(
+            config_loader=config_loader,
+            project_service=project_service,
+        )
+        self.assistant_agent_service = assistant_agent_service or AssistantAgentService(
+            assistant_skill_service=self.assistant_skill_service,
+            config_loader=config_loader,
+        )
+        self.assistant_mcp_service = assistant_mcp_service or AssistantMcpService(
+            config_loader=config_loader,
+            project_service=project_service,
+        )
+        self.assistant_hook_service = assistant_hook_service or AssistantHookService(
+            assistant_agent_service=self.assistant_agent_service,
+            assistant_mcp_service=self.assistant_mcp_service,
+            config_loader=config_loader,
+        )
+        self.credential_service_factory = credential_service_factory
         self.tool_provider = tool_provider
         self.template_renderer = template_renderer
-        self.plugin_registry = plugin_registry or build_assistant_plugin_registry(self, config_loader=config_loader)
+        self.plugin_registry = plugin_registry or build_assistant_plugin_registry(
+            self,
+            mcp_server_resolver=lambda context, server_id: self.assistant_mcp_service.resolve_mcp_server(
+                server_id,
+                owner_id=context.owner_id,
+                project_id=context.project_id,
+            ),
+        )
         self._credential_service: CredentialService | None = None
 
     async def turn(
@@ -154,16 +187,33 @@ class AssistantService:
         agent_id: str,
         input_mapping: dict[str, str],
     ) -> Any:
-        agent = self.config_loader.load_agent(agent_id)
-        skill = require_agent_skill(self.config_loader, agent)
+        agent = self.assistant_agent_service.resolve_agent(
+            agent_id,
+            owner_id=context.owner_id,
+            allow_disabled=True,
+        )
+        skill = require_agent_skill(
+            lambda skill_id: self.assistant_skill_service.resolve_skill(
+                skill_id,
+                owner_id=context.owner_id,
+                project_id=context.project_id,
+                allow_disabled=True,
+            ),
+            agent,
+        )
         variables = build_hook_agent_variables(context, input_mapping)
         prompt = self.template_renderer.render(skill.prompt, variables)
-        preferences = await self.assistant_preferences_service.get_preferences(
+        preferences = await self.assistant_preferences_service.resolve_preferences(
             context.db,
-            context.owner_id,
+            owner_id=context.owner_id,
+            project_id=context.project_id,
         )
-        preferred_model = apply_preferred_model(agent.model or skill.model, preferences)
-        model = resolve_model(preferred_model, None, context_label=f"Hook agent {agent.id}")
+        model = resolve_hook_agent_model(
+            agent=agent,
+            skill=skill,
+            preferences=preferences,
+            assistant_model=context.assistant_model,
+        )
         rule_bundle = await self.assistant_rule_service.build_rule_bundle(
             context.db,
             owner_id=context.owner_id,
@@ -193,8 +243,26 @@ class AssistantService:
         owner_id: uuid.UUID,
     ) -> PreparedAssistantTurn:
         project_id = await self._resolve_project_scope(db, payload.project_id, owner_id=owner_id)
-        preferences = await self.assistant_preferences_service.get_preferences(db, owner_id)
-        spec = resolve_execution_spec(self.config_loader, payload, preferences)
+        preferences = await self.assistant_preferences_service.resolve_preferences(
+            db,
+            owner_id=owner_id,
+            project_id=project_id,
+        )
+        spec = resolve_execution_spec(
+            self.config_loader,
+            payload,
+            preferences,
+            load_agent=lambda agent_id: self.assistant_agent_service.resolve_agent(
+                agent_id,
+                owner_id=owner_id,
+            ),
+            load_skill=lambda skill_id: self.assistant_skill_service.resolve_skill(
+                skill_id,
+                owner_id=owner_id,
+                project_id=project_id,
+                allow_disabled=payload.agent_id is not None,
+            ),
+        )
         rule_bundle = await self.assistant_rule_service.build_rule_bundle(
             db,
             owner_id=owner_id,
@@ -203,11 +271,13 @@ class AssistantService:
         messages = dump_turn_messages(payload)
         return PreparedAssistantTurn(
             before_payload=build_before_assistant_payload(spec, payload, project_id, messages),
-            hooks=[self.config_loader.load_hook(hook_id) for hook_id in payload.hook_ids],
+            hooks=[
+                self.assistant_hook_service.resolve_hook(hook_id, owner_id=owner_id)
+                for hook_id in payload.hook_ids
+            ],
             messages=messages,
             project_id=project_id,
             prompt=render_prompt(
-                config_loader=self.config_loader,
                 template_renderer=self.template_renderer,
                 skill=spec.skill,
                 payload=payload,
@@ -236,6 +306,7 @@ class AssistantService:
             project_id=prepared.project_id,
             agent_id=prepared.spec.agent_id,
             skill_id=prepared.spec.skill.id,
+            assistant_model=prepared.spec.model,
         )
 
     async def _finalize_turn(
@@ -265,6 +336,7 @@ class AssistantService:
             project_id=prepared.project_id,
             agent_id=prepared.spec.agent_id,
             skill_id=prepared.spec.skill.id,
+            assistant_model=prepared.spec.model,
         )
         return build_turn_response(
             prepared.spec,
@@ -295,6 +367,7 @@ class AssistantService:
         project_id: uuid.UUID | None,
         agent_id: str | None,
         skill_id: str,
+        assistant_model: ModelConfig,
     ) -> list[AssistantHookResultDTO]:
         context = AssistantHookExecutionContext(
             db=db,
@@ -303,6 +376,7 @@ class AssistantService:
             payload=payload,
             assistant_agent_id=agent_id,
             assistant_skill_id=skill_id,
+            assistant_model=assistant_model,
             project_id=project_id,
         )
         results: list[AssistantHookResultDTO] = []
@@ -353,6 +427,7 @@ class AssistantService:
         project_id: uuid.UUID | None,
         agent_id: str | None,
         skill_id: str,
+        assistant_model: ModelConfig,
     ) -> None:
         error_payload = dict(payload)
         error_payload["error"] = serialize_hook_error(error)
@@ -366,6 +441,7 @@ class AssistantService:
                 project_id=project_id,
                 agent_id=agent_id,
                 skill_id=skill_id,
+                assistant_model=assistant_model,
             )
         except Exception as hook_exc:
             raise ExceptionGroup("Assistant runtime error and on_error hook both failed", [error, hook_exc]) from hook_exc
@@ -401,6 +477,7 @@ class AssistantService:
                 project_id=project_id,
                 agent_id=spec.agent_id,
                 skill_id=spec.skill.id,
+                assistant_model=spec.model,
             )
             raise
 
@@ -440,6 +517,7 @@ class AssistantService:
                 project_id=project_id,
                 agent_id=spec.agent_id,
                 skill_id=spec.skill.id,
+                assistant_model=spec.model,
             )
             raise
 

@@ -5,12 +5,15 @@ from typing import Any
 from .errors import ConfigurationError
 from .llm_protocol_types import NormalizedLLMResponse, normalize_api_dialect
 
+TRUNCATED_STOP_REASONS = frozenset({"length", "max_tokens", "max_output_tokens", "MAX_TOKENS"})
+
 
 def parse_generation_response(
     api_dialect: str,
     payload: dict[str, Any],
 ) -> NormalizedLLMResponse:
     dialect = normalize_api_dialect(api_dialect)
+    _raise_if_response_truncated(dialect, payload)
     if dialect == "openai_chat_completions":
         return _parse_openai_chat_response(payload)
     if dialect == "openai_responses":
@@ -72,6 +75,30 @@ def _parse_gemini_generate_content_response(payload: dict[str, Any]) -> Normaliz
     )
 
 
+def _raise_if_response_truncated(
+    api_dialect: str,
+    payload: dict[str, Any],
+) -> None:
+    stop_reason = _extract_stop_reason(api_dialect, payload)
+    if stop_reason not in TRUNCATED_STOP_REASONS:
+        return
+    raise ConfigurationError(
+        "上游在输出尚未完成时提前停止了这次回复，"
+        f"当前只收到部分内容（stop_reason={stop_reason}）。"
+        "请在“模型与连接”里调高单次回复上限，或切换更稳定的连接后重试。"
+    )
+
+
+def _extract_stop_reason(api_dialect: str, payload: dict[str, Any]) -> str | None:
+    if api_dialect == "openai_chat_completions":
+        return _extract_openai_chat_stop_reason(payload)
+    if api_dialect == "openai_responses":
+        return _extract_openai_responses_stop_reason(payload)
+    if api_dialect == "anthropic_messages":
+        return _extract_anthropic_stop_reason(payload)
+    return _extract_gemini_stop_reason(payload)
+
+
 def _build_gemini_empty_content_message(candidate: dict[str, Any]) -> str:
     finish_reason = candidate.get("finishReason")
     if isinstance(finish_reason, str) and finish_reason:
@@ -93,6 +120,37 @@ def _extract_responses_text(payload: dict[str, Any]) -> str:
             if isinstance(block, dict) and isinstance(block.get("text"), str):
                 parts.append(block["text"])
     return "".join(parts)
+
+
+def _extract_openai_chat_stop_reason(payload: dict[str, Any]) -> str | None:
+    choices = _require_list(payload.get("choices"), "choices")
+    first_choice = _require_dict(choices[0], "choices[0]")
+    finish_reason = first_choice.get("finish_reason")
+    return finish_reason if isinstance(finish_reason, str) else None
+
+
+def _extract_openai_responses_stop_reason(payload: dict[str, Any]) -> str | None:
+    incomplete_details = _require_dict(
+        payload.get("incomplete_details"),
+        "incomplete_details",
+        allow_none=True,
+    ) or {}
+    reason = incomplete_details.get("reason")
+    if isinstance(reason, str):
+        return reason
+    return None
+
+
+def _extract_anthropic_stop_reason(payload: dict[str, Any]) -> str | None:
+    stop_reason = payload.get("stop_reason")
+    return stop_reason if isinstance(stop_reason, str) else None
+
+
+def _extract_gemini_stop_reason(payload: dict[str, Any]) -> str | None:
+    candidates = _require_list(payload.get("candidates"), "candidates")
+    first_candidate = _require_dict(candidates[0], "candidates[0]")
+    finish_reason = first_candidate.get("finishReason")
+    return finish_reason if isinstance(finish_reason, str) else None
 
 
 def _build_normalized_response(

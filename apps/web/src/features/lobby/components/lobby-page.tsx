@@ -60,7 +60,7 @@ function LobbyToolbar() {
         回收站
       </Link>
       <Link className="ink-button-secondary h-9 px-4 text-[13px]" href="/workspace/lobby/config-registry?type=skills">
-        平台配置
+        系统配置
       </Link>
     </div>
   );

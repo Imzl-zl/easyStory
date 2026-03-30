@@ -29,11 +29,11 @@ export type ConfigRegistryMetaRow = {
 };
 
 const CONFIG_REGISTRY_TABS: ConfigRegistryTabOption[] = [
-  { key: "skills", label: "Skills", description: "技能配置" },
-  { key: "agents", label: "Agents", description: "角色配置" },
-  { key: "hooks", label: "Hooks", description: "触发动作" },
-  { key: "mcp_servers", label: "MCP", description: "MCP 服务" },
-  { key: "workflows", label: "Workflows", description: "流程配置" },
+  { key: "skills", label: "Skills", description: "内置写作能力的运行配置" },
+  { key: "agents", label: "Agents", description: "内置助手角色的装配配置" },
+  { key: "hooks", label: "Hooks", description: "自动动作与联动规则" },
+  { key: "mcp_servers", label: "MCP", description: "外部工具与服务连接" },
+  { key: "workflows", label: "Workflows", description: "写作流程编排配置" },
 ];
 
 export function listConfigRegistryTabs(): ConfigRegistryTabOption[] {

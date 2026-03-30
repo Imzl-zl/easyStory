@@ -7,7 +7,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.config_registry.schemas import HookCondition, HookConfig
+from app.modules.config_registry.schemas import HookCondition, HookConfig, ModelConfig
 from app.shared.runtime.errors import ConfigurationError
 
 ASSISTANT_HOOK_EVENTS = frozenset(
@@ -23,6 +23,7 @@ class AssistantHookExecutionContext:
     payload: dict[str, Any]
     assistant_agent_id: str | None
     assistant_skill_id: str
+    assistant_model: ModelConfig
     project_id: uuid.UUID | None
 
     def read_path(self, path: str) -> Any:

@@ -5,7 +5,7 @@
 | 文档类型 | 技术规范 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-14 |
-| 更新时间 | 2026-03-28 |
+| 更新时间 | 2026-03-30 |
 | 关联文档 | [系统架构设计](./architecture.md)、[数据库设计](./database-design.md) |
 
 ---
@@ -72,18 +72,31 @@ apps/api/.runtime/assistant-config/
 │   └── <user_id>/
 │       ├── AGENTS.md              # 个人长期规则
 │       ├── preferences.yaml       # AI 偏好（默认连接、默认模型）
-│       ├── skills/                # 预留：个人 skills
-│       ├── agents/                # 预留：个人 agents
-│       ├── hooks/                 # 预留：个人 hooks
-│       ├── mcp_servers/           # 预留：个人 mcp_servers
+│       ├── skills/
+│       │   └── <skill_id>/
+│       │       └── SKILL.md       # 个人 Skills
+│       ├── agents/
+│       │   └── <agent_id>/
+│       │       └── AGENT.md       # 个人 Agents
+│       ├── hooks/
+│       │   └── <hook_id>/
+│       │       └── HOOK.yaml      # 个人 Hooks
+│       ├── mcp_servers/
+│       │   └── <server_id>/
+│       │       └── MCP.yaml       # 个人 MCP
 │       └── workflows/             # 预留：个人 workflows
 └── projects/
     └── <project_id>/
         ├── AGENTS.md              # 项目长期规则
-        ├── skills/                # 预留：项目级 skills
+        ├── preferences.yaml       # 项目 AI 偏好（覆盖个人默认）
+        ├── skills/
+        │   └── <skill_id>/
+        │       └── SKILL.md       # 项目 Skills
         ├── agents/                # 预留：项目级 agents
         ├── hooks/                 # 预留：项目级 hooks
-        ├── mcp_servers/           # 预留：项目级 mcp_servers
+        ├── mcp_servers/
+        │   └── <server_id>/
+        │       └── MCP.yaml       # 项目 MCP
         └── workflows/             # 预留：项目级 workflows
 ```
 
@@ -91,9 +104,18 @@ apps/api/.runtime/assistant-config/
 
 - `users/<user_id>/AGENTS.md`
 - `users/<user_id>/preferences.yaml`
+- `users/<user_id>/skills/<skill_id>/SKILL.md`
+- `users/<user_id>/agents/<agent_id>/AGENT.md`
+- `users/<user_id>/hooks/<hook_id>/HOOK.yaml`
+- `users/<user_id>/mcp_servers/<server_id>/MCP.yaml`
 - `projects/<project_id>/AGENTS.md`
+- `projects/<project_id>/preferences.yaml`
+- `projects/<project_id>/skills/<skill_id>/SKILL.md`
+- `projects/<project_id>/mcp_servers/<server_id>/MCP.yaml`
 
 > `/config` 负责系统内置能力；`apps/api/.runtime/assistant-config/` 负责用户和项目自己的 assistant 配置。后端运行时环境变量仍通过 `apps/api/.env` 注入，详见 [8.1 后端运行时 Settings](#81-后端运行时-settings)。
+>
+> 当前普通用户主路径正式聚焦 `AGENTS.md / SKILL.md / MCP.yaml`。运行时统一按 `项目层 -> 用户层 -> 系统层` 解析；其中 `preferences.yaml` 只覆盖显式填写的字段，`Skills / MCP` 则在同 ID 命中后整份项目文件覆盖用户或系统定义。
 
 ---
 
@@ -158,7 +180,7 @@ scope: user
 
 ### 2.2 Assistant 偏好文件
 
-AI 偏好使用 YAML 文件，文件名固定为 `preferences.yaml`：
+AI 偏好使用 YAML 文件，文件名固定为 `preferences.yaml`。用户层和项目层都使用同一份格式：
 
 ```yaml
 default_provider: "anthropic"
@@ -168,9 +190,129 @@ default_max_output_tokens: 4096
 
 字段说明：
 
-- `default_provider`：默认连接标识；为空表示跟随系统默认
-- `default_model_name`：默认模型；为空表示跟随该连接自己的默认模型
-- `default_max_output_tokens`：默认单次回复上限；为空或缺省时按系统默认 `4096`
+- `default_provider`：默认连接标识；用户层为空表示跟随系统默认，项目层为空表示继续跟随个人 AI 偏好
+- `default_model_name`：默认模型；为空表示继续跟随当前作用域下已经解析出的默认模型
+- `default_max_output_tokens`：默认单次回复上限；为空表示继续跟随上一级作用域，最终回落到系统默认 `4096`
+
+作用域优先级：
+
+- 运行时按 `项目层 preferences.yaml -> 用户层 preferences.yaml -> 系统默认 / 连接默认` 解析
+- 项目层只覆盖自己显式填写的字段；未填写的字段继续沿用用户层
+
+### 2.3 Assistant Skill 文件
+
+用户层和项目层的 Skill 都使用 Markdown 文件，文件名固定为 `SKILL.md`：
+
+```md
+---
+id: skill.user.story-helper-a1b2c3
+name: 温柔开题
+enabled: true
+description: 先陪我收拢方向，再一点点追问
+model:
+  provider: anthropic
+  name: claude-sonnet-4
+  max_tokens: 4096
+---
+
+你是一位擅长陪新手一起梳理故事方向的写作助手。
+先给 2 到 3 个可写方向，再告诉我你最推荐哪一个。
+如果信息还不够，每次只追问一个关键问题。
+
+用户输入：{{ user_input }}
+{% if conversation_history %}
+历史对话：{{ conversation_history }}
+{% endif %}
+```
+
+字段说明：
+
+- `id`：必填，skill 唯一标识；用户层当前统一由后端生成 `skill.user.*`，项目层统一由后端生成 `skill.project.*`
+- `name`：必填，显示名称
+- `enabled`：可选，默认 `true`；关闭后不会出现在聊天页 Skill 切换里
+- `description`：可选，一句简短说明
+- `model`：可选；用于覆盖默认连接、默认模型和默认单次回复上限
+- 正文：真正注入到 assistant prompt 的 Skill 内容
+
+运行时约束：
+
+- 当前用户层和项目层 Skill 都只允许使用 `{{ user_input }}` 与 `{{ conversation_history }}` 两个变量
+- 运行时按 `项目 Skill -> 用户 Skill -> 系统 Skill` 解析；项目层命中后整份 Skill 会覆盖同 ID 的用户层或系统层定义
+- frontmatter 非法、变量非法或内容为空时，运行时直接报错，不做静默降级
+
+### 2.4 Assistant Agent 文件
+
+用户自己的 Agent 使用 Markdown 文件，文件名固定为 `AGENT.md`：
+
+```md
+---
+id: agent.user.story-coach-a1b2c3
+name: 温柔陪跑
+enabled: true
+description: 更像一个长期创作搭子
+skill_id: skill.user.story-helper-d4e5f6
+model:
+  provider: anthropic
+  name: claude-sonnet-4
+  max_tokens: 4096
+---
+
+先给结论，再陪用户把方向收拢到下一步。
+每次只追问一个关键问题，不要像表单一样连续盘问。
+```
+
+字段说明：
+
+- `id`：必填，agent 唯一标识；用户层当前统一由后端生成 `agent.user.*`
+- `name`：必填，显示名称
+- `enabled`：可选，默认 `true`；关闭后不会出现在聊天页 Agent 切换里，也不能直接用于对话
+- `description`：可选，一句简短说明
+- `skill_id`：必填；当前一个用户 Agent 只绑定一个 Skill，运行时通过这个 Skill 渲染实际 prompt
+- `model`：可选；用于覆盖默认连接、默认模型和默认单次回复上限
+- 正文：真正注入到 assistant system prompt 的 Agent 角色说明
+
+运行时约束：
+
+- 当前用户 Agent 运行时优先解析用户 Agent，找不到才回退系统内置 Agent
+- 用户 Agent 允许绑定已停用的用户 Skill，便于把“隐藏 Skill”作为 Agent 的内部实现
+- frontmatter 非法、`skill_id` 缺失或正文为空时，运行时直接报错，不做静默降级
+
+### 2.5 Assistant MCP 文件
+
+用户层和项目层的 MCP 都使用 YAML 文件，文件名固定为 `MCP.yaml`：
+
+```yaml
+mcp_server:
+  id: "mcp.user.research-desk-a1b2c3"
+  name: "资料检索"
+  description: "给 Hook 调用的资料查询工具"
+  enabled: true
+  version: "1.0.0"
+  transport: "streamable_http"
+  url: "https://example.com/mcp"
+  headers:
+    X-Workspace: "story"
+  timeout: 30
+```
+
+字段说明：
+
+- `id`：必填，MCP 唯一标识；用户层当前统一由后端生成 `mcp.user.*`，项目层统一由后端生成 `mcp.project.*`
+- `name`：必填，显示名称
+- `description`：可选，一句简短说明
+- `enabled`：可选，默认 `true`；停用后不会被 Hook 或运行时调用
+- `version`：可选，默认 `1.0.0`
+- `transport`：必填；当前正式只支持 `streamable_http`
+- `url`：必填；MCP 服务地址
+- `headers`：可选；请求头字典
+- `timeout`：可选；超时时间，单位秒
+
+运行时约束：
+
+- 运行时按 `项目 MCP -> 用户 MCP -> 系统 MCP` 解析；项目层命中后整份 MCP 会覆盖同 ID 的用户层或系统层定义
+- `transport` 当前仅正式支持 `streamable_http`
+- `headers` 必须是 `string -> string` 映射；非法结构直接报错
+- 文档根节点缺失、URL 非法或内容非法时，运行时直接报错，不做静默降级
 
 ---
 

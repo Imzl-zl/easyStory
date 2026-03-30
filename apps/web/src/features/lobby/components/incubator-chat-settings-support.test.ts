@@ -22,10 +22,13 @@ test("incubator chat settings support shows token summary with stable wording", 
     }],
     credentialState: "ready",
     settings: {
+      agentId: "",
       allowSystemCredentialPool: false,
+      hookIds: [],
       maxOutputTokens: "8192",
       modelName: "",
       provider: "openai",
+      skillId: "skill.assistant.general_chat",
       streamOutput: true,
     },
   } as never);
@@ -40,10 +43,13 @@ test("incubator chat settings support shows token summary with stable wording", 
 
 test("incubator chat settings support syncs token limit when switching to a new connection default", () => {
   const initialSettings = {
+    agentId: "",
     allowSystemCredentialPool: false,
+    hookIds: [],
     maxOutputTokens: "4096",
     modelName: "gpt-4.1",
     provider: "openai",
+    skillId: "skill.assistant.general_chat",
     streamOutput: true,
   };
   let nextSettings: typeof initialSettings | null = null;
@@ -73,10 +79,13 @@ test("incubator chat settings support syncs token limit when switching to a new 
   syncProviderSelection(model as never, "anthropic");
 
   assert.deepEqual(nextSettings, {
+    agentId: "",
     allowSystemCredentialPool: false,
+    hookIds: [],
     maxOutputTokens: "12288",
     modelName: "claude-sonnet-4",
     provider: "anthropic",
+    skillId: "skill.assistant.general_chat",
     streamOutput: true,
   });
 });

@@ -9,17 +9,41 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.assistant.service import (
+    AssistantAgentCreateDTO,
+    AssistantAgentDetailDTO,
+    AssistantAgentService,
+    AssistantAgentSummaryDTO,
+    AssistantAgentUpdateDTO,
+    AssistantHookCreateDTO,
+    AssistantHookDetailDTO,
+    AssistantHookService,
+    AssistantHookSummaryDTO,
+    AssistantHookUpdateDTO,
+    AssistantMcpCreateDTO,
+    AssistantMcpDetailDTO,
+    AssistantMcpService,
+    AssistantMcpSummaryDTO,
+    AssistantMcpUpdateDTO,
     AssistantPreferencesDTO,
     AssistantPreferencesService,
     AssistantPreferencesUpdateDTO,
     AssistantRuleProfileDTO,
     AssistantRuleProfileUpdateDTO,
     AssistantRuleService,
+    AssistantSkillCreateDTO,
+    AssistantSkillDetailDTO,
+    AssistantSkillService,
+    AssistantSkillSummaryDTO,
+    AssistantSkillUpdateDTO,
     AssistantService,
     AssistantTurnRequestDTO,
     AssistantTurnResponseDTO,
     create_assistant_preferences_service,
+    create_assistant_agent_service,
+    create_assistant_hook_service,
+    create_assistant_mcp_service,
     create_assistant_rule_service,
+    create_assistant_skill_service,
     create_assistant_service,
 )
 from app.modules.user.entry.http.dependencies import get_current_user
@@ -40,8 +64,24 @@ def get_assistant_rule_service() -> AssistantRuleService:
     return create_assistant_rule_service()
 
 
+def get_assistant_agent_service() -> AssistantAgentService:
+    return create_assistant_agent_service()
+
+
 def get_assistant_preferences_service() -> AssistantPreferencesService:
     return create_assistant_preferences_service()
+
+
+def get_assistant_hook_service() -> AssistantHookService:
+    return create_assistant_hook_service()
+
+
+def get_assistant_mcp_service() -> AssistantMcpService:
+    return create_assistant_mcp_service()
+
+
+def get_assistant_skill_service() -> AssistantSkillService:
+    return create_assistant_skill_service()
 
 
 @router.post(
@@ -130,7 +170,7 @@ async def get_my_assistant_preferences(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db_session),
 ) -> AssistantPreferencesDTO:
-    return await assistant_preferences_service.get_preferences(db, current_user.id)
+    return await assistant_preferences_service.get_user_preferences(db, owner_id=current_user.id)
 
 
 @router.put("/preferences", response_model=AssistantPreferencesDTO)
@@ -142,10 +182,44 @@ async def update_my_assistant_preferences(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db_session),
 ) -> AssistantPreferencesDTO:
-    return await assistant_preferences_service.update_preferences(
+    return await assistant_preferences_service.update_user_preferences(
         db,
-        current_user.id,
-        payload,
+        owner_id=current_user.id,
+        payload=payload,
+    )
+
+
+@router.get("/preferences/projects/{project_id}", response_model=AssistantPreferencesDTO)
+async def get_project_assistant_preferences(
+    project_id: uuid.UUID,
+    assistant_preferences_service: AssistantPreferencesService = Depends(
+        get_assistant_preferences_service
+    ),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantPreferencesDTO:
+    return await assistant_preferences_service.get_project_preferences(
+        db,
+        project_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.put("/preferences/projects/{project_id}", response_model=AssistantPreferencesDTO)
+async def update_project_assistant_preferences(
+    project_id: uuid.UUID,
+    payload: AssistantPreferencesUpdateDTO,
+    assistant_preferences_service: AssistantPreferencesService = Depends(
+        get_assistant_preferences_service
+    ),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantPreferencesDTO:
+    return await assistant_preferences_service.update_project_preferences(
+        db,
+        project_id,
+        owner_id=current_user.id,
+        payload=payload,
     )
 
 
@@ -198,5 +272,433 @@ async def update_project_assistant_rules(
         db,
         project_id,
         payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/skills", response_model=list[AssistantSkillSummaryDTO])
+async def list_my_assistant_skills(
+    assistant_skill_service: AssistantSkillService = Depends(get_assistant_skill_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> list[AssistantSkillSummaryDTO]:
+    return await assistant_skill_service.list_user_skills(db, owner_id=current_user.id)
+
+
+@router.get("/skills/projects/{project_id}", response_model=list[AssistantSkillSummaryDTO])
+async def list_project_assistant_skills(
+    project_id: uuid.UUID,
+    assistant_skill_service: AssistantSkillService = Depends(get_assistant_skill_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> list[AssistantSkillSummaryDTO]:
+    return await assistant_skill_service.list_project_skills(
+        db,
+        project_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/agents", response_model=list[AssistantAgentSummaryDTO])
+async def list_my_assistant_agents(
+    assistant_agent_service: AssistantAgentService = Depends(get_assistant_agent_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> list[AssistantAgentSummaryDTO]:
+    return await assistant_agent_service.list_user_agents(db, owner_id=current_user.id)
+
+
+@router.get("/hooks", response_model=list[AssistantHookSummaryDTO])
+async def list_my_assistant_hooks(
+    assistant_hook_service: AssistantHookService = Depends(get_assistant_hook_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> list[AssistantHookSummaryDTO]:
+    return await assistant_hook_service.list_user_hooks(db, owner_id=current_user.id)
+
+
+@router.get("/mcp_servers", response_model=list[AssistantMcpSummaryDTO])
+async def list_my_assistant_mcp_servers(
+    assistant_mcp_service: AssistantMcpService = Depends(get_assistant_mcp_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> list[AssistantMcpSummaryDTO]:
+    return await assistant_mcp_service.list_user_mcp_servers(db, owner_id=current_user.id)
+
+
+@router.get("/mcp_servers/projects/{project_id}", response_model=list[AssistantMcpSummaryDTO])
+async def list_project_assistant_mcp_servers(
+    project_id: uuid.UUID,
+    assistant_mcp_service: AssistantMcpService = Depends(get_assistant_mcp_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> list[AssistantMcpSummaryDTO]:
+    return await assistant_mcp_service.list_project_mcp_servers(
+        db,
+        project_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.post("/agents", response_model=AssistantAgentDetailDTO)
+async def create_my_assistant_agent(
+    payload: AssistantAgentCreateDTO,
+    assistant_agent_service: AssistantAgentService = Depends(get_assistant_agent_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantAgentDetailDTO:
+    return await assistant_agent_service.create_user_agent(
+        db,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.post("/hooks", response_model=AssistantHookDetailDTO)
+async def create_my_assistant_hook(
+    payload: AssistantHookCreateDTO,
+    assistant_hook_service: AssistantHookService = Depends(get_assistant_hook_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantHookDetailDTO:
+    return await assistant_hook_service.create_user_hook(
+        db,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.post("/mcp_servers", response_model=AssistantMcpDetailDTO)
+async def create_my_assistant_mcp_server(
+    payload: AssistantMcpCreateDTO,
+    assistant_mcp_service: AssistantMcpService = Depends(get_assistant_mcp_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantMcpDetailDTO:
+    return await assistant_mcp_service.create_user_mcp_server(
+        db,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.post("/mcp_servers/projects/{project_id}", response_model=AssistantMcpDetailDTO)
+async def create_project_assistant_mcp_server(
+    project_id: uuid.UUID,
+    payload: AssistantMcpCreateDTO,
+    assistant_mcp_service: AssistantMcpService = Depends(get_assistant_mcp_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantMcpDetailDTO:
+    return await assistant_mcp_service.create_project_mcp_server(
+        db,
+        project_id,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/agents/{agent_id}", response_model=AssistantAgentDetailDTO)
+async def get_my_assistant_agent(
+    agent_id: str,
+    assistant_agent_service: AssistantAgentService = Depends(get_assistant_agent_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantAgentDetailDTO:
+    return await assistant_agent_service.get_user_agent(
+        db,
+        agent_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/hooks/{hook_id}", response_model=AssistantHookDetailDTO)
+async def get_my_assistant_hook(
+    hook_id: str,
+    assistant_hook_service: AssistantHookService = Depends(get_assistant_hook_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantHookDetailDTO:
+    return await assistant_hook_service.get_user_hook(
+        db,
+        hook_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/mcp_servers/projects/{project_id}/{server_id}", response_model=AssistantMcpDetailDTO)
+async def get_project_assistant_mcp_server(
+    project_id: uuid.UUID,
+    server_id: str,
+    assistant_mcp_service: AssistantMcpService = Depends(get_assistant_mcp_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantMcpDetailDTO:
+    return await assistant_mcp_service.get_project_mcp_server(
+        db,
+        project_id,
+        server_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/mcp_servers/{server_id}", response_model=AssistantMcpDetailDTO)
+async def get_my_assistant_mcp_server(
+    server_id: str,
+    assistant_mcp_service: AssistantMcpService = Depends(get_assistant_mcp_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantMcpDetailDTO:
+    return await assistant_mcp_service.get_user_mcp_server(
+        db,
+        server_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.put("/agents/{agent_id}", response_model=AssistantAgentDetailDTO)
+async def update_my_assistant_agent(
+    agent_id: str,
+    payload: AssistantAgentUpdateDTO,
+    assistant_agent_service: AssistantAgentService = Depends(get_assistant_agent_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantAgentDetailDTO:
+    return await assistant_agent_service.update_user_agent(
+        db,
+        agent_id,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.put("/hooks/{hook_id}", response_model=AssistantHookDetailDTO)
+async def update_my_assistant_hook(
+    hook_id: str,
+    payload: AssistantHookUpdateDTO,
+    assistant_hook_service: AssistantHookService = Depends(get_assistant_hook_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantHookDetailDTO:
+    return await assistant_hook_service.update_user_hook(
+        db,
+        hook_id,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.put("/mcp_servers/{server_id}", response_model=AssistantMcpDetailDTO)
+async def update_my_assistant_mcp_server(
+    server_id: str,
+    payload: AssistantMcpUpdateDTO,
+    assistant_mcp_service: AssistantMcpService = Depends(get_assistant_mcp_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantMcpDetailDTO:
+    return await assistant_mcp_service.update_user_mcp_server(
+        db,
+        server_id,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.put("/mcp_servers/projects/{project_id}/{server_id}", response_model=AssistantMcpDetailDTO)
+async def update_project_assistant_mcp_server(
+    project_id: uuid.UUID,
+    server_id: str,
+    payload: AssistantMcpUpdateDTO,
+    assistant_mcp_service: AssistantMcpService = Depends(get_assistant_mcp_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantMcpDetailDTO:
+    return await assistant_mcp_service.update_project_mcp_server(
+        db,
+        project_id,
+        server_id,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.delete("/agents/{agent_id}", status_code=204)
+async def delete_my_assistant_agent(
+    agent_id: str,
+    assistant_agent_service: AssistantAgentService = Depends(get_assistant_agent_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> None:
+    await assistant_agent_service.delete_user_agent(
+        db,
+        agent_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.delete("/hooks/{hook_id}", status_code=204)
+async def delete_my_assistant_hook(
+    hook_id: str,
+    assistant_hook_service: AssistantHookService = Depends(get_assistant_hook_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> None:
+    await assistant_hook_service.delete_user_hook(
+        db,
+        hook_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.delete("/mcp_servers/{server_id}", status_code=204)
+async def delete_my_assistant_mcp_server(
+    server_id: str,
+    assistant_mcp_service: AssistantMcpService = Depends(get_assistant_mcp_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> None:
+    await assistant_mcp_service.delete_user_mcp_server(
+        db,
+        server_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.delete("/mcp_servers/projects/{project_id}/{server_id}", status_code=204)
+async def delete_project_assistant_mcp_server(
+    project_id: uuid.UUID,
+    server_id: str,
+    assistant_mcp_service: AssistantMcpService = Depends(get_assistant_mcp_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> None:
+    await assistant_mcp_service.delete_project_mcp_server(
+        db,
+        project_id,
+        server_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.post("/skills", response_model=AssistantSkillDetailDTO)
+async def create_my_assistant_skill(
+    payload: AssistantSkillCreateDTO,
+    assistant_skill_service: AssistantSkillService = Depends(get_assistant_skill_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantSkillDetailDTO:
+    return await assistant_skill_service.create_user_skill(
+        db,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.post("/skills/projects/{project_id}", response_model=AssistantSkillDetailDTO)
+async def create_project_assistant_skill(
+    project_id: uuid.UUID,
+    payload: AssistantSkillCreateDTO,
+    assistant_skill_service: AssistantSkillService = Depends(get_assistant_skill_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantSkillDetailDTO:
+    return await assistant_skill_service.create_project_skill(
+        db,
+        project_id,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/skills/projects/{project_id}/{skill_id}", response_model=AssistantSkillDetailDTO)
+async def get_project_assistant_skill(
+    project_id: uuid.UUID,
+    skill_id: str,
+    assistant_skill_service: AssistantSkillService = Depends(get_assistant_skill_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantSkillDetailDTO:
+    return await assistant_skill_service.get_project_skill(
+        db,
+        project_id,
+        skill_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/skills/{skill_id}", response_model=AssistantSkillDetailDTO)
+async def get_my_assistant_skill(
+    skill_id: str,
+    assistant_skill_service: AssistantSkillService = Depends(get_assistant_skill_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantSkillDetailDTO:
+    return await assistant_skill_service.get_user_skill(
+        db,
+        skill_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.put("/skills/{skill_id}", response_model=AssistantSkillDetailDTO)
+async def update_my_assistant_skill(
+    skill_id: str,
+    payload: AssistantSkillUpdateDTO,
+    assistant_skill_service: AssistantSkillService = Depends(get_assistant_skill_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantSkillDetailDTO:
+    return await assistant_skill_service.update_user_skill(
+        db,
+        skill_id,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.put("/skills/projects/{project_id}/{skill_id}", response_model=AssistantSkillDetailDTO)
+async def update_project_assistant_skill(
+    project_id: uuid.UUID,
+    skill_id: str,
+    payload: AssistantSkillUpdateDTO,
+    assistant_skill_service: AssistantSkillService = Depends(get_assistant_skill_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> AssistantSkillDetailDTO:
+    return await assistant_skill_service.update_project_skill(
+        db,
+        project_id,
+        skill_id,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.delete("/skills/{skill_id}", status_code=204)
+async def delete_my_assistant_skill(
+    skill_id: str,
+    assistant_skill_service: AssistantSkillService = Depends(get_assistant_skill_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> None:
+    await assistant_skill_service.delete_user_skill(
+        db,
+        skill_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.delete("/skills/projects/{project_id}/{skill_id}", status_code=204)
+async def delete_project_assistant_skill(
+    project_id: uuid.UUID,
+    skill_id: str,
+    assistant_skill_service: AssistantSkillService = Depends(get_assistant_skill_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> None:
+    await assistant_skill_service.delete_project_skill(
+        db,
+        project_id,
+        skill_id,
         owner_id=current_user.id,
     )

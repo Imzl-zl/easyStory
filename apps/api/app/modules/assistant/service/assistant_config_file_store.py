@@ -14,12 +14,12 @@ from .assistant_rule_support import normalize_rule_content
 from .preferences_dto import (
     AssistantPreferencesDTO,
     AssistantPreferencesUpdateDTO,
-    DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS,
 )
 from .preferences_support import (
     build_preferences_dto,
     build_updated_preferences,
     has_custom_preferences,
+    merge_preferences,
 )
 
 RULE_FILE_NAME = "AGENTS.md"
@@ -60,21 +60,46 @@ class AssistantConfigFileStore:
     ) -> AssistantRuleProfileDTO:
         return self._save_rule("project", self._project_rule_path(project_id), payload)
 
-    def load_preferences(self, user_id: uuid.UUID) -> AssistantPreferencesDTO:
+    def load_user_preferences(self, user_id: uuid.UUID) -> AssistantPreferencesDTO:
         return _read_preferences_file(self._user_preferences_path(user_id))
+
+    def save_user_preferences(
+        self,
+        user_id: uuid.UUID,
+        payload: AssistantPreferencesUpdateDTO,
+    ) -> AssistantPreferencesDTO:
+        return self._save_preferences(self._user_preferences_path(user_id), payload)
+
+    def load_project_preferences(self, project_id: uuid.UUID) -> AssistantPreferencesDTO:
+        return _read_preferences_file(self._project_preferences_path(project_id))
+
+    def save_project_preferences(
+        self,
+        project_id: uuid.UUID,
+        payload: AssistantPreferencesUpdateDTO,
+    ) -> AssistantPreferencesDTO:
+        return self._save_preferences(self._project_preferences_path(project_id), payload)
+
+    def resolve_preferences(
+        self,
+        *,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID | None,
+    ) -> AssistantPreferencesDTO:
+        user_preferences = self.load_user_preferences(user_id)
+        if project_id is None:
+            return user_preferences
+        return merge_preferences(user_preferences, self.load_project_preferences(project_id))
+
+    def load_preferences(self, user_id: uuid.UUID) -> AssistantPreferencesDTO:
+        return self.load_user_preferences(user_id)
 
     def save_preferences(
         self,
         user_id: uuid.UUID,
         payload: AssistantPreferencesUpdateDTO,
     ) -> AssistantPreferencesDTO:
-        path = self._user_preferences_path(user_id)
-        preferences = build_updated_preferences(payload)
-        if not has_custom_preferences(preferences):
-            _delete_if_exists(path)
-            return build_preferences_dto()
-        _write_preferences_file(path, preferences)
-        return _read_preferences_file(path)
+        return self.save_user_preferences(user_id, payload)
 
     def _load_rule(
         self,
@@ -118,6 +143,21 @@ class AssistantConfigFileStore:
 
     def _user_preferences_path(self, user_id: uuid.UUID) -> Path:
         return self._user_dir(user_id) / PREFERENCES_FILE_NAME
+
+    def _project_preferences_path(self, project_id: uuid.UUID) -> Path:
+        return self._project_dir(project_id) / PREFERENCES_FILE_NAME
+
+    def _save_preferences(
+        self,
+        path: Path,
+        payload: AssistantPreferencesUpdateDTO,
+    ) -> AssistantPreferencesDTO:
+        preferences = build_updated_preferences(payload)
+        if not has_custom_preferences(preferences):
+            _delete_if_exists(path)
+            return build_preferences_dto()
+        _write_preferences_file(path, preferences)
+        return _read_preferences_file(path)
 
 
 def _read_rule_file(path: Path, *, expected_scope: str) -> RuleFileRecord | None:
@@ -183,7 +223,7 @@ def _write_preferences_file(path: Path, preferences: AssistantPreferencesDTO) ->
         payload["default_provider"] = preferences.default_provider
     if preferences.default_model_name is not None:
         payload["default_model_name"] = preferences.default_model_name
-    if preferences.default_max_output_tokens != DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS:
+    if preferences.default_max_output_tokens is not None:
         payload["default_max_output_tokens"] = preferences.default_max_output_tokens
     _ensure_parent_dir(path)
     path.write_text(

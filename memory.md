@@ -6,8 +6,8 @@
 ## 当前基线
 
 - 后端测试：最近一次已知全量 `cd apps/api && ruff check app tests && pytest -q` 通过（记录日期：2026-03-23）
-- 前端检查：最近一次已知 `pnpm --dir apps/web exec tsc --noEmit` + `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-03-29）
-- 最后更新：2026-03-29
+- 前端检查：最近一次已知 `pnpm --dir apps/web exec tsc --noEmit` + `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-03-30）
+- 最后更新：2026-03-30
 
 ## 已完成能力
 
@@ -21,13 +21,20 @@
 - assistant runtime 第一阶段闭环：新增 `/api/v1/assistant/turn`，非 workflow 对话已支持 skill prompt、hook 生命周期与 `mcp` 插件调用；workflow snapshot 已可冻结 `resolved_mcp_servers`
 - assistant 规则层当前闭环：已支持用户规则 `/api/v1/assistant/rules/me` 与项目规则 `/api/v1/assistant/rules/projects/{project_id}`；运行时自动注入“用户长期规则 + 当前项目规则”，Web 全局设置与项目设置已补入口；规则真值文件分别落在 `apps/api/.runtime/assistant-config/users/<user_id>/AGENTS.md` 与 `apps/api/.runtime/assistant-config/projects/<project_id>/AGENTS.md`
 - 多用户 assistant 体验第二轮收口：全局设置已整理为“AI 助手 / 模型连接”双入口，AI 偏好正式露出并与个人长期规则形成同一用户心智；孵化聊天默认会优先使用个人 AI 偏好，退出登录时会清空工作台项目上下文，避免账号串用；AI 偏好真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/preferences.yaml`
+- assistant 项目层配置闭环：项目设置页现已支持“项目长期规则 / 项目 AI 偏好 / 项目 Skills / 项目 MCP”；真值文件写入 `projects/<project_id>/AGENTS.md`、`preferences.yaml`、`skills/<skill_id>/SKILL.md`、`mcp_servers/<server_id>/MCP.yaml`；运行时按 `项目 -> 用户 -> 系统` 解析，其中 AI 偏好做字段级覆盖，Skills / MCP 做同 ID 命中覆盖
+- assistant 配置方向已进一步收口：后续继续靠拢 Claude 的“文件放到约定位置即可生效”模式，但只保留适合小说创作场景的两层作用域（全局 / 项目）；普通用户主路径聚焦 `规则文件 / Skills / MCP`，`Agents / Hooks` 降到高级能力，不再作为一线配置心智
+- assistant 前端 Claude 化第二阶段收口：全局设置与聊天页现已统一主路径，默认先引导“个人长期规则 + Skills + 模型连接”，`Agents / Hooks / MCP` 收进更明确的次级区域；同时 `Skills / Agents / Hooks / MCP` 设置页已支持“可视化编辑 / 按文件编辑”双模式，AI 设置首页也已加入用户层 / 项目层 / 系统层文件层级说明；用户可直接按 `SKILL.md / AGENT.md / HOOK.yaml / MCP.yaml` 约定编辑，不改变底层配置真值与运行时装配协议
+- 用户自定义 Skills 最小闭环：大厅设置现已新增独立 `Skills` 页签，用户可创建、编辑、启用/停用、删除自己的 Skill，并在聊天页“模型与连接”里直接切换；Skill 真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/skills/<skill_id>/SKILL.md`
+- 用户自定义 Agents 最小闭环：大厅设置现已新增独立 `Agents` 页签，用户可创建、编辑、启用/停用、删除自己的 Agent，并在聊天页“模型与连接”里直接切换；Agent 真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/agents/<agent_id>/AGENT.md`
+- 用户自定义 Hooks 最小闭环：大厅设置现已新增独立 `Hooks` 页签，用户可创建、编辑、启用/停用、删除自己的 Hook，并在聊天页“模型与连接”里按当前会话选择启用；Hook 真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/hooks/<hook_id>/HOOK.yaml`
+- 用户自定义 MCP 最小闭环：大厅设置现已新增独立 `MCP` 页签，用户可创建、编辑、启用/停用、删除自己的 MCP，并在 Hooks 里直接绑定调用；MCP 真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/mcp_servers/<server_id>/MCP.yaml`
 - assistant 运行时一致性补丁：hook agent 现已和主回复共用同一套用户偏好与项目规则叠加逻辑，不再出现主回复与 hook agent 模型/口径不一致
 - workflow runtime 模型回退闭环：已支持 candidate 构建、capability skip、retry、fallback exhausted pause/fail 语义；相关 pause reason 与 snapshot 已接入 state machine / review executor
 - context / review / billing / export / analysis 已补到查询面板或最小业务闭环
 - template + incubator 闭环：built-in sync、自定义模板、draft / create-project / conversation draft、完整度前移
 - config_registry 管理闭环：skills / agents / hooks / workflows 查询与 detail / update，strict DTO + staged config 校验
 - Config Registry 前端闭环：Lobby 子视图已支持 skills / agents / hooks / mcp_servers / workflows 列表、详情预览与 JSON 编辑保存
-- Project Settings 前端闭环：`/workspace/project/:projectId/settings` 已支持项目设定编辑、项目规则、项目审计日志子页，以及未保存离开保护
+- Project Settings 前端闭环：`/workspace/project/:projectId/settings` 已支持项目设定编辑、项目规则、项目 AI 偏好、项目 Skills、项目 MCP、项目审计日志子页，以及未保存离开保护
 - Credential Center 前端闭环：`/workspace/lobby/settings?tab=credentials` 已支持全局/项目作用域切换、项目入口、凭证编辑更新、审计子视图和未保存离开保护
 - Credential Center 删除确认闭环：删除前现有显式确认弹窗，影响文案对齐后端作用域优先级与 usage 历史限制
 - Credential Center 覆盖提示闭环：带项目上下文查看全局凭证时，可显式看到哪些 provider 已被项目级启用凭证接管
@@ -42,7 +49,7 @@
 ## 进行中 / 未完成
 
 - 前端更多页面和交互完善
-- 用户自定义 assistant / mcp / workflow 资源仍未实现，当前只补到“规则层”与对应设置入口
+- 用户自定义 `Workflows` 仍未实现；当前用户侧已补到 `AI 偏好 + 用户规则 + 项目规则 + 用户 Skills + 用户 Agents + 用户 Hooks + 用户 MCP`
 - agent 通用 tool-calling 尚未实现
 
 ## 当前仍有效的关键决策
@@ -55,7 +62,8 @@
 - 程序化 Alembic 优先复用现有 `connection` / `engine`，不要退回字符串化 URL
 - config_registry 对外暴露语义化 DTO，写回前必须 staged full-config 校验，未知字段直接失败
 - `assistant runtime` 当前采用显式 `agent_id/skill_id + hook_ids` 装配，不把配置自动全局注入任意对话；`mcp` 当前通过 hook/plugin 路径可执行，agent 通用 tool-calling 仍是下一阶段
-- 多用户 assistant 配置当前正式口径：平台内置 `skill/agent/hook/mcp/workflow` 继续由管理员维护；普通用户当前正式拥有三层能力：大厅“AI 助手”里的个人偏好、个人长期规则，以及项目设置里的项目长期规则；这三层当前均以文件为主真值；后续再逐步补“我的助手 / 我的 MCP / 我的 workflow”
+- 用户 Hook 当前正式支持 `agent | mcp` 两类动作；MCP 会先解析用户自己的 `mcp_servers/<server_id>/MCP.yaml`，找不到再回退系统 MCP
+- 多用户 assistant 配置当前正式口径：平台可保留系统内置 `skill/agent/hook/mcp/workflow` 作为可选能力；普通用户当前正式拥有个人偏好、个人长期规则、个人 Skills、个人 Agents、个人 Hooks、个人 MCP、项目长期规则和项目 AI 偏好；这些能力当前均以文件为主真值；用户自定义 `Workflows` 仍待补齐
 - runtime hardening 当前已补齐：assistant hook-agent 会按 agent 类型传 `response_format`；MCP provider 会显式拒绝 disabled server / `is_error=true`；workflow staged config 会拒绝 assistant-only hook 事件和 before/after stage 错绑
 - 轻权限边界当前正式口径：普通业务面继续 owner-only；控制面写操作走 `EASYSTORY_CONFIG_ADMIN_USERNAMES` 轻量白名单。当前已覆盖 `config_registry` 与模板创建/更新/删除，模板读取仍只要求登录
 
@@ -69,52 +77,13 @@
 - async 语义审查不要误把基础设施命名（AsyncSessionFactory 等）当待清理对象
 - shared/runtime 改为惰性导出，避免 settings -> runtime -> llm tool provider 循环导入
 
-## 最近活跃窗口（2026-03-22 ~ 03-28）
+## 最近活跃窗口（2026-03-26 ~ 03-30）
 
-- 2026-03-22：完成 review follow-up、模型连接方言化、Alembic 初始迁移与 DB 初始化链收口
-- 2026-03-23：完成 config_registry skills / agents / hooks / workflows detail / update 闭环，并收口 strict DTO + staged validation
-- 2026-03-23：完成 template 自定义模板、incubator draft / create-project / conversation draft 与完整度前移
-- 2026-03-24：收口协作文件边界：`AGENTS.md` 管规则，`tools.md` 管稳定知识，`memory.md` 管当前快照；`docs/` 改为按需查
-- 2026-03-24：完成 Web Incubator 前端闭环：独立路由、模板问答 draft/create、自由描述 draft、Lobby 入口与导航高亮
-- 2026-03-25：修复 Web Incubator review 问题：模板 loading/error 语义显式化，模板详情未就绪时阻断提交，自由描述 preview 支持 stale 提示
-- 2026-03-25：补齐 Web Template Library 前端闭环：独立路由、模板列表筛选、详情快照、自定义模板 CRUD、内建模板复制与 Lobby 入口
-- 2026-03-25：完成 Lobby 子视图路由化：回收站与全局设置拆出独立路由，Credential Center 支持审计日志子视图与默认 base_url 预填
-- 2026-03-25：补齐 Engine 实时事件流：前端改为 `fetch + ReadableStream` 接 SSE，支持带鉴权订阅、静默 EOF 重连、异常断线提示、重连成功系统日志与终态停重连
-- 2026-03-25：补齐 Engine Export Dialog：导出入口改为模态对话框，支持格式选择、章节任务预检、项目导出历史；后端 `stale` 导出口径与文档对齐
-- 2026-03-25：收口 Engine review fixes：导出预检与后端 `stale` 规则对齐，SSE 本地状态改为 session 隔离且 4xx 停止重连，DialogShell 基础焦点管理通过 lint，导出定向 pytest 与前端 tsc/lint 全绿
-- 2026-03-25：补齐 Engine SSE fatal error 显式提示：页面顶部新增 danger banner，不再只靠系统日志暴露 4xx；同时给 export/events support 补了 Node 原生单测链，`apps/web test:unit` 可执行
-- 2026-03-25：收口 Engine workflow 切换状态一致性：`EnginePage` 现在对输入框和 selected execution 使用 workflow-bound 本地状态，手动载入已有 workflow 后会回写 `lastWorkflowByProject`，避免切换 workflow 时继续请求旧 prompt replay
-- 2026-03-25：补齐 Engine pause reason 闭环：页面顶部新增暂停原因 callout，`review_failed`/`budget_exceeded` 可直接跳转到对应 tab，未载入 workflow 空态补显式“启动工作流”入口
-- 2026-03-25：补齐 Engine 工作流启动前的 preparation 状态展示：`PreparationStatusPanel` 与 support 抽到 shared `project` feature，Studio / Engine 共用一套状态文案与映射；Engine 未载入 workflow 时先展示设定完整度、前置资产和下一步提示，并补显式 support 单测
-- 2026-03-25：补齐 Engine 章节任务重建确认闭环：重建按钮改为“检查并确认”，新增确认对话框与固定风险文案“重建将覆盖当前章节计划，已生成的草稿将被标记为失效。”；确认后才真正调用重建接口，成功后对话框关闭并把焦点回到任务列表
-- 2026-03-25：修复 Engine review issues：start 按钮现绑定 `project-preparation-status.can_start_workflow`，preparation 未就绪/加载中/查询失败时前端直接禁用并给出原因；`DialogShell` 支持可选焦点恢复目标，任务重建确认弹窗成功后回任务列表、取消后回触发按钮
-- 2026-03-25：补齐 Engine 工作流摘要展示：顶部状态区改为中文 `status + mode` 徽标，左侧在 raw JSON 前新增 `Workflow Summary` 卡片，统一展示当前节点、恢复起点、启动/完成时间和 runtime snapshot；摘要逻辑收口到独立 support，并通过前端 `tsc/lint/test:unit`
-- 2026-03-25：补齐 Engine overview 结构化执行概览：中央 `overview` tab 不再输出 raw JSON，改为概览指标 + 节点时间线；时间线以 `workflow.nodes` 为主顺序，用 `node executions` 补齐最新状态、时间、重试、产物与审查数量，并把“定义外节点”显式暴露；runtime 查询失败时直接展示错误，不伪造等待态
-- 2026-03-25：收口 Engine detail 语义：右侧 detail tab 统一改为中文标签，tab 装配逻辑抽到独立 `EngineDetailPanel`；raw workflow JSON 改为折叠式调试入口，不再占左侧主信息层；前端 `tsc/lint/test:unit` 通过
-- 2026-03-25：修复 Engine review follow-up：统一 `logs/review/billing/context` 的时间展示为真实 UTC；`overview` 指标改为把 `skipped` 计入完成推进；`test:unit` 改为自动扫描 `src/features/**/*.test.ts`，避免新增 support 测试再次漏跑；前端 `tsc/lint/test:unit` 通过
-- 2026-03-25：补齐 Config Registry 前端管理页：Lobby 新增“配置中心”入口与 `/workspace/lobby/config-registry` 路由，已支持 skills / agents / hooks / workflows 的列表、详情预览和完整 JSON DTO 编辑保存；前端 contract 直接对齐后端 `ConfigRegistry` DTO，不再自造第二套字段语义；前端 `tsc/lint/test:unit` 通过
-- 2026-03-25：补齐 Project Settings 前端子页：Lobby 项目卡新增“项目设置”入口，`/workspace/project/:projectId/settings` 已支持设定编辑与 `?tab=audit&event=` 项目审计过滤；工作台导航在 settings 子页下继续归属 Studio，前端 `tsc/lint/test:unit` 通过
-- 2026-03-25：补齐 Credential Center 前端 scope/update 闭环：全局设置页现支持 `scope=user|project` 与 `project=:projectId` 语义，项目设置侧栏新增“项目凭证”入口，凭证列表支持编辑，表单支持 create/edit 两种模式与 update payload 精准构造；新增 query/payload support 单测，前端 `tsc/lint/test:unit` 通过
-- 2026-03-25：补齐 Credential Center 删除确认交互：凭证列表删除改为显式确认弹窗，影响说明仅基于已确认规则（项目级 > 全局 > 系统[仅显式允许]、usage 历史会阻止删除、成功后写审计）；新增 delete confirm support 单测，前端 `tsc/lint/test:unit` 通过
-- 2026-03-25：补齐 Credential Center 覆盖提示：在带项目上下文的全局凭证视图里，前端会并行查询当前项目凭证，并按 active provider 匹配显示“已被项目级重载”提示；覆盖提示查询失败时会显式报错，不做静默忽略；新增 override support 单测，前端 `tsc/lint/test:unit` 通过
-- 2026-03-25：收口 Credential Center 动作状态语义：`actionMutation.variables` 现在作为唯一 pending action 真值，列表按钮可按 `credentialId + actionType` 显示“验证中/启用中/停用中/删除中...”；验证成功反馈时间统一改为 UTC 格式，并新增 action/feedback support 单测
-- 2026-03-25：修复 Credential Center review issues：`audit` 子视图收口为只读审计视图，不再暴露 verify/enable/disable/delete；同时在 mutation 期间锁定 `scope`/`mode`/审计目标切换，避免 pending 语义和反馈上下文漂移
-- 2026-03-25：补齐 Lab 前端 MVP：Lab 页面拆成 sidebar/detail/create/delete-confirm/feedback/support，列表支持 `analysis_type / content_id / generated_skill_key` 过滤；创建成功会根据当前过滤条件决定是否自动选中，删除后按相邻记录回退，顶栏反馈统一收口为 `info / danger`；refetch 失败时保留已有列表/详情数据，`result` 空对象在前端直接阻断
-- 2026-03-26：补齐 provider interop 本地联调闭环：`shared/runtime` 现支持 `auth_strategy` / `api_key_header_name` override，并新增 `EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS` 显式测试开关；本地新增 `provider_interop_support.py` 与 `scripts/provider_interop_check.py`，用户提供的 GPT / Gemini / Anthropic profile 已保存到 ignored 本地文件，并已实测全部返回 `ok`：GPT 走 `openai_responses`，Anthropic `system` 需发 text block 数组，Gemini 保持 `generateContent`
-- 2026-03-29：修复后端“很多页面一直加载中”的根因：本地 SQLite 开发库中 `model_credentials.context_window_tokens / default_max_output_tokens` 已存在，但 `alembic_version` 仍停在 `b8d9f7c1a2e3`，导致 startup 每次重复执行 `5a1c9e8d4b72` 迁移并报 duplicate column；现已把该迁移改为按现有列幂等执行，补齐 Alembic 回归测试，并用浏览器实测确认登录、项目大厅、AI 聊天、模型连接页恢复显示
-- 2026-03-26：收口凭证 review fixes：provider interop `--model` 覆写现会真正进入 probe 请求；`api_key_header_name` 不再允许覆盖运行时保留头；`extra_headers` 改为只允许非敏感元数据头，前后端校验与定向 pytest / tsc / test:unit 已通过
-- 2026-03-26：完成 runtime/provider hardening：`project incubator` 改为复用统一 credential payload，workflow runtime 已补 candidate/capability/retry/model fallback 主链并把 `model_fallback_exhausted` 接到 pause/fail 语义；`workflow_runtime_*` 与 provider interop helper 已拆分到 support 文件，核心 mixin 均降到 300 行内
-- 2026-03-26：完成 workflow hooks runtime 闭环：新增 `PluginRegistry.execute`、workflow hook providers（script/webhook/agent）、节点级 hook dispatch、hook agent snapshot 冻结与 `app.hooks.builtin.auto_save_content`；定向 `ruff + pytest` 已通过
-- 2026-03-26：完成真实上游文字联调：`gpt / gemini / anthropic` 非流式与流式 probe 均对 `今天有什么新闻` 返回文字；其中 Gemini 初始返回半句，经确认是上游 `finishReason=MAX_TOKENS` + 默认 thinking 导致，probe 现已显式压低 thinking 配置后恢复为有效文本返回
-- 2026-03-26：完成 assistant runtime 第一阶段：新增 `assistant` 模块与 `/api/v1/assistant/turn`，支持 skill 驱动 prompt、assistant hook 事件、`mcp_server` 配置加载、`mcp` hook provider 与 workflow `resolved_mcp_servers` snapshot；定向 `ruff + pytest` 已通过
-- 2026-03-26：补齐 `mcp_servers` 配置管理闭环：`config_registry` 后端已支持 list/detail/update，Web 配置中心已新增 `mcp_servers` 类型；后端 `15` 个 config_registry 单测与前端 `tsc/lint/test:unit` 均通过
-- 2026-03-26：完成 runtime/config hardening：assistant hook-agent `response_format` 与 workflow 对齐；`McpPluginProvider` 现在会显式拒绝 disabled server 和 `is_error=true`；workflow staged validation 会在写回前拒绝 assistant-only hook 事件和 stage 错绑；最终 `ruff + 35` 项定向 pytest 通过
-- 2026-03-27：完成 Workspace Shell 全局侧栏折叠首轮改造：新增 `workspace-store.sidebarPreference + hasHydrated`，工作台壳层支持桌面 220/72 切换、小屏自动收口，并补齐 `workspace-shell-support` 单测；前端 `tsc/lint/test:unit` 通过
-- 2026-03-27：完成 Workspace UI 第二轮视觉收口：用户否定首版重装饰方案后，工作台左栏与主内容区已按 `web-design-guidelines` 改回更克制的后台风格；同步补齐 `skip link`、`aria-live`、触控细节、占位提示与省略号文案，并修复移动端强制折叠时仍显示侧栏切换按钮的语义问题；前端 `tsc/lint/test:unit` 通过
-- 2026-03-27：完成前端审查修复收口：WorkspaceShell 已把汉字图标替换为 SVG、删除无效侧栏宽度变量规则并补齐移动端滚动条隐藏与指示条 `transform-origin`；同时新增共享 `PageHeaderShell` 统一 Studio / Engine 页头骨架，`EnginePageStatusSection` 改为数组驱动 banner，前端 `tsc/lint/test:unit` 通过
-- 2026-03-27：完成前端审查 follow-up 修复：`EnginePageStatusSection` 的 banner 改用稳定 `id` 作为 React key，`WorkspaceNavIcon` 改为穷尽式分支，侧栏会话按钮移除死 `data-collapsed` 属性，并删除未使用的全局 `.skip-link` 样式；前端 `tsc/lint/test:unit` 通过
-- 2026-03-27：完成 Studio 顶部 Tab 化：`StudioPage` 已改为页头 + 顶部 Tab + 右侧准备状态卡，章节目录内收至 `Chapter` 面板；同时修复章节列表状态语义，显式区分 loading / error / empty，避免假空态；前端 `tsc/lint/test:unit` 通过
-- 2026-03-27：完成 Engine 控制区压缩：`EnginePage` 已改为页头控制区 + 顶部状态区 + 全宽详情区，workflow 输入、载入动作、控制按钮与导出入口收口到页头，摘要与调试入口移出旧左侧控制栏；前端 `tsc/lint/test:unit` 通过
-- 2026-03-27：收口回收站批量清理语义：后端批量清理现改为“先列出 `project_id`、删除前重查软删除态并返回结构化 `deleted/skipped/failed` 结果”，脚本拒绝非正整数参数，前端清空反馈不再假装“全部成功”；定向 `ruff/pytest/tsc/lint/test:unit` 通过
-- 2026-03-28：完成多用户 assistant 体验第二轮收口：大厅全局设置改为“AI 助手 / 模型连接”双入口，AI 偏好正式露出并与个人长期规则同页展示；孵化聊天默认会优先使用个人 AI 偏好，相关文案改为面向用户表达；退出登录时同步清空工作台项目上下文，并为大厅设置/项目设置/模型连接补齐未保存离开保护；前端 `tsc/lint/test:unit` 通过
-- 2026-03-28：完成 assistant 配置层收口：用户规则、项目规则与 AI 偏好已从数据库式正文切到文件优先；当前运行时文件根为 `apps/api/.runtime/assistant-config/`，assistant runtime 继续按 `系统提示 -> 用户规则 -> 项目规则` 自动注入；后端 assistant 定向 `11` 项 pytest 通过
+- 2026-03-26：完成 provider interop、本地 probe、assistant runtime 与 workflow hooks runtime 的第一轮真实闭环；运行时显式暴露错误，不做静默降级。
+- 2026-03-27：完成 Workspace / Studio / Engine 的一轮布局收口，工作台侧栏、页头骨架、状态区和移动端细节已统一。
+- 2026-03-28：assistant 配置主真值切到 `apps/api/.runtime/assistant-config/`，多用户体验改为“AI 助手 / 模型连接”双入口，并补齐未保存离开保护。
+- 2026-03-29：修复本地 SQLite 开发库迁移卡死导致的“页面一直加载中”；登录、项目大厅、AI 聊天、模型连接页恢复。
+- 2026-03-29：完成用户自定义 Skills 闭环，真值文件落到 `users/<user_id>/skills/<skill_id>/SKILL.md`；聊天页可直接切换 Skill。
+- 2026-03-29：完成用户自定义 MCP + Hook(mcp) 闭环，真值文件落到 `users/<user_id>/mcp_servers/<server_id>/MCP.yaml`；Hook 可直接绑定用户 MCP。
+- 2026-03-30：继续按 Claude 风格收口前端主路径，保留“长期规则 + Skills + 模型连接”为默认心智，`Agents / Hooks / MCP` 进入更明确的次级区域。
+- 2026-03-30：补齐项目级 Skills / MCP，文件真值落到 `projects/<project_id>/skills/<skill_id>/SKILL.md` 与 `projects/<project_id>/mcp_servers/<server_id>/MCP.yaml`，运行时按 `项目 -> 用户 -> 系统` 解析；浏览器已实测 `Skills -> MCP` 无输入切换不再弹未保存提示。

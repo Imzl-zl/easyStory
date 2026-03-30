@@ -4,6 +4,10 @@ import json
 from typing import Any
 
 from app.modules.config_registry.schemas import ModelConfig, SkillConfig
+from app.modules.config_registry.infrastructure.skill_input_validator import (
+    SkillInputValidationError,
+    validate_input_schema,
+)
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 
 from .dto import AssistantMessageDTO
@@ -65,6 +69,14 @@ def resolve_model(
     if not resolved.provider:
         raise ConfigurationError(f"{context_label} is missing executable model provider")
     return resolved
+
+
+def validate_skill_input(skill: SkillConfig, input_data: dict[str, Any]) -> None:
+    declared = skill.inputs or skill.variables
+    try:
+        validate_input_schema(declared, input_data)
+    except SkillInputValidationError as exc:
+        raise ConfigurationError(str(exc)) from exc
 
 
 def _format_message(message: AssistantMessageDTO) -> str:

@@ -12,7 +12,7 @@ PREFERENCES_MAX_OUTPUT_TOKENS_MAX = 131072
 class AssistantPreferencesDTO(BaseModel):
     default_provider: str | None = None
     default_model_name: str | None = None
-    default_max_output_tokens: int = DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS
+    default_max_output_tokens: int | None = None
 
 
 class AssistantPreferencesUpdateDTO(BaseModel):

@@ -9,13 +9,20 @@ import {
   buildIncubatorAssistantTurnPayload,
   shouldRetryAssistantWithoutStream,
 } from "./incubator-assistant-request-support";
-import { createIncubatorInitialMessages, type IncubatorChatSettings } from "./incubator-chat-support";
+import {
+  createIncubatorInitialMessages,
+  INCUBATOR_CHAT_SKILL_ID,
+  type IncubatorChatSettings,
+} from "./incubator-chat-support";
 
 const SETTINGS: IncubatorChatSettings = {
+  agentId: "",
   allowSystemCredentialPool: false,
+  hookIds: ["hook.user.story-summary", "hook.user.after-polish"],
   maxOutputTokens: "8192",
   modelName: "gpt-4.1",
   provider: "openai",
+  skillId: INCUBATOR_CHAT_SKILL_ID,
   streamOutput: true,
 };
 
@@ -26,7 +33,17 @@ test("incubator assistant request support builds payload with explicit max token
     name: "gpt-4.1",
     provider: "openai",
   });
-  assert.equal(payload.skill_id, "skill.assistant.general_chat");
+  assert.deepEqual(payload.hook_ids, ["hook.user.after-polish", "hook.user.story-summary"]);
+  assert.equal(payload.skill_id, INCUBATOR_CHAT_SKILL_ID);
+});
+
+test("incubator assistant request support prefers agent id when selected", () => {
+  const payload = buildIncubatorAssistantTurnPayload(
+    { ...SETTINGS, agentId: "agent.user.story-coach-a1b2c3" },
+    createIncubatorInitialMessages(),
+  );
+  assert.equal(payload.agent_id, "agent.user.story-coach-a1b2c3");
+  assert.equal("skill_id" in payload, false);
 });
 
 test("incubator assistant request support skips retry for clear client errors", () => {

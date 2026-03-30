@@ -13,7 +13,7 @@ import {
   INCUBATOR_PENDING_REPLY_MESSAGE,
   replaceIncubatorMessage,
   resolveIncubatorAssistantReply,
-  resolveInterruptedIncubatorReply,
+  resolveFailedIncubatorReply,
   type IncubatorChatMessage,
   type IncubatorChatSettings,
 } from "./incubator-chat-support";
@@ -73,7 +73,10 @@ export async function completePromptSubmission(
     messages: replaceIncubatorMessage(
       submission.nextMessages,
       submission.pendingAssistant.id,
-      createIncubatorMessage("assistant", assistantReply.content, { status: assistantReply.status }),
+      createIncubatorMessage("assistant", assistantReply.content, {
+        hookResults: result.hook_results,
+        status: assistantReply.status,
+      }),
     ),
   }));
 }
@@ -88,13 +91,13 @@ export function handlePromptSubmissionError(
   setFeedback(buildErrorFeedback(error));
   patchConversationSession(submission.conversationId, (current) => {
     const currentPending = current.messages.find((message) => message.id === submission.pendingAssistant.id);
-    const interruptedReply = currentPending ? resolveInterruptedIncubatorReply(currentPending.content) : null;
+    const failedReply = currentPending ? resolveFailedIncubatorReply(currentPending.content, errorMessage) : null;
     return {
       ...current,
       messages: replaceIncubatorMessage(
-        interruptedReply ? current.messages : submission.nextMessages,
+        failedReply ? current.messages : submission.nextMessages,
         submission.pendingAssistant.id,
-        createIncubatorMessage("assistant", interruptedReply ?? errorMessage, { status: "error" }),
+        createIncubatorMessage("assistant", failedReply ?? errorMessage, { status: "error" }),
       ),
     };
   });

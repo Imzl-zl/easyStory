@@ -62,7 +62,7 @@ function ConfigRegistryEditorPanelBody({
               <div className="flex flex-wrap items-center gap-2.5">
                 <ModeButton
                   isActive={mode === "form"}
-                  label="常用字段"
+                  label={getFormModeLabel(type)}
                   onClick={() => {
                     if (!canSwitchToForm) return;
                     setStructuredDraft(parsedJson.parsed as ConfigRegistryDetail);
@@ -71,7 +71,7 @@ function ConfigRegistryEditorPanelBody({
                 />
                 <ModeButton
                   isActive={mode === "json"}
-                  label="完整配置"
+                  label={getJsonModeLabel(type)}
                   onClick={() => {
                     setJsonValue(formatConfigRegistryDocument(structuredDraft));
                     onModeChange("json");
@@ -80,14 +80,12 @@ function ConfigRegistryEditorPanelBody({
               </div>
             ) : (
               <div className="rounded-full bg-[rgba(46,111,106,0.08)] px-3 py-2 text-sm text-[var(--accent-ink)]">
-                Workflows 当前仅支持完整配置
+                Workflows 当前仅支持原始配置
               </div>
             )}
           </div>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">
-            {mode === "json"
-              ? "编辑完整配置。"
-              : "编辑常用字段。"}
+            {getEditorDescription(type, mode)}
           </p>
         </header>
 
@@ -178,9 +176,26 @@ function ErrorBanner({ message }: Readonly<{ message: string }>) {
 }
 
 function getEditorTitle(type: ConfigRegistryType): string {
-  if (type === "skills") return "Skills";
+  if (type === "skills") return "Skill 编辑";
   if (type === "agents") return "Agents";
   if (type === "hooks") return "Hooks";
   if (type === "mcp_servers") return "MCP";
   return "Workflows";
+}
+
+function getEditorDescription(type: ConfigRegistryType, mode: ConfigRegistryEditorMode): string {
+  if (type === "skills") {
+    return mode === "json"
+      ? "这里显示 Skill 的原始配置，通常只在核对字段或排查问题时使用。"
+      : "在这里修改名称、提示词、字段结构和模型设置。";
+  }
+  return mode === "json" ? "编辑完整配置。" : "编辑常用字段。";
+}
+
+function getFormModeLabel(type: ConfigRegistryType): string {
+  return type === "skills" ? "字段编辑" : "常用字段";
+}
+
+function getJsonModeLabel(type: ConfigRegistryType): string {
+  return type === "skills" ? "原始配置" : "完整配置";
 }

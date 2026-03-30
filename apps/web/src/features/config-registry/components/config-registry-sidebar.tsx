@@ -76,7 +76,7 @@ export function ConfigRegistrySidebar({
 
       <div className="panel-muted space-y-4 p-4">
         <div className="space-y-1">
-          <p className="text-xs tracking-[0.16em] text-[var(--accent-ink)]">当前分类</p>
+          <p className="text-xs tracking-[0.16em] text-[var(--accent-ink)]">系统分类</p>
           <h3 className="font-serif text-lg font-semibold">{activeTab.label}</h3>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">{activeTab.description}</p>
         </div>

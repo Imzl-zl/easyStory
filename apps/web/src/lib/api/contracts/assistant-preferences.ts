@@ -1,7 +1,7 @@
 export type AssistantPreferences = {
   default_provider: string | null;
   default_model_name: string | null;
-  default_max_output_tokens: number;
+  default_max_output_tokens: number | null;
 };
 
 export type AssistantPreferencesUpdatePayload = {
