@@ -173,7 +173,7 @@ export function CredentialCenter({
       }
       return updateCredential(credential.id, payload);
     },
-    onSuccess: async (updatedCredential) => {
+    onSuccess: async () => {
       const message = "模型连接已更新。";
       setFeedback({
         message,
@@ -184,7 +184,6 @@ export function CredentialCenter({
         title: "模型连接",
         tone: "success",
       });
-      onSelectCredentialForEdit?.(updatedCredential.id);
       await refresh();
     },
     onError: (error) => {

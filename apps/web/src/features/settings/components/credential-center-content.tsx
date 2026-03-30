@@ -79,6 +79,7 @@ export function CredentialCenterContent({
           ) : (
             <CredentialCenterForm
               key={activeFormKey}
+              credential={editableCredential}
               feedback={null}
               initialState={activeInitialState}
               layout="split"
@@ -108,6 +109,7 @@ export function CredentialCenterContent({
   return (
     <CredentialCenterForm
       key={activeFormKey}
+      credential={null}
       feedback={null}
       initialState={createInitialCredentialForm()}
       layout="full"

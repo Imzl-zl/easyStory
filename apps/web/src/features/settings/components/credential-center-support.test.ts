@@ -235,6 +235,20 @@ test("isCredentialFormDirty compares current form against initial state", () => 
   );
 });
 
+test("isCredentialFormDirty ignores edit changes that normalize back to the same payload", () => {
+  const credential = createCredential({ display_name: "lucky" });
+  const initialState = createCredentialFormFromView(credential);
+
+  assert.equal(
+    isCredentialFormDirty({ ...initialState, displayName: " lucky " }, initialState, credential),
+    false,
+  );
+  assert.equal(
+    isCredentialFormDirty({ ...initialState, displayName: "lucky 2" }, initialState, credential),
+    true,
+  );
+});
+
 function createCredential(overrides: Partial<CredentialView> = {}): CredentialView {
   return {
     id: "credential-1",

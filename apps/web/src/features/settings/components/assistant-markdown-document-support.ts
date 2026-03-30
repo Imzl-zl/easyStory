@@ -1,3 +1,9 @@
+import {
+  hasIndentedChildLine,
+  isFrontmatterBlockScalarMarker,
+  parseFrontmatterBlockValue,
+} from "./assistant-markdown-frontmatter-block-support";
+
 export type FrontmatterScalar = boolean | number | string;
 export type AssistantMarkdownFrontmatterObject = Record<string, FrontmatterScalar>;
 
@@ -117,24 +123,25 @@ export function readRequiredFrontmatterString(
 
 function parseFrontmatterLines(lines: string[]): AssistantMarkdownFrontmatter {
   const frontmatter: AssistantMarkdownFrontmatter = {};
-
-  lines.forEach((line, index) => {
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
     if (!line.trim()) {
-      return;
+      index += 1;
+      continue;
     }
 
     if (line.startsWith("  ")) {
-      parseNestedFrontmatterLine(frontmatter, line);
-      return;
+      index = parseNestedFrontmatterLine(frontmatter, lines, index);
+      continue;
     }
 
     if (line.startsWith(" ")) {
       throw new Error(`frontmatter 第 ${index + 1} 行缩进无效。`);
     }
 
-    parseRootFrontmatterLine(frontmatter, lines, index, line);
-  });
-
+    index = parseRootFrontmatterLine(frontmatter, lines, index);
+  }
   return frontmatter;
 }
 
@@ -142,25 +149,24 @@ function parseRootFrontmatterLine(
   frontmatter: AssistantMarkdownFrontmatter,
   lines: string[],
   index: number,
-  line: string,
 ) {
+  const line = lines[index] ?? "";
   const { key, rawValue } = splitFrontmatterLine(line, `frontmatter 第 ${index + 1} 行`);
   if (key in frontmatter) {
     throw new Error(`frontmatter 字段 ${key} 重复定义。`);
   }
 
-  if (!rawValue.trim() && isNestedObjectStart(lines[index + 1] ?? "")) {
-    frontmatter[key] = {};
-    return;
-  }
-
-  frontmatter[key] = parseScalarValue(rawValue.trim(), `frontmatter.${key}`);
+  const parsed = parseFrontmatterValue(rawValue, lines, index, 0, `frontmatter.${key}`);
+  frontmatter[key] = parsed.value;
+  return parsed.nextIndex;
 }
 
 function parseNestedFrontmatterLine(
   frontmatter: AssistantMarkdownFrontmatter,
-  line: string,
+  lines: string[],
+  index: number,
 ) {
+  const line = lines[index] ?? "";
   const sectionKey = findLatestObjectKey(frontmatter);
   if (!sectionKey) {
     throw new Error("frontmatter 中存在未归属的缩进行。");
@@ -176,7 +182,35 @@ function parseNestedFrontmatterLine(
     throw new Error(`frontmatter.${sectionKey}.${key} 重复定义。`);
   }
 
-  section[key] = parseScalarValue(rawValue.trim(), `frontmatter.${sectionKey}.${key}`);
+  const parsed = parseFrontmatterValue(rawValue, lines, index, 2, `frontmatter.${sectionKey}.${key}`);
+  if (typeof parsed.value === "object") {
+    throw new Error(`frontmatter.${sectionKey}.${key} 不支持继续嵌套。`);
+  }
+  section[key] = parsed.value;
+  return parsed.nextIndex;
+}
+
+function parseFrontmatterValue(
+  rawValue: string,
+  lines: string[],
+  index: number,
+  currentIndent: number,
+  label: string,
+): {
+  nextIndex: number;
+  value: FrontmatterScalar | AssistantMarkdownFrontmatterObject;
+} {
+  const normalizedValue = rawValue.trim();
+  if (isFrontmatterBlockScalarMarker(normalizedValue)) {
+    return parseFrontmatterBlockValue(lines, index + 1, currentIndent + 2, normalizedValue, label);
+  }
+  if (!normalizedValue && hasIndentedChildLine(lines[index + 1] ?? "", currentIndent + 2)) {
+    return { nextIndex: index + 1, value: {} };
+  }
+  return {
+    nextIndex: index + 1,
+    value: parseScalarValue(normalizedValue, label),
+  };
 }
 
 function splitFrontmatterLine(line: string, label: string) {
@@ -217,10 +251,6 @@ function parseScalarValue(rawValue: string, label: string): FrontmatterScalar {
     return rawValue.slice(1, -1);
   }
   return rawValue;
-}
-
-function isNestedObjectStart(line: string) {
-  return line.startsWith("  ");
 }
 
 function findLatestObjectKey(frontmatter: AssistantMarkdownFrontmatter) {

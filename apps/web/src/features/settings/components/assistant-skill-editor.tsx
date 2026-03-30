@@ -197,7 +197,7 @@ function RawSkillEditor({
           <div className="rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-4">
           <p className="text-sm font-medium text-[var(--text-primary)]">文件约定</p>
           <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">
-            frontmatter 支持 `name`、`enabled`、`description` 和 `model`。正文里只允许用两个变量。
+            支持标准 Markdown frontmatter。`name`、`enabled`、`description`、`model` 都能直接写；多行说明可用 `description: |`。
           </p>
           {mode === "create" ? (
             <p className="mt-3 rounded-2xl bg-[rgba(248,243,235,0.84)] px-3 py-2 text-[12px] leading-5 text-[var(--text-secondary)]">

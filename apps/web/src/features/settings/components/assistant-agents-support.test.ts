@@ -6,6 +6,7 @@ import {
   buildAssistantAgentListDescription,
   buildAssistantAgentPayload,
   createEmptyAssistantAgentDraft,
+  isAssistantAgentDirty,
   parseAssistantAgentDocument,
 } from "./assistant-agents-support";
 
@@ -14,6 +15,22 @@ test("assistant agents support creates a beginner-friendly draft template", () =
   assert.equal(draft.enabled, true);
   assert.equal(draft.skillId, "skill.assistant.general_chat");
   assert.match(draft.systemPrompt, /先给结论/);
+});
+
+test("assistant agents support does not treat the default create draft as dirty", () => {
+  const draft = createEmptyAssistantAgentDraft();
+
+  assert.equal(isAssistantAgentDirty(draft, null), false);
+  assert.equal(
+    isAssistantAgentDirty(
+      {
+        ...draft,
+        name: "长期搭子",
+      },
+      null,
+    ),
+    true,
+  );
 });
 
 test("assistant agents support builds normalized payloads", () => {

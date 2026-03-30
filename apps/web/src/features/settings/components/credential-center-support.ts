@@ -112,8 +112,9 @@ export function createCredentialFormFromView(credential: CredentialView): Creden
 export function isCredentialFormDirty(
   formState: CredentialFormState,
   initialState: CredentialFormState,
+  credential?: CredentialView | null,
 ): boolean {
-  return (
+  const hasRawChanges = (
     formState.provider !== initialState.provider
     || formState.apiDialect !== initialState.apiDialect
     || formState.displayName !== initialState.displayName
@@ -126,6 +127,14 @@ export function isCredentialFormDirty(
     || formState.apiKeyHeaderName !== initialState.apiKeyHeaderName
     || formState.extraHeadersText !== initialState.extraHeadersText
   );
+  if (!hasRawChanges || !credential) {
+    return hasRawChanges;
+  }
+  try {
+    return getCredentialUpdatePayloadSize(buildCredentialUpdatePayload(credential, formState)) > 0;
+  } catch {
+    return true;
+  }
 }
 
 export function getApiDialectLabel(value: CredentialApiDialect) {

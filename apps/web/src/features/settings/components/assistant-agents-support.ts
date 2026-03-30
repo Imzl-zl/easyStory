@@ -142,10 +142,8 @@ export function isAssistantAgentDirty(
   draft: AssistantAgentDraft,
   detail: AssistantAgentDetail | null,
 ) {
-  if (detail === null) {
-    return hasDraftContent(draft);
-  }
-  return JSON.stringify(draft) !== JSON.stringify(toAssistantAgentDraft(detail));
+  const baseline = detail ? toAssistantAgentDraft(detail) : createEmptyAssistantAgentDraft();
+  return JSON.stringify(draft) !== JSON.stringify(baseline);
 }
 
 export function sanitizeAssistantAgentMaxOutputTokensInput(value: string) {
@@ -174,18 +172,6 @@ function parseAssistantAgentMaxOutputTokens(value: string) {
   }
   const parsed = Number.parseInt(normalized, 10);
   return Number.isInteger(parsed) ? parsed : null;
-}
-
-function hasDraftContent(draft: AssistantAgentDraft) {
-  return Boolean(
-    draft.name.trim()
-      || draft.description.trim()
-      || draft.systemPrompt.trim()
-      || draft.defaultProvider.trim()
-      || draft.defaultModelName.trim()
-      || draft.defaultMaxOutputTokens.trim()
-      || draft.skillId.trim() !== ASSISTANT_DEFAULT_CHAT_SKILL_ID,
-  ) || !draft.enabled;
 }
 
 function buildAssistantAgentModelPreview(draft: AssistantAgentDraft) {

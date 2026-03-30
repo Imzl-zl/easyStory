@@ -66,7 +66,9 @@ test("assistant skills support parses markdown documents back into drafts", () =
   const parsed = parseAssistantSkillDocument(`---
 name: "故事方向助手"
 enabled: true
-description: "适合先聊方向"
+description: |
+  适合先聊方向
+  慢一点追问
 model:
   provider: "anthropic"
   name: "claude-sonnet-4"
@@ -80,7 +82,7 @@ model:
     defaultMaxOutputTokens: "4096",
     defaultModelName: "claude-sonnet-4",
     defaultProvider: "anthropic",
-    description: "适合先聊方向",
+    description: "适合先聊方向\n慢一点追问",
     enabled: true,
     name: "故事方向助手",
   });

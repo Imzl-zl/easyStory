@@ -19,7 +19,7 @@ import {
   isCredentialFormDirty,
   type CredentialFormState,
 } from "@/features/settings/components/credential-center-support";
-import type { CredentialApiDialect } from "@/lib/api/types";
+import type { CredentialApiDialect, CredentialView } from "@/lib/api/types";
 
 type CredentialCenterFormMode = "create" | "edit";
 
@@ -28,6 +28,7 @@ type CredentialCenterFormProps = {
   initialState?: CredentialFormState;
   layout?: "full" | "split";
   feedback: CredentialCenterFeedback;
+  credential?: CredentialView | null;
   isPending: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
   onReset?: () => void;
@@ -39,13 +40,14 @@ export function CredentialCenterForm({
   initialState = createInitialCredentialForm(),
   layout = "split",
   feedback,
+  credential = null,
   isPending,
   onDirtyChange,
   onReset,
   onSubmit,
 }: CredentialCenterFormProps) {
   const [formState, setFormState] = useState(initialState);
-  const isDirty = isCredentialFormDirty(formState, initialState);
+  const isDirty = isCredentialFormDirty(formState, initialState, mode === "edit" ? credential : null);
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -64,7 +66,7 @@ export function CredentialCenterForm({
       <BasicFields formState={formState} layout={layout} mode={mode} setFormState={setFormState} />
       <CompatibilitySettings formState={formState} layout={layout} setFormState={setFormState} />
       <FeedbackNotice feedback={feedback} />
-      <FormActions isPending={isPending} mode={mode} onReset={onReset} />
+      <FormActions isDirty={isDirty} isPending={isPending} mode={mode} onReset={onReset} />
     </form>
   );
 }
@@ -269,17 +271,19 @@ function FeedbackNotice({ feedback }: { feedback: CredentialCenterFeedback }) {
 }
 
 function FormActions({
+  isDirty,
   isPending,
   mode,
   onReset,
 }: {
+  isDirty: boolean;
   isPending: boolean;
   mode: CredentialCenterFormMode;
   onReset?: () => void;
 }) {
   return (
     <div className="flex flex-wrap gap-3 pt-1">
-      <button className="ink-button min-w-[140px] flex-1" disabled={isPending} type="submit">
+      <button className="ink-button min-w-[140px] flex-1" disabled={isPending || !isDirty} type="submit">
         {isPending ? "提交中…" : mode === "edit" ? "保存修改" : "添加连接"}
       </button>
       {mode === "edit" && onReset ? (
