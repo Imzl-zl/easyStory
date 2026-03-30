@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Tag } from "@arco-design/web-react";
 
 import { getErrorMessage } from "@/lib/api/client";
 
@@ -46,11 +47,11 @@ export function ChatCapabilitiesPanel({
             <p className="mt-1 text-[11px] leading-5 text-[var(--text-secondary)]">
               大多数时候，只要选一个 Skill 和模型连接就够了。
             </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <SettingsLink href="/workspace/lobby/settings?tab=skills">管理 Skills</SettingsLink>
-            <SettingsLink href="/workspace/lobby/settings?tab=credentials">模型连接</SettingsLink>
-          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <SettingsLink href="/workspace/lobby/settings?tab=skills">Skills</SettingsLink>
+          <SettingsLink href="/workspace/lobby/settings?tab=credentials">模型连接</SettingsLink>
+        </div>
         </div>
         <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <SkillSelectField model={model} disabled={hasSelectedAgent} options={skillOptions} />
@@ -72,20 +73,24 @@ export function ChatCapabilitiesPanel({
       </section>
 
       <details className="overflow-hidden rounded-[16px] border border-[rgba(101,92,82,0.1)] bg-[rgba(255,255,255,0.74)]">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 text-[12px] font-medium text-[var(--text-primary)]">
-          <span>更多能力（按需添加）</span>
-          <span className="rounded-full bg-[rgba(248,243,235,0.92)] px-2.5 py-1 text-[10.5px] font-normal text-[var(--text-secondary)]">
-            {hasSelectedAgent ? "已选 Agent" : "未选 Agent"} · Hooks {selectedHookCount} 个
-          </span>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-[12px] font-medium text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-inset">
+          <span>更多能力</span>
+          <Tag
+            bordered={false}
+            className="!m-0 !rounded-full !bg-[rgba(248,243,235,0.92)] !px-2.5 !py-1 !text-[10.5px] !leading-4 !text-[var(--text-secondary)]"
+            size="small"
+          >
+            {hasSelectedAgent ? "已选 Agent" : "未选 Agent"} · Hooks {selectedHookCount}
+          </Tag>
         </summary>
         <div className="space-y-3 border-t border-[var(--line-soft)] px-3 py-3">
           <p className="text-[11px] leading-5 text-[var(--text-secondary)]">
-            这些也都是你自己的专属配置。想固定助手角色、自动整理回复，或者连接外部工具时，再来这里配置。
+            想固定助手角色、自动整理回复，或者连接外部工具时，再来这里配置。
           </p>
           <div className="flex flex-wrap gap-2">
-            <SettingsLink href="/workspace/lobby/settings?tab=agents">管理 Agents</SettingsLink>
-            <SettingsLink href="/workspace/lobby/settings?tab=hooks">管理 Hooks</SettingsLink>
-            <SettingsLink href="/workspace/lobby/settings?tab=mcp">管理 MCP</SettingsLink>
+            <SettingsLink href="/workspace/lobby/settings?tab=agents">Agents</SettingsLink>
+            <SettingsLink href="/workspace/lobby/settings?tab=hooks">Hooks</SettingsLink>
+            <SettingsLink href="/workspace/lobby/settings?tab=mcp">MCP</SettingsLink>
           </div>
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <AgentSelectField model={model} options={agentOptions} />
@@ -130,7 +135,7 @@ function SettingsLink({
 }>) {
   return (
     <Link
-      className="inline-flex items-center justify-center rounded-full border border-[var(--line-soft)] px-3 py-1.5 text-[12px] font-medium text-[var(--accent-ink)] transition hover:bg-[rgba(46,111,106,0.08)]"
+      className="inline-flex items-center justify-center rounded-full border border-[var(--line-soft)] bg-[rgba(255,255,255,0.82)] px-3 py-1.5 text-[12px] font-medium text-[var(--accent-ink)] transition hover:bg-[rgba(46,111,106,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgba(255,255,255,0.74)]"
       href={href}
     >
       {children}

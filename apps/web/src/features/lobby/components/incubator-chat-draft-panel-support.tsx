@@ -1,6 +1,7 @@
 "use client";
 
 import type { UseMutationResult } from "@tanstack/react-query";
+import { Button, Input } from "@arco-design/web-react";
 
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getErrorMessage } from "@/lib/api/client";
@@ -115,13 +116,15 @@ function ProjectNameField({
   return (
     <label className="block">
       <span className="label-text">项目名称</span>
-      <input
+      <Input
+        allowClear
         autoComplete="off"
-        className="ink-input min-h-[2.75rem] px-3 py-1.5 text-[13px] leading-6"
+        className="w-full"
         name="projectName"
         placeholder="例如：林昭的玄幻故事…"
+        size="default"
         value={projectName}
-        onChange={(event) => onProjectNameChange(event.target.value)}
+        onChange={(value) => onProjectNameChange(value)}
       />
     </label>
   );
@@ -144,12 +147,26 @@ function ActionButtons({
 }) {
   return (
     <div className="grid gap-2 sm:grid-cols-2">
-      <button className="ink-button-secondary h-9 w-full px-3.5 text-[13px]" disabled={!canSyncDraft} onClick={() => void onSyncDraft()} type="button">
+      <Button
+        disabled={!canSyncDraft}
+        long
+        shape="round"
+        size="default"
+        type="secondary"
+        onClick={() => void onSyncDraft()}
+      >
         {draftMutation.isPending ? "整理中…" : draft ? "重新整理草稿" : "整理草稿"}
-      </button>
-      <button className="ink-button h-9 w-full px-3.5 text-[13px]" disabled={!canCreate} onClick={() => createMutation.mutate()} type="button">
+      </Button>
+      <Button
+        disabled={!canCreate}
+        long
+        shape="round"
+        size="default"
+        type="primary"
+        onClick={() => createMutation.mutate()}
+      >
         {createMutation.isPending ? "创建中…" : "创建项目"}
-      </button>
+      </Button>
     </div>
   );
 }

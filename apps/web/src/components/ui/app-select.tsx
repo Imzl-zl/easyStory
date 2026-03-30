@@ -13,6 +13,7 @@ export type AppSelectOption = {
 };
 
 type AppSelectProps = {
+  ariaLabel?: string;
   className?: string;
   density?: "default" | "roomy";
   disabled?: boolean;
@@ -33,6 +34,7 @@ const INVALID_VALUE_LABEL_PREFIX = "当前值不可用";
 const INVALID_VALUE_DESCRIPTION = "这项配置已不在可选范围内，请重新选择。";
 
 export function AppSelect({
+  ariaLabel,
   className,
   density = "default",
   disabled = false,
@@ -54,6 +56,7 @@ export function AppSelect({
 
   return (
     <Select
+      aria-label={ariaLabel}
       allowClear={false}
       className={buildClassName(styles.root, density === "roomy" ? styles.roomy : undefined, className)}
       disabled={disabled}

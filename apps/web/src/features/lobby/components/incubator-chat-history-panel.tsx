@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@arco-design/web-react";
 
 import type { IncubatorChatModel } from "./incubator-page-model";
 
@@ -23,6 +24,7 @@ const FULL_DATE_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
 
 export function ChatHistoryPanel({ model }: { model: IncubatorChatModel }) {
   const [isOpen, setIsOpen] = useState(false);
+  const historyPanelId = "incubator-chat-history-panel";
   const conversations = model.conversationSummaries;
   const activeConversation = conversations.find(
     (conversation) => conversation.id === model.activeConversationId,
@@ -32,6 +34,7 @@ export function ChatHistoryPanel({ model }: { model: IncubatorChatModel }) {
     <div className="space-y-1.5">
       <div className="flex flex-wrap items-stretch gap-1.5">
         <button
+          aria-controls={historyPanelId}
           aria-expanded={isOpen}
           className="group flex min-w-0 flex-1 items-center justify-between rounded-[14px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-left transition-[border-color,background-color,box-shadow] hover:border-[rgba(46,111,106,0.18)] hover:bg-[rgba(255,255,255,0.96)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)]"
           onClick={() => setIsOpen((current) => !current)}
@@ -49,19 +52,23 @@ export function ChatHistoryPanel({ model }: { model: IncubatorChatModel }) {
             {conversations.length} 条
           </span>
         </button>
-        <button
-          className="ink-button-secondary h-10 shrink-0 px-3 text-[12px]"
+        <Button
+          shape="round"
+          size="default"
+          type="secondary"
           onClick={() => {
             model.createConversation();
             setIsOpen(false);
           }}
-          type="button"
         >
           新建
-        </button>
+        </Button>
       </div>
       {isOpen ? (
-        <div className="rounded-[18px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.94)] p-1.5 shadow-[0_12px_24px_rgba(58,45,29,0.06)]">
+        <div
+          className="rounded-[18px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.94)] p-1.5 shadow-[0_12px_24px_rgba(58,45,29,0.06)]"
+          id={historyPanelId}
+        >
           <div className="mb-1 flex items-center justify-between gap-2 px-1.5">
             <p className="text-[10.5px] leading-5 text-[var(--text-secondary)]">最近对话</p>
           </div>
@@ -95,19 +102,21 @@ export function ChatHistoryPanel({ model }: { model: IncubatorChatModel }) {
                         {formatConversationUpdatedAt(conversation.updatedAt)}
                       </p>
                     </button>
-                    <button
+                    <Button
                       aria-label={`删除对话：${conversation.title}`}
-                      className="inline-flex size-8 shrink-0 items-center justify-center rounded-[10px] text-[var(--text-secondary)] transition-[background-color,color,box-shadow] hover:bg-[rgba(178,65,46,0.1)] hover:text-[rgb(178,65,46)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(178,65,46,0.18)]"
+                      className="shrink-0"
+                      icon={<TrashIcon />}
+                      shape="circle"
+                      size="mini"
+                      status="danger"
+                      type="text"
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
                         model.deleteConversation(conversation.id);
                         setIsOpen(false);
                       }}
-                      type="button"
-                    >
-                      <TrashIcon />
-                    </button>
+                    />
                   </div>
                 </li>
               );

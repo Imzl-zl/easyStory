@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Button } from "@arco-design/web-react";
 
 import type { IncubatorCredentialState } from "@/features/lobby/components/incubator-chat-credential-support";
 import {
@@ -43,15 +44,17 @@ export function PromptSuggestionBar({
   return (
     <div className="mt-1.5 flex flex-wrap gap-1.5">
       {INCUBATOR_PROMPT_SUGGESTIONS.map((prompt) => (
-        <button
-          className="rounded-full border border-[var(--line-soft)] bg-[rgba(255,255,255,0.92)] px-2.5 py-1 text-left text-[11px] leading-5 text-[var(--text-primary)] transition-[border-color,background-color,color] hover:border-[rgba(46,111,106,0.18)] hover:bg-[rgba(46,111,106,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
+        <Button
+          className="!h-auto !px-3 !py-1.5 !text-left !text-[11px] !leading-5"
           disabled={disabled}
           key={prompt}
+          shape="round"
+          size="small"
+          type="secondary"
           onClick={() => onSelect(prompt)}
-          type="button"
         >
           {prompt}
-        </button>
+        </Button>
       ))}
     </div>
   );

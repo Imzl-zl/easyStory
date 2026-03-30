@@ -11,7 +11,7 @@ test("incubator chat settings support keeps token input numeric", () => {
   assert.equal(normalizeMaxOutputTokensInput(" 8a1-92 "), "8192");
 });
 
-test("incubator chat settings support shows token summary with stable wording", () => {
+test("incubator chat settings support keeps summary compact when using connection defaults", () => {
   const items = buildChatSettingsSummaryItems({
     credentialOptions: [{
       apiDialect: "openai_responses",
@@ -33,11 +33,36 @@ test("incubator chat settings support shows token summary with stable wording", 
     },
   } as never);
 
+  assert.deepEqual(items, ["OpenAI 主账号"]);
+});
+
+test("incubator chat settings support shows only changed summary items", () => {
+  const items = buildChatSettingsSummaryItems({
+    credentialOptions: [{
+      apiDialect: "openai_responses",
+      defaultModel: "gpt-4.1",
+      defaultMaxOutputTokens: 8192,
+      displayLabel: "OpenAI 主账号 · gpt-4.1",
+      provider: "openai",
+    }],
+    credentialState: "ready",
+    settings: {
+      agentId: "",
+      allowSystemCredentialPool: false,
+      hookIds: [],
+      maxOutputTokens: "12000",
+      modelName: "gpt-4.1-mini",
+      provider: "openai",
+      skillId: "skill.assistant.general_chat",
+      streamOutput: false,
+    },
+  } as never);
+
   assert.deepEqual(items, [
     "OpenAI 主账号",
-    "gpt-4.1",
-    "上限 8192",
-    "边写边显示",
+    "gpt-4.1-mini",
+    "上限 12000",
+    "生成后整体显示",
   ]);
 });
 

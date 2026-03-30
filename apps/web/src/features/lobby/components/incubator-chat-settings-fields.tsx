@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Checkbox, Input, Radio } from "@arco-design/web-react";
 
 import { AppSelect } from "@/components/ui/app-select";
 
@@ -26,8 +27,9 @@ export function AgentSelectField({
 }) {
   return (
     <div className="block min-w-0">
-      <span className="label-text">当前 Agent</span>
+      <span className="label-text">Agent</span>
       <AppSelect
+        ariaLabel="Agent"
         className="min-w-0"
         density="default"
         options={options}
@@ -49,8 +51,9 @@ export function SkillSelectField({
 }) {
   return (
     <div className="block min-w-0">
-      <span className="label-text">当前 Skill</span>
+      <span className="label-text">Skill</span>
       <AppSelect
+        ariaLabel="Skill"
         className="min-w-0"
         density="default"
         disabled={disabled}
@@ -72,6 +75,7 @@ export function ProviderSelectField({ model }: { model: IncubatorChatModel }) {
     <div className="block min-w-0" title={currentOption?.displayLabel ?? ""}>
       <span className="label-text">模型连接</span>
       <AppSelect
+        ariaLabel="模型连接"
         className="min-w-0"
         density="default"
         options={model.credentialOptions.map((option) => ({
@@ -106,7 +110,7 @@ export function HookSelectionField({
           return (
             <button
               aria-pressed={active}
-              className={`rounded-[16px] border px-3 py-2 text-left transition ${
+              className={`rounded-[16px] border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgba(248,243,235,0.88)] ${
                 active
                   ? "border-[rgba(46,111,106,0.22)] bg-[rgba(46,111,106,0.1)]"
                   : "border-[rgba(101,92,82,0.1)] bg-[rgba(255,255,255,0.82)] hover:border-[rgba(46,111,106,0.16)] hover:bg-[rgba(248,243,235,0.88)]"
@@ -161,15 +165,18 @@ export function TextSettingField({
   return (
     <label className="block min-w-0">
       <span className="label-text">{label}</span>
-      <input
+      <Input
+        allowClear
         autoComplete="off"
-        className="ink-input min-h-[2.4rem] min-w-0 px-3 py-1.5 text-[12.5px] leading-5"
+        className="w-full"
         inputMode={name === "maxOutputTokens" ? "numeric" : undefined}
+        maxLength={name === "maxOutputTokens" ? 7 : undefined}
         name={name}
         placeholder={placeholder}
+        size="default"
         spellCheck={false}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(nextValue) => onChange(nextValue)}
       />
     </label>
   );
@@ -177,28 +184,23 @@ export function TextSettingField({
 
 export function OutputModeField({ model }: { model: IncubatorChatModel }) {
   return (
-    <div className="rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-2.5 py-2">
+    <div className="rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-3 py-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[12px] font-medium text-[var(--text-primary)]">回复显示方式</p>
           <p className="text-[11px] leading-4 text-[var(--text-secondary)]">仅对当前聊天生效</p>
         </div>
-        <div
+        <Radio.Group
           aria-label="回复方式"
-          className="grid min-w-0 grid-cols-2 gap-1 rounded-full bg-[rgba(255,255,255,0.8)] p-1"
-          role="group"
+          mode="fill"
+          size="small"
+          type="button"
+          value={model.settings.streamOutput ? "stream" : "buffered"}
+          onChange={(value) => updateIncubatorChatSetting(model, "streamOutput", value === "stream")}
         >
-          <OutputModeButton
-            active={model.settings.streamOutput}
-            label="边写边显示"
-            onClick={() => updateIncubatorChatSetting(model, "streamOutput", true)}
-          />
-          <OutputModeButton
-            active={!model.settings.streamOutput}
-            label="生成后整体显示"
-            onClick={() => updateIncubatorChatSetting(model, "streamOutput", false)}
-          />
-        </div>
+          <Radio value="stream">边写边显示</Radio>
+          <Radio value="buffered">生成后整体显示</Radio>
+        </Radio.Group>
       </div>
     </div>
   );
@@ -206,24 +208,21 @@ export function OutputModeField({ model }: { model: IncubatorChatModel }) {
 
 export function SystemCredentialPoolField({ model }: { model: IncubatorChatModel }) {
   return (
-    <label className="flex items-start gap-2.5 rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-2.5 py-2">
-      <input
+    <div className="rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-3 py-2.5">
+      <Checkbox
         checked={model.settings.allowSystemCredentialPool}
-        className="mt-0.5 size-4 shrink-0 accent-[var(--accent-ink)]"
-        onChange={(event) =>
-          updateIncubatorChatSetting(model, "allowSystemCredentialPool", event.target.checked)
-        }
-        type="checkbox"
-      />
-      <span className="min-w-0">
-        <span className="block text-[12px] font-medium text-[var(--text-primary)]">
-          创建项目后沿用默认模型连接
+        onChange={(checked) => updateIncubatorChatSetting(model, "allowSystemCredentialPool", checked)}
+      >
+        <span className="block min-w-0">
+          <span className="block text-[12px] font-medium text-[var(--text-primary)]">
+            创建项目后沿用默认模型连接
+          </span>
+          <span className="mt-0.5 block text-[11px] leading-4 text-[var(--text-secondary)]">
+            仅影响创建后的项目。
+          </span>
         </span>
-        <span className="mt-0.5 block text-[11px] leading-4 text-[var(--text-secondary)]">
-          仅影响创建后的项目。
-        </span>
-      </span>
-    </label>
+      </Checkbox>
+    </div>
   );
 }
 
@@ -252,30 +251,5 @@ export function CredentialSettingsEmptyState({
         </Link>
       )}
     </div>
-  );
-}
-
-function OutputModeButton({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      aria-pressed={active}
-      className={`rounded-full px-3 py-1.5 text-[12px] leading-4 transition ${
-        active
-          ? "bg-[rgba(46,111,106,0.14)] font-medium text-[var(--accent-ink)] shadow-[0_6px_12px_rgba(46,111,106,0.08)]"
-          : "text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.96)] hover:text-[var(--text-primary)]"
-      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-inset`}
-      onClick={onClick}
-      type="button"
-    >
-      {label}
-    </button>
   );
 }

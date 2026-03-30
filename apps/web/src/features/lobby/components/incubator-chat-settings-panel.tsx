@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { Tag } from "@arco-design/web-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { listMyAssistantAgents, listMyAssistantHooks, listMyAssistantSkills } from "@/lib/api/assistant";
@@ -118,23 +119,8 @@ export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
 
   return (
     <details className="overflow-hidden rounded-[16px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.76)]">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-1.5 text-[12.5px] font-medium text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-inset">
-        <span className="min-w-0 flex-1">
-          <span className="block">模型与连接</span>
-          <span className="mt-1 flex flex-wrap gap-1">
-            {summaryItems.map((item) => (
-              <span
-                className="rounded-full bg-[rgba(248,243,235,0.96)] px-1.5 py-0.5 text-[10px] font-normal leading-4 text-[var(--text-secondary)]"
-                key={item}
-              >
-                {item}
-              </span>
-            ))}
-          </span>
-        </span>
-        <span className="shrink-0 rounded-full bg-[rgba(248,243,235,0.92)] px-2 py-0.5 text-[10.5px] font-normal text-[var(--text-secondary)]">
-          设置
-        </span>
+      <summary className="list-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-inset">
+        <SettingsCollapseHeader summaryItems={summaryItems} />
       </summary>
       <div className="border-t border-[var(--line-soft)] px-3 py-2">
         {model.credentialState === "ready" ? (
@@ -155,6 +141,35 @@ export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
         )}
       </div>
     </details>
+  );
+}
+
+function SettingsCollapseHeader({ summaryItems }: { summaryItems: string[] }) {
+  return (
+    <div className="flex items-start justify-between gap-3 px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <p className="text-[12.5px] font-medium text-[var(--text-primary)]">模型与连接</p>
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {summaryItems.map((item) => (
+            <Tag
+              bordered={false}
+              className="!m-0 !rounded-full !bg-[rgba(248,243,235,0.96)] !px-2 !py-0.5 !text-[10.5px] !leading-4 !text-[var(--text-secondary)]"
+              key={item}
+              size="small"
+            >
+              {item}
+            </Tag>
+          ))}
+        </div>
+      </div>
+      <Tag
+        bordered={false}
+        className="!m-0 !rounded-full !bg-[rgba(248,243,235,0.92)] !px-2 !py-0.5 !text-[10.5px] !leading-4 !text-[var(--text-secondary)]"
+        size="small"
+      >
+        设置
+      </Tag>
+    </div>
   );
 }
 
