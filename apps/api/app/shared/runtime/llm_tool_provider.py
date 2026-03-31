@@ -21,6 +21,10 @@ from .llm_protocol import (
 from .tool_provider import ToolProvider
 
 LLM_GENERATE_TOOL = "llm.generate"
+INCOMPLETE_STREAM_MESSAGE = (
+    "上游在输出尚未完成时提前停止了这次回复，当前只收到部分内容。"
+    "请关闭流式，或切换更稳定的连接后重试。"
+)
 
 
 class AsyncLlmRequestSender(Protocol):
@@ -82,19 +86,26 @@ class LLMToolProvider(ToolProvider):
         if tool_name != LLM_GENERATE_TOOL:
             raise ConfigurationError(f"Unsupported tool: {tool_name}")
         request = _build_request(params)
+        api_dialect = request.connection.api_dialect
         prepared_request = stream_support.build_stream_probe_request(
             prepare_generation_request(_to_generate_request(request)),
-            api_dialect=request.connection.api_dialect,
+            api_dialect=api_dialect,
         )
         parts: list[str] = []
         truncation_reason: str | None = None
+        saw_terminal_event = False
         async for event in stream_support.iterate_stream_request(
             prepared_request,
-            api_dialect=request.connection.api_dialect,
+            api_dialect=api_dialect,
             should_stop=should_stop,
         ):
             if truncation_reason is None:
                 truncation_reason = stream_support.extract_stream_truncation_reason(event.stop_reason)
+            if not saw_terminal_event:
+                saw_terminal_event = _is_terminal_stream_event(
+                    api_dialect=api_dialect,
+                    event=event,
+                )
             if not event.delta:
                 continue
             parts.append(event.delta)
@@ -106,6 +117,8 @@ class LLMToolProvider(ToolProvider):
             raise ConfigurationError(
                 stream_support.build_truncated_stream_message(truncation_reason)
             )
+        if not saw_terminal_event:
+            raise ConfigurationError(INCOMPLETE_STREAM_MESSAGE)
         yield LLMStreamEvent(
             response={
                 "content": content,
@@ -173,6 +186,20 @@ def _build_http_error_message(response: HttpJsonResponse) -> str:
     if suffix:
         return f"LLM request failed: HTTP {response.status_code} - {suffix}"
     return f"LLM request failed: HTTP {response.status_code}"
+
+
+def _is_terminal_stream_event(
+    *,
+    api_dialect: str,
+    event: stream_support.ParsedStreamEvent,
+) -> bool:
+    if api_dialect == "openai_chat_completions":
+        return event.stop_reason is not None
+    if api_dialect == "openai_responses":
+        return event.event_name == "response.completed"
+    if api_dialect == "anthropic_messages":
+        return event.event_name == "message_stop" or event.stop_reason is not None
+    return event.stop_reason is not None
 
 
 def _build_connection(credential: dict[str, Any]) -> LLMConnection:

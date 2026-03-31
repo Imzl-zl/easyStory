@@ -63,3 +63,4 @@ node_modules/
 .codex-tasks/
 .serena/cache/
 .serena/project.local.yml
+.worktrees/

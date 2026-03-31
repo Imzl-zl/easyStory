@@ -1,0 +1,466 @@
+  ---
+  你的需求很明确：基于 Notion / Linear / Scandinavian 等设计风格重构前端 UI，实现 目录树 + Markdown 编辑器 + 右侧聊天
+   的三栏布局。
+
+  从代码看，你当前的三栏结构已经有了雏形（studio-page.tsx），但整体 UI 品质还比较粗糙。我想确认一个核心方向问题：
+
+  这次重构的范围是什么？
+
+  - A) 仅 Studio 页面（目录树 + 编辑器 + 聊天面板的视觉升级）
+  - B) Studio 页面 + WorkspaceShell 顶栏（包括导航、品牌区、用户操作的视觉重做）
+  - C) 全站 UI 重构（包括登录页、书架/Lobby、设置页等所有页面的统一视觉升级）
+
+  你倾向哪个？
+
+✻ Sautéed for 1m 36s
+
+❯ C                                                                                                                  
+
+● 全站范围明确了。这意味着我们需要一套统一的视觉系统贯穿所有页面。
+
+  下一个问题——关于设计风格方向。你给了多个参考，它们风格差异不小：
+
+  ┌──────────────┬─────────────────────────────┬────────────────────┐
+  │     风格     │          核心气质           │      适合场景      │
+  ├──────────────┼─────────────────────────────┼────────────────────┤
+  │ Notion       │ 暖白/米色、极度克制、工具感 │ 编辑器、知识管理   │
+  ├──────────────┼─────────────────────────────┼────────────────────┤
+  │ Linear       │ 深色、精确、开发者审美      │ 任务管理、专业工具 │
+  ├──────────────┼─────────────────────────────┼────────────────────┤
+  │ Scandinavian │ 暖中性色、大量留白、轻柔    │ 内容展示、阅读体验 │
+  ├──────────────┼─────────────────────────────┼────────────────────┤
+  │ Swiss        │ 黑白红、严格网格、硬朗      │ 数据密集、信息层级 │
+  └──────────────┴─────────────────────────────┴────────────────────┘
+
+  你目前的 globals.css 已经是 Notion 暖白色系。考虑到 easyStory 的核心场景是写作工具，我的建议是：
+
+  以 Notion 风格为基础底色，融入 Scandinavian 的暖色留白感，再从 Linear 借鉴精确的排版和克制交互。 不走 Swiss
+  的硬朗路线，也不走 Linear 的深色路线。
+
+  你同意这个融合方向吗？还是你更倾向某个单一风格？
+
+✻ Baked for 35s
+
+❯ 同意，Notion + Scandinavian + Linear 融合                                                                          
+
+● 好，风格方向定了。现在进入最关键的视觉问题——让我在浏览器里展示整体设计方向和 Studio 页面布局方案。
+
+● Read 1 file (ctrl+o to expand)
+
+● Write(.superpowers/brainstorm/81679-1774871346/studio-layout.html)
+  ⎿  Wrote 26 lines to .superpowers/brainstorm/81679-1774871346/studio-layout.html
+     <h2>Studio 页面布局方案</h2>      
+     <p class="subtitle">选择你偏好的三栏布局方向</p>
+                                                                                                                     
+     <div class="options">
+       <div class="option" data-choice="a" onclick="toggleSelect(this)">                                             
+         <div class="letter">A</div>                                                                               
+         <div class="content">           
+           <h3>沉浸式无边框</h3>
+           <p>Notion 风格：三栏之间无边框分隔，靠背景色差异（米色侧栏 / 白色编辑区 /
+     微灰聊天区）自然分层。Header 极简，项目名内联显示，不占独立行。</p>
+         </div>
+     … +16 lines (ctrl+o to expand)
+
+● 浏览器中展示了 3 种 Studio 布局方案，请打开 http://localhost:60998 查看：
+
+  - A) 沉浸式无边框 — Notion 风格，靠背景色差异分层，无分隔线                                                        
+  - B) 精确分隔线 — Linear 风格，1px 细线分隔，各栏独立
+  - C) 呼吸感留白 — Scandinavian 风格，间隙分隔，更宽内边距                                                          
+                                                                                                                   
+  点击选择你偏好的方案，或者在终端告诉我你的想法。
+
+✻ Cogitated for 10m 48s
+
+❯ 你觉得哪个最好，最符合场景？                                                                                       
+                               
+● 我的推荐是 A（沉浸式无边框）+ C 的编辑区内边距，理由：                                                             
+                                                                 
+  写作工具的核心是"忘掉界面"。                                                                                       
+                                                                 
+  - 用户每天花几小时盯着编辑器，任何多余的线和框都是视觉噪音                                                         
+  - 目录树和聊天是配角，不应该和编辑器"平起平坐"——无边框让编辑区自然成为视觉焦点
+  - Notion 证明了靠背景色差异（米色侧栏 vs 白色编辑区）完全可以清晰分层，不需要硬线
+  - 但纯 A 会显得编辑区内容贴边太紧，所以借用 C 的 40px+ 内边距让正文有呼吸感
+
+  具体来说：
+  - 左侧目录树：米色背景 #f7f6f3，与白色编辑区自然过渡
+  - 中间编辑器：白色，内容区 40-48px 内边距，写作时感觉像一张纸
+  - 右侧聊天：可收起，展开时用极淡的背景差异（#faf9f7）而非硬分隔线
+  - 三栏之间无 1px 线，靠留白和背景色就够
+
+  你觉得这个方向对吗？
+
+✻ Brewed for 57s
+
+❯ 可以                                                                                                               
+       
+● 好，Studio 布局方向定了：沉浸式无边框 + 宽松编辑区内边距。                                                         
+                                                                 
+  下一个问题关于 WorkspaceShell 顶栏——这是贯穿全站的导航栏，需要和 Studio 的沉浸风格协调。让我在浏览器里展示方案。   
+                                                                 
+● Write(.superpowers/brainstorm/81679-1774871346/topbar-layout.html)                                                 
+  ⎿  Wrote 26 lines to .superpowers/brainstorm/81679-1774871346/topbar-layout.html
+     <h2>WorkspaceShell 顶栏方案</h2>                                                                                
+     <p class="subtitle">全站通用的顶部导航栏风格</p>
+                                                                                                                     
+     <div class="options">                                       
+       <div class="option" data-choice="a" onclick="toggleSelect(this)">
+         <div class="letter">A</div>
+         <div class="content">
+           <h3>Notion 风格融合顶栏</h3>
+           <p>当前方案的升级版：保留顶栏但去除渐变背景，改为纯白/半透明毛玻璃。品牌区缩小为纯文字
+     logo，导航项变为紧凑的文字链接（非按钮胶囊），右侧只保留头像 +
+     下拉菜单（设置/退出合并）。整体更轻更薄，不抢 Studio 的沉浸感。</p>
+         </div>
+     … +16 lines (ctrl+o to expand)
+                                              
+● 浏览器已更新，展示 3 种顶栏方案（http://localhost:60998）：
+
+  - A) Notion 融合顶栏 — 当前方案升级，去渐变变薄，不抢沉浸感                                                        
+  - B) Linear 极简顶栏 — 极窄，Studio 内进一步收缩/隐藏
+  - C) 上下文感知 — 不同页面不同顶栏形态，Studio 内切换为编辑器工具栏                                                
+                                                                 
+  你觉得哪个方向合适？                                                                                               
+                                                                 
+✻ Cogitated for 9m 15s                   
+
+❯ 你推荐                                                                                                             
+         
+● 我推荐 C（上下文感知顶栏）。                                                                                       
+                                                                 
+  原因很简单：一个写作工具里，书架浏览和深度写作是完全不同的心智模式。                                               
+                                                                 
+  - Lobby 页面：用户在选项目、管理设置，需要完整的导航指引——品牌名、导航链接、用户信息都应该清晰可见                 
+  - Studio 页面：用户已经进入写作状态，这时候顶栏还显示"书架 / 写作 / 任务 /
+  参考"这些全局导航反而是干扰。它应该变成文档工具栏：当前文档名 + 保存状态 + 视图切换 + 聊天开关
+  - Engine / Lab / Settings：各自显示该页面需要的操作，全局导航退到面包屑或小图标
+
+  这正好和 A 方案的沉浸式 Studio 布局完美配合——进入 Studio 后，旧顶栏的 64px
+  空间让出来给编辑器，写作面积直接多出一行。
+
+  本质上这就是 Notion
+  自己的做法：工作台页面有侧栏导航，进入文档后侧栏收起、顶栏变成页面级操作。我们只是把这个思路用到顶栏上。
+
+  你同意 C 方案吗？
+
+✻ Sautéed for 1m 21s
+
+❯ 可以                                                                                                               
+       
+● 好，顶栏方案也定了。接下来是另一个关键页面——Lobby（书架）。这是用户进入项目前的"入口页面"，和 Studio               
+  的沉浸式写作完全不同，需要独立讨论。                           
+                                                                                                                     
+● Write(.superpowers/brainstorm/81679-1774871346/lobby-style.html)
+  ⎿  Wrote 26 lines to .superpowers/brainstorm/81679-1774871346/lobby-style.html                                     
+     <h2>Lobby 书架页面风格</h2>                                                                                     
+     <p class="subtitle">项目列表页的视觉气质——这是用户的第一印象</p>
+                                                                                                                     
+     <div class="options">                                       
+       <div class="option" data-choice="a" onclick="toggleSelect(this)">
+         <div class="letter">A</div>
+         <div class="content">
+           <h3>Notion 风格卡片网格</h3>
+           <p>项目以卡片网格展示（2-3列），每张卡片有封面色块 + 项目名 + 简介 + 最近编辑时间。卡片 hover 有
+     Notion 式的微妙背景变化（#f7f6f3 → #efedea）。顶部有简洁的标题"我的作品" +
+     新建按钮。侧栏显示快捷导航（设置、模板、回收站）。</p>
+         </div>
+     … +16 lines (ctrl+o to expand)
+
+● 浏览器已更新（http://localhost:60998），展示 3 种书架页面方案：
+
+  - A) Notion 卡片网格 — 卡片展示，封面色块，有侧栏                                                                  
+  - B) Scandinavian 清单式 — 宽松列表，大量留白，无侧栏
+  - C) Linear 侧栏+列表 — 固定侧栏导航，紧凑列表                                                                     
+                                                                 
+  哪个方向你更喜欢？                     
+
+✻ Worked for 1m 36s
+
+❯ 推荐                                                                                                               
+       
+● 我推荐 A（Notion 卡片网格）。                                                                                      
+                                                                 
+  理由：                                                                                                             
+   
+  - 书架是"选书"动作——卡片比列表行更能传达每个项目的"存在感"。封面色块让项目有辨识度，用户一眼能认出要打开哪个       
+  - Lobby 是唯一需要全局导航的页面——设置、模板、回收站这些低频入口放侧栏很自然，比塞在顶栏下拉菜单里更容易发现
+  - 和 Studio 的沉浸式形成节奏对比——Lobby 是"展览馆"（展示选择），Studio
+  是"工作室"（专注创作）。两种不同的空间感让产品有层次
+  - B 太空——对于项目管理场景，清单式虽然优雅但信息效率低
+  - C 太重——Linear 的侧栏+列表适合开发者工具，但写作工具需要更温暖的第一印象
+
+  A 方案恰好和已定的 C 方案（上下文感知顶栏）配合：Lobby 显示完整顶栏+侧栏，点击项目进入 Studio
+  后，侧栏消失，顶栏变为编辑器工具栏，空间全部让给写作。
+
+  同意吗？
+
+✻ Brewed for 40s
+
+❯ 同意                                                                                                               
+       
+● 好，四大方向全部确定：                                                                                             
+                                                                 
+  ┌─────────────┬────────────────────────────────────────────────┐                                                   
+  │    决策     │                      方案                      │
+  ├─────────────┼────────────────────────────────────────────────┤                                                   
+  │ 风格融合    │ Notion + Scandinavian + Linear                 │
+  ├─────────────┼────────────────────────────────────────────────┤
+  │ Studio 布局 │ 沉浸式无边框 + 宽松内边距                      │
+  ├─────────────┼────────────────────────────────────────────────┤
+  │ 顶栏        │ 上下文感知（Lobby 完整 / Studio 编辑器工具栏） │
+  ├─────────────┼────────────────────────────────────────────────┤
+  │ Lobby 书架  │ Notion 卡片网格 + 侧栏                         │
+  └─────────────┴────────────────────────────────────────────────┘
+
+  现在进入最后一个视觉决策——配色微调。当前 globals.css 是纯 Notion 色系，需要注入 Scandinavian 的暖感。让我展示对比。
+
+● Write(.superpowers/brainstorm/81679-1774871346/color-palette.html)
+  ⎿  Wrote 68 lines to .superpowers/brainstorm/81679-1774871346/color-palette.html
+     <h2>配色方案微调</h2>                                                                                           
+     <p class="subtitle">在 Notion 底色上注入 Scandinavian 暖感</p>
+                                                                                                                     
+     <div class="split">                                         
+       <div class="mockup">              
+         <div class="mockup-header">当前 Notion 纯色</div>
+         <div class="mockup-body" style="padding: 20px;">
+           <div style="background: #faf9f7; padding: 16px; border-radius: 6px; margin-bottom: 12px;">
+             <p style="font-size: 11px; color: #999; margin: 0 0 4px;">--bg-canvas</p>
+             <p style="margin: 0; font-weight: 600;">#faf9f7 冷米色</p>
+     … +58 lines (ctrl+o to expand)
+
+● 浏览器已更新（http://localhost:60998），左右对比展示了配色方案：
+
+  核心变化：                                                                                                         
+  - 强调色：冷蓝 #2383e2 → 松绿 #5a7a6b（Scandinavian 标志色，温暖不张扬）
+  - 文字色：冷深灰 → 暖炭灰 #3d3d3d                                                                                  
+  - 背景色：整体向暖米色偏移                                     
+  - 保留 Notion 的极小圆角、极轻阴影、快速过渡
+  - 保留 Linear 的紧凑排版
+
+  看看色块对比，这个暖色方向你觉得可以吗？
+
+✻ Cooked for 3m 11s
+
+❯ 可以                                                                                                               
+       
+● 所有视觉方向都定了。让我把浏览器切到等待页，然后在终端呈现完整设计。                                               
+                                                                 
+● Write(.superpowers/brainstorm/81679-1774871346/waiting.html)                                                       
+  ⎿  Wrote 3 lines to .superpowers/brainstorm/81679-1774871346/waiting.html
+     <div style="display:flex;align-items:center;justify-content:center;min-height:60vh">                            
+       <p class="subtitle">Continuing in terminal...</p>         
+     </div>                                                                                                          
+                                                                 
+                                         
+● 好，现在整理完整设计。在此之前我还需要确认最后几个实施约束：
+
+  1) 现有组件保留策略                                                                                                
+   
+  当前你已经有不少组件在用 Arco Design（Button, Input, Dropdown, Avatar, Checkbox 等）。这次重构中：                 
+                                                                 
+  - 继续使用 Arco Design 作为基础组件库，但通过全局 CSS 变量覆盖其默认色系来统一风格？
+  - 还是大幅减少 Arco 使用，更多用自定义 CSS Module 组件来追求视觉精确度？
+
+  2) Tailwind CSS 的定位
+
+  当前项目引入了 Tailwind CSS 4 但使用很少（大部分样式用 CSS Module）。重构时：
+
+  - 维持现状：CSS Module 为主，Tailwind 偶尔辅助？
+  - 还是全面转 Tailwind，用 utility-first 替代 CSS Module？
+
+  这两个选择会显著影响实施方式和代码风格。
+
+✻ Worked for 1m 38s
+
+❯ 你觉得呢？                                                                                                         
+             
+● 我的建议：                                                                                                         
+                                                                 
+  1) Arco Design：保留，通过 CSS 变量覆盖统一风格                                                                    
+                                                                 
+  - Arco 提供的复杂交互组件（Dropdown、Modal、表单验证）自己重写代价巨大，收益低                                     
+  - 这次重构的核心是配色、间距、排版、布局层级——全部可以通过 CSS 变量覆盖 + ConfigProvider token 实现
+  - 组件结构和交互逻辑不动，只换皮肤     
+
+  2) CSS Module 为主，Tailwind 不扩展
+
+  - 项目已经有成熟的 CSS Module 模式，切换 Tailwind 是推倒重来，不值得
+  - globals.css 的 CSS 变量体系已经是一个很好的 design token 系统，和 CSS Module 天然配合
+  - Tailwind 保留现状（已引入但不常用），不主动扩展也不移除
+
+  总结：换皮不换骨。 Arco 组件保留，CSS Module 模式保留，改的是 CSS 变量色盘 + 布局结构 + 间距排版。
+
+  同意的话，我来呈现完整设计方案。
+
+✻ Worked for 1m 7s
+
+❯ 可以                                                                                                               
+       
+● 好，所有方向性决策已定。现在呈现完整设计方案。                                                                     
+                                                                 
+  ---                                                                                                                
+  设计方案：easyStory 全站 UI 重构                               
+                                                                                                                     
+  1. 设计系统：CSS 变量色盘重构                                  
+                                         
+  核心变化：Notion 底色 + Scandinavian 暖调 + Linear 排版精度
+
+  /* 背景层级 —— 从冷米到暖米 */
+  --bg-canvas: #f8f6f1;        /* 暖米色，全局底色 */
+  --bg-surface: #fffdfb;       /* 暖白，卡片/编辑区 */
+  --bg-muted: #f1efe9;         /* 暖灰米，侧栏/次要区 */
+  --bg-elevated: #ffffff;      /* 纯白，弹层/浮窗 */
+
+  /* 交互态 */
+  --bg-surface-hover: rgba(61, 61, 61, 0.04);
+  --bg-surface-active: rgba(61, 61, 61, 0.08);
+
+  /* 文字层级 */
+  --text-primary: #3d3d3d;     /* 暖炭灰 */
+  --text-secondary: #787774;   /* 保留 */
+  --text-tertiary: #9b9a97;    /* 保留 */
+  --text-placeholder: #b4b4b4; /* 保留 */
+
+  /* 强调色 —— 冷蓝换暖绿 */
+  --accent-primary: #5a7a6b;   /* 松绿，Scandinavian 标志色 */
+  --accent-primary-hover: #4d6b5e;
+
+  /* 边框 */
+  --line-soft: rgba(61, 61, 61, 0.09);
+  --line-strong: rgba(61, 61, 61, 0.16);
+  --line-focus: rgba(90, 122, 107, 0.4);
+
+  /* 排版 —— 融入 Linear 精度 */
+  --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --text-sm: 13px;              /* Linear 基准 */
+  --text-base: 14px;            /* Linear 正文 */
+  --text-lg: 15px;              /* 编辑器正文 */
+
+  /* 间距 —— Scandinavian 呼吸感 */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;             /* 编辑器内边距 */
+  --space-2xl: 48px;
+
+  /* 圆角/阴影/过渡 —— 保留 Notion 极致克制 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --transition-fast: 120ms ease;
+
+  设计原则：
+  - 禁止大圆角（最大 6px）、渐变背景、重阴影、scale 动画
+  - 按钮仅 opacity 和 background-color 变化
+  - 卡片层级靠背景色差异，不靠阴影
+
+  ---
+  2. WorkspaceShell 顶栏 → 上下文感知
+
+  Lobby 模式（完整顶栏）：
+  - 高度 56px，纯白半透明毛玻璃背景
+  - 左：文字 logo "easyStory" + "写作空间"（去掉图标，纯文字更轻盈）
+  - 中：导航文字链接（书架 / 写作 / 任务 / 参考），active 态用下划线而非按钮高亮
+  - 右：设置图标 + 用户头像（点击展开下拉菜单含退出）
+
+  Studio 模式（编辑器工具栏）：
+  - 高度 48px，无边框，背景继承编辑区白色
+  - 左：返回箭头 + 面包屑（项目名 > 文档名）
+  - 中：视图切换（编辑/分栏/预览）+ 保存状态
+  - 右：聊天开关图标 + 更多操作
+
+  Engine/Lab/Settings 模式：
+  - 左：返回箭头 + 页面标题
+  - 右：项目设置 + 用户头像
+
+  切换逻辑：根据路由 pathname 判断当前模式。
+
+  ---
+  3. Studio 三栏布局 → 沉浸式无边框
+
+  ┌─────────────────────────────────────────────────┐
+  │ ← 项目名 > 文档名     编辑 分栏 预览  💬 ⚙    │  ← 工具栏 48px
+  ├────────┬──────────────────────────┬──────────────┤
+  │        │                          │              │
+  │ 设定   │                          │  AI 聊天     │
+  │  世界观│     Markdown 编辑器       │              │
+  │  人物  │                          │  消息列表    │
+  │ 大纲   │     40px 内边距           │              │
+  │  总大纲│     15px 正文             │  输入框      │
+  │ 正文   │                          │              │
+  │  第001 │                          │              │
+  │ 附录   │                          │              │
+  │        │                          │              │
+  ├────────┴──────────────────────────┴──────────────┤
+  │              1,234 字 · 未保存                    │  ← 状态栏 28px
+  └─────────────────────────────────────────────────┘
+
+  关键差异（vs 当前）：
+  - 三栏之间无边框线，靠背景色分层（目录 #f1efe9 / 编辑 #fffdfb / 聊天 #f8f6f1）
+  - 编辑器内边距 40px，正文 15px，行高 1.8（Scandinavian 阅读舒适度）
+  - Header 内嵌在编辑区，不占独立行
+  - 状态栏极简 28px，字符数 + 保存状态
+
+  文档树侧栏（240px）：
+  - 背景色 #f1efe9，与编辑区自然过渡
+  - 一级目录（设定/大纲/正文/附录）用 11px 大写标签
+  - 文件项 hover 仅背景微变（Notion 式），选中态 #e8e6e0
+  - 右键菜单保持 Arco Dropdown，配色跟随新色盘
+
+  AI 聊天面板（360px，可收起）：
+  - 背景色 #f8f6f1，比编辑区微暗
+  - 无 Header 标题栏，顶部只有附加上下文折叠按钮
+  - 消息气泡去掉边框，用背景色区分（用户 #f1efe9 / AI 透明）
+  - 输入框底栏更紧凑，发送按钮用松绿色
+
+  ---
+  4. Lobby 书架 → Notion 卡片网格 + 侧栏
+
+  ┌────────┬─────────────────────────────────────────┐
+  │        │  easyStory / 写作空间                    │  ← 顶栏 56px
+  │        │  书架  写作  任务  参考         ⚙ 👤    │
+  ├────────┼─────────────────────────────────────────┤
+  │        │                                         │
+  │ 作品集 │  我的作品                    + 新建作品  │
+  │ 设置   │                                         │
+  │ 模板库 │  ┌──────┐  ┌──────┐  ┌──────┐           │
+  │ 回收站 │  │ 🟢   │  │ 🔵   │  │ 🟠   │           │
+  │        │  │ 星辰 │  │ 长安 │  │ 深渊 │           │
+  │        │  │ 记   │  │ 梦录 │  │ 迷途 │           │
+  │        │  │      │  │      │  │      │           │
+  │        │  │ 3月28│  │ 3月25│  │ 3月20│           │
+  │        │  └──────┘  └──────┘  └──────┘           │
+  │        │                                         │
+  └────────┴─────────────────────────────────────────┘
+
+  侧栏（220px）：
+  - 背景 #f1efe9，和 Studio 目录树同色
+  - 导航项：文字 + 图标，hover 微亮，active 左侧 2px 松绿竖线
+  - 不使用 Arco Menu 组件，自定义样式更轻
+
+  项目卡片：
+  - 2-3列响应式网格，卡片间距 16px
+  - 每张卡片：顶部 48px 色块（从预设色板随机/用户选）+ 项目名 + 简介 + 编辑时间
+  - 白色背景，无阴影，hover 微微升起（translateY -1px）+ 背景微暗
+  - 符合 Notion 的"信息够用，不堆砌"原则
+
+  ---
+  5. 登录/注册页
+
+  - 居中卡片，左右 40% 留白
+  - 卡片无阴影、无圆角 > 6px
+  - 输入框底部边框样式（Scandinavian 特征：border-bottom only）
+  - 标题用 font-light tracking-wide
+  - CTA 按钮松绿色
+
+  ---
+  6. 不改动的部分
+
+  - 所有业务逻辑、状态管理、API 调用
+  - 组件 TS 类型签名和 props 接口
+  - react-query / zustand 数据层
+  - Arco Design 组件的使用（Dropdown, Modal 等），只覆盖样式
+
+  ---
+  这个设计覆盖了你需要的全站范围。每个部分看起来合理吗？有需要调整的地方吗？

@@ -1,4 +1,0 @@
-packages:
-  - "apps/web"
-patchedDependencies:
-  '@arco-design/web-react@2.66.12': patches/@arco-design__web-react.patch

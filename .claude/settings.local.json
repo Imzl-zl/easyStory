@@ -27,7 +27,20 @@
       "Read(//tmp/**)",
       "Bash(npm install:*)",
       "mcp__plugin_playwright_playwright__browser_navigate",
-      "Bash(PLAYWRIGHT_BROWSERS_PATH=~/.cache/ms-playwright npx @playwright/mcp@latest --help 2>&1 | grep -i 'browser\\\\|executable' | head -10)"
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=~/.cache/ms-playwright npx @playwright/mcp@latest --help 2>&1 | grep -i 'browser\\\\|executable' | head -10)",
+      "WebFetch(domain:www.stylekit.top)",
+      "WebFetch(domain:www.designprompts.dev)",
+      "WebFetch(domain:dribbble.com)",
+      "Bash(bash /home/zl/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.2/skills/brainstorming/scripts/start-server.sh --project-dir /home/zl/code/easyStory)",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_fill_form",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "Bash(pnpm:*)",
+      "Bash(git:*)",
+      "mcp__plugin_playwright_playwright__browser_wait_for",
+      "mcp__augment-context-engine__codebase-retrieval"
     ]
   }
 }
