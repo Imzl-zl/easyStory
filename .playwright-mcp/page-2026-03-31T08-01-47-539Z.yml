@@ -1,0 +1,51 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - generic [ref=e6]: ES
+          - generic [ref=e7]:
+            - paragraph [ref=e8]: easyStory
+            - paragraph [ref=e9]: 写作不是填表，而是持续进入作品。
+        - generic [ref=e10]:
+          - paragraph [ref=e11]: 写作者入口
+          - heading "把故事继续写下去" [level=1] [ref=e12]
+          - paragraph [ref=e13]: 回到你的书架、创作桌面和洞察区，把故事从上次停下的地方继续写下去。
+        - generic [ref=e14]:
+          - paragraph [ref=e15]: “让产品先呈现作品与创作动作，而不是资源类型和后台配置。”
+          - list [ref=e16]:
+            - listitem [ref=e17]:
+              - generic [ref=e18]: 起稿
+              - paragraph [ref=e19]: 把一句念头整理成可写的世界、角色和冲突。
+            - listitem [ref=e20]:
+              - generic [ref=e21]: 推进
+              - paragraph [ref=e22]: 在创作与推进之间来回切换，不再找后台入口。
+            - listitem [ref=e23]:
+              - generic [ref=e24]: 定稿
+              - paragraph [ref=e25]: 分析、修订、导出都围着作品本身发生。
+        - generic [ref=e26]:
+          - paragraph [ref=e27]: 规则、Skills 和模型连接会直接跟着你进入项目。
+          - paragraph [ref=e28]: 工作区默认只关心作品、当前进度和下一步动作。
+          - paragraph [ref=e29]: 不需要理解控制面，只需要继续写。
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - paragraph [ref=e33]: easyStory
+          - heading "继续创作" [level=2] [ref=e34]
+          - paragraph [ref=e35]: 登录后直接进入书架，继续上次创作。
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - generic [ref=e38]: 用户名
+            - textbox "用户名" [ref=e39]:
+              - /placeholder: 输入你的创作身份
+          - generic [ref=e40]:
+            - generic [ref=e41]: 密码
+            - textbox "密码" [ref=e42]:
+              - /placeholder: 至少 8 位
+          - button "进入书架" [ref=e43] [cursor=pointer]
+        - generic [ref=e44]:
+          - generic [ref=e45]: 还没有账号？
+          - link "创建账号" [ref=e46] [cursor=pointer]:
+            - /url: /auth/register
+  - button "Open Next.js Dev Tools" [ref=e52] [cursor=pointer]:
+    - img [ref=e53]
+  - alert [ref=e56]

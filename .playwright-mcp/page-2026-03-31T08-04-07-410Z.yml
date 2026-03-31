@@ -1,0 +1,131 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - link "跳到主内容" [ref=e12] [cursor=pointer]:
+    - /url: "#workspace-main"
+  - generic [ref=e13]:
+    - banner [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - link "返回书架" [ref=e17] [cursor=pointer]:
+            - /url: /workspace/lobby
+            - generic [ref=e18]: ←
+            - text: 返回书架
+          - generic [ref=e19]:
+            - generic [ref=e20]: 当前项目
+            - generic [ref=e21]: 创作工作台
+        - navigation "工作台导航" [ref=e22]:
+          - link "创作" [ref=e23] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/studio
+          - link "推进" [ref=e24] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/engine
+          - link "洞察" [ref=e25] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/lab
+        - generic [ref=e26]:
+          - link "项目设置" [ref=e27] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/settings
+          - generic [ref=e28]:
+            - generic [ref=e30]: z
+            - generic [ref=e31]: zhanglu
+          - button "退出" [ref=e32] [cursor=pointer]
+    - main [ref=e33]:
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - paragraph [ref=e38]: 当前创作
+            - heading "选择一份文稿开始写作" [level=1] [ref=e39]
+            - paragraph [ref=e40]: 王云飞的警匪故事 · 正文优先，目录与助手都只是辅助桌面，不抢主舞台。
+          - generic [ref=e41]:
+            - button "收起助手" [ref=e42] [cursor=pointer]
+            - button "任务推进" [ref=e43] [cursor=pointer]
+        - generic [ref=e44]:
+          - complementary [ref=e45]:
+            - navigation "作品目录" [ref=e46]:
+              - generic [ref=e48]:
+                - heading "创作结构" [level=2] [ref=e49]
+                - paragraph [ref=e50]: 设定 · 大纲 · 正文
+              - list [ref=e51]:
+                - listitem [ref=e52]:
+                  - button "设定" [expanded] [ref=e53] [cursor=pointer]:
+                    - img [ref=e55]
+                    - generic [ref=e57]: 设定
+                  - list [ref=e58]:
+                    - listitem [ref=e59]:
+                      - button "世界观.md" [ref=e60] [cursor=pointer]:
+                        - img [ref=e62]
+                        - generic [ref=e65]: 世界观.md
+                    - listitem [ref=e66]:
+                      - button "人物设定.md" [ref=e67] [cursor=pointer]:
+                        - img [ref=e69]
+                        - generic [ref=e72]: 人物设定.md
+                    - listitem [ref=e73]:
+                      - button "势力关系.md" [ref=e74] [cursor=pointer]:
+                        - img [ref=e76]
+                        - generic [ref=e79]: 势力关系.md
+                    - listitem [ref=e80]:
+                      - button "伏笔与坑.md" [ref=e81] [cursor=pointer]:
+                        - img [ref=e83]
+                        - generic [ref=e86]: 伏笔与坑.md
+                - listitem [ref=e87]:
+                  - button "大纲" [expanded] [ref=e88] [cursor=pointer]:
+                    - img [ref=e90]
+                    - generic [ref=e92]: 大纲
+                  - list [ref=e93]:
+                    - listitem [ref=e94]:
+                      - button "总大纲.md" [ref=e95] [cursor=pointer]:
+                        - img [ref=e97]
+                        - generic [ref=e100]: 总大纲.md
+                    - listitem [ref=e101]:
+                      - button "开篇设计.md" [ref=e102] [cursor=pointer]:
+                        - img [ref=e104]
+                        - generic [ref=e107]: 开篇设计.md
+                    - listitem [ref=e108]:
+                      - button "章节规划.md" [ref=e109] [cursor=pointer]:
+                        - img [ref=e111]
+                        - generic [ref=e114]: 章节规划.md
+                - listitem [ref=e115]:
+                  - button "正文" [expanded] [ref=e116] [cursor=pointer]:
+                    - img [ref=e118]
+                    - generic [ref=e120]: 正文
+                - listitem [ref=e121]:
+                  - button "附录" [expanded] [ref=e122] [cursor=pointer]:
+                    - img [ref=e124]
+                    - generic [ref=e126]: 附录
+                  - list [ref=e127]:
+                    - listitem [ref=e128]:
+                      - button "灵感碎片.md" [ref=e129] [cursor=pointer]:
+                        - img [ref=e131]
+                        - generic [ref=e134]: 灵感碎片.md
+          - main [ref=e135]:
+            - generic [ref=e137]:
+              - img [ref=e139]
+              - heading "从左侧挑一份文稿" [level=3] [ref=e142]
+              - paragraph [ref=e143]: 设定、大纲、正文和附录都收在同一张写作纸面里，先选中文稿再开始进入正文。
+          - complementary [ref=e144]:
+            - complementary [ref=e145]:
+              - generic [ref=e147]:
+                - generic [ref=e148]:
+                  - heading "共创助手" [level=2] [ref=e149]
+                  - generic [ref=e150]: 读取中
+                - paragraph [ref=e151]: 围绕当前文稿推进，模型、上下文和文件都收进底部工具条。
+              - generic [ref=e153]:
+                - generic [ref=e154]: ✦
+                - paragraph [ref=e155]: 先接入一个可用模型，再开始共创。
+                - paragraph [ref=e156]: 上下文、模型、文件都收进底部工具条，主舞台只留给对话和正文。
+              - generic [ref=e158]:
+                - textbox "先启用可用模型后再开始提问" [ref=e159]
+                - generic [ref=e160]:
+                  - generic [ref=e161]:
+                    - button "上传文件" [ref=e162] [cursor=pointer]:
+                      - img [ref=e163]
+                    - button "上下文 ⌄" [ref=e165] [cursor=pointer]:
+                      - img [ref=e167]
+                      - generic [ref=e169]: 上下文
+                      - generic [ref=e170]: ⌄
+                    - button "选择模型 ⌄" [ref=e172] [cursor=pointer]:
+                      - img [ref=e174]
+                      - generic [ref=e176]: 选择模型
+                      - generic [ref=e177]: ⌄
+                  - button "发送" [disabled] [ref=e178]
+                - paragraph [ref=e179]: 先连接可用模型，再开始共创。

@@ -1,0 +1,256 @@
+.composer {
+  position: relative;
+  padding: 0.9rem 1rem 1rem;
+  background: rgba(248, 246, 241, 0.98);
+}
+
+.composerInner {
+  position: relative;
+  padding: 0.9rem;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    inset 0 0 0 1px rgba(61, 61, 61, 0.08),
+    0 16px 30px rgba(58, 45, 29, 0.06);
+  transition: box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+
+.composerInner:focus-within {
+  box-shadow:
+    inset 0 0 0 1px rgba(90, 122, 107, 0.35),
+    0 0 0 3px rgba(90, 122, 107, 0.08),
+    0 18px 30px rgba(58, 45, 29, 0.08);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 16px;
+  background: rgba(178, 65, 46, 0.08);
+}
+
+.noticeText {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+
+.noticeLink {
+  color: var(--accent-ink);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.noticeLink:hover {
+  text-decoration: underline;
+}
+
+.attachmentRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.attachmentChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 30px;
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 999px;
+  background: rgba(244, 240, 233, 0.96);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.74rem;
+}
+
+.attachmentName {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachmentRemove {
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+}
+
+.composerInput {
+  border: none !important;
+  background: transparent !important;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.composerInput :global(.arco-textarea) {
+  background: transparent !important;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 0.8rem;
+}
+
+.toolbarLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.iconButton,
+.chipButton {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.iconButton {
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(244, 240, 233, 0.92);
+  color: var(--text-secondary);
+}
+
+.iconButton:hover,
+.chipButton:hover {
+  background: rgba(236, 231, 221, 0.96);
+  color: var(--text-primary);
+}
+
+.chipButton {
+  gap: 0.45rem;
+  min-height: 36px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(244, 240, 233, 0.92);
+  color: var(--text-primary);
+}
+
+.chipButtonActive {
+  background: rgba(90, 122, 107, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(90, 122, 107, 0.18);
+}
+
+.chipIcon,
+.chipChevron {
+  color: var(--text-secondary);
+}
+
+.chipLabel {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.chipChevron {
+  font-size: 0.78rem;
+}
+
+.modelPickerWrap {
+  position: relative;
+}
+
+.modelPicker {
+  position: absolute;
+  bottom: calc(100% + 0.65rem);
+  left: 0;
+  z-index: 5;
+  display: grid;
+  gap: 0.75rem;
+  width: min(19rem, calc(100vw - 4rem));
+  padding: 0.9rem;
+  border-radius: 20px;
+  background: rgba(255, 251, 245, 0.98);
+  box-shadow: 0 20px 40px rgba(58, 45, 29, 0.16);
+  backdrop-filter: blur(18px);
+}
+
+.modelPickerHeader {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.modelPickerTitle {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.modelPickerHint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.fieldLabel {
+  color: var(--text-tertiary);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hint {
+  margin: 0.7rem 0 0;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .composer {
+    padding-right: 0.85rem;
+    padding-left: 0.85rem;
+  }
+
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .toolbarLeft {
+    width: 100%;
+  }
+
+  .chipButton {
+    max-width: 100%;
+  }
+
+  .modelPicker {
+    left: auto;
+    right: 0;
+  }
+}

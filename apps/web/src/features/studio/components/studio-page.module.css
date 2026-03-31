@@ -94,9 +94,9 @@
 }
 
 .chat {
-  width: 356px;
-  min-width: 304px;
-  max-width: 404px;
+  width: 432px;
+  min-width: 372px;
+  max-width: 468px;
   background: #f8f6f1;
   overflow: hidden;
 }
@@ -128,8 +128,8 @@
 
 @media (max-width: 1200px) {
   .chat {
-    width: 320px;
-    min-width: 280px;
+    width: 388px;
+    min-width: 336px;
   }
 }
 

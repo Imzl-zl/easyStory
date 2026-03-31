@@ -1,0 +1,133 @@
+.message {
+  position: relative;
+  margin-bottom: 0.85rem;
+  padding: 0.95rem 1rem;
+  border-radius: 22px;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  animation: fadeIn var(--transition-normal) ease forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.messageUser {
+  margin-left: 2rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.messageAssistant {
+  margin-right: 2rem;
+  background: rgba(90, 122, 107, 0.08);
+}
+
+.messageError {
+  box-shadow: inset 0 0 0 1px rgba(178, 65, 46, 0.12);
+}
+
+.messageRole {
+  margin: 0 0 0.3rem;
+  color: var(--text-tertiary);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.messageContent {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.75;
+}
+
+.plainText {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.attachmentList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.attachmentChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(61, 61, 61, 0.06);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.messageActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+}
+
+.markdownContent {
+  font-size: 0.9rem;
+  line-height: 1.75;
+}
+
+.markdownContent h1,
+.markdownContent h2,
+.markdownContent h3 {
+  margin: 0.7rem 0 0.35rem;
+}
+
+.markdownContent p {
+  margin: 0.45rem 0;
+}
+
+.markdownContent blockquote {
+  margin: 0.55rem 0;
+  padding: 0.1rem 0 0.1rem 0.8rem;
+  border-left: 2px solid var(--accent-primary);
+  color: var(--text-secondary);
+}
+
+.markdownContent code {
+  padding: 0.08rem 0.28rem;
+  border-radius: var(--radius-xs);
+  background: rgba(135, 131, 120, 0.15);
+  color: #9b3f2e;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+
+.codeBlock {
+  margin: 0.7rem 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 16px;
+  background: rgba(61, 61, 61, 0.05);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+
+@media (max-width: 767px) {
+  .messageUser,
+  .messageAssistant {
+    margin-right: 0;
+    margin-left: 0;
+  }
+}

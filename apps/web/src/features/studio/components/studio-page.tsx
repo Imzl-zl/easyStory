@@ -8,6 +8,7 @@ import { Button, Message } from "@arco-design/web-react";
 import { DocumentTree } from "@/features/studio/components/document-tree";
 import { MarkdownDocumentEditor } from "@/features/studio/components/markdown-document-editor";
 import { AiChatPanel } from "@/features/studio/components/ai-chat-panel";
+import { useStudioChatModel } from "@/features/studio/components/studio-chat-model";
 import {
   buildDocumentTreeFromChapters,
   buildStudioPathWithParams,
@@ -23,15 +24,6 @@ type StudioPageProps = {
   projectId: string;
 };
 
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  rawMarkdown: string;
-  status?: "pending" | "error";
-  timestamp: Date;
-};
-
 export function StudioPage({ projectId }: StudioPageProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -44,9 +36,6 @@ export function StudioPage({ projectId }: StudioPageProps) {
 
   const [documentContent, setDocumentContent] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [selectedContextPaths, setSelectedContextPaths] = useState<string[]>([]);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [isResponding, setIsResponding] = useState(false);
 
   const projectQuery = useQuery({
     queryKey: ["project", projectId],
@@ -72,6 +61,11 @@ export function StudioPage({ projectId }: StudioPageProps) {
   const staleChapters = useMemo(() => listStaleChapters(chaptersQuery.data), [chaptersQuery.data]);
   const projectName = projectQuery.data?.name ?? "正在加载项目…";
   const headerTitle = selectedNode?.label ?? "选择一份文稿开始写作";
+  const chatModel = useStudioChatModel({
+    currentDocumentContent: documentContent,
+    currentDocumentPath: documentPath,
+    projectId,
+  });
 
   const updateParams = useCallback((patches: Record<string, string | null>) => {
     startTransition(() => {
@@ -100,41 +94,6 @@ export function StudioPage({ projectId }: StudioPageProps) {
 
   const handleSave = useCallback(() => {
     Message.info("保存能力正在接入，当前仅保留本地编辑内容。");
-  }, []);
-
-  const handleToggleContext = useCallback((path: string) => {
-    setSelectedContextPaths((prev) =>
-      prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path],
-    );
-  }, []);
-
-  const handleSendMessage = useCallback((message: string, contextPaths: string[]) => {
-    const userMessage: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      role: "user",
-      content: message,
-      rawMarkdown: message,
-      timestamp: new Date(),
-    };
-    setChatMessages((prev) => [...prev, userMessage]);
-    setIsResponding(true);
-
-    window.setTimeout(() => {
-      const assistantMessage: ChatMessage = {
-        id: `msg-${Date.now() + 1}`,
-        role: "assistant",
-        content: contextPaths.length > 0
-          ? `写作助手仍在接入阶段，当前先保留三栏创作布局、上下文勾选与内容采纳动作。本次已附带 ${contextPaths.length} 份上下文。`
-          : "写作助手仍在接入阶段，当前先保留三栏创作布局、上下文勾选与内容采纳动作，不伪装为正式生成能力。",
-        rawMarkdown: contextPaths.length > 0
-          ? `写作助手仍在接入阶段，当前先保留三栏创作布局、上下文勾选与内容采纳动作。本次已附带 ${contextPaths.length} 份上下文。`
-          : "写作助手仍在接入阶段，当前先保留三栏创作布局、上下文勾选与内容采纳动作，不伪装为正式生成能力。",
-        status: "pending",
-        timestamp: new Date(),
-      };
-      setChatMessages((prev) => [...prev, assistantMessage]);
-      setIsResponding(false);
-    }, 500);
   }, []);
 
   const handleCopyMarkdown = useCallback((markdown: string) => {
@@ -211,17 +170,30 @@ export function StudioPage({ projectId }: StudioPageProps) {
         {chatOpen ? (
           <aside className={styles.chat}>
             <AiChatPanel
-              currentDocumentPath={documentPath}
-              currentDocumentContent={documentContent}
+              attachments={chatModel.attachments}
               availableContexts={documentTree}
-              selectedContextPaths={selectedContextPaths}
-              onToggleContext={handleToggleContext}
-              onSendMessage={handleSendMessage}
-              messages={chatMessages}
-              isResponding={isResponding}
+              canChat={chatModel.credentialModel.canChat}
+              credentialNotice={chatModel.credentialModel.credentialNotice}
+              credentialSettingsHref={chatModel.credentialModel.credentialSettingsHref}
+              credentialState={chatModel.credentialModel.credentialState}
+              currentDocumentPath={documentPath}
+              isCredentialLoading={chatModel.credentialModel.isCredentialLoading}
+              isResponding={chatModel.isResponding}
+              messages={chatModel.messages}
               onCopyMarkdown={handleCopyMarkdown}
               onAppendToDocument={handleAppendToDocument}
+              onAttachFiles={chatModel.handleAttachFiles}
               onCreateNewDocument={handleCreateNewDocument}
+              onModelNameChange={chatModel.handleModelNameChange}
+              onProviderChange={chatModel.handleProviderChange}
+              onRemoveAttachment={chatModel.handleRemoveAttachment}
+              onSendMessage={chatModel.handleSendMessage}
+              onToggleContext={chatModel.handleToggleContext}
+              providerOptions={chatModel.credentialModel.providerOptions}
+              selectedContextPaths={chatModel.selectedContextPaths}
+              selectedCredentialLabel={chatModel.selectedCredentialLabel}
+              settings={chatModel.settings}
+              visibleModelLabel={chatModel.visibleModelLabel}
             />
           </aside>
         ) : null}

@@ -1,0 +1,134 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e52] [cursor=pointer]:
+    - img [ref=e53]
+  - alert [ref=e56]
+  - link "跳到主内容" [ref=e57] [cursor=pointer]:
+    - /url: "#workspace-main"
+  - generic [ref=e58]:
+    - banner [ref=e59]:
+      - generic [ref=e60]:
+        - link "easyStory 写作空间" [ref=e61] [cursor=pointer]:
+          - /url: /workspace/lobby
+          - generic [ref=e62]: easyStory
+          - generic [ref=e63]: 写作空间
+        - navigation "工作台导航" [ref=e64]:
+          - link "书架" [ref=e65] [cursor=pointer]:
+            - /url: /workspace/lobby
+          - generic "请先打开一个项目" [ref=e66]: 创作
+          - generic "请先打开一个项目" [ref=e67]: 推进
+          - generic "请先打开一个项目" [ref=e68]: 洞察
+        - generic [ref=e69]:
+          - link "我的助手" [ref=e70] [cursor=pointer]:
+            - /url: /workspace/lobby/settings?tab=assistant
+          - generic [ref=e71]:
+            - generic [ref=e73]: z
+            - generic [ref=e74]: zhanglu
+          - button "退出" [ref=e75] [cursor=pointer]
+    - main [ref=e76]:
+      - generic [ref=e78]:
+        - complementary [ref=e79]:
+          - generic [ref=e80]:
+            - paragraph [ref=e81]: 书架
+            - heading "作品空间" [level=2] [ref=e82]
+            - paragraph [ref=e83]: 把项目、模板和助手放在同一张写作桌面上，而不是拆成后台模块。
+          - navigation [ref=e84]:
+            - link "我的作品 从书架继续进入正在写的故事。" [ref=e85] [cursor=pointer]:
+              - /url: /workspace/lobby
+              - img [ref=e87]
+              - generic [ref=e90]:
+                - generic [ref=e91]: 我的作品
+                - generic [ref=e92]: 从书架继续进入正在写的故事。
+            - link "我的助手 规则、Skills、模型连接和工具都在这里直接生效。" [ref=e93] [cursor=pointer]:
+              - /url: /workspace/lobby/settings?tab=assistant
+              - img [ref=e95]
+              - generic [ref=e97]:
+                - generic [ref=e98]: 我的助手
+                - generic [ref=e99]: 规则、Skills、模型连接和工具都在这里直接生效。
+            - link "模板库 用题材模板快速开始，不重新做一遍项目初始化。" [ref=e100] [cursor=pointer]:
+              - /url: /workspace/lobby/templates
+              - img [ref=e102]
+              - generic [ref=e104]:
+                - generic [ref=e105]: 模板库
+                - generic [ref=e106]: 用题材模板快速开始，不重新做一遍项目初始化。
+            - link "回收站 暂时搁置的项目还在，随时恢复。" [ref=e107] [cursor=pointer]:
+              - /url: /workspace/lobby/recycle-bin
+              - img [ref=e109]
+              - generic [ref=e111]:
+                - generic [ref=e112]: 回收站
+                - generic [ref=e113]: 暂时搁置的项目还在，随时恢复。
+          - generic [ref=e114]:
+            - paragraph [ref=e115]: 当前节奏
+            - paragraph [ref=e116]: 最近常用模板：玄幻小说模板
+        - main [ref=e117]:
+          - generic [ref=e118]:
+            - generic [ref=e119]:
+              - paragraph [ref=e120]: 继续创作
+              - heading "从书架回到故事现场" [level=1] [ref=e121]
+              - paragraph [ref=e122]: 打开项目就进入创作路径。规则、Skills、模型连接和工具都应该贴着作品工作，而不是先去管理页里翻找。
+            - generic [ref=e123]:
+              - link "打开我的助手" [ref=e124] [cursor=pointer]:
+                - /url: /workspace/lobby/settings?tab=assistant
+              - link "新建作品" [ref=e125] [cursor=pointer]:
+                - /url: /workspace/lobby/new
+          - generic [ref=e126]:
+            - generic [ref=e127]:
+              - generic [ref=e128]: 搜索作品
+              - textbox "搜索作品" [ref=e129]:
+                - /placeholder: 搜索作品名、题材或模板…
+            - generic [ref=e130]:
+              - generic [ref=e131]:
+                - generic [ref=e132]: 当前作品
+                - strong [ref=e133]: "2"
+              - generic [ref=e134]:
+                - generic [ref=e135]: 筛选结果
+                - strong [ref=e136]: "2"
+              - generic [ref=e137]:
+                - generic [ref=e138]: 模板库
+                - strong [ref=e139]: "1"
+          - generic [ref=e140]:
+            - article [ref=e141]:
+              - generic [ref=e142]:
+                - generic [ref=e143]:
+                  - generic [ref=e144]: 警匪
+                  - generic [ref=e145]: 王
+                - link "项目设置" [ref=e146] [cursor=pointer]:
+                  - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/settings
+                  - img [ref=e147]
+              - generic [ref=e150]:
+                - generic [ref=e151]:
+                  - generic [ref=e152]: 草稿
+                  - generic [ref=e153]: 未设定
+                - heading "王云飞的警匪故事" [level=3] [ref=e154]
+                - paragraph [ref=e155]: 以 自由创作 为起点，继续整理设定、章节和正文。
+                - generic [ref=e156]:
+                  - generic [ref=e157]: 模板 · 无
+                  - generic [ref=e158]: 使用自选连接
+              - generic [ref=e159]:
+                - generic [ref=e160]: 最近更新 03/29 23:57 UTC
+                - generic [ref=e161]:
+                  - link "继续创作" [ref=e162] [cursor=pointer]:
+                    - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/studio?panel=setting
+                  - button "删除" [ref=e163]
+            - article [ref=e164]:
+              - generic [ref=e165]:
+                - generic [ref=e166]:
+                  - generic [ref=e167]: 未定题材
+                  - generic [ref=e168]: 布
+                - link "项目设置" [ref=e169] [cursor=pointer]:
+                  - /url: /workspace/project/f217b234-9979-42c4-a5df-681ea369fa22/settings
+                  - img [ref=e170]
+              - generic [ref=e173]:
+                - generic [ref=e174]:
+                  - generic [ref=e175]: 草稿
+                  - generic [ref=e176]: 未设定
+                - heading "布局巡检测试项目" [level=3] [ref=e177]
+                - paragraph [ref=e178]: 以 自由创作 为起点，继续整理设定、章节和正文。
+                - generic [ref=e179]:
+                  - generic [ref=e180]: 模板 · 无
+                  - generic [ref=e181]: 使用自选连接
+              - generic [ref=e182]:
+                - generic [ref=e183]: 最近更新 03/27 22:16 UTC
+                - generic [ref=e184]:
+                  - link "继续创作" [ref=e185] [cursor=pointer]:
+                    - /url: /workspace/project/f217b234-9979-42c4-a5df-681ea369fa22/studio?panel=setting
+                  - button "删除" [ref=e186]
