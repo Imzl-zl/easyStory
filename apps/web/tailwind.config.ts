@@ -10,19 +10,30 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // 使用 CSS Variables
-        canvas: 'var(--color-canvas)',
-        paper: 'var(--color-paper)',
-        sidebar: 'var(--color-sidebar)',
+        canvas: 'var(--bg-canvas)',
+        surface: 'var(--bg-surface)',
+        muted: 'var(--bg-muted)',
+        elevated: 'var(--bg-elevated)',
+        line: {
+          soft: 'var(--line-soft)',
+          strong: 'var(--line-strong)',
+          focus: 'var(--line-focus)',
+        },
         accent: {
-          DEFAULT: 'var(--color-accent)',
-          hover: 'var(--color-accent-hover)',
-          light: 'var(--color-accent-light)',
+          primary: 'var(--accent-primary)',
+          hover: 'var(--accent-primary-hover)',
+          secondary: 'var(--accent-secondary)',
+          tertiary: 'var(--accent-tertiary)',
+          success: 'var(--accent-success)',
+          warning: 'var(--accent-warning)',
+          danger: 'var(--accent-danger)',
+          ink: 'var(--accent-ink)',
         },
         text: {
-          primary: 'var(--color-text-primary)',
-          secondary: 'var(--color-text-secondary)',
-          tertiary: 'var(--color-text-tertiary)',
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          tertiary: 'var(--text-tertiary)',
+          placeholder: 'var(--text-placeholder)',
         },
       },
       fontFamily: {
@@ -31,20 +42,21 @@ const config: Config = {
         mono: 'var(--font-mono)',
       },
       borderRadius: {
+        xs: 'var(--radius-xs)',
         sm: 'var(--radius-sm)',
         md: 'var(--radius-md)',
         lg: 'var(--radius-lg)',
       },
       boxShadow: {
+        xs: 'var(--shadow-xs)',
         sm: 'var(--shadow-sm)',
         md: 'var(--shadow-md)',
         lg: 'var(--shadow-lg)',
       },
       transitionDuration: {
-        DEFAULT: '200ms',
-      },
-      transitionTimingFunction: {
-        DEFAULT: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        fast: '120ms',
+        normal: '200ms',
+        slow: '300ms',
       },
     },
   },
