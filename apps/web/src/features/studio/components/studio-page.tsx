@@ -1,160 +1,230 @@
 "use client";
 
-import { useMemo, useTransition } from "react";
+import { useMemo, useTransition, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Button, Message } from "@arco-design/web-react";
 
-import { ChapterEditor } from "@/features/studio/components/chapter-editor";
-import { ProjectSettingEditor } from "@/features/studio/components/project-setting-editor";
-import { StoryAssetEditor } from "@/features/studio/components/story-asset-editor";
+import { DocumentTree } from "@/features/studio/components/document-tree";
+import { MarkdownDocumentEditor } from "@/features/studio/components/markdown-document-editor";
+import { AiChatPanel } from "@/features/studio/components/ai-chat-panel";
 import {
+  buildDocumentTreeFromChapters,
   buildStudioPathWithParams,
+  findNodeByPath,
   listStaleChapters,
-  resolveStudioChapterListState,
-  resolveStudioPanel,
-  resolveSelectedChapterNumber,
 } from "@/features/studio/components/studio-page-support";
-import {
-  StudioChapterNavigator,
-  StudioPageHeader,
-  StudioSidebarCards,
-} from "@/features/studio/components/studio-page-sections";
-import { getErrorMessage } from "@/lib/api/client";
 import { listChapters } from "@/lib/api/content";
-import { checkProjectSetting, getProject } from "@/lib/api/projects";
+import { getProject } from "@/lib/api/projects";
+import type { DocumentTreeNode } from "@/features/studio/components/studio-page-support";
+import styles from "./studio-page.module.css";
 
 type StudioPageProps = {
   projectId: string;
+};
+
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  rawMarkdown: string;
+  status?: "pending" | "error";
+  timestamp: Date;
 };
 
 export function StudioPage({ projectId }: StudioPageProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const currentSearch = searchParams.toString();
-  const panel = resolveStudioPanel(searchParams.get("panel"));
-  const versionPanelOpen = searchParams.get("versionPanel") === "1";
+
+  const documentPath = searchParams.get("doc");
+  const chatOpen = searchParams.get("chat") !== "0";
+
+  const [documentContent, setDocumentContent] = useState("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [selectedContextPaths, setSelectedContextPaths] = useState<string[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isResponding, setIsResponding] = useState(false);
 
   const projectQuery = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => getProject(projectId),
   });
 
-  const completenessQuery = useQuery({
-    queryKey: ["setting-check", projectId],
-    queryFn: () => checkProjectSetting(projectId),
-  });
-
   const chaptersQuery = useQuery({
     queryKey: ["chapters", projectId],
     queryFn: () => listChapters(projectId),
   });
-  const chapterErrorMessage = chaptersQuery.error ? getErrorMessage(chaptersQuery.error) : null;
-  const chapterListState = resolveStudioChapterListState({
-    chapters: chaptersQuery.data,
-    errorMessage: chapterErrorMessage,
-    isLoading: chaptersQuery.isLoading,
-  });
+
+  const documentTree = useMemo(() => {
+    return buildDocumentTreeFromChapters(chaptersQuery.data ?? []);
+  }, [chaptersQuery.data]);
+
+  const selectedNode = useMemo(() => {
+    if (!documentPath) {
+      return null;
+    }
+    return findNodeByPath(documentTree, documentPath);
+  }, [documentTree, documentPath]);
+
   const staleChapters = useMemo(() => listStaleChapters(chaptersQuery.data), [chaptersQuery.data]);
+  const projectName = projectQuery.data?.name ?? "正在加载项目…";
+  const headerTitle = selectedNode?.label ?? "选择一份文稿开始写作";
 
-  const selectedChapterNumber = useMemo(() => {
-    return resolveSelectedChapterNumber(chaptersQuery.data, searchParams.get("chapter"));
-  }, [chaptersQuery.data, searchParams]);
-
-  const updateParams = (patches: Record<string, string | null>) => {
+  const updateParams = useCallback((patches: Record<string, string | null>) => {
     startTransition(() => {
       router.replace(buildStudioPathWithParams(pathname, currentSearch, patches));
     });
-  };
+  }, [currentSearch, pathname, router, startTransition]);
+
+  const handleSelectNode = useCallback((node: DocumentTreeNode) => {
+    if (node.type === "file") {
+      if (hasUnsavedChanges) {
+        const confirmed = window.confirm("当前文档还有未保存内容，切换后会保留在本地编辑区，稍后再接入正式保存。是否继续？");
+        if (!confirmed) {
+          return;
+        }
+      }
+      updateParams({ doc: node.path });
+      setDocumentContent("");
+      setHasUnsavedChanges(false);
+    }
+  }, [hasUnsavedChanges, updateParams]);
+
+  const handleContentChange = useCallback((content: string) => {
+    setDocumentContent(content);
+    setHasUnsavedChanges(true);
+  }, []);
+
+  const handleSave = useCallback(() => {
+    Message.info("保存能力正在接入，当前仅保留本地编辑内容。");
+  }, []);
+
+  const handleToggleContext = useCallback((path: string) => {
+    setSelectedContextPaths((prev) =>
+      prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path],
+    );
+  }, []);
+
+  const handleSendMessage = useCallback((message: string, contextPaths: string[]) => {
+    const userMessage: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      role: "user",
+      content: message,
+      rawMarkdown: message,
+      timestamp: new Date(),
+    };
+    setChatMessages((prev) => [...prev, userMessage]);
+    setIsResponding(true);
+
+    window.setTimeout(() => {
+      const assistantMessage: ChatMessage = {
+        id: `msg-${Date.now() + 1}`,
+        role: "assistant",
+        content: contextPaths.length > 0
+          ? `写作助手仍在接入阶段，当前先保留三栏创作布局、上下文勾选与内容采纳动作。本次已附带 ${contextPaths.length} 份上下文。`
+          : "写作助手仍在接入阶段，当前先保留三栏创作布局、上下文勾选与内容采纳动作，不伪装为正式生成能力。",
+        rawMarkdown: contextPaths.length > 0
+          ? `写作助手仍在接入阶段，当前先保留三栏创作布局、上下文勾选与内容采纳动作。本次已附带 ${contextPaths.length} 份上下文。`
+          : "写作助手仍在接入阶段，当前先保留三栏创作布局、上下文勾选与内容采纳动作，不伪装为正式生成能力。",
+        status: "pending",
+        timestamp: new Date(),
+      };
+      setChatMessages((prev) => [...prev, assistantMessage]);
+      setIsResponding(false);
+    }, 500);
+  }, []);
+
+  const handleCopyMarkdown = useCallback((markdown: string) => {
+    navigator.clipboard.writeText(markdown);
+    Message.success("已复制到剪贴板");
+  }, []);
+
+  const handleAppendToDocument = useCallback((markdown: string) => {
+    setDocumentContent((prev) => (prev ? `${prev}\n\n${markdown}` : markdown));
+    setHasUnsavedChanges(true);
+    Message.success("已追加到当前文档");
+  }, []);
+
+  const handleCreateNewDocument = useCallback(() => {
+    Message.info("新建文档写入能力正在接入。");
+  }, []);
+
+  const toggleChat = useCallback(() => {
+    updateParams({ chat: chatOpen ? "0" : null });
+  }, [chatOpen, updateParams]);
 
   return (
-    <div className="space-y-6">
-      <StudioPageHeader
-        activePanel={panel}
-        isPending={isPending}
-        onSelectPanel={(nextPanel) =>
-          updateParams({
-            panel: nextPanel === "setting" ? null : nextPanel,
-          })
-        }
-        projectId={projectId}
-        projectName={projectQuery.data?.name ?? "正在加载项目…"}
-        projectStatus={projectQuery.data?.status ?? null}
-      />
-
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-4">
-          {projectQuery.isLoading ? (
-            <p aria-live="polite" className="text-sm text-[var(--text-secondary)]" role="status">
-              正在加载项目…
-            </p>
-          ) : null}
-          {projectQuery.error ? (
-            <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
-              {getErrorMessage(projectQuery.error)}
-            </div>
-          ) : null}
-
-          {panel === "setting" ? (
-            <ProjectSettingEditor
-              completeness={completenessQuery.data}
-              initialSetting={projectQuery.data?.project_setting ?? null}
-              projectId={projectId}
-            />
-          ) : null}
-
-          {panel === "outline" ? <StoryAssetEditor assetType="outline" projectId={projectId} /> : null}
-
-          {panel === "opening-plan" ? (
-            <StoryAssetEditor assetType="opening_plan" projectId={projectId} />
-          ) : null}
-
-          {panel === "chapter" ? (
-            <div className="space-y-4">
-              <StudioChapterNavigator
-                chapters={chaptersQuery.data ?? []}
-                errorMessage={chapterErrorMessage}
-                isLoading={chaptersQuery.isLoading}
-                isPending={isPending}
-                onSelectChapter={(chapterNumber) =>
-                  updateParams({
-                    chapter: String(chapterNumber),
-                    panel: "chapter",
-                  })
-                }
-                onToggleVersionPanel={() =>
-                  updateParams({
-                    panel: "chapter",
-                    versionPanel: versionPanelOpen ? null : "1",
-                  })
-                }
-                selectedChapterNumber={selectedChapterNumber}
-                versionPanelOpen={versionPanelOpen}
-              />
-              {chapterListState === "ready" ? (
-                <ChapterEditor
-                  chapterNumber={selectedChapterNumber}
-                  projectId={projectId}
-                  versionPanelOpen={versionPanelOpen}
-                />
-              ) : null}
-            </div>
+    <div className={styles.page}>
+      <div className={styles.pageMeta}>
+        <div className={styles.projectInfo}>
+          <p className={styles.projectEyebrow}>当前创作</p>
+          <h1 className={styles.projectTitle}>{headerTitle}</h1>
+          <p className={styles.projectHint}>{projectName} · 正文优先，目录与助手都只是辅助桌面，不抢主舞台。</p>
+        </div>
+        <div className={styles.pageActions}>
+          <Button shape="round" size="small" type="secondary" onClick={toggleChat}>
+            {chatOpen ? "收起助手" : "展开助手"}
+          </Button>
+          <Button
+            shape="round"
+            size="small"
+            type="secondary"
+            onClick={() => router.push(`/workspace/project/${projectId}/engine`)}
+          >
+            任务推进
+          </Button>
+          {staleChapters.length > 0 ? (
+            <span className={styles.statusChip}>{staleChapters.length} 个章节待整理</span>
           ) : null}
         </div>
+      </div>
 
-        <div className="xl:sticky xl:top-6 xl:self-start">
-          <StudioSidebarCards
-            onFocusStaleChapter={(chapterNumber) =>
-              updateParams({
-                chapter: String(chapterNumber),
-                panel: "chapter",
-              })
-            }
-            projectId={projectId}
-            staleChapters={staleChapters}
+      <div className={styles.mainLayout}>
+        <aside className={styles.sidebar}>
+          <DocumentTree
+            selectedPath={documentPath}
+            tree={documentTree}
+            onSelectNode={handleSelectNode}
           />
-        </div>
+          {staleChapters.length > 0 ? (
+            <div className={styles.staleNotice}>
+              <p className={styles.staleTitle}>待更新章节</p>
+              <p className={styles.staleDescription}>{staleChapters.length} 个章节需要重新整理到当前上下文。</p>
+            </div>
+          ) : null}
+        </aside>
+
+        <main className={styles.content}>
+          <MarkdownDocumentEditor
+            documentPath={documentPath}
+            documentNode={selectedNode}
+            content={documentContent}
+            onChange={handleContentChange}
+            onSave={handleSave}
+            hasUnsavedChanges={hasUnsavedChanges}
+          />
+        </main>
+
+        {chatOpen ? (
+          <aside className={styles.chat}>
+            <AiChatPanel
+              currentDocumentPath={documentPath}
+              currentDocumentContent={documentContent}
+              availableContexts={documentTree}
+              selectedContextPaths={selectedContextPaths}
+              onToggleContext={handleToggleContext}
+              onSendMessage={handleSendMessage}
+              messages={chatMessages}
+              isResponding={isResponding}
+              onCopyMarkdown={handleCopyMarkdown}
+              onAppendToDocument={handleAppendToDocument}
+              onCreateNewDocument={handleCreateNewDocument}
+            />
+          </aside>
+        ) : null}
       </div>
     </div>
   );

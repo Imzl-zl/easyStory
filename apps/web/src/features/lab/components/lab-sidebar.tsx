@@ -40,8 +40,8 @@ export function LabSidebar({
   return (
     <aside className="panel-shell space-y-4 p-5">
       <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">实验室</p>
-        <h1 className="font-serif text-2xl font-semibold">分析结果工作台</h1>
+        <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">洞察书架</p>
+        <h1 className="font-serif text-2xl font-semibold">项目洞察列表</h1>
       </div>
       <LabFilters filters={filters} isPending={isPending} onFilterChange={onFilterChange} />
       {isLoading ? <p className="text-sm text-[var(--text-secondary)]">正在加载分析列表...</p> : null}
@@ -86,17 +86,17 @@ function LabFilters({
         />
       </label>
       <label className="block space-y-2">
-        <span className="label-text">content_id</span>
+        <span className="label-text">关联正文片段</span>
         <input
           className="ink-input"
           disabled={isPending}
-          placeholder="可选，粘贴某条内容 ID"
+          placeholder="可选，输入某段正文的内容 ID"
           value={filters.contentId}
           onChange={(event) => onFilterChange({ contentId: event.target.value })}
         />
       </label>
       <label className="block space-y-2">
-        <span className="label-text">generated_skill_key</span>
+        <span className="label-text">来源 Skill</span>
         <input
           className="ink-input"
           disabled={isPending}

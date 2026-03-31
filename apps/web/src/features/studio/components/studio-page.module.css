@@ -1,0 +1,158 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 49px);
+  background: #fffdfb;
+}
+
+.pageMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem 0.85rem;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 251, 0.96), rgba(255, 253, 251, 0.9)),
+    #fffdfb;
+}
+
+.projectInfo {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+}
+
+.projectEyebrow {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.projectTitle {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-serif);
+  font-size: clamp(1.5rem, 2vw, 2.15rem);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+}
+
+.projectHint {
+  max-width: 56rem;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.pageActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.statusChip {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  background: rgba(196, 136, 61, 0.12);
+  color: var(--accent-warning);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.mainLayout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 248px;
+  min-width: 220px;
+  max-width: 300px;
+  background: #f1efe9;
+  overflow-y: auto;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  background: #fffdfb;
+  overflow: hidden;
+}
+
+.chat {
+  width: 356px;
+  min-width: 304px;
+  max-width: 404px;
+  background: #f8f6f1;
+  overflow: hidden;
+}
+
+.staleNotice {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.25rem 0.9rem 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  background: rgba(196, 136, 61, 0.12);
+}
+
+.staleTitle {
+  margin: 0;
+  color: var(--accent-warning);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.staleDescription {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+@media (max-width: 1200px) {
+  .chat {
+    width: 320px;
+    min-width: 280px;
+  }
+}
+
+@media (max-width: 980px) {
+  .pageMeta {
+    padding: 0.95rem 1rem 0.8rem;
+  }
+
+  .mainLayout {
+    flex-direction: column;
+  }
+
+  .sidebar,
+  .chat {
+    width: 100%;
+    max-width: none;
+  }
+
+  .sidebar {
+    max-height: 270px;
+  }
+
+  .chat {
+    min-height: 360px;
+  }
+}

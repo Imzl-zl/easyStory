@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { runAssistantTurnStream } from "@/lib/api/assistant";
 
-test("assistant stream client returns buffered content when stream ends without completed event", async () => {
+test("assistant stream client rejects partial content when stream ends without completed event", async () => {
   const originalFetch = global.fetch;
   const streamBody = "event: chunk\ndata: {\"delta\":\"好的，这是回复。\"}\n\n";
 
@@ -26,25 +26,24 @@ test("assistant stream client returns buffered content when stream ends without 
   const chunks: string[] = [];
 
   try {
-    const result = await runAssistantTurnStream(
-      {
-        messages: [{ content: "测试", role: "user" }],
-        model: {
-          max_tokens: 8192,
-          name: "gemini-2.5-flash",
-          provider: "薄荷",
+    await assert.rejects(
+      runAssistantTurnStream(
+        {
+          messages: [{ content: "测试", role: "user" }],
+          model: {
+            max_tokens: 8192,
+            name: "gemini-2.5-flash",
+            provider: "薄荷",
+          },
+          skill_id: "skill.assistant.general_chat",
         },
-        skill_id: "skill.assistant.general_chat",
-      },
-      {
-        onChunk: (delta) => chunks.push(delta),
-      },
+        {
+          onChunk: (delta) => chunks.push(delta),
+        },
+      ),
+      /实时回复意外中断，请重试/,
     );
-
     assert.deepEqual(chunks, ["好的，这是回复。"]);
-    assert.equal(result.content, "好的，这是回复。");
-    assert.equal(result.provider, "薄荷");
-    assert.equal(result.model_name, "gemini-2.5-flash");
   } finally {
     global.fetch = originalFetch;
   }

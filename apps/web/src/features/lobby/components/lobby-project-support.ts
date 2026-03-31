@@ -3,6 +3,13 @@ import type { AppNoticeTone } from "@/components/ui/app-notice";
 import type { ProjectSummary, ProjectTrashCleanupResult } from "@/lib/api/types";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const PROJECT_CARD_TONES = [
+  { accent: "#8d6e63", surface: "#f7efe9" },
+  { accent: "#5a7a6b", surface: "#eef4ef" },
+  { accent: "#8b7355", surface: "#f5efe6" },
+  { accent: "#5a9aaa", surface: "#eef6f8" },
+  { accent: "#b7791f", surface: "#faf2e2" },
+] as const;
 
 export const PROJECT_TRASH_RETENTION_DAYS = 30;
 
@@ -36,6 +43,10 @@ export function formatProjectTrashTime(value: string | null): string {
   return formatObservabilityDateTime(value);
 }
 
+export function formatProjectUpdatedTime(value: string): string {
+  return formatObservabilityDateTime(value);
+}
+
 export function formatProjectTrashDeadline(
   value: string | null,
   retentionDays: number = PROJECT_TRASH_RETENTION_DAYS,
@@ -66,6 +77,11 @@ export function resolveProjectActionNotice(type: ProjectActionType): ProjectNoti
     title: "项目",
     tone: "success",
   };
+}
+
+export function resolveProjectCardTone(projectId: string) {
+  const seed = Array.from(projectId).reduce((total, char) => total + char.charCodeAt(0), 0);
+  return PROJECT_CARD_TONES[seed % PROJECT_CARD_TONES.length];
 }
 
 export function resolveEmptyTrashButtonLabel(isPending: boolean): string {

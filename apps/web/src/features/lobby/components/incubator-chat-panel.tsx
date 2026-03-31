@@ -90,11 +90,14 @@ export function ChatModePanel({ model }: Readonly<ChatModePanelProps>) {
         />
       </section>
       <IncubatorChatDraftPanel
+        canCompleteWithAi={model.canCompleteDraftWithAi}
         createMutation={model.createMutation}
         draft={model.draft}
         draftMutation={model.draftMutation}
         hasUserMessage={model.hasUserMessage}
         isDraftStale={model.isDraftStale}
+        isCompletingWithAi={model.isCompletingDraftWithAi}
+        onCompleteWithAi={model.completeDraftWithAi}
         onProjectNameChange={model.setProjectName}
         onSyncDraft={model.syncDraft}
         projectName={model.projectName}

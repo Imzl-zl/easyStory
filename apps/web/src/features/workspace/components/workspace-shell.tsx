@@ -1,51 +1,58 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
+import { Avatar } from "@arco-design/web-react";
 import { usePathname } from "next/navigation";
 
 import { AuthGuard } from "@/features/auth/components/auth-guard";
-import { useAuthStore } from "@/lib/stores/auth-store";
-import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import {
   buildWorkspaceItems,
-  getNextSidebarPreference,
   isWorkspaceItemActive,
   resolveWorkspaceProjectId,
-  resolveWorkspaceSidebarCollapsed,
-  resolveWorkspaceSidebarWidth,
   resolveWorkspaceUserBadge,
-  shouldShowWorkspaceSidebarToggle,
   type WorkspaceNavItem,
 } from "@/features/workspace/components/workspace-shell-support";
-import {
-  WorkspaceBrandIcon,
-  WorkspaceLogoutIcon,
-  WorkspaceNavIcon,
-  WorkspaceToggleIcon,
-} from "@/features/workspace/components/workspace-shell-icons";
 import styles from "@/features/workspace/components/workspace-shell.module.css";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 
-const MOBILE_VIEWPORT_MEDIA_QUERY = "(max-width: 1023px)";
+type PageMode = "lobby" | "studio" | "project";
+
+function resolvePageMode(pathname: string): PageMode {
+  if (pathname.includes("/lobby") || pathname === "/workspace") {
+    return "lobby";
+  }
+  if (pathname.includes("/studio")) {
+    return "studio";
+  }
+  return "project";
+}
+
+function resolveContextTitle(pathname: string): string {
+  if (pathname.includes("/studio")) return "创作工作台";
+  if (pathname.includes("/engine")) return "任务推进";
+  if (pathname.includes("/lab")) return "分析与灵感";
+  if (pathname.includes("/settings")) return "项目设置";
+  return "当前项目";
+}
+
+function resolveSettingsHref(currentProjectId: string | null): string {
+  if (currentProjectId) {
+    return `/workspace/project/${currentProjectId}/settings`;
+  }
+  return "/workspace/lobby/settings?tab=assistant";
+}
 
 export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
   const clearSession = useAuthStore((state) => state.clearSession);
-  const hasHydrated = useWorkspaceStore((state) => state.hasHydrated);
   const lastProjectId = useWorkspaceStore((state) => state.lastProjectId);
-  const sidebarPreference = useWorkspaceStore((state) => state.sidebarPreference);
   const setLastProjectId = useWorkspaceStore((state) => state.setLastProjectId);
-  const setSidebarPreference = useWorkspaceStore((state) => state.setSidebarPreference);
-  const isMobileViewport = useIsMobileViewport();
   const currentProjectId = resolveWorkspaceProjectId(pathname);
-  const isSidebarCollapsed = resolveWorkspaceSidebarCollapsed({
-    hasHydrated,
-    isMobileViewport,
-    sidebarPreference,
-  });
   const workspaceItems = buildWorkspaceItems(currentProjectId, lastProjectId);
+  const pageMode = resolvePageMode(pathname);
 
   useEffect(() => {
     if (currentProjectId) {
@@ -56,221 +63,162 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
   return (
     <AuthGuard>
       <a className={styles.skipLink} href="#workspace-main">跳到主内容</a>
-      <div
-        className={`${styles.shell} min-h-screen p-3 lg:p-6 xl:p-7 2xl:p-8`}
-        style={
-          {
-            "--workspace-sidebar-width": resolveWorkspaceSidebarWidth(isSidebarCollapsed),
-          } as CSSProperties
-        }
-      >
-        <WorkspaceSidebar
-          isCollapsed={isSidebarCollapsed}
-          isMobileViewport={isMobileViewport}
-          items={workspaceItems}
-          pathname={pathname}
-          sidebarPreference={sidebarPreference}
-          userName={user?.username ?? "未登录"}
+      <div className={styles.shell} data-page-mode={pageMode}>
+        <WorkspaceHeader
+          currentProjectId={currentProjectId}
           onLogout={clearSession}
-          onToggle={() => setSidebarPreference(getNextSidebarPreference(sidebarPreference))}
+          pageMode={pageMode}
+          pathname={pathname}
+          userName={user?.username ?? "未登录"}
+          workspaceItems={workspaceItems}
         />
-        <main className={styles.content} id="workspace-main">
-          <div className={`${styles.contentInner} space-y-6 xl:space-y-7`}>{children}</div>
+        <main className={pageMode === "studio" ? styles.contentFull : styles.content} id="workspace-main">
+          <div className={pageMode === "studio" ? styles.contentStage : styles.contentInner}>{children}</div>
         </main>
       </div>
     </AuthGuard>
   );
 }
 
-function WorkspaceSidebar({
-  isCollapsed,
-  isMobileViewport,
-  items,
+function WorkspaceHeader({
+  currentProjectId,
   onLogout,
-  onToggle,
+  pageMode,
   pathname,
-  sidebarPreference,
   userName,
+  workspaceItems,
 }: Readonly<{
-  isCollapsed: boolean;
-  isMobileViewport: boolean;
-  items: WorkspaceNavItem[];
+  currentProjectId: string | null;
   onLogout: () => void;
-  onToggle: () => void;
+  pageMode: PageMode;
   pathname: string;
-  sidebarPreference: "expanded" | "collapsed";
   userName: string;
+  workspaceItems: WorkspaceNavItem[];
+}>) {
+  if (pageMode === "lobby") {
+    return (
+      <header className={styles.topbar}>
+        <div className={styles.topbarInner}>
+          <WorkspaceBrand />
+          <WorkspaceNav items={workspaceItems} pathname={pathname} />
+          <WorkspaceActions
+            onLogout={onLogout}
+            settingsHref="/workspace/lobby/settings?tab=assistant"
+            settingsLabel="我的助手"
+            userName={userName}
+          />
+        </div>
+      </header>
+    );
+  }
+
+  return (
+    <header className={pageMode === "studio" ? styles.studioTopbar : styles.projectTopbar}>
+      <div className={styles.projectTopbarInner}>
+        <div className={styles.projectTopbarPrimary}>
+          <Link className={styles.backLink} href="/workspace/lobby">
+            <span aria-hidden="true">←</span>
+            返回书架
+          </Link>
+          <div className={styles.projectCopy}>
+            <span className={styles.projectEyebrow}>当前项目</span>
+            <span className={styles.projectTitle}>{resolveContextTitle(pathname)}</span>
+          </div>
+        </div>
+        <WorkspaceNav
+          items={workspaceItems.filter((item) => item.segment !== "lobby")}
+          pathname={pathname}
+          variant="project"
+        />
+        <WorkspaceActions
+          onLogout={onLogout}
+          settingsHref={resolveSettingsHref(currentProjectId)}
+          settingsLabel="项目设置"
+          userName={userName}
+        />
+      </div>
+    </header>
+  );
+}
+
+function WorkspaceBrand() {
+  return (
+    <Link className={styles.brandLink} href="/workspace/lobby">
+      <span className={styles.brandEyebrow}>easyStory</span>
+      <span className={styles.brandTitle}>写作空间</span>
+    </Link>
+  );
+}
+
+function WorkspaceNav({
+  items,
+  pathname,
+  variant = "default",
+}: Readonly<{
+  items: WorkspaceNavItem[];
+  pathname: string;
+  variant?: "default" | "project";
 }>) {
   return (
-    <aside
-      aria-label="工作台导航"
-      className={styles.sidebar}
-      data-collapsed={isCollapsed}
-    >
-      <div className={styles.sidebarTop}>
-        <div className={styles.brandBlock}>
-          <WorkspaceSidebarBrand />
-          {shouldShowWorkspaceSidebarToggle(isMobileViewport) ? (
-            <WorkspaceSidebarToggle
-              isCollapsed={isCollapsed}
-              sidebarPreference={sidebarPreference}
-              onToggle={onToggle}
-            />
-          ) : null}
-        </div>
-        <div>
-          <p className={styles.sectionLabel}>主导航</p>
-          <WorkspaceSidebarNav items={items} pathname={pathname} />
-        </div>
-      </div>
-      <WorkspaceSidebarSession userName={userName} onLogout={onLogout} />
-    </aside>
-  );
-}
-
-function useIsMobileViewport() {
-  return useSyncExternalStore(
-    subscribeToMobileViewport,
-    getMobileViewportSnapshot,
-    getMobileViewportServerSnapshot,
-  );
-}
-
-function getMobileViewportSnapshot() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  return window.matchMedia(MOBILE_VIEWPORT_MEDIA_QUERY).matches;
-}
-
-function getMobileViewportServerSnapshot() {
-  return false;
-}
-
-function subscribeToMobileViewport(onStoreChange: () => void) {
-  if (typeof window === "undefined") {
-    return () => {};
-  }
-  const mediaQueryList = window.matchMedia(MOBILE_VIEWPORT_MEDIA_QUERY);
-  mediaQueryList.addEventListener("change", onStoreChange);
-  return () => {
-    mediaQueryList.removeEventListener("change", onStoreChange);
-  };
-}
-
-function WorkspaceSidebarBrand() {
-  return (
-    <div className={styles.brandHeader}>
-      <span aria-hidden="true" className={styles.glyph}>
-        <WorkspaceBrandIcon />
-      </span>
-      <div className={styles.brandCopy}>
-        <p className={styles.brandEyebrow}>easyStory</p>
-        <p className={styles.brandTitle}>创作空间</p>
-      </div>
-    </div>
-  );
-}
-
-function WorkspaceSidebarNav({ items, pathname }: Readonly<{ items: WorkspaceNavItem[]; pathname: string }>) {
-  return (
-    <nav aria-label="主导航" className={`${styles.nav} grid gap-2`}>
-      {items.map((item) => <WorkspaceSidebarNavItem item={item} key={item.label} pathname={pathname} />)}
+    <nav aria-label="工作台导航" className={variant === "project" ? styles.projectNav : styles.nav}>
+      {items.map((item) => (
+        <WorkspaceNavLink item={item} key={`${variant}-${item.segment}`} pathname={pathname} />
+      ))}
     </nav>
   );
 }
 
-function WorkspaceSidebarNavItem({ item, pathname }: Readonly<{ item: WorkspaceNavItem; pathname: string }>) {
-  const navMeta = item.disabled ? "请先选择项目" : item.meta;
-  const navContent = (
-    <>
-      <span aria-hidden="true" className={styles.glyph}>
-        <WorkspaceNavIcon segment={item.segment} />
-      </span>
-      <span className={styles.navCopy}>
-        <span className={styles.navLabel}>{item.label}</span>
-        <span className={`${styles.navMeta} text-xs`}>
-          {navMeta}
-        </span>
-      </span>
-    </>
-  );
-  if (item.href) {
+function WorkspaceNavLink({
+  item,
+  pathname,
+}: Readonly<{
+  item: WorkspaceNavItem;
+  pathname: string;
+}>) {
+  const isActive = isWorkspaceItemActive(item, pathname);
+  if (!item.href) {
     return (
-      <Link
-        aria-current={isWorkspaceItemActive(item, pathname) ? "page" : undefined}
-        aria-label={item.label}
-        className={`ink-tab ${styles.navItem}`}
-        data-active={isWorkspaceItemActive(item, pathname)}
-        data-disabled={false}
-        href={item.href}
-        title={item.label}
-      >
-        {navContent}
-      </Link>
+      <span aria-disabled="true" className={styles.navLinkDisabled} title="请先打开一个项目">
+        {item.label}
+      </span>
     );
   }
+
   return (
-    <button
-      aria-label={item.label}
-      className={`ink-tab ${styles.navItem}`}
-      data-active={false}
-      data-disabled
-      disabled
-      title={item.label}
-      type="button"
+    <Link
+      className={styles.navLink}
+      data-active={isActive ? "true" : "false"}
+      href={item.href}
+      title={item.meta}
     >
-      {navContent}
-    </button>
+      {item.label}
+    </Link>
   );
 }
 
-function WorkspaceSidebarSession({ onLogout, userName }: Readonly<{
+function WorkspaceActions({
+  onLogout,
+  settingsHref,
+  settingsLabel,
+  userName,
+}: Readonly<{
   onLogout: () => void;
+  settingsHref: string;
+  settingsLabel: string;
   userName: string;
 }>) {
   return (
-    <div className={styles.sessionArea}>
-      <div className={styles.sessionSummary}>
-        <span className={`${styles.sessionBadge} font-medium`}>{resolveWorkspaceUserBadge(userName)}</span>
-        <div className={styles.sessionCopy}>
-          <p className={styles.sessionLabel}>当前账号</p>
-          <p className={styles.sessionUser}>{userName}</p>
-        </div>
+    <div className={styles.actions}>
+      <Link className={styles.actionLink} href={settingsHref}>
+        {settingsLabel}
+      </Link>
+      <div className={styles.userChip}>
+        <Avatar size={28}>{resolveWorkspaceUserBadge(userName)}</Avatar>
+        <span className={styles.userName}>{userName}</span>
       </div>
-      <button
-        aria-label="退出登录"
-        className={`ink-button-secondary ${styles.logoutButton}`}
-        onClick={onLogout}
-        type="button"
-      >
-        <span aria-hidden="true" className={styles.glyph}>
-          <WorkspaceLogoutIcon />
-        </span>
-        <span className={styles.logoutLabel}>退出登录</span>
+      <button className={styles.logoutButton} onClick={onLogout} type="button">
+        退出
       </button>
     </div>
-  );
-}
-
-function WorkspaceSidebarToggle({ isCollapsed, onToggle, sidebarPreference }: Readonly<{
-  isCollapsed: boolean;
-  onToggle: () => void;
-  sidebarPreference: "expanded" | "collapsed";
-}>) {
-  const label = isCollapsed ? "展开导航" : "收起导航";
-  return (
-    <button
-      aria-label={label}
-      aria-pressed={sidebarPreference === "collapsed"}
-      className={`ink-button-secondary ${styles.toggleButton} shrink-0 px-3`}
-      onClick={onToggle}
-      title={label}
-      type="button"
-    >
-      <span aria-hidden="true" className={styles.toggleIcon}>
-        <WorkspaceToggleIcon collapsed={isCollapsed} />
-      </span>
-    </button>
   );
 }

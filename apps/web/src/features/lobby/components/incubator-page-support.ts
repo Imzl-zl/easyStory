@@ -174,6 +174,8 @@ export function formatSettingFieldLabel(field: string): string {
   if (field === "core_conflict") return "核心冲突";
   if (field === "plot_direction") return "剧情方向";
   if (field === "special_requirements") return "特殊要求";
+  if (field === "world_setting") return "世界设定";
+  if (field === "scale") return "篇幅规划";
   if (field.startsWith("protagonist.")) return "主角设定";
   if (field.startsWith("world_setting.")) return "世界设定";
   if (field.startsWith("scale.")) return "篇幅规划";

@@ -15,22 +15,28 @@ import {
 } from "./incubator-chat-draft-panel-support";
 
 type IncubatorChatDraftPanelProps = {
+  canCompleteWithAi: boolean;
   createMutation: UseMutationResult<ProjectDetail, unknown, void>;
   draft: ProjectIncubatorConversationDraft | null;
   draftMutation: IncubatorConversationDraftMutation;
   hasUserMessage: boolean;
   isDraftStale: boolean;
+  isCompletingWithAi: boolean;
+  onCompleteWithAi: () => Promise<void>;
   onProjectNameChange: (value: string) => void;
   onSyncDraft: () => Promise<void>;
   projectName: string;
 };
 
 export function IncubatorChatDraftPanel({
+  canCompleteWithAi,
   createMutation,
   draft,
   draftMutation,
   hasUserMessage,
   isDraftStale,
+  isCompletingWithAi,
+  onCompleteWithAi,
   onProjectNameChange,
   onSyncDraft,
   projectName,
@@ -41,11 +47,14 @@ export function IncubatorChatDraftPanel({
     <aside className="order-2 flex min-h-0 flex-col gap-2 lg:order-1 lg:h-full">
       <ActionCard
         canCreate={Boolean(draft && projectName.trim()) && !createMutation.isPending}
+        canCompleteWithAi={canCompleteWithAi}
         canSyncDraft={hasUserMessage && !draftMutation.isPending}
         createMutation={createMutation}
         draft={draft}
         draftMutation={draftMutation}
         isDraftStale={isDraftStale}
+        isCompletingWithAi={isCompletingWithAi}
+        onCompleteWithAi={onCompleteWithAi}
         onProjectNameChange={onProjectNameChange}
         onSyncDraft={onSyncDraft}
         projectName={projectName}

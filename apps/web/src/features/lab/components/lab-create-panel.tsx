@@ -27,14 +27,14 @@ export function LabCreatePanel({
       }}
     >
       <div className="space-y-1">
-        <h2 className="font-serif text-xl font-semibold">新建分析</h2>
+        <h2 className="font-serif text-xl font-semibold">记录新的洞察</h2>
         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          选择分析类型，填好来源标题和结果内容，就能把这条分析记录保存下来。
+          把一次分析、灵感拆解或文风判断保存进当前项目，后续创作时可以继续引用。
         </p>
       </div>
       <LabCreateFields formState={formState} isPending={isPending} onFieldChange={onFieldChange} />
       <button className="ink-button w-full" disabled={isPending} type="submit">
-        {isPending ? "创建中..." : "创建分析"}
+        {isPending ? "保存中..." : "保存洞察"}
       </button>
     </form>
   );
@@ -52,7 +52,7 @@ function LabCreateFields({
   return (
     <>
       <label className="block space-y-2">
-        <span className="label-text">分析类型</span>
+        <span className="label-text">洞察类型</span>
         <AppSelect
           disabled={isPending}
           options={LAB_ANALYSIS_TYPES.map((item) => ({ label: item, value: item }))}
@@ -62,14 +62,14 @@ function LabCreateFields({
       </label>
       <LabTextField label="来源标题" required value={formState.sourceTitle} onChange={(value) => onFieldChange({ sourceTitle: value })} />
       <LabTextField
-        label="生成标记"
+        label="来源 Skill"
         placeholder="可选，例如 skill.style.river"
         value={formState.generatedSkillKey}
         onChange={(value) => onFieldChange({ generatedSkillKey: value })}
       />
-      <LabTextAreaField label="分析结果（JSON）" value={formState.result} onChange={(value) => onFieldChange({ result: value })} />
+      <LabTextAreaField label="洞察正文（JSON）" value={formState.result} onChange={(value) => onFieldChange({ result: value })} />
       <LabTextAreaField
-        label="建议列表（JSON）"
+        label="后续建议（JSON）"
         minHeightClassName="min-h-32"
         value={formState.suggestions}
         onChange={(value) => onFieldChange({ suggestions: value })}

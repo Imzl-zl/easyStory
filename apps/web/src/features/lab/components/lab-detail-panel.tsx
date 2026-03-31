@@ -29,8 +29,8 @@ export function LabDetailPanel({
 }: Readonly<LabDetailPanelProps>) {
   return (
     <SectionCard
-      title={analysis ? formatLabAnalysisTitle(analysis) : "分析详情"}
-      description="查看分析结果与提取的文风特征。"
+      title={analysis ? formatLabAnalysisTitle(analysis) : "洞察详情"}
+      description="查看这条洞察的结论、来源范围与可继续使用的建议。"
       action={
         analysis ? (
           <button
@@ -39,7 +39,7 @@ export function LabDetailPanel({
             onClick={() => onRequestDelete(analysis)}
             type="button"
           >
-            {isDeletePending ? "删除中..." : "删除分析"}
+            {isDeletePending ? "删除中..." : "删除洞察"}
           </button>
         ) : null
       }
@@ -77,7 +77,7 @@ function LabDetailContent({
     );
   }
   if (isLoading && !analysis) {
-    return <p className="text-sm text-[var(--text-secondary)]">正在加载分析详情...</p>;
+    return <p className="text-sm text-[var(--text-secondary)]">正在加载洞察详情...</p>;
   }
   if (errorMessage && !analysis) {
     return (
@@ -87,7 +87,7 @@ function LabDetailContent({
     );
   }
   if (!analysis) {
-    return <EmptyState title="暂无分析详情" description="该记录暂无可展示的数据。" />;
+    return <EmptyState title="暂无洞察详情" description="该记录暂无可展示的数据。" />;
   }
   return (
     <div className="space-y-4">
@@ -112,7 +112,7 @@ function LabAnalysisMeta({ analysis }: Readonly<{ analysis: AnalysisDetail }>) {
         {analysis.generated_skill_key ? <StatusBadge status="approved" label={analysis.generated_skill_key} /> : null}
       </div>
       <p className="text-sm leading-6 text-[var(--text-secondary)]">来源标题：{analysis.source_title ?? "未命名来源"}</p>
-      <p className="text-sm leading-6 text-[var(--text-secondary)]">content_id：{analysis.content_id ?? "未绑定内容"}</p>
+      <p className="text-sm leading-6 text-[var(--text-secondary)]">关联正文片段：{analysis.content_id ?? "未绑定内容"}</p>
       <p className="text-sm leading-6 text-[var(--text-secondary)]">创建时间：{formatLabAnalysisTime(analysis.created_at)}</p>
     </div>
   );

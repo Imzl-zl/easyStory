@@ -7,16 +7,21 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { getErrorMessage } from "@/lib/api/client";
 import type { ProjectDetail, ProjectIncubatorConversationDraft } from "@/lib/api/types";
 
+import { DraftGuidanceCard } from "./incubator-chat-draft-guidance";
 import type { IncubatorConversationDraftMutation } from "./incubator-page-model-support";
+import { buildDraftGuidance } from "./incubator-chat-draft-support";
 import { buildSettingIssueSummary, type SettingPreviewSection } from "./incubator-page-support";
 
 export type ActionCardProps = {
   canCreate: boolean;
+  canCompleteWithAi: boolean;
   canSyncDraft: boolean;
   createMutation: UseMutationResult<ProjectDetail, unknown, void>;
   draft: ProjectIncubatorConversationDraft | null;
   draftMutation: IncubatorConversationDraftMutation;
   isDraftStale: boolean;
+  isCompletingWithAi: boolean;
+  onCompleteWithAi: () => Promise<void>;
   onProjectNameChange: (value: string) => void;
   onSyncDraft: () => Promise<void>;
   projectName: string;
@@ -24,11 +29,14 @@ export type ActionCardProps = {
 
 export function ActionCard({
   canCreate,
+  canCompleteWithAi,
   canSyncDraft,
   createMutation,
   draft,
   draftMutation,
   isDraftStale,
+  isCompletingWithAi,
+  onCompleteWithAi,
   onProjectNameChange,
   onSyncDraft,
   projectName,
@@ -45,8 +53,16 @@ export function ActionCard({
         draftMutation={draftMutation}
         onSyncDraft={onSyncDraft}
       />
+      {draft ? (
+        <DraftGuidanceCard
+          canCompleteWithAi={canCompleteWithAi}
+          draft={draft}
+          isCompletingWithAi={isCompletingWithAi}
+          onCompleteWithAi={() => void onCompleteWithAi()}
+        />
+      ) : null}
       <p className="text-[11px] leading-5 text-[var(--text-secondary)]">
-        整理后可直接创建项目。
+        只缺建议项时也能继续创建项目，后面照样可以用 AI 生成大纲。
       </p>
       <NoticeList
         createMutation={createMutation}
@@ -96,9 +112,10 @@ function ActionCardHeader({ draft }: { draft: ProjectIncubatorConversationDraft 
 }
 
 function DraftStatusRow({ draft }: { draft: ProjectIncubatorConversationDraft }) {
+  const guidance = buildDraftGuidance(draft);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <StatusBadge status={draft.setting_completeness.status} />
+      <StatusBadge label={guidance.statusLabel} status={draft.setting_completeness.status} />
       <span className="text-xs leading-5 text-[var(--text-secondary)]">
         {buildSettingIssueSummary(draft.setting_completeness)}
       </span>

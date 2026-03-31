@@ -1,15 +1,36 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { showAppNotice } from "@/components/ui/app-notice";
-import { SectionCard } from "@/components/ui/section-card";
-import { EngineDetailPanel } from "@/features/engine/components/engine-detail-panel";
-import { EnginePageHeader } from "@/features/engine/components/engine-page-header";
-import { EnginePageStatusSection } from "@/features/engine/components/engine-page-status-section";
-import { resolveEngineDetailTab } from "@/features/engine/components/engine-detail-panel-support";
+import { getErrorMessage } from "@/lib/api/client";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+
+import { EngineDetailPanel } from "./engine-detail-panel";
+import { EngineExportPanel } from "./engine-export-panel";
+import {
+  resolveWorkflowEventsBanner,
+  useWorkflowEventsQuerySync,
+  useWorkflowEventsStream,
+} from "./engine-events-stream";
+import {
+  buildBillingState,
+  buildEngineBanners,
+  buildLogsState,
+  buildReplayState,
+  buildReviewsState,
+  shouldInspectLogs,
+  useBillingQuery,
+  useClearInvalidExecutionParam,
+  useLogsQuery,
+  usePreparationQuery,
+  usePromptReplayQuery,
+  useReviewsQuery,
+  useWorkflowActionMutation,
+  useWorkflowQuery,
+} from "./engine-page-model";
+import { EnginePageShell } from "./engine-page-shell";
 import {
   buildEnginePathWithParams,
   createWorkflowBoundValue,
@@ -18,19 +39,11 @@ import {
   resolveStartWorkflowDisabledReason,
   resolveWorkflowBoundValue,
   useRememberLastWorkflow,
-} from "@/features/engine/components/engine-page-support";
-import { EngineExportPanel } from "@/features/engine/components/engine-export-panel";
-import { resolveWorkflowEventsBanner, useWorkflowEventsQuerySync, useWorkflowEventsStream } from "@/features/engine/components/engine-events-stream";
-import { buildWorkflowSummary } from "@/features/engine/components/engine-workflow-summary-support";
-import { resolveEngineWorkflowControls, shouldPollWorkflow } from "@/features/engine/components/engine-workflow-controls";
-import { getWorkflowBillingSummary, listWorkflowTokenUsages } from "@/lib/api/billing";
-import { getErrorMessage } from "@/lib/api/client";
-import { listWorkflowExecutions, listWorkflowLogs, listPromptReplays } from "@/lib/api/observability";
-import { getProjectPreparationStatus } from "@/lib/api/projects";
-import { getWorkflowReviewSummary, listWorkflowReviewActions } from "@/lib/api/review";
-import { cancelWorkflow, getWorkflow, pauseWorkflow, resumeWorkflow, startWorkflow } from "@/lib/api/workflow";
-import { useWorkspaceStore } from "@/lib/stores/workspace-store";
-import type { EngineTabKey } from "@/features/engine/components/engine-workflow-status-support";
+} from "./engine-page-support";
+import { resolveEngineDetailTab } from "./engine-detail-panel-support";
+import { buildWorkflowSummary } from "./engine-workflow-summary-support";
+import { resolveEngineWorkflowControls, shouldPollWorkflow } from "./engine-workflow-controls";
+import type { EngineTabKey } from "./engine-workflow-status-support";
 
 type EnginePageProps = { projectId: string };
 
@@ -48,98 +61,33 @@ export function EnginePage({ projectId }: EnginePageProps) {
   const selectedExecutionId = searchParams.get("execution") ?? "";
   const [workflowInputState, setWorkflowInputState] = useState(() => createWorkflowBoundValue(workflowId, workflowId));
   const workflowInput = resolveWorkflowBoundValue(workflowInputState, workflowId, workflowId);
-  const setParams = (patches: Record<string, string | null>) => startTransition(() => router.replace(buildEnginePathWithParams(pathname, searchParams.toString(), patches)));
+  const setParams = (patches: Record<string, string | null>) =>
+    startTransition(() => router.replace(buildEnginePathWithParams(pathname, searchParams.toString(), patches)));
 
-  const workflowQuery = useQuery({
-    queryKey: ["workflow", workflowId],
-    queryFn: () => getWorkflow(workflowId),
-    enabled: Boolean(workflowId),
-    refetchInterval: (query) => (shouldPollWorkflow(query.state.data?.status) ? 5000 : false),
-  });
+  const workflowQuery = useWorkflowQuery(workflowId);
   const workflowControls = resolveEngineWorkflowControls(workflowQuery.data);
   const hasWorkflow = Boolean(workflowId && workflowQuery.data);
-  const preparationQuery = useQuery({
-    queryKey: ["project-preparation-status", projectId],
-    queryFn: () => getProjectPreparationStatus(projectId),
-    enabled: workflowControls.primary.action === "start" && !workflowControls.primary.disabled,
-  });
-
-  const reviewsQuery = useQuery({
-    queryKey: ["workflow-reviews", workflowId],
-    queryFn: () => Promise.all([getWorkflowReviewSummary(workflowId), listWorkflowReviewActions(workflowId)]),
-    enabled: hasWorkflow && tab === "reviews",
-  });
-  const billingQuery = useQuery({
-    queryKey: ["workflow-billing", workflowId],
-    queryFn: () => Promise.all([getWorkflowBillingSummary(workflowId), listWorkflowTokenUsages(workflowId)]),
-    enabled: hasWorkflow && tab === "billing",
-  });
-  const logsQuery = useQuery({
-    queryKey: ["workflow-observability", workflowId],
-    queryFn: () => Promise.all([listWorkflowExecutions(workflowId), listWorkflowLogs(workflowId)]),
-    enabled: hasWorkflow && (tab === "logs" || tab === "replays" || tab === "overview"),
-    refetchInterval: shouldPollWorkflow(workflowQuery.data?.status) ? 5000 : false,
-  });
-
+  const preparationQuery = usePreparationQuery(projectId, workflowControls.primary.action, workflowControls.primary.disabled);
+  const reviewsQuery = useReviewsQuery(hasWorkflow, tab, workflowId);
+  const billingQuery = useBillingQuery(hasWorkflow, tab, workflowId);
+  const logsQuery = useLogsQuery(hasWorkflow, tab, workflowId, workflowQuery.data?.status);
   const logExecutions = logsQuery.data?.[0] ?? [];
-  const replayExecutionSelection = resolveReplayExecutionSelection({
-    canValidateSelection:
-      hasWorkflow &&
-      logsQuery.data !== undefined &&
-      (tab === "logs" || tab === "replays" || tab === "overview"),
+  const replaySelection = resolveReplayExecutionSelection({
+    canValidateSelection: hasWorkflow && logsQuery.data !== undefined && shouldInspectLogs(tab),
     executions: logExecutions,
     selectedExecutionId,
   });
-  const activeSelectedExecutionId = replayExecutionSelection.activeSelectedExecutionId;
-  const promptReplayQuery = useQuery({
-    queryKey: ["prompt-replays", workflowId, activeSelectedExecutionId],
-    queryFn: () => listPromptReplays(workflowId, activeSelectedExecutionId),
-    enabled: hasWorkflow && tab === "replays" && Boolean(activeSelectedExecutionId),
+  const activeSelectedExecutionId = replaySelection.activeSelectedExecutionId;
+  const promptReplayQuery = usePromptReplayQuery(activeSelectedExecutionId, hasWorkflow, tab, workflowId);
+  const actionMutation = useWorkflowActionMutation({
+    projectId,
+    queryClient,
+    selectedExecutionId,
+    setLastWorkflow,
+    setParams,
+    setWorkflowInputState,
+    workflowId,
   });
-
-  const actionMutation = useMutation({
-    mutationFn: async (action: "start" | "pause" | "resume" | "cancel") => {
-      if (action === "start") {
-        return startWorkflow(projectId);
-      }
-      if (action === "pause") {
-        return pauseWorkflow(workflowId);
-      }
-      if (action === "resume") {
-        return resumeWorkflow(workflowId);
-      }
-      return cancelWorkflow(workflowId);
-    },
-    onSuccess: (result, action) => {
-      showAppNotice({
-        content: resolveWorkflowActionNoticeMessage(action),
-        title: "工作流",
-        tone: "success",
-      });
-      setLastWorkflow(projectId, result.execution_id);
-      setWorkflowInputState(createWorkflowBoundValue(result.execution_id, result.execution_id));
-      setParams({
-        execution: resolveExecutionParamForWorkflow({
-          currentExecutionId: selectedExecutionId,
-          currentWorkflowId: workflowId,
-          nextWorkflowId: result.execution_id,
-        }),
-        workflow: result.execution_id,
-      });
-      queryClient.invalidateQueries({ queryKey: ["workflow"] });
-      queryClient.invalidateQueries({ queryKey: ["workflow-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["workflow-observability"] });
-      queryClient.invalidateQueries({ queryKey: ["project-preparation-status", projectId] });
-    },
-    onError: (error) =>
-      showAppNotice({
-        content: getErrorMessage(error),
-        title: "工作流",
-        tone: "danger",
-      }),
-  });
-
-  const selectedExecution = logExecutions.find((item) => item.id === activeSelectedExecutionId) ?? null;
   const workflowEvents = useWorkflowEventsStream({
     workflowId,
     enabled: hasWorkflow && shouldPollWorkflow(workflowQuery.data?.status),
@@ -153,55 +101,59 @@ export function EnginePage({ projectId }: EnginePageProps) {
     setLastWorkflow,
     workflowId,
   });
-
-  useEffect(() => {
-    if (!replayExecutionSelection.shouldClearExecutionParam) {
-      return;
-    }
-    startTransition(() => {
-      router.replace(
-        buildEnginePathWithParams(pathname, searchParams.toString(), { execution: null }),
-      );
-    });
-  }, [
+  useClearInvalidExecutionParam({
     pathname,
-    replayExecutionSelection.shouldClearExecutionParam,
     router,
     searchParams,
+    shouldClear: replaySelection.shouldClearExecutionParam,
     startTransition,
-  ]);
-
-  const executionLogs = workflowEvents.logs;
-  const reviewSummary = reviewsQuery.data?.[0] ?? null;
-  const reviewActions = reviewsQuery.data?.[1] ?? [];
-  const billingSummary = billingQuery.data?.[0] ?? null;
-  const billingUsages = billingQuery.data?.[1] ?? [];
-  const workflowEventsBanner = resolveWorkflowEventsBanner(workflowEvents.connectionState);
-  const workflowEventsErrorMessage = workflowEvents.clientErrorMessage;
-  const startWorkflowDisabledReason = resolveStartWorkflowDisabledReason({
-    action: workflowControls.primary.action,
-    errorMessage: preparationQuery.error ? getErrorMessage(preparationQuery.error) : null,
-    isLoading: preparationQuery.isLoading,
-    preparation: preparationQuery.data,
   });
-  const workflowSummary = buildWorkflowSummary(workflowQuery.data);
-  const primaryActionDisabled =
-    actionMutation.isPending ||
-    workflowControls.primary.disabled ||
-    Boolean(startWorkflowDisabledReason);
-  const openEngineTab = (nextTab: EngineTabKey) => setParams({ tab: nextTab });
-  const openReplayExecution = (executionId: string) =>
-    setParams({ execution: executionId, tab: "replays" });
-
   useWorkflowEventsQuerySync({
     workflowId,
     reconnectSignal: workflowEvents.reconnectSignal,
     endSignal: workflowEvents.endSignal,
   });
 
+  const workflowSummary = buildWorkflowSummary(workflowQuery.data);
+  const startWorkflowDisabledReason = resolveStartWorkflowDisabledReason({
+    action: workflowControls.primary.action,
+    errorMessage: preparationQuery.error ? getErrorMessage(preparationQuery.error) : null,
+    isLoading: preparationQuery.isLoading,
+    preparation: preparationQuery.data,
+  });
+  const primaryActionDisabled = actionMutation.isPending || workflowControls.primary.disabled || Boolean(startWorkflowDisabledReason);
+
   return (
-    <div className="space-y-6">
-      <EnginePageHeader
+    <>
+      <EnginePageShell
+        banners={buildEngineBanners({
+          startWorkflowDisabledReason,
+          workflowErrorMessage: workflowQuery.error ? getErrorMessage(workflowQuery.error) : null,
+          workflowEventsBanner: resolveWorkflowEventsBanner(workflowEvents.connectionState),
+          workflowEventsErrorMessage: workflowEvents.clientErrorMessage,
+        })}
+        detailPanel={(
+          <EngineDetailPanel
+            activeTab={tab}
+            billing={buildBillingState(billingQuery)}
+            context={{ projectId, workflowId }}
+            hasWorkflow={hasWorkflow}
+            logs={buildLogsState(logExecutions, logsQuery, workflowEvents.logs)}
+            onOpenReplayExecution={(executionId) => setParams({ execution: executionId, tab: "replays" })}
+            onOpenTab={(nextTab) => setParams({ tab: nextTab })}
+            projectId={projectId}
+            replays={buildReplayState({
+              activeSelectedExecutionId,
+              logExecutions,
+              logsQuery,
+              promptReplayQuery,
+              selectedExecutionId: activeSelectedExecutionId,
+              setParams,
+            })}
+            reviews={buildReviewsState(reviewsQuery)}
+            workflow={workflowQuery.data}
+          />
+        )}
         hasWorkflow={hasWorkflow}
         isActionPending={actionMutation.isPending}
         isLoadWorkflowDisabled={!workflowInput || isPending}
@@ -217,87 +169,24 @@ export function EnginePage({ projectId }: EnginePageProps) {
           })
         }
         onOpenExport={() => setParams({ export: "1" })}
-        onWorkflowInputChange={(value) =>
-          setWorkflowInputState(createWorkflowBoundValue(workflowId, value))
-        }
+        onOpenTab={(nextTab: EngineTabKey) => setParams({ tab: nextTab })}
+        onWorkflowInputChange={(value) => setWorkflowInputState(createWorkflowBoundValue(workflowId, value))}
         primaryAction={workflowControls.primary}
         primaryActionDisabled={primaryActionDisabled}
         projectId={projectId}
         secondaryControls={workflowControls.secondary}
         startWorkflowDisabledReason={startWorkflowDisabledReason}
+        workflow={workflowQuery.data}
         workflowInput={workflowInput}
         workflowSummary={workflowSummary}
       />
-
-      <EnginePageStatusSection
-        isActionPending={actionMutation.isPending}
-        onOpenTab={openEngineTab}
-        onPrimaryAction={() => actionMutation.mutate(workflowControls.primary.action)}
-        primaryActionDisabled={primaryActionDisabled}
-        primaryActionLabel={workflowControls.primary.label}
-        projectId={projectId}
-        startWorkflowDisabledReason={startWorkflowDisabledReason}
-        workflow={workflowQuery.data}
-        workflowErrorMessage={workflowQuery.error ? getErrorMessage(workflowQuery.error) : null}
-        workflowEventsBanner={workflowEventsBanner}
-        workflowEventsErrorMessage={workflowEventsErrorMessage}
-        workflowSummary={workflowSummary}
-      />
-
-      <SectionCard title="执行详情" description="按标签查看概览、章节任务、日志、审核、账单和提示词回放。">
-        <EngineDetailPanel
-          activeTab={tab}
-          billing={{
-            errorMessage: billingQuery.error ? getErrorMessage(billingQuery.error) : null,
-            isLoading: billingQuery.isPending,
-            summary: billingSummary,
-            usages: billingUsages,
-          }}
-          context={{ projectId, workflowId }}
-          hasWorkflow={hasWorkflow}
-          logs={{
-            errorMessage: logsQuery.error ? getErrorMessage(logsQuery.error) : null,
-            executions: logExecutions,
-            executionLogs,
-            isLoading: logsQuery.isPending,
-          }}
-          onOpenReplayExecution={openReplayExecution}
-          onOpenTab={openEngineTab}
+      {exportOpen ? (
+        <EngineExportPanel
+          onClose={() => setParams({ export: null })}
           projectId={projectId}
-          replays={{
-            errorMessage: promptReplayQuery.error ? getErrorMessage(promptReplayQuery.error) : null,
-            executions: logExecutions,
-            executionsErrorMessage: logsQuery.error ? getErrorMessage(logsQuery.error) : null,
-            isExecutionsLoading: logsQuery.isPending,
-            isReplaysLoading: promptReplayQuery.isPending,
-            onSelectExecutionId: (value) => setParams({ execution: value || null }),
-            replays: promptReplayQuery.data ?? [],
-            selectedExecution,
-            selectedExecutionId: activeSelectedExecutionId,
-          }}
-          reviews={{
-            actions: reviewActions,
-            errorMessage: reviewsQuery.error ? getErrorMessage(reviewsQuery.error) : null,
-            isLoading: reviewsQuery.isPending,
-            summary: reviewSummary,
-          }}
-          workflow={workflowQuery.data}
+          workflowId={workflowId}
         />
-      </SectionCard>
-      {exportOpen ? <EngineExportPanel onClose={() => setParams({ export: null })} projectId={projectId} workflowId={workflowId} /> : null}
-    </div>
+      ) : null}
+    </>
   );
-}
-
-function resolveWorkflowActionNoticeMessage(action: "start" | "pause" | "resume" | "cancel") {
-  if (action === "start") {
-    return "工作流已启动。";
-  }
-  if (action === "pause") {
-    return "工作流已暂停。";
-  }
-  if (action === "resume") {
-    return "工作流已恢复。";
-  }
-  return "工作流已取消。";
 }

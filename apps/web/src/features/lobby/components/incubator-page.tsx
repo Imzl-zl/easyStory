@@ -1,23 +1,38 @@
 "use client";
 
-import { useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
 import Link from "next/link";
+import { useState } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 
 import { ChatModePanel } from "@/features/lobby/components/incubator-chat-panel";
-import { type FeedbackState } from "@/features/lobby/components/incubator-feedback-support";
+import type { FeedbackState } from "@/features/lobby/components/incubator-feedback-support";
 import { useIncubatorChatModel } from "@/features/lobby/components/incubator-page-model";
 import {
   INCUBATOR_MODE_OPTIONS,
   type IncubatorMode,
 } from "@/features/lobby/components/incubator-page-support";
-import { useIncubatorTemplateModel } from "@/features/lobby/components/incubator-template-model";
 import { TemplateModePanel } from "@/features/lobby/components/incubator-panels";
+import { useIncubatorTemplateModel } from "@/features/lobby/components/incubator-template-model";
+
+import styles from "./incubator-page.module.css";
+
+const STARTER_NOTES = [
+  "先用对话把题材、角色和冲突说清。",
+  "再把草稿整理成真正可写的项目设定。",
+  "所有配置都服务于这部作品，而不是独立后台流程。",
+] as const;
+
+type IncubatorStageCopy = {
+  label: string;
+  title: string;
+  description: string;
+};
 
 export function IncubatorPage() {
   const [mode, setMode] = useState<IncubatorMode>("chat");
   const [hasVisitedTemplateMode, setHasVisitedTemplateMode] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+  const stageCopy = buildStageCopy(mode);
 
   const handleModeChange = (nextMode: IncubatorMode) => {
     setMode(nextMode);
@@ -28,110 +43,89 @@ export function IncubatorPage() {
   };
 
   return (
-    <div className="flex flex-col gap-1.5 lg:h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-3rem)] lg:overflow-hidden">
-      <IncubatorPageHeader mode={mode} onModeChange={handleModeChange} />
+    <div className={styles.page}>
+      <IncubatorHero mode={mode} onModeChange={handleModeChange} />
       {feedback ? <FeedbackBanner feedback={feedback} /> : null}
-      <section
-        aria-labelledby="incubator-tab-chat"
-        className="min-h-0 flex-1"
-        hidden={mode !== "chat"}
-        id="incubator-panel-chat"
-        role="tabpanel"
-      >
-        <ChatModeContent setFeedback={setFeedback} />
-      </section>
-      {hasVisitedTemplateMode || mode === "template" ? (
+      <StageShell mode={mode} stageCopy={stageCopy}>
         <section
-          aria-labelledby="incubator-tab-template"
-          className="min-h-0 flex-1"
-          hidden={mode !== "template"}
-          id="incubator-panel-template"
+          aria-labelledby="incubator-tab-chat"
+          className={styles.stagePanel}
+          hidden={mode !== "chat"}
+          id="incubator-panel-chat"
           role="tabpanel"
         >
-          <TemplateModeContent onSwitchToChat={() => handleModeChange("chat")} setFeedback={setFeedback} />
+          <ChatModeContent setFeedback={setFeedback} />
         </section>
-      ) : null}
+        {hasVisitedTemplateMode || mode === "template" ? (
+          <section
+            aria-labelledby="incubator-tab-template"
+            className={styles.stagePanel}
+            hidden={mode !== "template"}
+            id="incubator-panel-template"
+            role="tabpanel"
+          >
+            <TemplateModeContent
+              onSwitchToChat={() => handleModeChange("chat")}
+              setFeedback={setFeedback}
+            />
+          </section>
+        ) : null}
+      </StageShell>
     </div>
   );
 }
 
-function ChatModeContent({
-  setFeedback,
-}: {
-  setFeedback: Dispatch<SetStateAction<FeedbackState | null>>;
-}) {
-  const chatModel = useIncubatorChatModel(setFeedback);
-
-  return <ChatModePanel model={chatModel} />;
-}
-
-function TemplateModeContent({
-  onSwitchToChat,
-  setFeedback,
-}: {
-  onSwitchToChat: () => void;
-  setFeedback: Dispatch<SetStateAction<FeedbackState | null>>;
-}) {
-  const templateModel = useIncubatorTemplateModel(setFeedback);
-
-  return <TemplateModePanel model={templateModel} onSwitchToChat={onSwitchToChat} />;
-}
-
-function IncubatorPageHeader({
+function IncubatorHero({
   mode,
   onModeChange,
-}: {
+}: Readonly<{
   mode: IncubatorMode;
   onModeChange: (mode: IncubatorMode) => void;
-}) {
-  const modeSummary = mode === "chat" ? "AI 聊天" : "模板创建";
-
+}>) {
   return (
-    <section className="panel-shell px-3 py-2 md:px-4 xl:px-5">
-      <div className="flex flex-col gap-1.5 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <Link className="ink-button-secondary h-8 px-3 text-[13px]" href="/workspace/lobby">
-            返回项目大厅
-          </Link>
-          <div className="hidden h-4 w-px bg-[var(--line-soft)] xl:block" />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <h1 className="text-[0.97rem] font-semibold text-[var(--text-primary)] md:text-[1.02rem]">
-                创建项目
-              </h1>
-              <span className="rounded-full bg-[rgba(46,111,106,0.08)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--accent-ink)]">
-                {modeSummary}
-              </span>
-            </div>
-            <p className="mt-0.5 text-[11px] leading-5 text-[var(--text-secondary)]">
-              先聊想法，再整理成项目草稿。
-            </p>
-          </div>
+    <section className={styles.hero}>
+      <div className={styles.heroMain}>
+        <Link className={styles.backLink} href="/workspace/lobby">
+          返回书架
+        </Link>
+        <p className={styles.eyebrow}>项目起稿</p>
+        <h1 className={styles.heroTitle}>先把想法变成可写的作品，再开始创作。</h1>
+        <p className={styles.heroDescription}>
+          easyStory 的起稿流程不再像填后台表单，而是像跟编辑一起把故事轮廓整理清楚。
+        </p>
+        <div className={styles.noteGrid}>
+          {STARTER_NOTES.map((item) => (
+            <article className={styles.noteCard} key={item}>
+              <p>{item}</p>
+            </article>
+          ))}
         </div>
-        <ModeTabs mode={mode} onModeChange={onModeChange} />
       </div>
+      <aside className={styles.modeDock}>
+        <div>
+          <p className={styles.modeEyebrow}>启动方式</p>
+          <p className={styles.modeLead}>选择更适合你此刻状态的起稿路径。</p>
+        </div>
+        <ModeCards mode={mode} onModeChange={onModeChange} />
+      </aside>
     </section>
   );
 }
 
-function ModeTabs({
+function ModeCards({
   mode,
   onModeChange,
-}: {
+}: Readonly<{
   mode: IncubatorMode;
   onModeChange: (mode: IncubatorMode) => void;
-}) {
+}>) {
   return (
-    <nav
-      aria-label="创作启动模式"
-      className="flex flex-wrap items-center gap-1 rounded-full bg-[rgba(248,243,235,0.88)] p-1"
-      role="tablist"
-    >
+    <nav aria-label="创作启动模式" className={styles.modeGrid} role="tablist">
       {INCUBATOR_MODE_OPTIONS.map((option) => (
         <button
           aria-controls={`incubator-panel-${option.id}`}
           aria-selected={mode === option.id}
-          className="ink-tab h-8 px-2.5 text-[12px]"
+          className={styles.modeCard}
           data-active={mode === option.id}
           id={`incubator-tab-${option.id}`}
           key={option.id}
@@ -139,20 +133,80 @@ function ModeTabs({
           role="tab"
           type="button"
         >
-          {option.label}
+          <span className={styles.modeCardLabel}>{option.label}</span>
+          <span className={styles.modeCardDetail}>{option.description}</span>
         </button>
       ))}
     </nav>
   );
 }
 
-function FeedbackBanner({ feedback }: { feedback: FeedbackState }) {
-  const className =
-    feedback.tone === "danger"
-      ? "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]"
-      : "bg-[rgba(58,124,165,0.1)] text-[var(--accent-info)]";
-
+function StageShell({
+  children,
+  mode,
+  stageCopy,
+}: Readonly<{
+  children: ReactNode;
+  mode: IncubatorMode;
+  stageCopy: IncubatorStageCopy;
+}>) {
   return (
-    <div className={`rounded-xl px-3 py-2 text-[12.5px] leading-5 ${className}`}>{feedback.message}</div>
+    <section className={styles.stage}>
+      <div className={styles.stageHeader}>
+        <div>
+          <p className={styles.stageLabel}>{stageCopy.label}</p>
+          <h2 className={styles.stageTitle}>{stageCopy.title}</h2>
+          <p className={styles.stageDescription}>{stageCopy.description}</p>
+        </div>
+        <div className={styles.stageHint} data-mode={mode}>
+          {mode === "chat" ? "先聊，再整理草稿" : "按模板补足缺失信息"}
+        </div>
+      </div>
+      <div className={styles.stageBody}>{children}</div>
+    </section>
   );
+}
+
+function ChatModeContent({
+  setFeedback,
+}: Readonly<{
+  setFeedback: Dispatch<SetStateAction<FeedbackState | null>>;
+}>) {
+  const chatModel = useIncubatorChatModel(setFeedback);
+  return <ChatModePanel model={chatModel} />;
+}
+
+function TemplateModeContent({
+  onSwitchToChat,
+  setFeedback,
+}: Readonly<{
+  onSwitchToChat: () => void;
+  setFeedback: Dispatch<SetStateAction<FeedbackState | null>>;
+}>) {
+  const templateModel = useIncubatorTemplateModel(setFeedback);
+  return <TemplateModePanel model={templateModel} onSwitchToChat={onSwitchToChat} />;
+}
+
+function FeedbackBanner({ feedback }: Readonly<{ feedback: FeedbackState }>) {
+  return (
+    <div className={styles.feedbackBanner} data-tone={feedback.tone}>
+      {feedback.message}
+    </div>
+  );
+}
+
+function buildStageCopy(mode: IncubatorMode): IncubatorStageCopy {
+  if (mode === "chat") {
+    return {
+      description: "用自然语言把题材、角色和冲突逐步说清，系统会同步整理成项目草稿。",
+      label: "对话起稿",
+      title: "像跟编辑聊故事一样，把项目先说出来。",
+    };
+  }
+
+  return {
+    description: "适合你已经知道题材方向，只需要顺着模板把关键空位填完整的场景。",
+    label: "模板起稿",
+    title: "用模板把必要信息一次补齐。",
+  };
 }

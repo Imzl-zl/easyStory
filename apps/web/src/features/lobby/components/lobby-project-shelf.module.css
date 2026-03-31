@@ -1,0 +1,238 @@
+.cardGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--project-card-surface, rgba(255, 253, 251, 0.92));
+  box-shadow:
+    inset 0 0 0 1px rgba(61, 61, 61, 0.07),
+    0 14px 28px -24px rgba(61, 61, 61, 0.32);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 0 0 1px rgba(61, 61, 61, 0.09),
+    0 18px 30px -24px rgba(61, 61, 61, 0.28);
+}
+
+.cardCoverBand {
+  display: flex;
+  min-height: 104px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.95rem;
+  background: var(--project-card-accent, var(--accent-primary));
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.cardCoverMeta {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.cardCoverEyebrow {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.88;
+}
+
+.cardCoverGlyph {
+  font-family: var(--font-serif, "Noto Serif SC", "Songti SC", serif);
+  font-size: 2.3rem;
+  font-weight: 600;
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+
+.cardBody {
+  display: grid;
+  flex: 1;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem 0.85rem;
+}
+
+.cardStatusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.cardMetaPill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 500;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-serif, "Noto Serif SC", "Songti SC", serif);
+  font-size: 1.42rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+}
+
+.cardDescription {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.75;
+}
+
+.cardDetailRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.8rem;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1.15rem 1.15rem;
+}
+
+.cardTime {
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.cardActionButton {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.96);
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.cardActionButton:hover {
+  background: rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.cardActionButton svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 1.5rem;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(61, 61, 61, 0.06);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: flex;
+  width: 4.2rem;
+  height: 4.2rem;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  border-radius: 20px;
+  background: rgba(90, 122, 107, 0.08);
+  color: var(--accent-primary);
+}
+
+.emptyIcon svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.emptyTitle {
+  margin: 0 0 0.4rem;
+  color: var(--text-primary);
+  font-family: var(--font-serif, "Noto Serif SC", "Songti SC", serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+.emptyDescription {
+  max-width: 26rem;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.75;
+}
+
+.loading {
+  padding: 2.5rem 1rem;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.error {
+  padding: 1rem 1.1rem;
+  border-radius: 22px;
+  background: rgba(196, 90, 90, 0.08);
+  color: var(--accent-danger);
+  font-size: 0.92rem;
+}
+
+.deletedCard {
+  background: rgba(248, 246, 241, 0.92);
+}
+
+.deletedCard .cardCoverBand {
+  background: rgba(139, 115, 85, 0.72);
+}
+
+@media (max-width: 767px) {
+  .cardGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cardFooter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cardActions {
+    justify-content: flex-start;
+  }
+}
