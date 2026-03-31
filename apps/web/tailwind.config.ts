@@ -11,7 +11,11 @@ const config: Config = {
     extend: {
       colors: {
         canvas: 'var(--bg-canvas)',
-        surface: 'var(--bg-surface)',
+        surface: {
+          DEFAULT: 'var(--bg-surface)',
+          hover: 'var(--bg-surface-hover)',
+          active: 'var(--bg-surface-active)',
+        },
         muted: 'var(--bg-muted)',
         elevated: 'var(--bg-elevated)',
         line: {
@@ -27,6 +31,8 @@ const config: Config = {
           success: 'var(--accent-success)',
           warning: 'var(--accent-warning)',
           danger: 'var(--accent-danger)',
+          purple: 'var(--accent-purple)',
+          pink: 'var(--accent-pink)',
           ink: 'var(--accent-ink)',
         },
         text: {

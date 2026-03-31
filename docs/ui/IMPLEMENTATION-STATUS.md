@@ -42,6 +42,7 @@ tailwind.config.ts       对 globals.css 的工具映射
 /workspace/lobby/config-registry
 /workspace/lobby/recycle-bin
 /workspace/lobby/templates
+/workspace/lobby/templates/[templateId]
 /workspace/project/[projectId]/studio
 /workspace/project/[projectId]/engine
 /workspace/project/[projectId]/lab
