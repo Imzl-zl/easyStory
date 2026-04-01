@@ -12,6 +12,19 @@
 
 ---
 
+## 涉及的页面与组件
+
+本文档优化涉及 **1 个页面**的 **4 个组件/区域**：
+
+| 标签页 | 涉及组件/区域 | 优化内容 |
+|--------|--------------|---------|
+| **项目设定（Setting）** | `project-setting-editor.tsx` | 字段分组语义化 |
+| **审计（Audit）** | `ProjectAuditPanel` | 预设过滤项、文案优化 |
+| **AI 偏好（Assistant）** | `AssistantPreferencesPanel` | 继承状态可见性 |
+| **全局布局** | `project-settings-page.module.css` | 移动端折叠体验 |
+
+---
+
 ## 一、需要修正的错误认知
 
 ### ❌ 错误认知 1：内容卡片需要添加 900px 限宽
