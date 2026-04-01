@@ -115,8 +115,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
   }, [chatOpen, updateParams]);
 
   return (
-    <div className="grid [grid-template-columns:260px_1fr_380px] [grid-template-rows:auto_1fr] h-screen bg-[#fefdfb] relative overflow-hidden">
-      <div className="fixed inset-0 opacity-[0.025] pointer-events-none [background-image:url('data:image/svg+xml,%3Csvg_viewBox%3D%220%200%20400%20400%22_xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cfilter_id%3D%22n%22%3E%3CfeTurbulence_type%3D%22fractalNoise%22_baseFrequency%3D%220.9%22_numOctaves%3D%224%22_stitchTiles%3D%22stitch%22%2F%3E%3C%2Ffilter%3E%3Crect_width%3D%22100%25%22_height%3D%22100%25%22_filter%3D%22url(%23n)%22%2F%3E%3C%2Fsvg%3E')]" />
+    <div className="grid [grid-template-columns:1fr] lg:[grid-template-columns:260px_1fr_380px] [grid-template-rows:auto_1fr] h-screen bg-[#fefdfb] relative overflow-hidden">
       <div className="fixed -top-1/2 -right-[20%] w-full h-[150%] pointer-events-none [background:radial-gradient(ellipse_at_60%_40%,rgba(107,143,113,0.15)_0%,transparent_50%),radial-gradient(ellipse_at_30%_70%,rgba(196,167,108,0.12)_0%,transparent_40%)]" />
 
       <div className="col-span-3 flex justify-between items-center px-8 py-5 bg-gradient-to-b from-white/98 to-white/85 backdrop-blur-xl border-b border-[rgba(44,36,22,0.06)] relative z-10 animate-[inkFadeIn_0.4s_cubic-bezier(0.16,1,0.3,1)]">
