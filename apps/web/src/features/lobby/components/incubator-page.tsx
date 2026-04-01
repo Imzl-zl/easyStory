@@ -81,12 +81,12 @@ function IncubatorHero({
   onModeChange: (mode: IncubatorMode) => void;
 }>) {
   return (
-    <section className="grid gap-5.5 p-6 rounded-[28px] border border-[rgba(61,61,61,0.09)] bg-[rgba(255,255,255,0.86)] shadow-[0_18px_42px_rgba(76,55,29,0.06)] [grid-template-columns:minmax(0,1.2fr)_minmax(280px,360px)]">
+    <section className="hero-card grid gap-5.5 p-6 [grid-template-columns:minmax(0,1.2fr)_minmax(280px,360px)]">
       <div className="grid gap-4">
         <Link className="inline-flex w-fit items-center gap-2 text-[var(--accent-primary)] text-[13px] font-semibold" href="/workspace/lobby">
           返回书架
         </Link>
-        <p className="text-[var(--accent-secondary)] text-[11px] tracking-[0.26em] uppercase">项目起稿</p>
+        <p className="label-overline">项目起稿</p>
         <h1 className="max-w-[820px] font-serif text-[clamp(2rem,4vw,3.8rem)] leading-tight">先把想法变成可写的作品，再开始创作。</h1>
         <p className="text-[var(--text-secondary)] text-sm leading-relaxed">
           easyStory 的起稿流程不再像填后台表单，而是像跟编辑一起把故事轮廓整理清楚。
@@ -101,7 +101,7 @@ function IncubatorHero({
       </div>
       <aside className="grid content-start gap-4 p-5 rounded-[22px] bg-[rgba(244,239,231,0.86)]">
         <div>
-          <p className="text-[var(--accent-secondary)] text-[11px] tracking-[0.26em] uppercase">启动方式</p>
+          <p className="label-overline">启动方式</p>
           <p className="text-[var(--text-secondary)] text-sm leading-relaxed">选择更适合你此刻状态的起稿路径。</p>
         </div>
         <ModeCards mode={mode} onModeChange={onModeChange} />
@@ -148,10 +148,10 @@ function StageShell({
   stageCopy: IncubatorStageCopy;
 }>) {
   return (
-    <section className="flex flex-col min-h-[calc(100vh-240px)] rounded-[28px] border border-[rgba(61,61,61,0.09)] bg-[rgba(255,255,255,0.86)] shadow-[0_18px_42px_rgba(76,55,29,0.06)] overflow-hidden">
+    <section className="hero-card flex flex-col min-h-[calc(100vh-240px)]">
       <div className="flex justify-between gap-5 px-6 py-5.5 border-b border-[rgba(61,61,61,0.08)] bg-gradient-to-b from-[rgba(250,246,237,0.92)] to-[rgba(255,255,255,0.9)]">
         <div>
-          <p className="text-[var(--accent-secondary)] text-[11px] tracking-[0.26em] uppercase">{stageCopy.label}</p>
+          <p className="label-overline">{stageCopy.label}</p>
           <h2 className="mt-2.5 font-serif text-7 font-semibold leading-tight">{stageCopy.title}</h2>
           <p className="text-[var(--text-secondary)] text-sm leading-relaxed">{stageCopy.description}</p>
         </div>
