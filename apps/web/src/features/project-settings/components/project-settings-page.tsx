@@ -111,7 +111,7 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
             tab={tab}
           />
         </div>
-        <div className="relative flex flex-col min-h-[600px] animate-[fadeIn_0.35s_cubic-bezier(0.16,1,0.3,1)]">
+        <div className="relative flex flex-col min-h-[600px] animate-[fadeIn_0.35s_cubic-bezier(0.16,1,0.3,1)] max-w-3xl w-full mx-auto pb-24">
           <ProjectSettingsContent
             completeness={completenessQuery.data}
             eventType={eventType}
