@@ -16,12 +16,12 @@
 
 本文档优化涉及 **1 个页面**的 **4 个组件/区域**：
 
-| 标签页 | 涉及组件/区域 | 优化内容 |
-|--------|--------------|---------|
-| **项目设定（Setting）** | `project-setting-editor.tsx` | 字段分组语义化 |
-| **审计（Audit）** | `ProjectAuditPanel` | 预设过滤项、文案优化 |
-| **AI 偏好（Assistant）** | `AssistantPreferencesPanel` | 继承状态可见性 |
-| **全局布局** | `project-settings-page.module.css` | 移动端折叠体验 |
+| 标签页 | 涉及组件/区域 | 优化内容 | 优先级 |
+|--------|--------------|---------|--------|
+| **审计（Audit）** | `project-audit-panel.tsx` | 预设过滤标签 + 文案优化 | ⭐⭐⭐ 最优先 |
+| **项目设定（Setting）** | `project-setting-editor.tsx` | 字段分组语义化 | 🟡 可选 |
+| **AI 偏好（Assistant）** | `AssistantPreferencesPanel` | 继承状态可见性 | 🟡 可选 |
+| **全局布局** | `project-settings-page.module.css` | 移动端折叠体验 | ⚠️ 需确认方向 |
 
 ---
 
@@ -149,31 +149,62 @@
 
 ---
 
-### 🟡 建议 2：改进审计页过滤器
+### 🟡 建议 2：改进审计页过滤器（最实用）
 
-**现状**（`ProjectAuditPanel`）：
-- 过滤器是文本输入，需要用户知道事件名
-- `actor`、`details` 等文案偏内部视角
-
-**优化方向**：
-
-1. 添加预设过滤项（不需要改后端，只改前端）：
+**现状**（`project-audit-panel.tsx` 第 95-100 行）：
 ```tsx
-const presetFilters = [
-  { label: '全部', value: null },
-  { label: '项目更新', value: 'project.updated' },
-  { label: '设置变更', value: 'project.setting' },
-];
+<input
+  className="ink-input"
+  placeholder="如 project.updated / project.setting.updated"
+  value={draftEventType}
+/>
 ```
 
-2. 优化字段文案：
+第 183 行显示：`actor: {item.actor_user_id} · details: {summarize...}`
+
+**问题**：
+1. 过滤器是纯文本输入，`placeholder` 里写着技术术语，普通用户看不懂
+2. `actor`、`details` 等术语对用户不友好
+
+**优化方案**：
+
+1. **添加预设过滤标签**（改动最小）：
 ```tsx
-// 原来
-<span>操作者: {actor}</span>
+// 在输入框上方添加预设标签
+<div className="flex flex-wrap gap-2">
+  {[
+    { label: '项目更新', value: 'project.updated' },
+    { label: '设置变更', value: 'project.setting.updated' },
+    { label: '成员变动', value: 'project.member' },
+  ].map(preset => (
+    <button
+      key={preset.value}
+      className="ink-tab"
+      onClick={() => onChange(preset.value)}
+    >
+      {preset.label}
+    </button>
+  ))}
+</div>
+```
+
+2. **优化文案**：
+```tsx
+// 原来（第183行）
+<p className="text-sm text-[var(--text-secondary)]">
+  actor: {item.actor_user_id ?? "system"} · details: {summarizeProjectAuditDetails(item.details)}
+</p>
 
 // 改进
-<span>操作人: {actor}</span>
+<p className="text-sm text-[var(--text-secondary)]">
+  操作人: {item.actor_user_id ?? "系统"} · 详情: {summarizeProjectAuditDetails(item.details)}
+</p>
 ```
+
+**影响范围**：
+- 仅涉及 `project-audit-panel.tsx` 一个文件
+- 不需要改后端接口
+- 预设标签可后续扩展
 
 ---
 
@@ -230,16 +261,15 @@ const presetFilters = [
 
 ## 五、实施优先级
 
+### ⭐ 最优先（可立即实施）
+
+- [ ] **审计页预设过滤标签**：在输入框上方添加"项目更新"、"设置变更"、"成员变动"等预设标签
+- [ ] **审计页文案优化**：`actor` → `操作人`，`details` → `详情`，`system` → `系统`
+
 ### P1 - 可选优化（非紧急）
 
-- [ ] 为项目设定字段添加分组视觉分隔
-- [ ] 审计页添加预设过滤项
+- [ ] 为项目设定字段添加分组视觉分隔（fieldset/legend）
 - [ ] AI 偏好显示当前继承状态
-
-### P2 - 低优先级
-
-- [ ] 移动端侧栏折叠体验优化（需确认设计方向）
-- [ ] 加载态骨架屏（当前 spinner 已可用）
 
 ---
 
