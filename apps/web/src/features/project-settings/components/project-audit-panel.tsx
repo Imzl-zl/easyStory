@@ -103,7 +103,7 @@ function AuditFilterBar({
             className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
               draftEventType === preset.value
                 ? 'bg-[var(--accent-ink)] text-white shadow-sm'
-                : 'bg-[var(--bg-soft)] text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:shadow-sm'
+                : 'bg-[var(--bg-muted)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:shadow-sm'
             }`}
             onClick={() => onChange(preset.value)}
             type="button"

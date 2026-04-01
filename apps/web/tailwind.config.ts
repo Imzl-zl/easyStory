@@ -8,6 +8,13 @@ const config: Config = {
     './src/features/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
+    screens: {
+      'sm': '640px',
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+      '2xl': '1600px',
+    },
     extend: {
       spacing: {
         'card-sm': '1rem',
@@ -78,6 +85,55 @@ const config: Config = {
       transitionTimingFunction: {
         'spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
         'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
+      },
+      animation: {
+        'fade-in': 'fadeIn 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+        'slide-up': 'slideUp 250ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'slide-in-left': 'slideInLeft 350ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'slide-from-left': 'slideFromLeft 500ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'slide-from-right': 'slideFromRight 500ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'ink-fade-in': 'inkFadeIn 400ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'ink-shimmer': 'inkShimmer 4s ease-in-out infinite',
+        'typing-pulse': 'typingPulse 1.4s ease-in-out infinite',
+        'stale-pulse': 'stalePulse 2.5s ease-in-out infinite',
+      },
+      keyframes: {
+        fadeIn: {
+          from: { opacity: '0', transform: 'translateY(6px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideUp: {
+          from: { opacity: '0', transform: 'translateY(12px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideInLeft: {
+          from: { opacity: '0', transform: 'translateX(-12px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        slideFromLeft: {
+          from: { opacity: '0', transform: 'translateX(-20px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        slideFromRight: {
+          from: { opacity: '0', transform: 'translateX(20px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        inkFadeIn: {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        inkShimmer: {
+          '0%, 100%': { transform: 'translateX(-100%)' },
+          '50%': { transform: 'translateX(100%)' },
+        },
+        typingPulse: {
+          '0%, 100%': { opacity: '0.4' },
+          '50%': { opacity: '1' },
+        },
+        stalePulse: {
+          '0%, 100%': { opacity: '1', transform: 'scale(1)' },
+          '50%': { opacity: '0.6', transform: 'scale(1.1)' },
+        },
       },
     },
   },
