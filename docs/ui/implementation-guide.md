@@ -45,7 +45,9 @@ src/app/workspace/
 ├── lobby/settings/page.tsx
 ├── lobby/config-registry/page.tsx
 ├── lobby/recycle-bin/page.tsx
-├── lobby/templates/page.tsx
+├── lobby/templates/
+│   ├── page.tsx
+│   └── [templateId]/page.tsx
 └── project/[projectId]/
     ├── studio/page.tsx
     ├── engine/page.tsx
@@ -61,6 +63,7 @@ src/app/workspace/
 - `code-block`
 - `dialog-shell`
 - `empty-state`
+- `guarded-link`
 - `page-header-shell`
 - `section-card`
 - `status-badge`
@@ -96,6 +99,8 @@ src/app/workspace/
 :root {
   --bg-canvas: #f8f6f1;
   --bg-surface: #ffffff;
+  --bg-surface-hover: rgba(61, 61, 61, 0.04);
+  --bg-surface-active: rgba(61, 61, 61, 0.08);
   --bg-muted: #f3f0e8;
   --bg-elevated: #ffffff;
 
@@ -115,6 +120,8 @@ src/app/workspace/
   --accent-success: #5a8a6b;
   --accent-warning: #c4883d;
   --accent-danger: #c45a5a;
+  --accent-purple: #9065b0;
+  --accent-pink: #d44c8f;
   --accent-ink: #5a9aaa;
 }
 ```
@@ -127,10 +134,10 @@ src/app/workspace/
 
 推荐类名语义：
 
-- 背景：`bg-canvas` `bg-surface` `bg-muted`
+- 背景：`bg-canvas` `bg-surface` `bg-surface-hover` `bg-surface-active` `bg-muted`
 - 边线：`border-line-soft` `border-line-strong`
 - 文字：`text-text-primary` `text-text-secondary`
-- 强调色：`bg-accent-primary` `text-accent-primary`
+- 强调色：`bg-accent-primary` `text-accent-primary` `bg-accent-purple` `bg-accent-pink`
 
 ### 3.4 全局样式职责
 
@@ -191,14 +198,15 @@ src/app/workspace/
 #### 规则 3：复杂局部样式允许继续使用 CSS Module
 
 当前仓库已经大量使用 `*.module.css`，尤其在这些区域：
-
 - `workspace-shell`
 - `lobby-page`
 - `incubator-page`
 - `studio-page`
 - `engine-page`
-
 这些文件是现状的一部分，不需要为了“全 Tailwind”强行回退。
+判断标准：
+- 适合继续用 CSS Module：复杂动画、伪元素组合、大片局部状态样式、已有大页面外壳
+- 适合优先用 Tailwind：布局、间距、断点切换、小型新组件、快速视觉迭代
 
 #### 规则 4：共享组件优先走真实 import 路径
 
@@ -227,6 +235,10 @@ src/app/**                          路由页面和装配入口
 - 跨多个 feature 复用，才进入 `src/components/ui/**`
 - 仍然强绑定某个页面语义，留在 `src/features/**`
 - 不为了“看起来像组件库”提前抽空壳组件
+命名规则：
+- 文件名使用 kebab-case，导出组件使用 PascalCase
+- 布局壳层继续使用 `-shell` 后缀，如 `dialog-shell`
+- 新共享组件不再新增 `app-` 前缀；现有 `app-select` 视为历史命名，先不强改
 
 ### 5.3 示例
 
@@ -256,6 +268,15 @@ export function SurfaceCard({ className, children }: SurfaceCardProps) {
 
 ## 6. 页面开发检查清单
 
+### 6.0 响应式与性能基线
+
+| 断点 | 宽度 | 前缀 | 布局策略 |
+|---|---|---|---|
+| 移动端 | `< 768px` | 默认 | 垂直堆叠，正文优先 |
+| 平板 | `768px - 1023px` | `md:` | 收窄侧栏或助手栏 |
+| 桌面 | `>= 1024px` | `lg:` | 保持完整三栏 |
+| 大屏 | `>= 1440px` | `xl:` | 控制内容最大宽度 |
+
 ### 6.1 开发前
 
 - [ ] 先看 `docs/ui/ui-design.md`，确认页面语义
@@ -270,6 +291,8 @@ export function SurfaceCard({ className, children }: SurfaceCardProps) {
 - [ ] 局部复杂样式按需使用 CSS Module
 - [ ] 模型、工具、上传等会话控件靠近输入区，不抢正文主位
 - [ ] 页面文案保持创作者语义
+- [ ] 避免堆运行时 style 对象；大块视觉优先走 Tailwind 或 CSS Module
+- [ ] 新增大型编辑器或重组件时优先考虑动态导入，避免压首屏
 
 ### 6.3 开发后
 
