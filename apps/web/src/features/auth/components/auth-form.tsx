@@ -85,7 +85,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
 function AuthHero({ copy }: Readonly<{ copy: AuthCopy }>) {
   return (
-    <section className="relative overflow-hidden border border-[rgba(61,61,61,0.09)] rounded-[28px] bg-[rgba(255,255,255,0.82)] shadow-[0_18px_48px_rgba(72,52,28,0.06)] backdrop-blur-xl p-9 flex flex-col justify-between gap-7">
+    <section className="hero-card p-9 flex flex-col justify-between gap-7">
       <div className="absolute -right-10 -bottom-14 w-[180px] h-[180px] rounded-full bg-[rgba(90,122,107,0.08)]" />
       <div className="flex items-center gap-3.5">
         <span className="inline-flex items-center justify-center w-12 h-12 rounded-4 bg-gradient-to-br from-[rgba(90,122,107,0.92)] to-[rgba(75,94,88,0.92)] text-white text-[15px] font-semibold tracking-[0.12em]">ES</span>
@@ -95,7 +95,7 @@ function AuthHero({ copy }: Readonly<{ copy: AuthCopy }>) {
         </div>
       </div>
       <div className="max-w-[620px]">
-        <p className="text-[var(--accent-secondary)] text-[11px] tracking-[0.28em] uppercase">写作者入口</p>
+        <p className="label-overline">写作者入口</p>
         <h1 className="mt-4.5 font-serif text-[clamp(2.6rem,5vw,4.4rem)] font-semibold leading-tight">{copy.heroTitle}</h1>
         <p className="max-w-[580px] mt-4.5 text-[var(--text-secondary)] text-base leading-relaxed">{copy.description}</p>
       </div>
@@ -151,9 +151,9 @@ function AuthPanel({
 
   return (
     <section className="flex items-center justify-center">
-      <div className="relative overflow-hidden w-full max-w-[460px] border border-[rgba(61,61,61,0.09)] rounded-[26px] bg-[rgba(255,255,255,0.82)] shadow-[0_18px_48px_rgba(72,52,28,0.06)] backdrop-blur-xl p-8">
+      <div className="hero-card w-full max-w-[460px] p-8">
         <div className="mb-7">
-          <p className="text-[var(--accent-secondary)] text-[11px] tracking-[0.28em] uppercase">easyStory</p>
+          <p className="label-overline">easyStory</p>
           <h2 className="mt-3.5 font-serif text-[34px] font-semibold">{copy.formTitle}</h2>
           <p className="mt-3 text-[var(--text-secondary)] text-sm leading-relaxed">登录后直接进入书架，继续上次创作。</p>
         </div>
@@ -197,7 +197,7 @@ function AuthPanel({
             onChange={onPasswordChange}
           />
           {errorMessage ? <ErrorNotice message={errorMessage} /> : null}
-          <button className="min-h-[50px] border-none rounded-4 bg-gradient-to-br from-[var(--accent-primary)] to-[#47665a] text-white text-[15px] font-semibold cursor-pointer transition-all hover:-translate-y-px hover:shadow-[0_18px_26px_rgba(71,102,90,0.18)] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none" disabled={isPending} type="submit">
+          <button className="ink-button-hero w-full" disabled={isPending} type="submit">
             {isPending ? "处理中..." : copy.submitLabel}
           </button>
         </form>
