@@ -62,7 +62,7 @@ export function LobbyProjectShelf({
 
 function ProjectShelfEmptyState({ deletedOnly }: Readonly<{ deletedOnly: boolean }>) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 px-6 rounded-[28px] bg-[rgba(255,255,255,0.62)] shadow-[inset_0_0_0_1px_rgba(61,61,61,0.06)] text-center">
+    <div className="flex flex-col items-center justify-center py-24 px-6 rounded-5xl bg-[rgba(255,255,255,0.62)] shadow-[inset_0_0_0_1px_rgba(61,61,61,0.06)] text-center">
       <div className="flex w-[4.2rem] h-[4.2rem] items-center justify-center mb-4 rounded-5 bg-[rgba(90,122,107,0.08)] text-[var(--accent-primary)]">
         <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -94,7 +94,7 @@ function LobbyProjectCard({
 
   return (
     <article
-      className={`flex min-w-0 flex-col overflow-hidden rounded-[28px] bg-[var(--project-card-surface,rgba(255,253,251,0.92))] shadow-[inset_0_0_0_1px_rgba(61,61,61,0.07),0_14px_28px_-24px_rgba(61,61,61,0.32)] transition-all hover:-translate-y-0.5 hover:shadow-[inset_0_0_0_1px_rgba(61,61,61,0.09),0_18px_30px_-24px_rgba(61,61,61,0.28)] ${isDeleted ? "bg-[rgba(248,246,241,0.92)]" : ""}`}
+      className={`flex min-w-0 flex-col overflow-hidden rounded-5xl bg-[var(--project-card-surface,rgba(255,253,251,0.92))] shadow-[inset_0_0_0_1px_rgba(61,61,61,0.07),0_14px_28px_-24px_rgba(61,61,61,0.32)] transition-all hover:-translate-y-0.5 hover:shadow-[inset_0_0_0_1px_rgba(61,61,61,0.09),0_18px_30px_-24px_rgba(61,61,61,0.28)] ${isDeleted ? "bg-[rgba(248,246,241,0.92)]" : ""}`}
       style={
         {
           "--project-card-accent": tone.accent,

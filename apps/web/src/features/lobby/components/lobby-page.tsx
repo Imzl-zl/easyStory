@@ -106,11 +106,11 @@ export function LobbyPage() {
           </div>
         </header>
 
-        <section className="grid [grid-template-columns:minmax(0,1fr)_auto] gap-4 items-stretch p-4 px-[1.1rem] rounded-[26px] bg-[rgba(255,255,255,0.58)] shadow-[inset_0_0_0_1px_rgba(61,61,61,0.06)]">
+        <section className="grid [grid-template-columns:minmax(0,1fr)_auto] gap-4 items-stretch p-4 px-[1.1rem] rounded-5xl bg-[rgba(255,255,255,0.58)] shadow-[inset_0_0_0_1px_rgba(61,61,61,0.06)]">
           <label className="grid gap-[0.55rem] min-w-0">
             <span className="text-[var(--text-tertiary)] text-[0.68rem] font-semibold tracking-[0.14em] uppercase">搜索作品</span>
             <input
-              className="w-full min-h-12 px-4 border border-[rgba(61,61,61,0.08)] rounded-[18px] bg-[rgba(255,255,255,0.86)] text-[var(--text-primary)] text-[0.95rem] transition-all hover:border-[var(--line-strong)] focus:border-[var(--accent-primary)] focus:shadow-[0_0_0_3px_rgba(90,122,107,0.12)] focus:outline-none placeholder:text-[var(--text-placeholder)]"
+              className="ink-input min-h-12 rounded-xl text-[0.95rem]"
               placeholder="搜索作品名、题材或模板…"
               value={model.searchText}
               onChange={(event) => model.setSearchText(event.target.value)}
