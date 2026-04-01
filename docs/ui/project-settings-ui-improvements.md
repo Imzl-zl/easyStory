@@ -1,22 +1,27 @@
 # 项目设置页面 UI 改进实施指南
 
+> 本文档经源码核查，已修正问题分级和解决方案。
+
 ## 快速总结
 
-✅ **好消息**：你的设计文档与源码高度一致，**没有明显走样**！
+✅ **好消息**：你的设计文档与源码高度一致，**没有严重问题**！
 
-⚠️ **改进空间**：3 个高优先级问题 + 5 个中低优先级建议
+🟡 **需澄清**：原文档中部分"问题"实为优化建议，且部分解决方案与当前设计方向冲突。
+
+✅ **真实存在**：审计过滤器偏技术向、移动端体验可优化
 
 ---
 
-## 问题 1：内容卡片宽度未限制 🔴 高优先级
+## 一、需要修正的错误认知
 
-### 问题描述
-在超宽屏幕（> 1600px）上，内容卡片会无限扩展，导致：
-- 文本行过长，阅读困难
-- 表单字段过宽，输入体验差
-- 与设计规范中的"800px 限宽"不符
+### ❌ 错误认知 1：内容卡片需要添加 900px 限宽
 
-### 当前代码
+**原文档声称**：
+> 在超宽屏幕（> 1600px）上，内容卡片会无限扩展
+
+**源码实际情况**：
+
+`.contentCard`（`project-settings-page.module.css` 第 234-243 行）：
 ```css
 .contentCard {
   position: relative;
@@ -24,431 +29,158 @@
   background: var(--bg-surface);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
-  /* 没有 max-width */
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  /* 确实没有 max-width */
 }
 ```
 
-### 改进方案
-```css
-.contentCard {
-  position: relative;
-  padding: 1.5rem;
-  background: var(--bg-surface);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  max-width: 900px;  /* 添加这一行 */
-  margin: 0 auto;    /* 添加这一行 */
-  width: 100%;       /* 添加这一行 */
-}
-```
+**但不需要修复**，因为：
+1. `SectionCard` 内部已经有 `max-w-4xl`（约 896px）限制
+2. 字段网格 `md:grid-cols-2` 自然限制了单行宽度
+3. `project-settings-ui-redesign.md` 明确指出"不适合再对外层内容卡施加统一 `800px` 限宽"
 
-### 为什么是 900px？
-- 文本最佳阅读宽度：65-75 个字符 ≈ 600-800px
-- 加上表单字段和间距：900px 是合理的上限
-- 与设计规范中的建议一致
-
-### 实施步骤
-1. 打开 `apps/web/src/features/project-settings/components/project-settings-page.module.css`
-2. 在 `.contentCard` 规则中添加上述三行
-3. 在各个断点处测试（1024px、768px、640px）
+**结论**：这不是问题，无需修复。
 
 ---
 
-## 问题 2：各标签页表单字段间距不统一 🔴 高优先级
+### ❌ 错误认知 2：Skills/MCP 间距与其它标签页不一致
 
-### 问题描述
-- Skills/MCP 的字段间距与其他标签页不一致
-- 导致视觉不统一，用户体验割裂
+**原文档声称**：
+> Skills/MCP 的字段间距约为 0.75rem，不一致
 
-### 当前情况
-```
-项目设定：字段间距 ≈ 1rem
-规则：字段间距 ≈ 1.5rem
-AI偏好：字段间距 ≈ 1rem
-Skills：字段间距 ≈ 0.75rem（不一致！）
-MCP：字段间距 ≈ 0.75rem（不一致！）
-```
+**实际情况**：
+- 原文档未提供具体源码位置
+- `project-setting-editor.tsx` 中使用 `grid gap-5` (1.25rem)
+- Skills/MCP 使用的是 `AssistantSkillsPanel` / `AssistantMcpPanel` 组件，内部结构不同
 
-### 改进方案
-
-#### 方案 A：建立全局表单字段间距规范
-在 `globals.css` 中添加：
-```css
-:root {
-  --form-field-gap: 1rem;      /* 字段间距 */
-  --form-section-gap: 1.5rem;  /* 分组间距 */
-  --form-group-gap: 0.5rem;    /* 组内间距 */
-}
-```
-
-#### 方案 B：创建表单字段容器组件
-```css
-.formFieldGroup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--form-field-gap);
-}
-
-.formFieldGroup--section {
-  gap: var(--form-section-gap);
-  padding-bottom: var(--form-section-gap);
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.formFieldGroup--section:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-```
-
-#### 方案 C：统一各组件的间距
-在各个组件中使用统一的间距：
-```css
-/* AssistantSkillsPanel 中 */
-.skillsForm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--form-field-gap);
-}
-
-/* AssistantMcpPanel 中 */
-.mcpForm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--form-field-gap);
-}
-```
-
-### 实施步骤
-1. 在 `globals.css` 中定义表单间距变量
-2. 在各个组件中使用这些变量
-3. 进行视觉回归测试
+**结论**：缺少具体证据，问题存在性存疑。
 
 ---
 
-## 问题 3：移动端 < 640px 的布局优化 🔴 高优先级
+## 二、真实存在的问题
 
-### 问题描述
-在手机屏幕上（< 640px）：
-- 侧栏占用过多空间
-- 内容区域被压缩
-- 用户体验不佳
+### 🟡 问题 1：移动端 < 768px 布局可继续优化
 
-### 当前代码
+**源码证据**：
+
+当前 `project-settings-page.module.css` 第 297-325 行：
 ```css
 @media (max-width: 767px) {
   .page {
     gap: 1rem;
     padding: 0.75rem;
   }
-  /* 侧栏仍然显示 */
+
+  .sidebarCard,
+  .contentCard {
+    padding: 1rem;
+  }
+  /* 侧栏仍然显示，只是尺寸缩小 */
 }
 ```
 
-### 改进方案
+**现状**：
+- 侧栏不会隐藏，只会在小屏幕下排到内容区上方
+- 当前设计方向是"侧栏不隐藏"
 
-#### 方案 A：隐藏侧栏（推荐）
-```css
-@media (max-width: 640px) {
-  .page {
-    grid-template-columns: 1fr;
-  }
-  
-  .sidebar {
-    display: none;
-  }
-  
-  .content {
-    width: 100%;
-  }
-}
-```
+**优化建议**（可选，非必须）：
 
-#### 方案 B：改为抽屉式侧栏
+若要进一步优化，可考虑在 `<= 640px` 时将侧栏改为折叠式：
 ```css
 @media (max-width: 640px) {
   .sidebar {
-    position: fixed;
-    left: -280px;
-    top: 0;
-    width: 280px;
-    height: 100vh;
-    background: var(--bg-surface);
-    border-right: 1px solid var(--line-soft);
-    transition: left 0.3s ease;
-    z-index: 100;
-  }
-  
-  .sidebar.open {
-    left: 0;
+    /* 改为可折叠，而不是隐藏 */
   }
 }
 ```
 
-#### 方案 C：改为底部标签栏
-```css
-@media (max-width: 640px) {
-  .page {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
-    padding-bottom: 0;
-  }
-  
-  .sidebar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    height: auto;
-    border-top: 1px solid var(--line-soft);
-    border-radius: 0;
-  }
-  
-  .tabList {
-    flex-direction: row;
-    overflow-x: auto;
-  }
-}
-```
-
-### 推荐方案
-**方案 A（隐藏侧栏）** 最简单，用户可以通过顶部导航返回。
-
-### 实施步骤
-1. 在 `project-settings-page.module.css` 中添加 `@media (max-width: 640px)` 规则
-2. 选择合适的方案实施
-3. 在真实手机上测试
+但这与 `project-settings-ui-redesign.md` 的设计方向可能冲突，实施前需确认。
 
 ---
 
-## 建议 1：增强字段分组的语义 🟡 中优先级
+## 三、优化建议（非问题）
 
-### 当前问题
-项目设定页面的字段是平铺排列的，没有明确的分组：
+以下内容不属于"审查报错"，而是可选的体验提升：
+
+### 🟡 建议 1：增强项目设定字段分组的语义
+
+**现状**（`project-setting-editor.tsx` 第 161-274 行）：
+```tsx
+<div className="grid gap-5 md:grid-cols-2">
+  <ProjectSettingField label="题材">...</ProjectSettingField>
+  <ProjectSettingField label="子题材">...</ProjectSettingField>
+  {/* 四组字段平铺排列，没有视觉分组 */}
+</div>
 ```
-题材、子题材、目标读者、整体语气
-主角姓名、主角身份
-世界名称、力量体系
-目标字数、目标章节
-```
 
-### 改进方案
+**当前结构**：
+- 基本信息：题材、子题材、目标读者、整体语气
+- 角色设定：主角姓名、主角身份
+- 世界观：世界名称、力量体系
+- 规模设定：目标字数、目标章节
 
-#### 方案 A：使用 fieldset + legend
+**可选改进**：为四组短字段添加视觉分隔或 `fieldset/legend`
+
 ```html
 <fieldset>
-  <legend>基础信息</legend>
-  <div class="formFieldGroup">
-    <input name="theme" />
-    <input name="subTheme" />
-  </div>
-</fieldset>
-
-<fieldset>
-  <legend>角色设定</legend>
-  <div class="formFieldGroup">
-    <input name="characterName" />
-    <input name="characterRole" />
+  <legend>基本信息</legend>
+  <div className="grid gap-5 md:grid-cols-2">
+    <ProjectSettingField label="题材">...</ProjectSettingField>
+    {/* ... */}
   </div>
 </fieldset>
 ```
 
-#### 方案 B：使用卡片分组
-```html
-<div class="formSection">
-  <h3 class="formSectionTitle">📋 基础信息</h3>
-  <div class="formFieldGroup">
-    <input name="theme" />
-    <input name="subTheme" />
-  </div>
-</div>
-
-<div class="formSection">
-  <h3 class="formSectionTitle">🎨 角色设定</h3>
-  <div class="formFieldGroup">
-    <input name="characterName" />
-    <input name="characterRole" />
-  </div>
-</div>
-```
-
-#### 方案 C：使用视觉分隔线
-```css
-.formFieldGroup--section {
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.formFieldGroup--section:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-```
-
-### 推荐方案
-**方案 B（卡片分组）** 最直观，用户能清楚看到字段分组。
-
-### 实施步骤
-1. 修改 `ProjectSettingEditor` 组件
-2. 添加分组标题和样式
-3. 进行视觉测试
+**注意**：这不影响功能，属于语义化增强。
 
 ---
 
-## 建议 2：改进加载态 🟡 中优先级
+### 🟡 建议 2：改进审计页过滤器
 
-### 当前代码
-```tsx
-<div className={styles.loadingText}>
-  <div className="flex items-center justify-center gap-2">
-    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin opacity-50" />
-    <span>正在加载项目设定...</span>
-  </div>
-</div>
-```
-
-### 改进方案
-
-#### 方案 A：添加骨架屏
-```tsx
-<div className={styles.contentCard}>
-  <div className={styles.skeleton}>
-    <div className={styles.skeletonLine} />
-    <div className={styles.skeletonLine} style={{ width: '80%' }} />
-    <div className={styles.skeletonLine} style={{ marginTop: '1rem' }} />
-    <div className={styles.skeletonLine} />
-  </div>
-</div>
-```
-
-```css
-.skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.skeletonLine {
-  height: 1rem;
-  background: linear-gradient(
-    90deg,
-    var(--bg-muted) 0%,
-    var(--bg-surface) 50%,
-    var(--bg-muted) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: var(--radius-md);
-}
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-```
-
-#### 方案 B：改进加载文本
-```tsx
-<div className={styles.loadingContainer}>
-  <div className={styles.loadingSpinner} />
-  <p className={styles.loadingText}>正在加载项目设定...</p>
-  <p className={styles.loadingHint}>这通常需要 1-2 秒</p>
-</div>
-```
-
-### 推荐方案
-**方案 A（骨架屏）** 能显著提升感知性能。
-
----
-
-## 建议 3：增强可访问性 🟡 中优先级
-
-### 当前问题
-- 缺少 ARIA 标签
-- 键盘导航可能不完善
-- 屏幕阅读器支持不足
-
-### 改进方案
-
-#### 添加 ARIA 标签
-```html
-<!-- 侧栏 -->
-<nav className={styles.sidebar} aria-label="项目设置导航">
-  <div role="tablist">
-    <button role="tab" aria-selected={tab === 'setting'}>
-      设置
-    </button>
-  </div>
-</nav>
-
-<!-- 内容区 -->
-<main className={styles.content} role="main">
-  <div className={styles.contentCard} role="region" aria-label="项目设置内容">
-    {/* 内容 */}
-  </div>
-</main>
-```
-
-#### 改进键盘导航
-```tsx
-const handleKeyDown = (e: React.KeyboardEvent) => {
-  if (e.key === 'ArrowDown') {
-    // 移动到下一个标签
-  } else if (e.key === 'ArrowUp') {
-    // 移动到上一个标签
-  } else if (e.key === 'Enter' || e.key === ' ') {
-    // 激活标签
-  }
-};
-```
-
----
-
-## 建议 4：优化审计页过滤器 🟡 中优先级
-
-### 当前问题
+**现状**（`ProjectAuditPanel`）：
 - 过滤器是文本输入，需要用户知道事件名
-- 用户体验不友好
+- `actor`、`details` 等文案偏内部视角
 
-### 改进方案
+**优化方向**：
 
-#### 添加预设过滤项
+1. 添加预设过滤项（不需要改后端，只改前端）：
 ```tsx
 const presetFilters = [
+  { label: '全部', value: null },
   { label: '项目更新', value: 'project.updated' },
-  { label: '设置更新', value: 'project.setting.updated' },
-  { label: '规则更新', value: 'project.rules.updated' },
-  { label: '所有操作', value: null },
+  { label: '设置变更', value: 'project.setting' },
 ];
-
-<div className={styles.filterPresets}>
-  {presetFilters.map(filter => (
-    <button
-      key={filter.value}
-      onClick={() => onEventTypeChange(filter.value)}
-      className={filter.value === eventType ? styles.active : ''}
-    >
-      {filter.label}
-    </button>
-  ))}
-</div>
 ```
 
-#### 改进空状态
+2. 优化字段文案：
 ```tsx
-<div className={styles.emptyState}>
-  <div className={styles.emptyIcon}>📋</div>
-  <h3>暂无操作记录</h3>
-  <p>项目的所有操作都会在这里显示</p>
-</div>
+// 原来
+<span>操作者: {actor}</span>
+
+// 改进
+<span>操作人: {actor}</span>
 ```
 
 ---
 
-## 建议 5：添加微交互动画 🟢 低优先级
+### 🟡 建议 3：AI 偏好的继承状态可见性
 
-### 当前代码
+**现状**（`AssistantPreferencesPanel`）：
+- "留空即继承个人设置"只体现在说明文案里
+- 用户很难一眼看出自己是否正在继承默认值
+
+**优化方向**：
+- 在字段旁显示"当前值：继承个人偏好"或"当前值：[具体模型名]"
+- 这是可见性优化，不需要改数据结构
+
+---
+
+## 四、已有实现，无需重复
+
+### ✅ 动画已存在
+
+源码证据（`project-settings-page.module.css` 第 352-358 行）：
 ```css
 .sidebar {
   animation: slideInLeft 0.35s cubic-bezier(0.16, 1, 0.3, 1);
@@ -459,91 +191,75 @@ const presetFilters = [
 }
 ```
 
-### 改进方案
+---
 
-#### 添加标签页切换动画
-```css
-@keyframes tabSwitch {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
+### ✅ 加载态已实现
 
-.contentCard {
-  animation: tabSwitch 0.25s ease-out;
-}
-```
-
-#### 添加按钮悬停效果
-```css
-.actionButton {
-  transition: all var(--transition-fast);
-}
-
-.actionButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.actionButton:active {
-  transform: translateY(0);
-}
+源码证据（`project-settings-content.tsx` 第 46-55 行）：
+```tsx
+<div className={styles.contentCard}>
+  <div className={styles.loadingText}>
+    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin opacity-50" />
+    <span>正在加载项目设定...</span>
+  </div>
+</div>
 ```
 
 ---
 
-## 实施优先级和时间表
+### ✅ 响应式断点已实现
 
-### 第一阶段（立即改进）- 1-2 天
-- [ ] 问题 1：添加内容卡片宽度限制
-- [ ] 问题 2：统一表单字段间距
-- [ ] 问题 3：优化移动端 < 640px 布局
-
-### 第二阶段（重要改进）- 3-5 天
-- [ ] 建议 1：增强字段分组语义
-- [ ] 建议 2：改进加载态
-- [ ] 建议 3：增强可访问性
-
-### 第三阶段（体验优化）- 5-7 天
-- [ ] 建议 4：优化审计页过滤器
-- [ ] 建议 5：添加微交互动画
-- [ ] 进行完整的视觉回归测试
+源码证据（`project-settings-page.module.css`）：
+- `<= 1023px`：单列布局
+- `<= 767px`：间距收紧
 
 ---
 
-## 测试清单
+## 五、实施优先级
 
-### 视觉测试
-- [ ] 桌面端（1920px）：内容卡片宽度正确
-- [ ] 平板端（1024px）：布局正确
-- [ ] 手机端（640px）：侧栏隐藏或改为抽屉式
-- [ ] 手机端（375px）：极端宽度测试
+### P1 - 可选优化（非紧急）
+
+- [ ] 为项目设定字段添加分组视觉分隔
+- [ ] 审计页添加预设过滤项
+- [ ] AI 偏好显示当前继承状态
+
+### P2 - 低优先级
+
+- [ ] 移动端侧栏折叠体验优化（需确认设计方向）
+- [ ] 加载态骨架屏（当前 spinner 已可用）
+
+---
+
+## 六、测试清单
+
+### 布局测试
+- [ ] 桌面端（1920px）：布局正常
+- [ ] 平板端（1024px）：单列布局正确
+- [ ] 手机端（375px）：侧栏和内容区比例合适
 
 ### 交互测试
 - [ ] 标签页切换：动画流畅
-- [ ] 表单输入：焦点状态清晰
-- [ ] 按钮悬停：反馈明显
-- [ ] 键盘导航：Tab 键可以导航
+- [ ] 保存按钮：loading 状态正常
+- [ ] 错误提示：AppNotice 正常显示
 
-### 可访问性测试
-- [ ] 屏幕阅读器：能正确读出内容
-- [ ] 键盘导航：所有功能可用键盘操作
-- [ ] 颜色对比：满足 WCAG AA 标准
-- [ ] 动画：支持 `prefers-reduced-motion`
+### 功能测试
+- [ ] 项目设定：保存后完整度更新
+- [ ] 规则：启用开关正常
+- [ ] Skills/MCP：列表和编辑器正常
+- [ ] 审计：过滤功能正常
 
 ---
 
-## 总结
+## 七、结论
 
-你的设计文档质量很高，与源码高度一致。通过实施这些改进建议，可以进一步提升用户体验和代码质量。
+| 原文档声称 | 实际情况 |
+|-----------|---------|
+| 内容卡片宽度需限制 | ❌ 误报，设计已通过内部组件限制 |
+| 间距不统一 | ❓ 缺少证据，存疑 |
+| 移动端需隐藏侧栏 | ⚠️ 与当前设计方向冲突 |
+| 加载态需改进 | ❌ 已有 spinner |
+| 动画需添加 | ❌ 已有 fadeIn/slideInLeft |
+| 字段分组需优化 | 🟡 优化建议，非问题 |
+| 审计过滤器需优化 | ✅ 真实有价值建议 |
 
-**建议优先级**：
-1. 🔴 问题 1-3（必须改进）
-2. 🟡 建议 1-3（重要改进）
-3. 🟢 建议 4-5（体验优化）
-
+**总体评估**：页面基础扎实，主要问题在于原文档把优化建议包装成问题，且部分建议与设计方向冲突。
