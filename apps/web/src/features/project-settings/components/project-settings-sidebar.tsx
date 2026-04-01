@@ -116,7 +116,7 @@ export function ProjectSettingsSidebar({
 
       <div className="mt-4 space-y-2">
         <GuardedLink
-          className="inline-flex items-center gap-1.5 h-8 px-3 border border-[var(--line-soft)] rounded-[var(--radius-md)] bg-[var(--bg-surface)] text-[var(--text-secondary)] cursor-pointer text-[0.8125rem] font-medium font-inherit leading-none transition-all hover:bg-[var(--bg-surface-hover)] hover:border-[var(--line-strong)] hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--accent-primary)] focus-visible:outline-offset-2 no-underline w-full justify-center"
+          className="ink-link-button w-full justify-center"
           href={`/workspace/project/${projectId}/studio?panel=setting`}
           isDirty={isDirty}
           onNavigate={onNavigate}
@@ -125,7 +125,7 @@ export function ProjectSettingsSidebar({
           进入编辑器
         </GuardedLink>
         <GuardedLink
-          className="inline-flex items-center gap-1.5 h-8 px-3 border border-[var(--line-soft)] rounded-[var(--radius-md)] bg-[var(--bg-surface)] text-[var(--text-secondary)] cursor-pointer text-[0.8125rem] font-medium font-inherit leading-none transition-all hover:bg-[var(--bg-surface-hover)] hover:border-[var(--line-strong)] hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--accent-primary)] focus-visible:outline-offset-2 no-underline w-full justify-center"
+          className="ink-link-button w-full justify-center"
           href={`/workspace/project/${projectId}/engine`}
           isDirty={isDirty}
           onNavigate={onNavigate}
@@ -134,7 +134,7 @@ export function ProjectSettingsSidebar({
           打开执行器
         </GuardedLink>
         <GuardedLink
-          className="inline-flex items-center gap-1.5 h-8 px-3 border border-[var(--line-soft)] rounded-[var(--radius-md)] bg-[var(--bg-surface)] text-[var(--text-secondary)] cursor-pointer text-[0.8125rem] font-medium font-inherit leading-none transition-all hover:bg-[var(--bg-surface-hover)] hover:border-[var(--line-strong)] hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-[var(--accent-primary)] focus-visible:outline-offset-2 no-underline w-full justify-center"
+          className="ink-link-button w-full justify-center"
           href={`/workspace/lobby/settings?tab=credentials&scope=project&project=${projectId}&sub=list`}
           isDirty={isDirty}
           onNavigate={onNavigate}
