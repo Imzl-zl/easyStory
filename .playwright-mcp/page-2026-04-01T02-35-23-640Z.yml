@@ -1,0 +1,4 @@
+- generic [ref=e3]:
+  - paragraph [ref=e4]: 登录状态
+  - heading "正在确认你的登录状态" [level=1] [ref=e5]
+  - paragraph [ref=e6]: 如果当前没有可用会话，会自动回到登录页。
