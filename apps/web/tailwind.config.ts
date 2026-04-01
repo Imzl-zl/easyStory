@@ -71,6 +71,11 @@ const config: Config = {
         sm: 'var(--radius-sm)',
         md: 'var(--radius-md)',
         lg: 'var(--radius-lg)',
+        xl: '12px',
+        '2xl': '16px',
+        '3xl': '20px',
+        '4xl': '24px',
+        '5xl': '28px',
       },
       boxShadow: {
         xs: 'var(--shadow-xs)',
