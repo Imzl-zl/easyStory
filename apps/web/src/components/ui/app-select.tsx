@@ -66,7 +66,7 @@ export function AppSelect({
       size="default"
       triggerProps={{
         autoAlignPopupMinWidth: true,
-        className: "p-[0.28rem] border border-[rgba(101,92,82,0.12)] rounded-4 bg-[rgba(255,251,245,0.98)] shadow-[0_16px_30px_rgba(58,45,29,0.12)] backdrop-blur-xl",
+        className: "p-[0.28rem] border border-[var(--dropdown-border)] rounded-4 bg-[var(--dropdown-bg)] shadow-[var(--dropdown-shadow)] backdrop-blur-xl",
       }}
       value={resolvedValue}
       renderFormat={() => (

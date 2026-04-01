@@ -24,6 +24,9 @@ const config: Config = {
         'gap-sm': '0.75rem',
         'gap-md': '1rem',
         'gap-lg': '1.5rem',
+        'section-sm': '2rem',
+        'section-md': '2.5rem',
+        'section-lg': '3rem',
       },
       colors: {
         canvas: 'var(--bg-canvas)',
