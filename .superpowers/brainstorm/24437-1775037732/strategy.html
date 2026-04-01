@@ -1,0 +1,34 @@
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:2rem">
+  <h2>UI 优化方案确认</h2>
+  <p class="subtitle" style="text-align:center;max-width:600px">
+    目前的基础样式统一和冗余 CSS 清理已经完成（大赞！）。<br>
+    虽然代码结构清爽了，但因为移除了大量特定的模块级样式，目前页面（特别是表单、面板和一些细节部分）显得有些“素”或排版错乱。<br><br>
+    接下来的优化，你希望按照哪种粒度来进行？
+  </p>
+
+  <div class="options">
+    <div class="option" data-choice="incremental" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>小步快跑（推荐）</h3>
+        <p>每次只聚焦一个组件或一个页面（比如先搞定“项目设定”的表单排版，再弄“AI偏好”），这样改动可控，容易验证，也不会因为一次改动太多导致新的冲突。</p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="systematic" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>系统性铺开</h3>
+        <p>先统一定义所有基础元素的类（如所有的表单域、所有的面板卡片等），然后一次性应用到所有页面。虽然动作大，但能快速达到全局视觉统一。</p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="specific" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>特定痛点修复</h3>
+        <p>你直接指出当前觉得“最 low”或“最乱”的那个页面/组件，我直接切入那个点进行深度优化。比如：先修 Studio 页面的侧边栏，或者先修设置页的表单对齐。</p>
+      </div>
+    </div>
+  </div>
+</div>

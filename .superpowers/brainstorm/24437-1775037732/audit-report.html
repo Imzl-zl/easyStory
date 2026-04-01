@@ -1,0 +1,144 @@
+<h2>easyStory 前端 UI 全面审查报告</h2>
+<p class="subtitle">基于源码逐页分析，按严重程度排序</p>
+
+<!-- ====== CRITICAL ====== -->
+<div class="section">
+  <h3 style="color:#c45a5a">🔴 严重问题（视觉/布局明显异常）</h3>
+
+  <div class="options">
+    <div class="option" data-choice="issue-1" onclick="toggleSelect(this)">
+      <div class="letter">1</div>
+      <div class="content">
+        <h3>项目设置页：侧边栏双重 sticky + 双重圆角</h3>
+        <p><code>project-settings-page.tsx:92</code> 外层已经 <code>sticky top-6</code>，而 <code>project-settings-sidebar.tsx:43</code> 内层又 <code>sticky top-6</code>，造成双重定位冲突。<br>
+        同时侧边栏 <code>rounded-[24px]</code> 在设置页语境下过于膨胀（与 lobby 的 <code>rounded-[28px]</code> 不是同一套圆角系统）。</p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="issue-2" onclick="toggleSelect(this)">
+      <div class="letter">2</div>
+      <div class="content">
+        <h3>GuardedLink 按钮：巨量重复内联样式</h3>
+        <p><code>project-settings-sidebar.tsx:119-143</code> 三个 GuardedLink 各自包含一模一样的 ~200 字符内联 className。<br>
+        这不仅是维护灾难，任何微调都需要改三处。应提取为全局类（如 <code>ink-link-button</code>）或 Tailwind <code>@apply</code>。</p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="issue-3" onclick="toggleSelect(this)">
+      <div class="letter">3</div>
+      <div class="content">
+        <h3>Studio 页面：硬编码三栏 + body 纹理重复</h3>
+        <p><code>studio-page.tsx:118</code> 用 <code>[grid-template-columns:260px_1fr_380px]</code> 无响应式断点，<strong>平板和窄屏直接裂开</strong>。<br>
+        <code>studio-page.tsx:119</code> 手动重复了 body 的噪声纹理 SVG（已在 globals.css body::before 定义），造成双层纹理叠加。</p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="issue-4" onclick="toggleSelect(this)">
+      <div class="letter">4</div>
+      <div class="content">
+        <h3>Lobby 侧边栏：搜索框自定义样式 vs ink-input 不一致</h3>
+        <p><code>lobby-page.tsx:113</code> 搜索框使用了一套独立的圆角 (<code>rounded-[18px]</code>)、高度 (<code>min-h-12</code>) 和内边距，与全局 <code>.ink-input</code> 的 <code>rounded-md min-h-9</code> 完全不同。<br>
+        造成同一产品内两套输入框视觉系统。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== IMPORTANT ====== -->
+<div class="section">
+  <h3 style="color:#c4883d">🟡 重要问题（不一致 / 可维护性差）</h3>
+
+  <div class="options">
+    <div class="option" data-choice="issue-5" onclick="toggleSelect(this)">
+      <div class="letter">5</div>
+      <div class="content">
+        <h3>圆角系统混乱：至少 5 套并行体系</h3>
+        <p>globals.css 定义了 <code>--radius-xs/sm/md/lg</code> (3-8px)，但各页面硬编码了 <code>rounded-[18px]</code>, <code>rounded-[22px]</code>, <code>rounded-[24px]</code>, <code>rounded-[26px]</code>, <code>rounded-[28px]</code>。<br>
+        这些数值缺少对应的 token 或 Tailwind 配置，几乎不可能统一调整。</p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="issue-6" onclick="toggleSelect(this)">
+      <div class="letter">6</div>
+      <div class="content">
+        <h3>阴影系统不统一</h3>
+        <p>Tailwind 配置了 <code>shadow-xs/sm/md/lg</code>，但各组件大量使用 <code>shadow-[0_18px_48px_rgba(...)]</code> 等硬编码值。<br>
+        特别是 auth、engine、lab、incubator 共用了一套"hero 卡片阴影"，但每个文件都内联重复。</p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="issue-7" onclick="toggleSelect(this)">
+      <div class="letter">7</div>
+      <div class="content">
+        <h3>Engine 主按钮：独立于 ink-button 体系</h3>
+        <p><code>engine-page-shell.tsx:103</code> 和 <code>auth-form.tsx:200</code> 的主按钮都用了 <code>min-h-[50px] bg-gradient-to-br from-[var(--accent-primary)] to-[#47665a]</code>，<br>
+        与 <code>.ink-button</code> 的 32px 高度 + 纯色背景完全不同。<strong>同一产品两套主按钮。</strong></p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="issue-8" onclick="toggleSelect(this)">
+      <div class="letter">8</div>
+      <div class="content">
+        <h3>标签文案样式 "accent-secondary + 11px tracking" 被复制了 12+ 次</h3>
+        <p>几乎每个 Hero 区域都有 <code>text-[var(--accent-secondary)] text-[11px] tracking-[0.28em] uppercase</code> 这个 pattern。<br>
+        应该提取为 <code>.label-overline</code> 或类似的全局类。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== MINOR ====== -->
+<div class="section">
+  <h3 style="color:#5a7a6b">🟢 次要问题（打磨细节）</h3>
+
+  <div class="options">
+    <div class="option" data-choice="issue-9" onclick="toggleSelect(this)">
+      <div class="letter">9</div>
+      <div class="content">
+        <h3>Lobby 项目卡片颜色值硬编码</h3>
+        <p><code>lobby-project-shelf.tsx:97</code> 的阴影 <code>rgba(61,61,61,0.07)</code> 和背景 <code>rgba(255,253,251,0.92)</code> 没有走 CSS 变量。<br>
+        如果以后要做暗色模式，这些全是改不动的遗留。</p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="issue-10" onclick="toggleSelect(this)">
+      <div class="letter">10</div>
+      <div class="content">
+        <h3>WorkspaceShell 响应式不足</h3>
+        <p><code>workspace-shell.tsx:74</code> 在 studio 模式下是 <code>w-full</code>，非 studio 模式下是 <code>w-[min(100%-2.5rem,1560px)]</code>。<br>
+        但 Header 内部的三栏 grid 在窄屏下会挤压导航项，没有折叠或 overflow 处理。</p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="issue-11" onclick="toggleSelect(this)">
+      <div class="letter">11</div>
+      <div class="content">
+        <h3>tailwind.config.ts 缺少大圆角 token</h3>
+        <p>目前只有 <code>xs(3px) sm(4px) md(6px) lg(8px)</code>。<br>
+        需要补充 <code>xl(12px) 2xl(16px) 3xl(20px) 4xl(24px) 5xl(28px)</code> 来收编各页面硬编码的大圆角值。</p>
+      </div>
+    </div>
+
+    <div class="option" data-choice="issue-12" onclick="toggleSelect(this)">
+      <div class="letter">12</div>
+      <div class="content">
+        <h3>Lobby/Engine/Lab 共享"Hero Card"模式未提取</h3>
+        <p>Auth, Engine, Lab, Incubator 都有相同的 Hero 卡片结构（圆角 28px + 半透明白底 + backdrop-blur + 大阴影）。<br>
+        应该提取为 <code>.hero-card</code> 全局类或共享组件。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:2rem;padding:1.5rem;background:rgba(90,122,107,0.06);border-radius:12px">
+  <h3>📋 建议实施顺序</h3>
+  <ol style="margin:0.5rem 0 0 1.2rem;line-height:2">
+    <li><strong>P0</strong> — 修复 Studio 响应式 + 移除重复纹理（#3）</li>
+    <li><strong>P0</strong> — 修复项目设置侧边栏双重 sticky（#1）</li>
+    <li><strong>P1</strong> — 补充 Tailwind 大圆角 token + 收编硬编码值（#5, #11）</li>
+    <li><strong>P1</strong> — 提取 hero-card / label-overline / ink-link-button 全局类（#2, #6, #8, #12）</li>
+    <li><strong>P1</strong> — 统一按钮体系：把 Engine/Auth 大按钮纳入 ink-button 变体（#7）</li>
+    <li><strong>P2</strong> — Lobby 搜索框统一 + 项目卡片颜色走变量（#4, #9）</li>
+    <li><strong>P2</strong> — WorkspaceShell Header 响应式折叠（#10）</li>
+  </ol>
+</div>

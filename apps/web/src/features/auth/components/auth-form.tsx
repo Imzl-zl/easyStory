@@ -63,8 +63,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   });
 
   return (
-    <main className="min-h-screen p-8 [background:radial-gradient(circle_at_top_left,rgba(196,167,125,0.18),transparent_30%),radial-gradient(circle_at_right_20%,rgba(90,154,170,0.16),transparent_28%),linear-gradient(180deg,#f7f1e7_0%,#f4efe7_48%,#f8f6f1_100%)]">
-      <div className="grid gap-6 max-w-[1240px] min-h-[calc(100vh-64px)] mx-auto [grid-template-columns:minmax(0,1.15fr)_minmax(360px,460px)]">
+    <main className="min-h-screen flex items-center justify-center p-6 lg:p-8 [background:radial-gradient(circle_at_top_left,rgba(196,167,125,0.18),transparent_30%),radial-gradient(circle_at_right_20%,rgba(90,154,170,0.16),transparent_28%),linear-gradient(180deg,#f7f1e7_0%,#f4efe7_48%,#f8f6f1_100%)]">
+      <div className="grid gap-6 w-full max-w-[1240px] mx-auto [grid-template-columns:1fr] lg:[grid-template-columns:minmax(0,1.15fr)_minmax(360px,460px)] lg:items-center">
         <AuthHero copy={copy} />
         <AuthPanel
           email={email}
@@ -85,7 +85,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
 function AuthHero({ copy }: Readonly<{ copy: AuthCopy }>) {
   return (
-    <section className="hero-card p-9 flex flex-col justify-between gap-7">
+    <section className="hero-card p-9 flex flex-col gap-7 max-lg:hidden">
       <div className="absolute -right-10 -bottom-14 w-[180px] h-[180px] rounded-full bg-[rgba(90,122,107,0.08)]" />
       <div className="flex items-center gap-3.5">
         <span className="inline-flex items-center justify-center w-12 h-12 rounded-4 bg-gradient-to-br from-[rgba(90,122,107,0.92)] to-[rgba(75,94,88,0.92)] text-white text-[15px] font-semibold tracking-[0.12em]">ES</span>
