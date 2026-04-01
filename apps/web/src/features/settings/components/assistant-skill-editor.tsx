@@ -52,7 +52,7 @@ export function AssistantSkillEditor({
 
   return (
     <form
-      className="panel-muted space-y-4 p-4"
+      className="panel-muted space-y-10 p-10"
       onSubmit={(event) => {
         event.preventDefault();
       onSubmit(draft);
@@ -136,7 +136,7 @@ function GuidedSkillEditor({
     <>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)]">
         <div className="space-y-4">
-          <div className="rounded-2xl bg-[rgba(58,124,165,0.07)] px-4 py-3 text-[12px] leading-6 text-[var(--text-secondary)]">
+          <div className="rounded-2xl bg-[rgba(248,243,235,0.92)] px-4 py-3 text-xs leading-6 text-[var(--text-secondary)]">
             把常用聊天方式写成一份长期说明就行。重点告诉助手应该怎么帮你，不需要去描述系统实现。
           </div>
           <label className="block space-y-2">
@@ -200,7 +200,7 @@ function RawSkillEditor({
             支持标准 Markdown frontmatter。`name`、`enabled`、`description`、`model` 都能直接写；多行说明可用 `description: |`。
           </p>
           {mode === "create" ? (
-            <p className="mt-3 rounded-2xl bg-[rgba(248,243,235,0.84)] px-3 py-2 text-[12px] leading-5 text-[var(--text-secondary)]">
+            <p className="mt-3 rounded-2xl bg-[rgba(183,121,31,0.08)] px-4 py-3 text-xs leading-6 text-[var(--accent-warning)]">
               第一次保存后，系统会自动补上这份 Skill 的 id。
             </p>
           ) : null}
@@ -253,7 +253,7 @@ function SkillHelperCards({
             </span>
           ))}
         </div>
-        <div className="mt-3 rounded-2xl bg-[rgba(58,124,165,0.07)] px-4 py-3 text-[12px] leading-6 text-[var(--text-secondary)]">
+        <div className="mt-3 rounded-2xl bg-[rgba(248,243,235,0.92)] px-4 py-3 text-xs leading-6 text-[var(--text-secondary)]">
           常见写法：先规定语气和做事方式，再在正文里引用 <code>{"{{ user_input }}"}</code>；
           如果你希望助手参考前文，再加上 <code>{"{{ conversation_history }}"}</code>。
         </div>

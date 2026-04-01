@@ -41,6 +41,11 @@ export function AssistantPreferencesPanel({
     queryKey: buildAssistantPreferencesQueryKey(scope, projectId),
     queryFn: () => loadAssistantPreferences(scope, projectId),
   });
+  const userPreferencesQuery = useQuery({
+    queryKey: ["assistant-preferences", "user", "me"] as const,
+    queryFn: () => getMyAssistantPreferences(),
+    enabled: scope === "project",
+  });
   const credentialsQuery = useQuery({
     queryKey: ["credentials", scope, projectId ?? "none", "assistant-preferences"],
     queryFn: () => loadAssistantPreferenceCredentials(scope, projectId),
@@ -100,6 +105,7 @@ export function AssistantPreferencesPanel({
             key={formKey}
             emptyStateText={copy.emptyStateText}
             formDescription={copy.formDescription}
+            inheritedPreferences={scope === "project" ? userPreferencesQuery.data : undefined}
             isPending={mutation.isPending}
             preferences={preferencesQuery.data}
             placeholderText={copy.maxOutputPlaceholder}

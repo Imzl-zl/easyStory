@@ -131,13 +131,13 @@ function AssistantRulesForm({
 
   return (
     <form
-      className="panel-muted space-y-4 p-4"
+      className="panel-muted space-y-10 p-10"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit(draft);
       }}
     >
-      <label className="rounded-xl bg-[rgba(248,243,235,0.92)] px-3 py-2.5">
+      <label className="flex items-start gap-3 rounded-xl bg-[rgba(248,243,235,0.92)] px-4 py-3 cursor-pointer">
         <span className="flex items-start gap-3">
           <input
             checked={draft.enabled}
@@ -156,7 +156,7 @@ function AssistantRulesForm({
         </span>
       </label>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <label className="text-sm font-medium text-[var(--text-primary)]" htmlFor={buildAssistantRuleFieldId(scope)}>
           规则内容
         </label>
@@ -172,7 +172,7 @@ function AssistantRulesForm({
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-3">
         <button className="ink-button" disabled={isPending || !isDirty} type="submit">
           {isPending ? "保存中..." : "保存规则"}
         </button>

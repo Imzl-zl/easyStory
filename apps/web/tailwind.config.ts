@@ -9,6 +9,15 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      spacing: {
+        'card-sm': '1rem',
+        'card-md': '1.25rem',
+        'card-lg': '1.5rem',
+        'card-xl': '2rem',
+        'gap-sm': '0.75rem',
+        'gap-md': '1rem',
+        'gap-lg': '1.5rem',
+      },
       colors: {
         canvas: 'var(--bg-canvas)',
         surface: {

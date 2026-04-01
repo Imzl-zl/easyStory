@@ -14,8 +14,6 @@ import {
 import { TemplateModePanel } from "@/features/lobby/components/incubator-panels";
 import { useIncubatorTemplateModel } from "@/features/lobby/components/incubator-template-model";
 
-import styles from "./incubator-page.module.css";
-
 const STARTER_NOTES = [
   "先用对话把题材、角色和冲突说清。",
   "再把草稿整理成真正可写的项目设定。",
@@ -43,13 +41,13 @@ export function IncubatorPage() {
   };
 
   return (
-    <div className={styles.page}>
+    <div className="flex flex-col gap-5">
       <IncubatorHero mode={mode} onModeChange={handleModeChange} />
       {feedback ? <FeedbackBanner feedback={feedback} /> : null}
       <StageShell mode={mode} stageCopy={stageCopy}>
         <section
           aria-labelledby="incubator-tab-chat"
-          className={styles.stagePanel}
+          className="flex-1 min-w-0 min-h-0"
           hidden={mode !== "chat"}
           id="incubator-panel-chat"
           role="tabpanel"
@@ -59,7 +57,7 @@ export function IncubatorPage() {
         {hasVisitedTemplateMode || mode === "template" ? (
           <section
             aria-labelledby="incubator-tab-template"
-            className={styles.stagePanel}
+            className="flex-1 min-w-0 min-h-0"
             hidden={mode !== "template"}
             id="incubator-panel-template"
             role="tabpanel"
@@ -83,28 +81,28 @@ function IncubatorHero({
   onModeChange: (mode: IncubatorMode) => void;
 }>) {
   return (
-    <section className={styles.hero}>
-      <div className={styles.heroMain}>
-        <Link className={styles.backLink} href="/workspace/lobby">
+    <section className="grid gap-5.5 p-6 rounded-[28px] border border-[rgba(61,61,61,0.09)] bg-[rgba(255,255,255,0.86)] shadow-[0_18px_42px_rgba(76,55,29,0.06)] [grid-template-columns:minmax(0,1.2fr)_minmax(280px,360px)]">
+      <div className="grid gap-4">
+        <Link className="inline-flex w-fit items-center gap-2 text-[var(--accent-primary)] text-[13px] font-semibold" href="/workspace/lobby">
           返回书架
         </Link>
-        <p className={styles.eyebrow}>项目起稿</p>
-        <h1 className={styles.heroTitle}>先把想法变成可写的作品，再开始创作。</h1>
-        <p className={styles.heroDescription}>
+        <p className="text-[var(--accent-secondary)] text-[11px] tracking-[0.26em] uppercase">项目起稿</p>
+        <h1 className="max-w-[820px] font-serif text-[clamp(2rem,4vw,3.8rem)] leading-tight">先把想法变成可写的作品，再开始创作。</h1>
+        <p className="text-[var(--text-secondary)] text-sm leading-relaxed">
           easyStory 的起稿流程不再像填后台表单，而是像跟编辑一起把故事轮廓整理清楚。
         </p>
-        <div className={styles.noteGrid}>
+        <div className="grid gap-3 [grid-template-columns:repeat(3,minmax(0,1fr))]">
           {STARTER_NOTES.map((item) => (
-            <article className={styles.noteCard} key={item}>
-              <p>{item}</p>
+            <article className="min-h-[108px] p-4.5 rounded-5 bg-gradient-to-b from-[rgba(247,241,231,0.92)] to-[rgba(251,248,242,0.82)]" key={item}>
+              <p className="text-[var(--text-primary)] text-sm leading-relaxed">{item}</p>
             </article>
           ))}
         </div>
       </div>
-      <aside className={styles.modeDock}>
+      <aside className="grid content-start gap-4 p-5 rounded-[22px] bg-[rgba(244,239,231,0.86)]">
         <div>
-          <p className={styles.modeEyebrow}>启动方式</p>
-          <p className={styles.modeLead}>选择更适合你此刻状态的起稿路径。</p>
+          <p className="text-[var(--accent-secondary)] text-[11px] tracking-[0.26em] uppercase">启动方式</p>
+          <p className="text-[var(--text-secondary)] text-sm leading-relaxed">选择更适合你此刻状态的起稿路径。</p>
         </div>
         <ModeCards mode={mode} onModeChange={onModeChange} />
       </aside>
@@ -120,21 +118,20 @@ function ModeCards({
   onModeChange: (mode: IncubatorMode) => void;
 }>) {
   return (
-    <nav aria-label="创作启动模式" className={styles.modeGrid} role="tablist">
+    <nav aria-label="创作启动模式" className="grid gap-3" role="tablist">
       {INCUBATOR_MODE_OPTIONS.map((option) => (
         <button
           aria-controls={`incubator-panel-${option.id}`}
           aria-selected={mode === option.id}
-          className={styles.modeCard}
-          data-active={mode === option.id}
+          className={`grid gap-2 p-4 border border-[rgba(61,61,61,0.08)] rounded-[18px] bg-[rgba(255,255,255,0.72)] text-left transition-all ${mode === option.id ? "border-[rgba(90,122,107,0.36)] bg-[rgba(255,255,255,0.96)] -translate-y-px" : ""}`}
           id={`incubator-tab-${option.id}`}
           key={option.id}
           onClick={() => onModeChange(option.id)}
           role="tab"
           type="button"
         >
-          <span className={styles.modeCardLabel}>{option.label}</span>
-          <span className={styles.modeCardDetail}>{option.description}</span>
+          <span className="text-[15px] font-semibold">{option.label}</span>
+          <span className="text-[var(--text-secondary)] text-[13px] leading-relaxed">{option.description}</span>
         </button>
       ))}
     </nav>
@@ -151,18 +148,18 @@ function StageShell({
   stageCopy: IncubatorStageCopy;
 }>) {
   return (
-    <section className={styles.stage}>
-      <div className={styles.stageHeader}>
+    <section className="flex flex-col min-h-[calc(100vh-240px)] rounded-[28px] border border-[rgba(61,61,61,0.09)] bg-[rgba(255,255,255,0.86)] shadow-[0_18px_42px_rgba(76,55,29,0.06)] overflow-hidden">
+      <div className="flex justify-between gap-5 px-6 py-5.5 border-b border-[rgba(61,61,61,0.08)] bg-gradient-to-b from-[rgba(250,246,237,0.92)] to-[rgba(255,255,255,0.9)]">
         <div>
-          <p className={styles.stageLabel}>{stageCopy.label}</p>
-          <h2 className={styles.stageTitle}>{stageCopy.title}</h2>
-          <p className={styles.stageDescription}>{stageCopy.description}</p>
+          <p className="text-[var(--accent-secondary)] text-[11px] tracking-[0.26em] uppercase">{stageCopy.label}</p>
+          <h2 className="mt-2.5 font-serif text-7 font-semibold leading-tight">{stageCopy.title}</h2>
+          <p className="text-[var(--text-secondary)] text-sm leading-relaxed">{stageCopy.description}</p>
         </div>
-        <div className={styles.stageHint} data-mode={mode}>
+        <div className={`inline-flex items-center h-fit min-h-9 px-4 rounded-full text-xs font-semibold ${mode === "chat" ? "bg-[rgba(90,122,107,0.09)] text-[var(--accent-primary)]" : "bg-[rgba(139,115,85,0.1)] text-[var(--accent-secondary)]"}`}>
           {mode === "chat" ? "先聊，再整理草稿" : "按模板补足缺失信息"}
         </div>
       </div>
-      <div className={styles.stageBody}>{children}</div>
+      <div className="flex flex-1 min-h-0 p-4 bg-gradient-to-b from-[rgba(255,255,255,0.9)] to-[rgba(248,243,235,0.86)]">{children}</div>
     </section>
   );
 }
@@ -189,7 +186,7 @@ function TemplateModeContent({
 
 function FeedbackBanner({ feedback }: Readonly<{ feedback: FeedbackState }>) {
   return (
-    <div className={styles.feedbackBanner} data-tone={feedback.tone}>
+    <div className={`px-4 py-3.5 rounded-[18px] text-[13px] leading-relaxed ${feedback.tone === "danger" ? "bg-[rgba(196,90,90,0.12)] text-[var(--accent-danger)]" : "bg-[rgba(90,154,170,0.14)] text-[var(--accent-ink)]"}`}>
       {feedback.message}
     </div>
   );

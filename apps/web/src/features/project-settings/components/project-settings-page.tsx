@@ -16,7 +16,6 @@ import {
 } from "@/features/project-settings/components/project-settings-support";
 import { checkProjectSetting, getProject } from "@/lib/api/projects";
 import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
-import styles from "./project-settings-page.module.css";
 
 type ProjectSettingsPageProps = {
   projectId: string;
@@ -89,9 +88,17 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
 
   return (
     <>
-      <div className={styles.page}>
-        <div className={styles.sidebar}>
+      <div className="grid gap-gap-lg grid-cols-[280px_1fr] min-h-[calc(100vh-4rem)] p-card-xl max-w-[1600px] mx-auto">
+        <div className="sticky top-6 h-fit max-h-[calc(100vh-4rem)] overflow-y-auto scrollbar-thin animate-[slideInLeft_0.35s_cubic-bezier(0.16,1,0.3,1)]">
           <ProjectSettingsSidebar
+            dirtyState={{
+              assistant: projectPreferencesDirty,
+              mcp: projectMcpDirty,
+              rules: projectRulesDirty,
+              setting: projectSettingDirty,
+              skills: projectSkillsDirty,
+              audit: false,
+            }}
             isDirty={isDirty}
             isPending={isPending}
             onNavigate={navigationGuard.attemptNavigation}
@@ -104,21 +111,21 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
             tab={tab}
           />
         </div>
-        <div className={styles.content}>
+        <div className="relative flex flex-col min-h-[600px] animate-[fadeIn_0.35s_cubic-bezier(0.16,1,0.3,1)]">
           <ProjectSettingsContent
             completeness={completenessQuery.data}
             eventType={eventType}
-            projectError={projectQuery.error}
-            projectLoading={projectQuery.isLoading}
-            projectId={projectId}
-            projectSetting={projectQuery.data?.project_setting ?? null}
-            tab={tab}
             onEventTypeChange={(nextEventType) => setParams({ event: nextEventType, tab: "audit" })}
             onProjectMcpDirtyChange={setProjectMcpDirty}
             onProjectPreferencesDirtyChange={setProjectPreferencesDirty}
             onProjectRulesDirtyChange={setProjectRulesDirty}
             onProjectSettingDirtyChange={setProjectSettingDirty}
             onProjectSkillsDirtyChange={setProjectSkillsDirty}
+            projectError={projectQuery.error}
+            projectId={projectId}
+            projectLoading={projectQuery.isLoading}
+            projectSetting={projectQuery.data?.project_setting ?? null}
+            tab={tab}
           />
         </div>
       </div>

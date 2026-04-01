@@ -13,7 +13,6 @@ import {
   resolveWorkspaceUserBadge,
   type WorkspaceNavItem,
 } from "@/features/workspace/components/workspace-shell-support";
-import styles from "@/features/workspace/components/workspace-shell.module.css";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 
@@ -62,8 +61,8 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
 
   return (
     <AuthGuard>
-      <a className={styles.skipLink} href="#workspace-main">跳到主内容</a>
-      <div className={styles.shell} data-page-mode={pageMode}>
+      <a className="absolute top-3 left-3 z-30 -translate-y-[140%] focus-visible:translate-y-0" href="#workspace-main">跳到主内容</a>
+      <div className="min-h-screen pb-[max(env(safe-area-inset-bottom),0px)] [background:radial-gradient(circle_at_top_left,rgba(90,122,107,0.06),transparent_26%),var(--bg-canvas)]" data-page-mode={pageMode}>
         <WorkspaceHeader
           currentProjectId={currentProjectId}
           onLogout={clearSession}
@@ -72,8 +71,8 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
           userName={user?.username ?? "未登录"}
           workspaceItems={workspaceItems}
         />
-        <main className={pageMode === "studio" ? styles.contentFull : styles.content} id="workspace-main">
-          <div className={pageMode === "studio" ? styles.contentStage : styles.contentInner}>{children}</div>
+        <main className={pageMode === "studio" ? "w-full min-h-[calc(100vh-49px)]" : "w-[min(100%-2.5rem,1560px)] mx-auto"} id="workspace-main">
+          <div className={pageMode === "studio" ? "min-h-[calc(100vh-49px)]" : "min-h-[calc(100vh-72px)] py-5 pb-7"}>{children}</div>
         </main>
       </div>
     </AuthGuard>
@@ -97,8 +96,8 @@ function WorkspaceHeader({
 }>) {
   if (pageMode === "lobby") {
     return (
-      <header className={styles.topbar}>
-        <div className={styles.topbarInner}>
+      <header className="sticky top-0 z-20 border-b border-[rgba(61,61,61,0.08)] bg-[rgba(255,253,251,0.9)] backdrop-blur-xl">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 w-[min(100%-2.5rem,1560px)] mx-auto py-3.5">
           <WorkspaceBrand />
           <WorkspaceNav items={workspaceItems} pathname={pathname} />
           <WorkspaceActions
@@ -113,16 +112,16 @@ function WorkspaceHeader({
   }
 
   return (
-    <header className={pageMode === "studio" ? styles.studioTopbar : styles.projectTopbar}>
-      <div className={styles.projectTopbarInner}>
-        <div className={styles.projectTopbarPrimary}>
-          <Link className={styles.backLink} href="/workspace/lobby">
+    <header className={`sticky top-0 z-20 border-b backdrop-blur-xl ${pageMode === "studio" ? "border-[rgba(61,61,61,0.04)] bg-[rgba(255,253,251,0.94)]" : "border-[rgba(61,61,61,0.06)] bg-[rgba(248,246,241,0.88)]"}`}>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 w-[min(100%-2.5rem,1560px)] mx-auto py-3">
+        <div className="flex items-center gap-4 min-w-0">
+          <Link className="inline-flex items-center gap-1.5 text-[var(--text-secondary)] text-sm font-medium whitespace-nowrap hover:text-[var(--text-primary)]" href="/workspace/lobby">
             <span aria-hidden="true">←</span>
             返回书架
           </Link>
-          <div className={styles.projectCopy}>
-            <span className={styles.projectEyebrow}>当前项目</span>
-            <span className={styles.projectTitle}>{resolveContextTitle(pathname)}</span>
+          <div className="grid gap-0.5 min-w-0">
+            <span className="text-[var(--text-tertiary)] text-[0.66rem] tracking-[0.14em] uppercase">当前项目</span>
+            <span className="overflow-hidden text-[var(--text-primary)] text-sm font-semibold tracking-tight text-ellipsis whitespace-nowrap">{resolveContextTitle(pathname)}</span>
           </div>
         </div>
         <WorkspaceNav
@@ -143,9 +142,9 @@ function WorkspaceHeader({
 
 function WorkspaceBrand() {
   return (
-    <Link className={styles.brandLink} href="/workspace/lobby">
-      <span className={styles.brandEyebrow}>easyStory</span>
-      <span className={styles.brandTitle}>写作空间</span>
+    <Link className="inline-flex flex-col gap-0.5 min-w-0" href="/workspace/lobby">
+      <span className="text-[var(--text-secondary)] text-[0.68rem] tracking-[0.16em] uppercase">easyStory</span>
+      <span className="text-[var(--text-primary)] text-lg font-semibold tracking-tight">写作空间</span>
     </Link>
   );
 }
@@ -160,7 +159,7 @@ function WorkspaceNav({
   variant?: "default" | "project";
 }>) {
   return (
-    <nav aria-label="工作台导航" className={variant === "project" ? styles.projectNav : styles.nav}>
+    <nav aria-label="工作台导航" className={`flex min-w-0 items-center gap-1.5 overflow-x-auto scrollbar-hide ${variant === "project" ? "justify-center" : ""}`}>
       {items.map((item) => (
         <WorkspaceNavLink item={item} key={`${variant}-${item.segment}`} pathname={pathname} />
       ))}
@@ -178,7 +177,7 @@ function WorkspaceNavLink({
   const isActive = isWorkspaceItemActive(item, pathname);
   if (!item.href) {
     return (
-      <span aria-disabled="true" className={styles.navLinkDisabled} title="请先打开一个项目">
+      <span aria-disabled="true" className="relative inline-flex items-center h-8 px-1.5 text-[var(--text-secondary)] text-sm font-medium whitespace-nowrap opacity-40 cursor-not-allowed" title="请先打开一个项目">
         {item.label}
       </span>
     );
@@ -186,7 +185,7 @@ function WorkspaceNavLink({
 
   return (
     <Link
-      className={styles.navLink}
+      className="relative inline-flex items-center h-8 px-1.5 text-[var(--text-secondary)] text-sm font-medium whitespace-nowrap transition-colors hover:text-[var(--text-primary)] [&[data-active='true']]:text-[var(--text-primary)] [&[data-active='true']]:after:content-[''] [&[data-active='true']]:after:absolute [&[data-active='true']]:after:right-1.5 [&[data-active='true']]:after:bottom-2 [&[data-active='true']]:after:left-1.5 [&[data-active='true']]:after:h-0.5 [&[data-active='true']]:after:rounded-full [&[data-active='true']]:after:bg-[var(--accent-primary)]"
       data-active={isActive ? "true" : "false"}
       href={item.href}
       title={item.meta}
@@ -208,15 +207,15 @@ function WorkspaceActions({
   userName: string;
 }>) {
   return (
-    <div className={styles.actions}>
-      <Link className={styles.actionLink} href={settingsHref}>
+    <div className="inline-flex min-w-0 items-center justify-end gap-3">
+      <Link className="inline-flex items-center justify-center h-8 px-3.5 border border-[rgba(61,61,61,0.08)] rounded-full bg-[rgba(255,255,255,0.62)] text-[var(--text-primary)] text-sm font-medium transition-colors hover:border-[rgba(90,122,107,0.22)] hover:bg-[rgba(255,255,255,0.92)]" href={settingsHref}>
         {settingsLabel}
       </Link>
-      <div className={styles.userChip}>
+      <div className="inline-flex min-w-0 items-center gap-2 py-1 px-1.5 pr-1 rounded-full bg-[rgba(90,122,107,0.08)]">
         <Avatar size={28}>{resolveWorkspaceUserBadge(userName)}</Avatar>
-        <span className={styles.userName}>{userName}</span>
+        <span className="max-w-[8rem] overflow-hidden text-[var(--text-primary)] text-sm font-semibold text-ellipsis whitespace-nowrap">{userName}</span>
       </div>
-      <button className={styles.logoutButton} onClick={onLogout} type="button">
+      <button className="inline-flex items-center justify-center h-8 px-3.5 border border-[rgba(61,61,61,0.08)] rounded-full bg-[rgba(255,255,255,0.62)] text-[var(--text-primary)] text-sm font-medium cursor-pointer transition-colors hover:border-[rgba(90,122,107,0.22)] hover:bg-[rgba(255,255,255,0.92)]" onClick={onLogout} type="button">
         退出
       </button>
     </div>

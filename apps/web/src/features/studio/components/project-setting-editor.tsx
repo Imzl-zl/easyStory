@@ -149,7 +149,7 @@ function ProjectSettingEditorForm({
         </div>
       }
     >
-      <div className="space-y-8">
+      <div className="space-y-12">
         <div className="panel-muted flex flex-wrap items-start justify-between gap-4 p-5">
           <div className="space-y-1.5">
             <p className="text-sm font-medium text-[var(--text-secondary)]">设定完整度</p>
@@ -158,150 +158,177 @@ function ProjectSettingEditorForm({
           <StatusBadge status={completeness?.status ?? "draft"} label={completeness?.status ?? "未检查"} />
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2">
-          <ProjectSettingField label="题材">
-            <input
-              className="ink-input"
-              value={setting.genre ?? ""}
-              onChange={(event) => setSetting((current) => ({ ...current, genre: event.target.value }))}
-            />
-          </ProjectSettingField>
-          <ProjectSettingField label="子题材">
-            <input
-              className="ink-input"
-              value={setting.sub_genre ?? ""}
+        <fieldset className="border border-[var(--line-soft)] rounded-[var(--radius-lg)] p-7 m-0 bg-gradient-to-br from-[var(--bg-surface)] to-[rgba(255,255,255,0.95)] transition-all relative">
+          <legend className="text-[0.75rem] font-semibold text-[var(--text-secondary)] px-2 ml-2 tracking-[0.08em] uppercase">基本信息</legend>
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+            <ProjectSettingField label="题材">
+              <input
+                className="ink-input"
+                value={setting.genre ?? ""}
+                onChange={(event) => setSetting((current) => ({ ...current, genre: event.target.value }))}
+              />
+            </ProjectSettingField>
+            <ProjectSettingField label="子题材">
+              <input
+                className="ink-input"
+                value={setting.sub_genre ?? ""}
+                onChange={(event) =>
+                  setSetting((current) => ({ ...current, sub_genre: event.target.value }))
+                }
+              />
+            </ProjectSettingField>
+            <ProjectSettingField label="目标读者">
+              <input
+                className="ink-input"
+                value={setting.target_readers ?? ""}
+                onChange={(event) =>
+                  setSetting((current) => ({ ...current, target_readers: event.target.value }))
+                }
+              />
+            </ProjectSettingField>
+            <ProjectSettingField label="整体语气">
+              <input
+                className="ink-input"
+                value={setting.tone ?? ""}
+                onChange={(event) => setSetting((current) => ({ ...current, tone: event.target.value }))}
+              />
+            </ProjectSettingField>
+          </div>
+        </fieldset>
+
+        <fieldset className="border border-[var(--line-soft)] rounded-[var(--radius-lg)] p-7 m-0 bg-gradient-to-br from-[var(--bg-surface)] to-[rgba(255,255,255,0.95)] transition-all relative">
+          <legend className="text-[0.75rem] font-semibold text-[var(--text-secondary)] px-2 ml-2 tracking-[0.08em] uppercase">角色设定</legend>
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+            <ProjectSettingField label="主角姓名">
+              <input
+                className="ink-input"
+                value={setting.protagonist?.name ?? ""}
+                onChange={(event) =>
+                  setSetting((current) => ({
+                    ...current,
+                    protagonist: { ...current.protagonist, name: event.target.value },
+                  }))
+                }
+              />
+            </ProjectSettingField>
+            <ProjectSettingField label="主角身份">
+              <input
+                className="ink-input"
+                value={setting.protagonist?.identity ?? ""}
+                onChange={(event) =>
+                  setSetting((current) => ({
+                    ...current,
+                    protagonist: { ...current.protagonist, identity: event.target.value },
+                  }))
+                }
+              />
+            </ProjectSettingField>
+          </div>
+        </fieldset>
+
+        <fieldset className="border border-[var(--line-soft)] rounded-[var(--radius-lg)] p-7 m-0 bg-gradient-to-br from-[var(--bg-surface)] to-[rgba(255,255,255,0.95)] transition-all relative">
+          <legend className="text-[0.75rem] font-semibold text-[var(--text-secondary)] px-2 ml-2 tracking-[0.08em] uppercase">世界观</legend>
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+            <ProjectSettingField label="世界名称">
+              <input
+                className="ink-input"
+                value={setting.world_setting?.name ?? ""}
+                onChange={(event) =>
+                  setSetting((current) => ({
+                    ...current,
+                    world_setting: { ...current.world_setting, name: event.target.value },
+                  }))
+                }
+              />
+            </ProjectSettingField>
+            <ProjectSettingField label="力量体系">
+              <input
+                className="ink-input"
+                value={setting.world_setting?.power_system ?? ""}
+                onChange={(event) =>
+                  setSetting((current) => ({
+                    ...current,
+                    world_setting: { ...current.world_setting, power_system: event.target.value },
+                  }))
+                }
+              />
+            </ProjectSettingField>
+          </div>
+        </fieldset>
+
+        <fieldset className="border border-[var(--line-soft)] rounded-[var(--radius-lg)] p-7 m-0 bg-gradient-to-br from-[var(--bg-surface)] to-[rgba(255,255,255,0.95)] transition-all relative">
+          <legend className="text-[0.75rem] font-semibold text-[var(--text-secondary)] px-2 ml-2 tracking-[0.08em] uppercase">规模设定</legend>
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+            <ProjectSettingField label="目标字数">
+              <input
+                className="ink-input"
+                inputMode="numeric"
+                value={setting.scale?.target_words ?? ""}
+                onChange={(event) =>
+                  setSetting((current) => ({
+                    ...current,
+                    scale: {
+                      ...current.scale,
+                      target_words: event.target.value ? Number(event.target.value) : undefined,
+                    },
+                  }))
+                }
+              />
+            </ProjectSettingField>
+            <ProjectSettingField label="目标章节">
+              <input
+                className="ink-input"
+                inputMode="numeric"
+                value={setting.scale?.target_chapters ?? ""}
+                onChange={(event) =>
+                  setSetting((current) => ({
+                    ...current,
+                    scale: {
+                      ...current.scale,
+                      target_chapters: event.target.value ? Number(event.target.value) : undefined,
+                    },
+                  }))
+                }
+              />
+            </ProjectSettingField>
+          </div>
+        </fieldset>
+
+        <div className="relative rounded-[var(--radius-md)] transition-all focus-within:shadow-[0_0_0_3px_rgba(90,122,107,0.12),0_2px_8px_rgba(90,122,107,0.08)] focus-within:bg-[rgba(255,255,255,0.02)]">
+          <ProjectSettingField label="核心冲突">
+            <textarea
+              className="ink-textarea min-h-32"
+              value={setting.core_conflict ?? ""}
               onChange={(event) =>
-                setSetting((current) => ({ ...current, sub_genre: event.target.value }))
-              }
-            />
-          </ProjectSettingField>
-          <ProjectSettingField label="目标读者">
-            <input
-              className="ink-input"
-              value={setting.target_readers ?? ""}
-              onChange={(event) =>
-                setSetting((current) => ({ ...current, target_readers: event.target.value }))
-              }
-            />
-          </ProjectSettingField>
-          <ProjectSettingField label="整体语气">
-            <input
-              className="ink-input"
-              value={setting.tone ?? ""}
-              onChange={(event) => setSetting((current) => ({ ...current, tone: event.target.value }))}
-            />
-          </ProjectSettingField>
-          <ProjectSettingField label="主角姓名">
-            <input
-              className="ink-input"
-              value={setting.protagonist?.name ?? ""}
-              onChange={(event) =>
-                setSetting((current) => ({
-                  ...current,
-                  protagonist: { ...current.protagonist, name: event.target.value },
-                }))
-              }
-            />
-          </ProjectSettingField>
-          <ProjectSettingField label="主角身份">
-            <input
-              className="ink-input"
-              value={setting.protagonist?.identity ?? ""}
-              onChange={(event) =>
-                setSetting((current) => ({
-                  ...current,
-                  protagonist: { ...current.protagonist, identity: event.target.value },
-                }))
-              }
-            />
-          </ProjectSettingField>
-          <ProjectSettingField label="世界名称">
-            <input
-              className="ink-input"
-              value={setting.world_setting?.name ?? ""}
-              onChange={(event) =>
-                setSetting((current) => ({
-                  ...current,
-                  world_setting: { ...current.world_setting, name: event.target.value },
-                }))
-              }
-            />
-          </ProjectSettingField>
-          <ProjectSettingField label="力量体系">
-            <input
-              className="ink-input"
-              value={setting.world_setting?.power_system ?? ""}
-              onChange={(event) =>
-                setSetting((current) => ({
-                  ...current,
-                  world_setting: { ...current.world_setting, power_system: event.target.value },
-                }))
-              }
-            />
-          </ProjectSettingField>
-          <ProjectSettingField label="目标字数">
-            <input
-              className="ink-input"
-              inputMode="numeric"
-              value={setting.scale?.target_words ?? ""}
-              onChange={(event) =>
-                setSetting((current) => ({
-                  ...current,
-                  scale: {
-                    ...current.scale,
-                    target_words: event.target.value ? Number(event.target.value) : undefined,
-                  },
-                }))
-              }
-            />
-          </ProjectSettingField>
-          <ProjectSettingField label="目标章节">
-            <input
-              className="ink-input"
-              inputMode="numeric"
-              value={setting.scale?.target_chapters ?? ""}
-              onChange={(event) =>
-                setSetting((current) => ({
-                  ...current,
-                  scale: {
-                    ...current.scale,
-                    target_chapters: event.target.value ? Number(event.target.value) : undefined,
-                  },
-                }))
+                setSetting((current) => ({ ...current, core_conflict: event.target.value }))
               }
             />
           </ProjectSettingField>
         </div>
 
-        <ProjectSettingField label="核心冲突">
-          <textarea
-            className="ink-textarea min-h-32"
-            value={setting.core_conflict ?? ""}
-            onChange={(event) =>
-              setSetting((current) => ({ ...current, core_conflict: event.target.value }))
-            }
-          />
-        </ProjectSettingField>
+        <div className="relative rounded-[var(--radius-md)] transition-all focus-within:shadow-[0_0_0_3px_rgba(90,122,107,0.12),0_2px_8px_rgba(90,122,107,0.08)] focus-within:bg-[rgba(255,255,255,0.02)]">
+          <ProjectSettingField label="剧情走向">
+            <textarea
+              className="ink-textarea min-h-32"
+              value={setting.plot_direction ?? ""}
+              onChange={(event) =>
+                setSetting((current) => ({ ...current, plot_direction: event.target.value }))
+              }
+            />
+          </ProjectSettingField>
+        </div>
 
-        <ProjectSettingField label="剧情走向">
-          <textarea
-            className="ink-textarea min-h-32"
-            value={setting.plot_direction ?? ""}
-            onChange={(event) =>
-              setSetting((current) => ({ ...current, plot_direction: event.target.value }))
-            }
-          />
-        </ProjectSettingField>
-
-        <ProjectSettingField label="特殊要求">
-          <textarea
-            className="ink-textarea min-h-28"
-            value={setting.special_requirements ?? ""}
-            onChange={(event) =>
-              setSetting((current) => ({ ...current, special_requirements: event.target.value }))
-            }
-          />
-        </ProjectSettingField>
+        <div className="relative rounded-[var(--radius-md)] transition-all focus-within:shadow-[0_0_0_3px_rgba(90,122,107,0.12),0_2px_8px_rgba(90,122,107,0.08)] focus-within:bg-[rgba(255,255,255,0.02)]">
+          <ProjectSettingField label="特殊要求">
+            <textarea
+              className="ink-textarea min-h-28"
+              value={setting.special_requirements ?? ""}
+              onChange={(event) =>
+                setSetting((current) => ({ ...current, special_requirements: event.target.value }))
+              }
+            />
+          </ProjectSettingField>
+        </div>
         {lastImpact ? <ProjectSettingImpactPanel impact={lastImpact} /> : null}
       </div>
     </SectionCard>

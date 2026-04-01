@@ -15,7 +15,7 @@ async function main() {
     if (msg.type() === 'warning') warnings.push(`[Console] ${msg.text()}`);
   });
 
-  page.on('pageerror', err => errors.push(`[Page] ${err.message}`);
+  page.on('pageerror', err => errors.push(`[Page] ${err.message}`));
 
   console.log('=== Playwright UI 检查 ===\n');
 

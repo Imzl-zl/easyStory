@@ -9,7 +9,6 @@ import { AssistantSkillsPanel } from "@/features/settings/components/assistant-s
 import { ProjectSettingEditor } from "@/features/studio/components/project-setting-editor";
 import { getErrorMessage } from "@/lib/api/client";
 import { checkProjectSetting, getProject } from "@/lib/api/projects";
-import styles from "./project-settings-page.module.css";
 
 type ProjectSettingsContentProps = {
   completeness: Awaited<ReturnType<typeof checkProjectSetting>> | undefined;
@@ -44,26 +43,24 @@ export function ProjectSettingsContent({
 }: Readonly<ProjectSettingsContentProps>) {
   if (tab === "setting" && projectLoading) {
     return (
-      <div className={styles.contentCard}>
-        <div className={styles.loadingText}>
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin opacity-50" />
-            <span>正在加载项目设定...</span>
-          </div>
+      <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
+        <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-[var(--text-secondary)]">
+          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin opacity-50" />
+          <span>正在加载项目设定...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={styles.content}>
+    <div className="space-y-4">
       {projectError ? (
-        <div className={styles.errorCard}>
-          <p className={styles.errorText}>{getErrorMessage(projectError)}</p>
+        <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+          <p>{getErrorMessage(projectError)}</p>
         </div>
       ) : null}
       {tab === "setting" && !projectError ? (
-        <div className={styles.contentCard}>
+        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
           <ProjectSettingEditor
             completeness={completeness}
             initialSetting={projectSetting}
@@ -73,7 +70,7 @@ export function ProjectSettingsContent({
         </div>
       ) : null}
       {tab === "rules" ? (
-        <div className={styles.contentCard}>
+        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
           <AssistantRulesEditor
             description="只影响这个项目里的聊天和创作建议。适合写题材方向、风格限制和明确不想要的内容。"
             onDirtyChange={onProjectRulesDirtyChange}
@@ -84,7 +81,7 @@ export function ProjectSettingsContent({
         </div>
       ) : null}
       {tab === "assistant" ? (
-        <div className={styles.contentCard}>
+        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
           <AssistantPreferencesPanel
             onDirtyChange={onProjectPreferencesDirtyChange}
             projectId={projectId}
@@ -93,7 +90,7 @@ export function ProjectSettingsContent({
         </div>
       ) : null}
       {tab === "skills" ? (
-        <div className={styles.contentCard}>
+        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
           <AssistantSkillsPanel
             onDirtyChange={onProjectSkillsDirtyChange}
             projectId={projectId}
@@ -102,7 +99,7 @@ export function ProjectSettingsContent({
         </div>
       ) : null}
       {tab === "mcp" ? (
-        <div className={styles.contentCard}>
+        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
           <AssistantMcpPanel
             onDirtyChange={onProjectMcpDirtyChange}
             projectId={projectId}
@@ -111,7 +108,7 @@ export function ProjectSettingsContent({
         </div>
       ) : null}
       {tab === "audit" ? (
-        <div className={styles.contentCard}>
+        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
           <ProjectAuditPanel
             eventType={eventType}
             onEventTypeChange={onEventTypeChange}

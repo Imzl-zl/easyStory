@@ -11,7 +11,6 @@ import type { DocumentTreeNode } from "@/features/studio/components/studio-page-
 import { STUDIO_ATTACHMENT_ACCEPT, type StudioChatAttachmentMeta } from "./studio-chat-attachment-support";
 import type { StudioChatSettings, StudioProviderOption } from "./studio-chat-support";
 import { buildStudioComposerHint } from "./studio-chat-ui-support";
-import styles from "./studio-chat-composer.module.css";
 
 type StudioChatComposerProps = {
   attachments: StudioChatAttachmentMeta[];
@@ -146,28 +145,28 @@ export function StudioChatComposer({
   );
 
   return (
-    <div className={styles.composer} ref={composerRef}>
-      <div className={styles.composerInner}>
+    <div className="relative shrink-0 border-t border-[rgba(44,36,22,0.08)] bg-gradient-to-b from-[var(--bg-surface)] to-[rgba(248,243,235,0.92)]" ref={composerRef}>
+      <div className="relative p-3">
         {credentialNotice ? (
-          <div className={styles.notice}>
-            <p className={styles.noticeText}>{credentialNotice}</p>
-            <Link className={styles.noticeLink} href={credentialSettingsHref}>
+          <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-[rgba(178,65,46,0.08)] text-sm text-[var(--accent-danger)]">
+            <p className="flex-1">{credentialNotice}</p>
+            <Link className="font-medium underline underline-offset-2 hover:no-underline" href={credentialSettingsHref}>
               模型连接
             </Link>
           </div>
         ) : null}
 
         {attachments.length > 0 ? (
-          <div className={styles.attachmentRow}>
+          <div className="flex flex-wrap gap-1.5 mb-2">
             {attachments.map((attachment) => (
               <button
-                className={styles.attachmentChip}
+                className="inline-flex items-center gap-1.5 h-6 px-2 rounded-md bg-[rgba(107,143,113,0.12)] text-xs text-[var(--text-primary)] hover:bg-[rgba(107,143,113,0.2)] transition-colors"
                 key={attachment.id}
                 type="button"
                 onClick={() => onRemoveAttachment(attachment.id)}
               >
-                <span className={styles.attachmentName}>{attachment.name}</span>
-                <span className={styles.attachmentRemove}>×</span>
+                <span className="truncate max-w-[120px]">{attachment.name}</span>
+                <span className="opacity-60 hover:opacity-100">×</span>
               </button>
             ))}
           </div>
@@ -175,20 +174,20 @@ export function StudioChatComposer({
 
         <Input.TextArea
           autoSize={{ maxRows: 6, minRows: 2 }}
-          className={styles.composerInput}
+          className="w-full text-sm leading-relaxed resize-none border border-[rgba(44,36,22,0.1)] rounded-lg bg-white/80 focus:border-[var(--accent-primary)] focus:shadow-[0_0_0_3px_rgba(107,143,113,0.12)] transition-all placeholder:text-[var(--text-muted)]"
           placeholder={canChat ? "写你的要求，或直接带文件进来一起改。" : "先启用可用模型后再开始提问"}
           value={inputText}
           onChange={setInputText}
           onKeyDown={handleComposerKeyDown}
         />
 
-        <div className={styles.toolbar}>
-          <div className={styles.toolbarLeft}>
+        <div className="flex items-center justify-between gap-2 mt-2">
+          <div className="flex items-center gap-1">
             <ToolbarIconButton label="上传文件" onClick={() => fileInputRef.current?.click()}>
               <PaperclipIcon />
             </ToolbarIconButton>
 
-            <div className={styles.contextButtonWrap}>
+            <div className="relative">
               <ToolbarChipButton
                 active={showContextSelector}
                 label={`上下文 ${selectedContextPaths.length}`}
@@ -199,42 +198,40 @@ export function StudioChatComposer({
               </ToolbarChipButton>
 
               {showContextSelector && (
-                <div className={styles.contextSelector} ref={contextSelectorRef}>
-                  <p className={styles.contextLabel}>
+                <div className="absolute bottom-full left-0 mb-2 w-72 max-h-80 overflow-hidden rounded-xl border border-[rgba(44,36,22,0.1)] bg-white/95 backdrop-blur-sm shadow-lg" ref={contextSelectorRef}>
+                  <p className="px-3 py-2 text-xs font-medium text-[var(--text-secondary)] border-b border-[rgba(44,36,22,0.06)]">
                     附加文档上下文 ({selectedContextPaths.length}/{totalFileCount})
                   </p>
                   <input
                     type="text"
-                    className={styles.contextSearch}
+                    className="w-full px-3 py-2 text-sm border-b border-[rgba(44,36,22,0.06)] bg-transparent focus:outline-none focus:bg-[rgba(107,143,113,0.05)]"
                     placeholder="搜索章节..."
                     value={contextSearchQuery}
                     onChange={(e) => setContextSearchQuery(e.target.value)}
                   />
-                  <div className={styles.contextList}>
+                  <div className="overflow-y-auto max-h-52 scrollbar-thin">
                     {Object.entries(groupedContexts).map(([groupName, nodes]) => {
                       if (nodes.length === 0) return null;
                       return (
-                        <div key={groupName} className={styles.contextGroup}>
+                        <div key={groupName}>
                           <div
-                            className={`${styles.contextGroupHeader} ${expandedGroups[groupName] ? styles.contextGroupHeaderExpanded : ""}`}
+                            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] cursor-pointer hover:bg-[rgba(107,143,113,0.05)] ${expandedGroups[groupName] ? "bg-[rgba(107,143,113,0.08)]" : ""}`}
                             onClick={() => toggleGroup(groupName)}
                           >
-                            <span className={styles.contextGroupIcon}>▶</span>
+                            <span className={`transition-transform ${expandedGroups[groupName] ? "rotate-90" : ""}`}>▶</span>
                             <span>{groupName}</span>
-                            <span style={{ marginLeft: "auto", opacity: 0.6 }}>
-                              {nodes.length}
-                            </span>
+                            <span className="ml-auto opacity-60">{nodes.length}</span>
                           </div>
                           {expandedGroups[groupName] && (
-                            <div className={styles.contextGroupItems}>
+                            <div className="py-1">
                               {nodes.map((node) => (
-                                <label className={styles.contextItem} key={node.id}>
+                                <label className="flex items-center gap-2 px-3 py-1 cursor-pointer hover:bg-[rgba(107,143,113,0.05)]" key={node.id}>
                                   <Checkbox
                                     checked={selectedContextPaths.includes(node.path)}
                                     onChange={() => onToggleContext(node.path)}
                                   />
-                                  <span className={styles.contextPath}>{node.label}</span>
-                                  <span className={styles.contextPathSecondary}>
+                                  <span className="text-sm truncate flex-1">{node.label}</span>
+                                  <span className="text-xs text-[var(--text-muted)] truncate max-w-[80px]">
                                     {node.path.split("/").slice(-2, -1)[0]}
                                   </span>
                                 </label>
@@ -249,7 +246,7 @@ export function StudioChatComposer({
               )}
             </div>
 
-            <div className={styles.modelPickerWrap}>
+            <div className="relative">
               <ToolbarChipButton
                 active={showModelPicker}
                 label={modelButtonLabel}
@@ -259,15 +256,15 @@ export function StudioChatComposer({
               </ToolbarChipButton>
 
               {showModelPicker && (
-                <div className={styles.modelPicker} ref={modelPickerRef}>
-                  <div className={styles.modelPickerHeader}>
-                    <p className={styles.modelPickerTitle}>切换模型</p>
-                    <p className={styles.modelPickerHint}>
+                <div className="absolute bottom-full left-0 mb-2 w-64 rounded-xl border border-[rgba(44,36,22,0.1)] bg-white/95 backdrop-blur-sm shadow-lg p-3" ref={modelPickerRef}>
+                  <div className="mb-3">
+                    <p className="text-sm font-medium text-[var(--text-primary)]">切换模型</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">
                       {selectedCredentialLabel ?? "先选可用渠道，再决定模型名。"}
                     </p>
                   </div>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>渠道</span>
+                  <label className="block mb-2">
+                    <span className="text-xs font-medium text-[var(--text-secondary)] mb-1 block">渠道</span>
                     <AppSelect
                       aria-label="渠道"
                       options={providerOptionsForSelect}
@@ -276,8 +273,8 @@ export function StudioChatComposer({
                       onChange={onProviderChange}
                     />
                   </label>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>模型</span>
+                  <label className="block">
+                    <span className="text-xs font-medium text-[var(--text-secondary)] mb-1 block">模型</span>
                     <Input
                       allowClear
                       autoComplete="off"
@@ -305,7 +302,7 @@ export function StudioChatComposer({
 
         <input
           accept={STUDIO_ATTACHMENT_ACCEPT}
-          className={styles.hiddenInput}
+          className="hidden"
           ref={fileInputRef}
           type="file"
           multiple
@@ -326,7 +323,7 @@ function ToolbarIconButton({
   onClick: () => void;
 }) {
   return (
-    <button aria-label={label} className={styles.iconButton} type="button" onClick={onClick}>
+    <button aria-label={label} className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.1)] hover:text-[var(--text-primary)] transition-colors" type="button" onClick={onClick}>
       {children}
     </button>
   );
@@ -348,13 +345,13 @@ function ToolbarChipButton({
   return (
     <button
       ref={buttonRef}
-      className={`${styles.chipButton} ${active ? styles.chipButtonActive : ""}`}
+      className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-medium transition-colors ${active ? "bg-[rgba(107,143,113,0.15)] text-[var(--accent-primary)]" : "bg-[rgba(44,36,22,0.05)] text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.1)]"}`}
       type="button"
       onClick={onClick}
     >
-      <span className={styles.chipIcon}>{children}</span>
-      <span className={styles.chipLabel}>{label}</span>
-      <span className={styles.chipChevron}>⌄</span>
+      <span className="opacity-70">{children}</span>
+      <span>{label}</span>
+      <span className="opacity-50 text-[10px]">⌄</span>
     </button>
   );
 }

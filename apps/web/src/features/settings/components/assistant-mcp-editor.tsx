@@ -59,7 +59,7 @@ export function AssistantMcpEditor({
   }, [isDirty, onDirtyChange]);
 
   return (
-    <form className="panel-muted space-y-4 p-4" onSubmit={(event) => submitDraft(event, draft, onSubmit)}>
+    <form className="panel-muted space-y-10 p-10" onSubmit={(event) => submitDraft(event, draft, onSubmit)}>
       <AssistantDocumentModeToggle
         description="可以继续用可视化方式维护连接，也可以直接按 MCP.yaml 来写。"
         fileLabel={ASSISTANT_MCP_FILE_LABEL}
@@ -70,7 +70,7 @@ export function AssistantMcpEditor({
       {editorMode === "guided" ? (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.92fr)]">
           <div className="space-y-4">
-            <div className="rounded-2xl bg-[rgba(58,124,165,0.07)] px-4 py-3 text-[12px] leading-6 text-[var(--text-secondary)]">
+            <div className="rounded-2xl bg-[rgba(248,243,235,0.92)] px-4 py-3 text-xs leading-6 text-[var(--text-secondary)]">
               MCP 用来保存你自己的外部工具连接。创建好以后，就可以在 Hooks 里直接选它来执行。
             </div>
             <TextField label="名称" maxLength={80} placeholder="例如：资料检索" value={draft.name} onChange={(value) => applyDraft({ ...draft, name: value }, detail?.id ?? null, setDraft, setDocumentValue, setDocumentError)} />

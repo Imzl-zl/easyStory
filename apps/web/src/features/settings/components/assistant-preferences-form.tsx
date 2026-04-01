@@ -17,6 +17,7 @@ import {
 type AssistantPreferencesFormProps = {
   emptyStateText: string;
   formDescription: string;
+  inheritedPreferences?: AssistantPreferences;
   isPending: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
   onSubmit: (draft: AssistantPreferencesDraft) => void;
@@ -29,6 +30,7 @@ type AssistantPreferencesFormProps = {
 export function AssistantPreferencesForm({
   emptyStateText,
   formDescription,
+  inheritedPreferences,
   isPending,
   onDirtyChange,
   onSubmit,
@@ -47,20 +49,25 @@ export function AssistantPreferencesForm({
 
   return (
     <form
-      className="panel-muted space-y-4 p-4"
+      className="panel-muted space-y-10 p-10"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit(draft);
       }}
     >
-      <div className="rounded-2xl bg-[rgba(58,124,165,0.06)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">
-        {formDescription}
-      </div>
+      <div className="rounded-2xl bg-[rgba(248,243,235,0.92)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">
+          {formDescription}
+        </div>
       <div className="grid gap-4 xl:grid-cols-[repeat(3,minmax(0,1fr))]">
         <AssistantProviderField draft={draft} providerOptions={providerOptions} setDraft={setDraft} />
-        <AssistantModelField draft={draft} setDraft={setDraft} />
+        <AssistantModelField
+          draft={draft}
+          inheritedModelName={inheritedPreferences?.default_model_name ?? undefined}
+          setDraft={setDraft}
+        />
         <AssistantMaxOutputTokensField
           draft={draft}
+          inheritedMaxOutputTokens={inheritedPreferences?.default_max_output_tokens ?? undefined}
           placeholderText={placeholderText}
           setDraft={setDraft}
         />
@@ -123,11 +130,17 @@ function AssistantProviderField({
 
 function AssistantModelField({
   draft,
+  inheritedModelName,
   setDraft,
 }: Readonly<{
   draft: AssistantPreferencesDraft;
+  inheritedModelName?: string;
   setDraft: Dispatch<SetStateAction<AssistantPreferencesDraft>>;
 }>) {
+  const placeholder = inheritedModelName
+    ? `当前继承：${inheritedModelName}`
+    : "例如：gpt-4.1-mini";
+
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium text-[var(--text-primary)]" htmlFor="assistant-default-model-name">
@@ -142,7 +155,7 @@ function AssistantModelField({
             defaultModelName: event.target.value,
           }))
         }
-        placeholder="例如：gpt-4.1-mini"
+        placeholder={placeholder}
         value={draft.defaultModelName}
       />
       <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
@@ -154,13 +167,19 @@ function AssistantModelField({
 
 function AssistantMaxOutputTokensField({
   draft,
+  inheritedMaxOutputTokens,
   placeholderText,
   setDraft,
 }: Readonly<{
   draft: AssistantPreferencesDraft;
+  inheritedMaxOutputTokens?: number;
   placeholderText: string;
   setDraft: Dispatch<SetStateAction<AssistantPreferencesDraft>>;
 }>) {
+  const placeholder = inheritedMaxOutputTokens
+    ? `当前继承：${inheritedMaxOutputTokens}`
+    : placeholderText;
+
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium text-[var(--text-primary)]" htmlFor="assistant-default-max-output-tokens">
@@ -177,7 +196,7 @@ function AssistantMaxOutputTokensField({
             defaultMaxOutputTokens: normalizeAssistantMaxOutputTokenDraft(event.target.value),
           }))
         }
-        placeholder={placeholderText}
+        placeholder={placeholder}
         value={draft.defaultMaxOutputTokens}
       />
       <p className="text-[12px] leading-5 text-[var(--text-secondary)]">

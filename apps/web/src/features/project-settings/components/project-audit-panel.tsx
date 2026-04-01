@@ -82,29 +82,53 @@ function AuditFilterBar({
   onChange: (value: string) => void;
   onReset: () => void;
 }>) {
+  const presetFilters = [
+    { label: '项目更新', value: 'project.updated' },
+    { label: '设置变更', value: 'project.setting.updated' },
+    { label: '成员变动', value: 'project.member' },
+  ];
+
   return (
     <form
-      className="panel-muted flex flex-wrap items-end gap-3 p-4"
+      className="panel-muted space-y-8 p-10"
       onSubmit={(event) => {
         event.preventDefault();
         onApply();
       }}
     >
-      <label className="min-w-64 flex-1">
-        <span className="label-text">操作类型过滤</span>
-        <input
-          className="ink-input"
-          placeholder="如 project.updated / project.setting.updated"
-          value={draftEventType}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      </label>
-      <button className="ink-button-secondary" type="submit">
-        应用过滤
-      </button>
-      <button className="ink-button-secondary" onClick={onReset} type="button">
-        清空
-      </button>
+      <div className="flex flex-wrap gap-2">
+        {presetFilters.map((preset) => (
+          <button
+            key={preset.value}
+            className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
+              draftEventType === preset.value
+                ? 'bg-[var(--accent-ink)] text-white shadow-sm'
+                : 'bg-[var(--bg-soft)] text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:shadow-sm'
+            }`}
+            onClick={() => onChange(preset.value)}
+            type="button"
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="min-w-64 flex-1">
+          <span className="label-text">操作类型过滤</span>
+          <input
+            className="ink-input"
+            placeholder="如 project.updated / project.setting.updated"
+            value={draftEventType}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        </label>
+        <button className="ink-button-secondary" type="submit">
+          应用过滤
+        </button>
+        <button className="ink-button-secondary" onClick={onReset} type="button">
+          清空
+        </button>
+      </div>
     </form>
   );
 }
@@ -180,7 +204,7 @@ function AuditLogCard({
             </span>
           </div>
           <p className="text-sm text-[var(--text-secondary)]">
-            actor: {item.actor_user_id ?? "system"} · details: {summarizeProjectAuditDetails(item.details)}
+            操作人: {item.actor_user_id ?? "系统"} · 详情: {summarizeProjectAuditDetails(item.details)}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">

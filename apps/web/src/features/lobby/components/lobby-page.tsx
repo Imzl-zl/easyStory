@@ -5,7 +5,6 @@ import Link from "next/link";
 
 import { LobbyProjectShelf } from "@/features/lobby/components/lobby-project-shelf";
 import { useLobbyProjectModel } from "@/features/lobby/components/lobby-project-model";
-import styles from "./lobby-page.module.css";
 
 type LobbyNavItem = {
   description: string;
@@ -72,32 +71,32 @@ export function LobbyPage() {
     : "先从一个故事开始，助手和模板会跟着作品一起工作。";
 
   return (
-    <div className={styles.page}>
-      <aside className={styles.sidebar}>
-        <div className={styles.sidebarIntro}>
-          <p className={styles.sidebarEyebrow}>书架</p>
-          <h2 className={styles.sidebarTitle}>作品空间</h2>
-          <p className={styles.sidebarDescription}>把项目、模板和助手放在同一张写作桌面上，而不是拆成后台模块。</p>
+    <div className="grid min-h-[calc(100vh-72px)] [grid-template-columns:272px_minmax(0,1fr)] gap-7 items-start">
+      <aside className="sticky top-[5.5rem] flex flex-col gap-3 p-[1.4rem_1.1rem] rounded-[28px] bg-[linear-gradient(180deg,rgba(255,255,255,0.62),rgba(255,255,255,0.28)),var(--bg-muted)] shadow-[inset_0_0_0_1px_rgba(61,61,61,0.06)]">
+        <div className="grid gap-[0.55rem] p-[0.2rem_0.35rem_0]">
+          <p className="text-[var(--text-tertiary)] text-[0.68rem] font-semibold tracking-[0.14em] uppercase">书架</p>
+          <h2 className="text-[var(--text-primary)] font-serif text-[1.55rem] font-semibold tracking-[-0.04em]">作品空间</h2>
+          <p className="text-[var(--text-secondary)] text-[0.9rem] leading-relaxed">把项目、模板和助手放在同一张写作桌面上，而不是拆成后台模块。</p>
         </div>
-        <nav className={styles.sidebarNav}>
+        <nav className="flex flex-col gap-[0.55rem]">
           {LOBBY_NAV_ITEMS.map((item) => (
             <LobbySidebarLink item={item} key={item.href} />
           ))}
         </nav>
-        <div className={styles.sidebarNote}>
-          <p className={styles.sidebarNoteTitle}>当前节奏</p>
-          <p className={styles.sidebarNoteBody}>{helperText}</p>
+        <div className="grid gap-[0.45rem] p-4 pb-[1.05rem] rounded-5 bg-[rgba(255,255,255,0.58)]">
+          <p className="text-[var(--text-tertiary)] text-[0.68rem] font-semibold tracking-[0.14em] uppercase">当前节奏</p>
+          <p className="text-[var(--text-secondary)] text-[0.84rem] leading-relaxed">{helperText}</p>
         </div>
       </aside>
 
-      <main className={styles.main}>
-        <header className={styles.header}>
-          <div className={styles.headerInfo}>
-            <p className={styles.eyebrow}>继续创作</p>
-            <h1 className={styles.title}>从书架回到故事现场</h1>
-            <p className={styles.subtitle}>打开项目就进入创作路径。规则、Skills、模型连接和工具都应该贴着作品工作，而不是先去管理页里翻找。</p>
+      <main className="grid gap-6 min-w-0">
+        <header className="grid [grid-template-columns:minmax(0,1fr)_auto] gap-4 items-end p-[0.35rem_0_0.25rem]">
+          <div className="grid gap-2 min-w-0">
+            <p className="text-[var(--text-tertiary)] text-[0.68rem] font-semibold tracking-[0.14em] uppercase">继续创作</p>
+            <h1 className="text-[var(--text-primary)] font-serif text-[clamp(2.1rem,4vw,3.4rem)] font-semibold tracking-[-0.05em] leading-tight">从书架回到故事现场</h1>
+            <p className="max-w-[60rem] text-[var(--text-secondary)] text-base leading-relaxed">打开项目就进入创作路径。规则、Skills、模型连接和工具都应该贴着作品工作，而不是先去管理页里翻找。</p>
           </div>
-          <div className={styles.headerActions}>
+          <div className="flex flex-wrap gap-[0.6rem] items-center justify-end">
             <Link className="ink-button-secondary" href="/workspace/lobby/settings?tab=assistant">
               打开我的助手
             </Link>
@@ -107,17 +106,17 @@ export function LobbyPage() {
           </div>
         </header>
 
-        <section className={styles.shelfBar}>
-          <label className={styles.searchField}>
-            <span className={styles.searchLabel}>搜索作品</span>
+        <section className="grid [grid-template-columns:minmax(0,1fr)_auto] gap-4 items-stretch p-4 px-[1.1rem] rounded-[26px] bg-[rgba(255,255,255,0.58)] shadow-[inset_0_0_0_1px_rgba(61,61,61,0.06)]">
+          <label className="grid gap-[0.55rem] min-w-0">
+            <span className="text-[var(--text-tertiary)] text-[0.68rem] font-semibold tracking-[0.14em] uppercase">搜索作品</span>
             <input
-              className={styles.searchInput}
+              className="w-full min-h-12 px-4 border border-[rgba(61,61,61,0.08)] rounded-[18px] bg-[rgba(255,255,255,0.86)] text-[var(--text-primary)] text-[0.95rem] transition-all hover:border-[var(--line-strong)] focus:border-[var(--accent-primary)] focus:shadow-[0_0_0_3px_rgba(90,122,107,0.12)] focus:outline-none placeholder:text-[var(--text-placeholder)]"
               placeholder="搜索作品名、题材或模板…"
               value={model.searchText}
               onChange={(event) => model.setSearchText(event.target.value)}
             />
           </label>
-          <div className={styles.metrics}>
+          <div className="flex flex-wrap gap-3 items-stretch justify-end">
             <LobbyMetric label="当前作品" value={projectCount} />
             <LobbyMetric label="筛选结果" value={filteredProjectCount} />
             <LobbyMetric label="模板库" value={model.templateCount} />
@@ -139,13 +138,13 @@ export function LobbyPage() {
 
 function LobbySidebarLink({ item }: Readonly<{ item: LobbyNavItem }>) {
   return (
-    <Link className={styles.sidebarLink} data-active={item.active ? "true" : "false"} href={item.href}>
-      <span aria-hidden="true" className={styles.sidebarIcon}>
-        {item.icon}
+    <Link className={`relative grid [grid-template-columns:auto_minmax(0,1fr)] gap-2 items-start p-[0.95rem_0.95rem_0.95rem_1rem] rounded-[22px] bg-transparent transition-all hover:bg-[rgba(255,255,255,0.48)] hover:translate-x-[2px] ${item.active ? "bg-[rgba(255,255,255,0.74)] before:content-[''] before:absolute before:top-[0.95rem] before:bottom-[0.95rem] before:left-[0.4rem] before:w-[2px] before:rounded-full before:bg-[var(--accent-primary)]" : ""}`} href={item.href}>
+      <span aria-hidden="true" className="inline-flex w-8 h-8 items-center justify-center rounded-3.5 bg-[rgba(90,122,107,0.08)] text-[var(--accent-primary)]">
+        <span className="w-4 h-4">{item.icon}</span>
       </span>
-      <span className={styles.sidebarCopy}>
-        <span className={styles.sidebarLinkLabel}>{item.label}</span>
-        <span className={styles.sidebarLinkMeta}>{item.description}</span>
+      <span className="grid gap-[0.22rem] min-w-0">
+        <span className="text-[var(--text-primary)] text-[0.95rem] font-semibold tracking-[-0.02em]">{item.label}</span>
+        <span className="text-[var(--text-secondary)] text-[0.8rem] leading-relaxed">{item.description}</span>
       </span>
     </Link>
   );
@@ -159,9 +158,9 @@ function LobbyMetric({
   value: number;
 }>) {
   return (
-    <div className={styles.metricCard}>
-      <span className={styles.metricLabel}>{label}</span>
-      <strong className={styles.metricValue}>{new Intl.NumberFormat("zh-CN").format(value)}</strong>
+    <div className="grid min-w-[118px] gap-[0.35rem] p-[0.9rem_1rem] rounded-5 bg-[rgba(248,246,241,0.88)]">
+      <span className="text-[var(--text-tertiary)] text-[0.68rem] font-semibold tracking-[0.14em] uppercase">{label}</span>
+      <strong className="text-[var(--text-primary)] text-[1.3rem] font-semibold [font-variant-numeric:tabular-nums] tracking-[-0.03em]">{new Intl.NumberFormat("zh-CN").format(value)}</strong>
     </div>
   );
 }

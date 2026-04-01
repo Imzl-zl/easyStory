@@ -3,8 +3,6 @@
 import { Select } from "@arco-design/web-react";
 import { useEffect, useMemo } from "react";
 
-import styles from "./app-select.module.css";
-
 export type AppSelectOption = {
   description?: string;
   disabled?: boolean;
@@ -58,9 +56,9 @@ export function AppSelect({
     <Select
       aria-label={ariaLabel}
       allowClear={false}
-      className={buildClassName(styles.root, density === "roomy" ? styles.roomy : undefined, className)}
+      className={`w-full ${density === "roomy" ? "min-h-[2.9rem] p-[0.62rem_0.95rem]" : ""} ${className ?? ""}`}
       disabled={disabled}
-      dropdownMenuClassName={styles.dropdown}
+      dropdownMenuClassName="grid gap-[0.18rem]"
       id={id}
       notFoundContent={emptyText}
       placeholder={placeholder}
@@ -68,12 +66,12 @@ export function AppSelect({
       size="default"
       triggerProps={{
         autoAlignPopupMinWidth: true,
-        className: styles.popup,
+        className: "p-[0.28rem] border border-[rgba(101,92,82,0.12)] rounded-4 bg-[rgba(255,251,245,0.98)] shadow-[0_16px_30px_rgba(58,45,29,0.12)] backdrop-blur-xl",
       }}
       value={resolvedValue}
       renderFormat={() => (
         currentOption ? (
-          <span className={buildClassName(styles.triggerLabel, currentOption.isInvalid ? styles.triggerLabelInvalid : undefined)}>
+          <span className={`text-[var(--text-primary)] text-[0.88rem] leading-normal ${currentOption.isInvalid ? "text-[var(--accent-warning)]" : ""}`}>
             {currentOption.label}
           </span>
         ) : undefined
@@ -82,10 +80,10 @@ export function AppSelect({
     >
       {resolvedOptions.map((option) => (
         <Select.Option key={option.value} disabled={option.disabled} value={option.value}>
-          <span className={buildClassName(styles.option, option.isInvalid ? styles.optionInvalid : undefined)}>
-            <span className={styles.optionLabel}>{option.label}</span>
+          <span className={`grid gap-[0.16rem] p-[0.62rem_0.82rem] rounded-3 transition-all ${option.isInvalid ? "border border-dashed rgba(183,121,31,0.28)] bg-[rgba(183,121,31,0.08)]" : ""}`}>
+            <span className="text-[var(--text-primary)] text-[0.86rem] leading-relaxed">{option.label}</span>
             {option.description ? (
-              <span className={styles.optionDescription}>{option.description}</span>
+              <span className="text-[var(--text-secondary)] text-[0.74rem] leading-relaxed">{option.description}</span>
             ) : null}
           </span>
         </Select.Option>
@@ -110,7 +108,7 @@ function buildResolvedOptions(
   if (!value || hasOptionValue(options, value)) {
     return [...options];
   }
-  return [buildInvalidOption(value), ...options];
+  return [buildInvalidOption(value), ...options]
 }
 
 function buildInvalidOption(value: string): ResolvedOption {
@@ -124,23 +122,23 @@ function buildInvalidOption(value: string): ResolvedOption {
 }
 
 function hasOptionValue(options: ReadonlyArray<AppSelectOption>, value: string) {
-  return options.some((option) => option.value === value);
+  return options.some((option) => option.value === value)
 }
 
 function buildClassName(...parts: Array<string | undefined>) {
-  return parts.filter(Boolean).join(" ");
+  return parts.filter(Boolean).join(" ")
 }
 
 function resolveAppSelectValue(value: string | number | { value: string | number }) {
   if (typeof value === "object" && value !== null && "value" in value) {
-    return String(value.value);
+    return String(value.value)
   }
-  return String(value);
+  return String(value)
 }
 
 function resolveAppSelectValueProp(options: ReadonlyArray<AppSelectOption>, value: string | undefined) {
   if (!value) {
-    return hasOptionValue(options, "") ? "" : undefined;
+    return hasOptionValue(options, "") ? "" : undefined
   }
-  return hasOptionValue(options, value) ? value : undefined;
+  return hasOptionValue(options, value) ? value : undefined
 }
