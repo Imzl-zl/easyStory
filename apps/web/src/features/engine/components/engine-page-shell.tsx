@@ -64,10 +64,10 @@ export function EnginePageShell({
 }: Readonly<EnginePageShellProps>) {
   return (
     <div className="min-h-screen p-8 [background:radial-gradient(circle_at_top_left,rgba(196,167,125,0.18),transparent_30%),radial-gradient(circle_at_right_20%,rgba(90,154,170,0.16),transparent_28%),linear-gradient(180deg,#f7f1e7_0%,#f4efe7_48%,#f8f6f1_100%)]">
-      <section className="relative overflow-hidden border border-[rgba(61,61,61,0.09)] rounded-[28px] bg-[rgba(255,255,255,0.82)] shadow-[0_18px_48px_rgba(72,52,28,0.06)] backdrop-blur-xl p-9 flex flex-col justify-between gap-6">
+      <section className="hero-card p-9 flex flex-col justify-between gap-6">
         <div className="absolute -right-10 -bottom-14 w-[180px] h-[180px] rounded-full bg-[rgba(90,122,107,0.08)]" />
         <div className="max-w-[620px]">
-          <p className="text-[var(--accent-secondary)] text-[11px] tracking-[0.28em] uppercase">推进中心</p>
+          <p className="label-overline">推进中心</p>
           <h1 className="mt-4.5 font-serif text-[clamp(2.6rem,5vw,4.4rem)] font-semibold leading-tight">让创作推进本身可见，但别让它盖过作品。</h1>
           <p className="max-w-[580px] mt-4.5 text-[var(--text-secondary)] text-base leading-relaxed">
             在这里查看当前执行批次、推进阻塞、审核和回放。入口语言保持创作语境，不再像控制台。
@@ -80,7 +80,7 @@ export function EnginePageShell({
             </div>
           ) : null}
           <article className="mt-6 p-5 rounded-[22px] bg-gradient-to-b from-[rgba(250,246,237,0.94)] to-[rgba(247,241,231,0.88)]">
-            <p className="text-[var(--accent-secondary)] text-[11px] tracking-[0.28em] uppercase">当前批次</p>
+            <p className="label-overline">当前批次</p>
             <h2 className="mt-2 font-serif text-xl font-semibold">{workflowSummary?.workflowIdentity ?? "尚未载入执行批次"}</h2>
             <p className="mt-1.5 text-[var(--text-secondary)] text-sm leading-relaxed">
               {workflowSummary?.description ?? "先确认项目准备状态，再启动一轮新的推进。"}
@@ -100,7 +100,7 @@ export function EnginePageShell({
             />
           </label>
           <div className="grid grid-cols-2 gap-2.5">
-            <button className="min-h-[50px] border-none rounded-4 bg-gradient-to-br from-[var(--accent-primary)] to-[#47665a] text-white text-[15px] font-semibold cursor-pointer transition-all hover:-translate-y-px hover:shadow-[0_18px_26px_rgba(71,102,90,0.18)] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none" disabled={primaryActionDisabled} onClick={() => onAction(primaryAction.action)} title={startWorkflowDisabledReason ?? undefined} type="button">
+            <button className="ink-button-hero w-full" disabled={primaryActionDisabled} onClick={() => onAction(primaryAction.action)} title={startWorkflowDisabledReason ?? undefined} type="button">
               {isActionPending ? "处理中..." : primaryAction.label}
             </button>
             <button className="ink-button-secondary" disabled={isLoadWorkflowDisabled} onClick={onLoadWorkflow} type="button">
@@ -156,9 +156,9 @@ export function EnginePageShell({
             </>
           )}
         </aside>
-        <section className="relative overflow-hidden border border-[rgba(61,61,61,0.09)] rounded-[28px] bg-[rgba(255,255,255,0.82)] shadow-[0_18px_48px_rgba(72,52,28,0.06)] backdrop-blur-xl">
+        <section className="hero-card">
           <div className="p-6">
-            <p className="text-[var(--accent-secondary)] text-[11px] tracking-[0.28em] uppercase">执行详情</p>
+            <p className="label-overline">执行详情</p>
             <h2 className="mt-3 font-serif text-2xl font-semibold">按视角查看这一轮推进。</h2>
             <p className="mt-2 text-[var(--text-secondary)] text-sm leading-relaxed">
               概览、章节任务、审核、日志和提示词回放都保留，但它们现在属于作品推进过程的一部分。
