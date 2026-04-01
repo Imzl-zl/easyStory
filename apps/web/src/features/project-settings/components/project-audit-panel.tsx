@@ -90,7 +90,7 @@ function AuditFilterBar({
 
   return (
     <form
-      className="panel-muted space-y-8 p-10"
+      className="space-y-6 pb-6 border-b border-[var(--line-soft)]"
       onSubmit={(event) => {
         event.preventDefault();
         onApply();
