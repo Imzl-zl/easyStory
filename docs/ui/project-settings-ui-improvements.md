@@ -263,7 +263,38 @@ const presetFilters = [
 
 ---
 
-## 七、结论
+## 七、涉及的文件位置
+
+### 页面骨架文件
+
+| 文件 | 职责 |
+|------|------|
+| `apps/web/src/app/workspace/project/[projectId]/settings/page.tsx` | 路由入口 |
+| `apps/web/src/features/project-settings/components/project-settings-page.tsx` | 主页面、dirty state 管理 |
+| `apps/web/src/features/project-settings/components/project-settings-page.module.css` | 页面骨架样式 |
+| `apps/web/src/features/project-settings/components/project-settings-content.tsx` | 内容区容器 |
+| `apps/web/src/features/project-settings/components/project-settings-sidebar.tsx` | 侧栏导航 |
+
+### 各标签页文件
+
+| 标签页 | 主组件 | 文件位置 |
+|--------|--------|--------|
+| 项目设定 | `ProjectSettingEditor` | `apps/web/src/features/studio/components/` |
+| 规则 | `AssistantRulesEditor` | `apps/web/src/features/settings/components/` |
+| AI偏好 | `AssistantPreferencesPanel` | `apps/web/src/features/settings/components/` |
+| Skills | `AssistantSkillsPanel` | `apps/web/src/features/settings/components/` |
+| MCP | `AssistantMcpPanel` | `apps/web/src/features/settings/components/` |
+| 审计 | `ProjectAuditPanel` | `apps/web/src/features/project-settings/components/` |
+
+### 全局共享组件
+
+| 组件 | 文件位置 |
+|------|--------|
+| `ink-input`, `ink-textarea`, `ink-button` | `apps/web/src/app/globals.css` |
+| `SectionCard`, `StatusBadge`, `EmptyState` | `apps/web/src/components/ui/` |
+| `AppNotice`, `UnsavedChangesDialog` | `apps/web/src/components/ui/` |
+
+## 八、结论
 
 | 原文档声称 | 实际情况 |
 |-----------|---------|
