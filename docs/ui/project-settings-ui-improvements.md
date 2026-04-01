@@ -208,15 +208,116 @@
 
 ---
 
-### 🟡 建议 3：AI 偏好的继承状态可见性
+### 🟡 建议 3：AI 偏好的"幽灵占位符"（最实用）
 
 **现状**（`AssistantPreferencesPanel`）：
 - "留空即继承个人设置"只体现在说明文案里
 - 用户很难一眼看出自己是否正在继承默认值
 
-**优化方向**：
-- 在字段旁显示"当前值：继承个人偏好"或"当前值：[具体模型名]"
-- 这是可见性优化，不需要改数据结构
+**优化方案**：动态 placeholder 显示继承值
+
+```tsx
+// 原来（固定 placeholder）
+<input
+  className="ink-input"
+  placeholder="输入模型名称，如 gpt-4o"
+/>
+
+// 改进（幽灵占位符）
+<input
+  className="ink-input"
+  placeholder={inheritedValue ? `当前继承：${inheritedValue}` : "输入模型名称"}
+  value={inputValue}
+  onChange={e => setInputValue(e.target.value)}
+/>
+```
+
+**效果**：用户看到 "当前继承：GPT-4o" 会有安全感；开始输入后 placeholder 消失，进入自定义模式。
+
+---
+
+### 🟡 建议 4：Dirty Tab 未保存圆点（最实用）
+
+**现状**：
+- dirty state 按 tab 维护，但侧栏 tab 没有视觉提示
+- 用户必须点进去或触发拦截弹窗才知道有未保存内容
+
+**优化方案**：在侧栏 tab 旁显示微小圆点
+
+```tsx
+// project-settings-sidebar.tsx
+{tabs.map(tab => (
+  <button
+    key={tab.id}
+    className={cn("tab-button", { active: tab.id === currentTab })}
+  >
+    {tab.label}
+    {dirtyState[tab.id] && (
+      <span className="dirty-dot" aria-label="有未保存的更改" />
+    )}
+  </button>
+))}
+```
+
+```css
+/* project-settings-page.module.css */
+.dirty-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent-warning);
+  margin-left: 4px;
+  vertical-align: middle;
+}
+```
+
+**影响范围**：`project-settings-sidebar.tsx` + 样式文件
+
+---
+
+### 🟡 建议 5：编辑器文本容器 65ch 限宽
+
+**现状**（Skills/MCP 编辑器）：
+- 右侧编辑器内容过少时，文本行过长，阅读困难
+
+**优化方案**：为编辑器文本容器设置 max-width
+
+```css
+/* skills-editor.module.css / mcp-editor.module.css */
+.editor-content {
+  max-width: 65ch; /* 约 80-100 个字符 */
+  margin-left: auto;
+  margin-right: auto;
+}
+```
+
+**效果**：保持卡片宽度灵活，但文本阅读宽度固定在舒适范围。
+
+---
+
+### 🟡 建议 6：全宽文本域聚焦 glow 效果
+
+**现状**：
+- 项目设定的 3 个全宽文本域（核心冲突、剧情走向、特殊要求）是"重度思考"项
+- 聚焦时没有视觉引导
+
+**优化方案**：聚焦时给外层 SectionCard 微弱的 glow
+
+```css
+/* project-setting-editor.module.css */
+.section-card {
+  transition: box-shadow 0.2s ease;
+}
+
+.section-card:focus-within {
+  box-shadow: 0 0 0 3px rgba(90, 122, 107, 0.15);
+}
+```
+
+**效果**：帮助用户进入沉浸式写作状态。
+
+---
 
 ---
 
@@ -259,17 +360,20 @@
 
 ---
 
-## 五、实施优先级
+## 六、实施优先级
 
 ### ⭐ 最优先（可立即实施）
 
 - [ ] **审计页预设过滤标签**：在输入框上方添加"项目更新"、"设置变更"、"成员变动"等预设标签
 - [ ] **审计页文案优化**：`actor` → `操作人`，`details` → `详情`，`system` → `系统`
+- [ ] **幽灵占位符**：AI 偏好 input 动态显示 "当前继承：xxx"
+- [ ] **Dirty Tab 圆点**：侧栏 tab 旁显示未保存橙色圆点
 
-### P1 - 可选优化（非紧急）
+### P1 - 可选优化
 
-- [ ] 为项目设定字段添加分组视觉分隔（fieldset/legend）
-- [ ] AI 偏好显示当前继承状态
+- [ ] 项目设定字段分组语义化（fieldset/legend）
+- [ ] 编辑器 65ch 限宽（Skills/MCP）
+- [ ] 全宽文本域聚焦 glow 效果
 
 ---
 
