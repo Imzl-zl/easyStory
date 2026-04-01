@@ -7,7 +7,8 @@ Desktop.ini
 .idea/
 *.iml
 .claude/settings.local.json
-.kiro
+.kiro/
+.trae/
 
 # Python runtime artifacts
 __pycache__/

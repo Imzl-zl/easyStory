@@ -8,7 +8,7 @@ export function ProjectSettingField({
   label: string;
 }>) {
   return (
-    <label className="block space-y-2">
+    <label className="block space-y-2.5">
       <span className="label-text">{label}</span>
       {children}
     </label>

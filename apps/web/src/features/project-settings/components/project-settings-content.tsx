@@ -9,6 +9,7 @@ import { AssistantSkillsPanel } from "@/features/settings/components/assistant-s
 import { ProjectSettingEditor } from "@/features/studio/components/project-setting-editor";
 import { getErrorMessage } from "@/lib/api/client";
 import { checkProjectSetting, getProject } from "@/lib/api/projects";
+import styles from "./project-settings-page.module.css";
 
 type ProjectSettingsContentProps = {
   completeness: Awaited<ReturnType<typeof checkProjectSetting>> | undefined;
@@ -42,60 +43,81 @@ export function ProjectSettingsContent({
   tab,
 }: Readonly<ProjectSettingsContentProps>) {
   if (tab === "setting" && projectLoading) {
-    return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载项目设定...</div>;
+    return (
+      <div className={styles.contentCard}>
+        <div className={styles.loadingText}>
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin opacity-50" />
+            <span>正在加载项目设定...</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4">
+    <div className={styles.content}>
       {projectError ? (
-        <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
-          {getErrorMessage(projectError)}
+        <div className={styles.errorCard}>
+          <p className={styles.errorText}>{getErrorMessage(projectError)}</p>
         </div>
       ) : null}
       {tab === "setting" && !projectError ? (
-        <ProjectSettingEditor
-          completeness={completeness}
-          initialSetting={projectSetting}
-          onDirtyChange={onProjectSettingDirtyChange}
-          projectId={projectId}
-        />
+        <div className={styles.contentCard}>
+          <ProjectSettingEditor
+            completeness={completeness}
+            initialSetting={projectSetting}
+            onDirtyChange={onProjectSettingDirtyChange}
+            projectId={projectId}
+          />
+        </div>
       ) : null}
       {tab === "rules" ? (
-        <AssistantRulesEditor
-          description="只影响这个项目里的聊天和创作建议。适合写题材方向、风格限制和明确不想要的内容。"
-          onDirtyChange={onProjectRulesDirtyChange}
-          projectId={projectId}
-          scope="project"
-          title="项目长期规则"
-        />
+        <div className={styles.contentCard}>
+          <AssistantRulesEditor
+            description="只影响这个项目里的聊天和创作建议。适合写题材方向、风格限制和明确不想要的内容。"
+            onDirtyChange={onProjectRulesDirtyChange}
+            projectId={projectId}
+            scope="project"
+            title="项目长期规则"
+          />
+        </div>
       ) : null}
       {tab === "assistant" ? (
-        <AssistantPreferencesPanel
-          onDirtyChange={onProjectPreferencesDirtyChange}
-          projectId={projectId}
-          scope="project"
-        />
+        <div className={styles.contentCard}>
+          <AssistantPreferencesPanel
+            onDirtyChange={onProjectPreferencesDirtyChange}
+            projectId={projectId}
+            scope="project"
+          />
+        </div>
       ) : null}
       {tab === "skills" ? (
-        <AssistantSkillsPanel
-          onDirtyChange={onProjectSkillsDirtyChange}
-          projectId={projectId}
-          scope="project"
-        />
+        <div className={styles.contentCard}>
+          <AssistantSkillsPanel
+            onDirtyChange={onProjectSkillsDirtyChange}
+            projectId={projectId}
+            scope="project"
+          />
+        </div>
       ) : null}
       {tab === "mcp" ? (
-        <AssistantMcpPanel
-          onDirtyChange={onProjectMcpDirtyChange}
-          projectId={projectId}
-          scope="project"
-        />
+        <div className={styles.contentCard}>
+          <AssistantMcpPanel
+            onDirtyChange={onProjectMcpDirtyChange}
+            projectId={projectId}
+            scope="project"
+          />
+        </div>
       ) : null}
       {tab === "audit" ? (
-        <ProjectAuditPanel
-          eventType={eventType}
-          onEventTypeChange={onEventTypeChange}
-          projectId={projectId}
-        />
+        <div className={styles.contentCard}>
+          <ProjectAuditPanel
+            eventType={eventType}
+            onEventTypeChange={onEventTypeChange}
+            projectId={projectId}
+          />
+        </div>
       ) : null}
     </div>
   );

@@ -16,6 +16,7 @@ import {
 } from "@/features/project-settings/components/project-settings-support";
 import { checkProjectSetting, getProject } from "@/lib/api/projects";
 import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
+import styles from "./project-settings-page.module.css";
 
 type ProjectSettingsPageProps = {
   projectId: string;
@@ -75,36 +76,51 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
     });
   }, [eventType, routeEvent, routeTab, setParams]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isDirty) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isDirty]);
+
   return (
     <>
-      <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
-        <ProjectSettingsSidebar
-          isDirty={isDirty}
-          isPending={isPending}
-          onNavigate={navigationGuard.attemptNavigation}
-          onSelectTab={(nextTab) =>
-            navigationGuard.attemptNavigation(() => handleSelectTab(nextTab, eventType, setParams))
-          }
-          projectId={projectId}
-          projectName={projectQuery.data?.name ?? "正在加载项目..."}
-          projectStatus={projectQuery.data?.status ?? null}
-          tab={tab}
-        />
-        <ProjectSettingsContent
-          completeness={completenessQuery.data}
-          eventType={eventType}
-          projectError={projectQuery.error}
-          projectLoading={projectQuery.isLoading}
-          projectId={projectId}
-          projectSetting={projectQuery.data?.project_setting ?? null}
-          tab={tab}
-          onEventTypeChange={(nextEventType) => setParams({ event: nextEventType, tab: "audit" })}
-          onProjectMcpDirtyChange={setProjectMcpDirty}
-          onProjectPreferencesDirtyChange={setProjectPreferencesDirty}
-          onProjectRulesDirtyChange={setProjectRulesDirty}
-          onProjectSettingDirtyChange={setProjectSettingDirty}
-          onProjectSkillsDirtyChange={setProjectSkillsDirty}
-        />
+      <div className={styles.page}>
+        <div className={styles.sidebar}>
+          <ProjectSettingsSidebar
+            isDirty={isDirty}
+            isPending={isPending}
+            onNavigate={navigationGuard.attemptNavigation}
+            onSelectTab={(nextTab) =>
+              navigationGuard.attemptNavigation(() => handleSelectTab(nextTab, eventType, setParams))
+            }
+            projectId={projectId}
+            projectName={projectQuery.data?.name ?? "正在加载项目..."}
+            projectStatus={projectQuery.data?.status ?? null}
+            tab={tab}
+          />
+        </div>
+        <div className={styles.content}>
+          <ProjectSettingsContent
+            completeness={completenessQuery.data}
+            eventType={eventType}
+            projectError={projectQuery.error}
+            projectLoading={projectQuery.isLoading}
+            projectId={projectId}
+            projectSetting={projectQuery.data?.project_setting ?? null}
+            tab={tab}
+            onEventTypeChange={(nextEventType) => setParams({ event: nextEventType, tab: "audit" })}
+            onProjectMcpDirtyChange={setProjectMcpDirty}
+            onProjectPreferencesDirtyChange={setProjectPreferencesDirty}
+            onProjectRulesDirtyChange={setProjectRulesDirty}
+            onProjectSettingDirtyChange={setProjectSettingDirty}
+            onProjectSkillsDirtyChange={setProjectSkillsDirty}
+          />
+        </div>
       </div>
       <UnsavedChangesDialog
         isOpen={navigationGuard.isConfirmOpen}

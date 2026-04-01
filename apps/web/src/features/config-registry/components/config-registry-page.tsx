@@ -181,7 +181,7 @@ export function ConfigRegistryPage() {
               isDirty={effectiveIsDirty}
               onNavigate={navigationGuard.attemptNavigation}
             >
-              返回项目大厅
+              返回书架
             </GuardedLink>
             <GuardedLink
               className="ink-button-secondary h-9 px-4 text-[13px]"

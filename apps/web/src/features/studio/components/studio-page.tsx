@@ -133,7 +133,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
             type="secondary"
             onClick={() => router.push(`/workspace/project/${projectId}/engine`)}
           >
-            任务推进
+            作品推进
           </Button>
           {staleChapters.length > 0 ? (
             <span className={styles.statusChip}>{staleChapters.length} 个章节待整理</span>

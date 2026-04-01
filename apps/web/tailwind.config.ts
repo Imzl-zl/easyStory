@@ -63,6 +63,12 @@ const config: Config = {
         fast: '120ms',
         normal: '200ms',
         slow: '300ms',
+        spring: '300ms',
+        smooth: '250ms',
+      },
+      transitionTimingFunction: {
+        'spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
       },
     },
   },

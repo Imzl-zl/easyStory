@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Checkbox } from "@arco-design/web-react";
 
 import type { DocumentTreeNode } from "@/features/studio/components/studio-page-support";
 
@@ -69,8 +68,8 @@ export function AiChatPanel({
   settings,
   visibleModelLabel,
 }: Readonly<AiChatPanelProps>) {
-  const [showContextSelector, setShowContextSelector] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
+
   const flatContexts = useMemo(
     () => flattenStudioContexts(availableContexts),
     [availableContexts],
@@ -100,26 +99,16 @@ export function AiChatPanel({
         </div>
       </header>
 
-      {showContextSelector ? (
-        <section className={styles.contextSelector}>
-          <p className={styles.contextLabel}>附加文档上下文</p>
-          <div className={styles.contextList}>
-            {flatContexts.filter((node) => node.type === "file").map((node) => (
-              <label className={styles.contextItem} key={node.id}>
-                <Checkbox checked={selectedContextPaths.includes(node.path)} onChange={() => onToggleContext(node.path)} />
-                <span className={styles.contextPath}>{node.path}</span>
-              </label>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       <div className={styles.transcript} ref={transcriptRef}>
         {messages.length === 0 ? (
           <div className={styles.emptyChat}>
             <div className={styles.emptyIcon}>✦</div>
-            <p className={styles.emptyText}>{canChat ? "把问题、片段，或者文件直接丢进来就行。" : "先接入一个可用模型，再开始共创。"}</p>
-            <p className={styles.emptyHint}>上下文、模型、文件都收进底部工具条，主舞台只留给对话和正文。</p>
+            <p className={styles.emptyText}>
+              {canChat ? "把问题、片段，或者文件直接丢进来就行。" : "先接入一个可用模型，再开始共创。"}
+            </p>
+            <p className={styles.emptyHint}>
+              上下文、模型、文件都收进底部工具条，主舞台只留给对话和正文。
+            </p>
           </div>
         ) : null}
         {messages.map((message) => (
@@ -142,11 +131,11 @@ export function AiChatPanel({
 
       <StudioChatComposer
         attachments={attachments}
+        availableContexts={flatContexts}
         canChat={canChat}
         credentialNotice={credentialNotice}
         credentialSettingsHref={credentialSettingsHref}
         isCredentialLoading={isCredentialLoading}
-        isContextSelectorOpen={showContextSelector}
         isResponding={isResponding}
         modelButtonLabel={visibleModelLabel}
         onAttachFiles={onAttachFiles}
@@ -154,9 +143,9 @@ export function AiChatPanel({
         onProviderChange={onProviderChange}
         onRemoveAttachment={onRemoveAttachment}
         onSendMessage={onSendMessage}
-        onToggleContextSelector={() => setShowContextSelector((current) => !current)}
+        onToggleContext={onToggleContext}
         providerOptions={providerOptions}
-        selectedContextCount={selectedContextPaths.length}
+        selectedContextPaths={selectedContextPaths}
         selectedCredentialLabel={selectedCredentialLabel}
         settings={settings}
       />
@@ -168,9 +157,7 @@ function flattenStudioContexts(nodes: DocumentTreeNode[]) {
   return nodes.flatMap((node) => (node.children ? [node, ...node.children] : [node]));
 }
 
-function resolveStatusToneClassName(
-  credentialState: AiChatPanelProps["credentialState"],
-) {
+function resolveStatusToneClassName(credentialState: AiChatPanelProps["credentialState"]) {
   const tone = resolveStudioStatusTone(credentialState);
   if (tone === "danger") {
     return styles.statusPillDanger;

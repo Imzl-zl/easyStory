@@ -31,8 +31,8 @@ function resolvePageMode(pathname: string): PageMode {
 
 function resolveContextTitle(pathname: string): string {
   if (pathname.includes("/studio")) return "创作工作台";
-  if (pathname.includes("/engine")) return "任务推进";
-  if (pathname.includes("/lab")) return "分析与灵感";
+  if (pathname.includes("/engine")) return "作品推进";
+  if (pathname.includes("/lab")) return "作品洞察";
   if (pathname.includes("/settings")) return "项目设置";
   return "当前项目";
 }

@@ -149,16 +149,16 @@ function ProjectSettingEditorForm({
         </div>
       }
     >
-      <div className="space-y-5">
-        <div className="panel-muted flex flex-wrap items-start justify-between gap-3 p-4">
-          <div className="space-y-2">
-            <p className="text-sm text-[var(--text-secondary)]">设定完整度</p>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">{issueSummary}</p>
+      <div className="space-y-8">
+        <div className="panel-muted flex flex-wrap items-start justify-between gap-4 p-5">
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-[var(--text-secondary)]">设定完整度</p>
+            <p className="text-sm leading-relaxed text-[var(--text-secondary)]">{issueSummary}</p>
           </div>
           <StatusBadge status={completeness?.status ?? "draft"} label={completeness?.status ?? "未检查"} />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           <ProjectSettingField label="题材">
             <input
               className="ink-input"
@@ -275,7 +275,7 @@ function ProjectSettingEditorForm({
 
         <ProjectSettingField label="核心冲突">
           <textarea
-            className="ink-textarea min-h-28"
+            className="ink-textarea min-h-32"
             value={setting.core_conflict ?? ""}
             onChange={(event) =>
               setSetting((current) => ({ ...current, core_conflict: event.target.value }))
@@ -285,7 +285,7 @@ function ProjectSettingEditorForm({
 
         <ProjectSettingField label="剧情走向">
           <textarea
-            className="ink-textarea min-h-28"
+            className="ink-textarea min-h-32"
             value={setting.plot_direction ?? ""}
             onChange={(event) =>
               setSetting((current) => ({ ...current, plot_direction: event.target.value }))
@@ -295,7 +295,7 @@ function ProjectSettingEditorForm({
 
         <ProjectSettingField label="特殊要求">
           <textarea
-            className="ink-textarea min-h-24"
+            className="ink-textarea min-h-28"
             value={setting.special_requirements ?? ""}
             onChange={(event) =>
               setSetting((current) => ({ ...current, special_requirements: event.target.value }))

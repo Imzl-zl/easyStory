@@ -24,8 +24,8 @@ export function TemplateLibraryPage({ initialTemplateId = null }: TemplateLibrar
         description="查看和维护项目模板。"
         action={
           <div className="flex flex-wrap gap-2">
-            <Link className="ink-button-secondary" href="/workspace/lobby">返回项目大厅</Link>
-            <Link className="ink-button-secondary" href="/workspace/lobby/new">创建项目</Link>
+            <Link className="ink-button-secondary" href="/workspace/lobby">返回书架</Link>
+            <Link className="ink-button-secondary" href="/workspace/lobby/new">创建作品</Link>
           </div>
         }
       >

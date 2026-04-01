@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { KeyboardEvent, ReactNode, RefObject } from "react";
-import { Button, Input } from "@arco-design/web-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
+import { Button, Checkbox, Input } from "@arco-design/web-react";
 
 import { AppSelect } from "@/components/ui/app-select";
+import type { DocumentTreeNode } from "@/features/studio/components/studio-page-support";
 
 import { STUDIO_ATTACHMENT_ACCEPT, type StudioChatAttachmentMeta } from "./studio-chat-attachment-support";
 import type { StudioChatSettings, StudioProviderOption } from "./studio-chat-support";
@@ -14,11 +15,11 @@ import styles from "./studio-chat-composer.module.css";
 
 type StudioChatComposerProps = {
   attachments: StudioChatAttachmentMeta[];
+  availableContexts: DocumentTreeNode[];
   canChat: boolean;
   credentialNotice: string | null;
   credentialSettingsHref: string;
   isCredentialLoading: boolean;
-  isContextSelectorOpen: boolean;
   isResponding: boolean;
   modelButtonLabel: string;
   onAttachFiles: (files: FileList | null) => void;
@@ -26,20 +27,20 @@ type StudioChatComposerProps = {
   onProviderChange: (provider: string) => void;
   onRemoveAttachment: (attachmentId: string) => void;
   onSendMessage: (message: string) => void;
-  onToggleContextSelector: () => void;
+  onToggleContext: (path: string) => void;
   providerOptions: StudioProviderOption[];
-  selectedContextCount: number;
+  selectedContextPaths: string[];
   selectedCredentialLabel: string | null;
   settings: Pick<StudioChatSettings, "modelName" | "provider">;
 };
 
 export function StudioChatComposer({
   attachments,
+  availableContexts,
   canChat,
   credentialNotice,
   credentialSettingsHref,
   isCredentialLoading,
-  isContextSelectorOpen,
   isResponding,
   modelButtonLabel,
   onAttachFiles,
@@ -47,38 +48,105 @@ export function StudioChatComposer({
   onProviderChange,
   onRemoveAttachment,
   onSendMessage,
-  onToggleContextSelector,
+  onToggleContext,
   providerOptions,
-  selectedContextCount,
+  selectedContextPaths,
   selectedCredentialLabel,
   settings,
 }: Readonly<StudioChatComposerProps>) {
   const [inputText, setInputText] = useState("");
   const [showModelPicker, setShowModelPicker] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const modelPickerRef = useRef<HTMLDivElement | null>(null);
-  const canSubmit = canChat && !isResponding && (inputText.trim().length > 0 || attachments.length > 0);
+  const [showContextSelector, setShowContextSelector] = useState(false);
+  const [contextSearchQuery, setContextSearchQuery] = useState("");
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ 设定: true, 大纲: true, 章节: true });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const modelPickerRef = useRef<HTMLDivElement>(null);
+  const contextSelectorRef = useRef<HTMLDivElement>(null);
+  const contextButtonRef = useRef<HTMLButtonElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
 
-  useDismissStudioPopover(modelPickerRef, showModelPicker, () => setShowModelPicker(false));
+  const toggleGroup = useCallback((groupName: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }));
+  }, []);
+
+  const providerOptionsForSelect = useMemo(
+    () => providerOptions.map((p) => ({ label: p.label, value: p.value })),
+    [providerOptions],
+  );
+
+  const filteredContexts = useMemo(() => {
+    const fileContexts = availableContexts.filter((n) => n.type === "file");
+    if (!contextSearchQuery.trim()) {
+      return fileContexts;
+    }
+    const query = contextSearchQuery.toLowerCase();
+    return fileContexts.filter(
+      (node) =>
+        node.path.toLowerCase().includes(query) ||
+        node.label.toLowerCase().includes(query),
+    );
+  }, [availableContexts, contextSearchQuery]);
+
+  const groupedContexts = useMemo(() => {
+    const groups: { [key: string]: typeof filteredContexts } = {
+      设定: [],
+      大纲: [],
+      章节: [],
+    };
+
+    filteredContexts.forEach((node) => {
+      const path = node.path.toLowerCase();
+      if (path.includes("设定") || path.includes("setting")) {
+        groups["设定"].push(node);
+      } else if (path.includes("大纲") || path.includes("outline")) {
+        groups["大纲"].push(node);
+      } else {
+        groups["章节"].push(node);
+      }
+    });
+
+    return groups;
+  }, [filteredContexts]);
+
+  const totalFileCount = availableContexts.filter((n) => n.type === "file").length;
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (modelPickerRef.current && !modelPickerRef.current.contains(event.target as Node)) {
+        setShowModelPicker(false);
+      }
+      if (
+        contextSelectorRef.current &&
+        !contextSelectorRef.current.contains(event.target as Node) &&
+        contextButtonRef.current &&
+        !contextButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowContextSelector(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleSubmit = useCallback(() => {
-    if (!canSubmit) {
-      return;
-    }
-    onSendMessage(inputText.trim());
+    const trimmed = inputText.trim();
+    if (!trimmed || isResponding) return;
+    onSendMessage(trimmed);
     setInputText("");
-  }, [canSubmit, inputText, onSendMessage]);
+  }, [inputText, isResponding, onSendMessage]);
 
-  const handleComposerKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
-      return;
-    }
-    event.preventDefault();
-    handleSubmit();
-  }, [handleSubmit]);
+  const handleComposerKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+      event.preventDefault();
+      handleSubmit();
+    },
+    [handleSubmit],
+  );
 
   return (
-    <footer className={styles.composer}>
+    <div className={styles.composer} ref={composerRef}>
       <div className={styles.composerInner}>
         {credentialNotice ? (
           <div className={styles.notice}>
@@ -88,6 +156,7 @@ export function StudioChatComposer({
             </Link>
           </div>
         ) : null}
+
         {attachments.length > 0 ? (
           <div className={styles.attachmentRow}>
             {attachments.map((attachment) => (
@@ -103,6 +172,7 @@ export function StudioChatComposer({
             ))}
           </div>
         ) : null}
+
         <Input.TextArea
           autoSize={{ maxRows: 6, minRows: 2 }}
           className={styles.composerInput}
@@ -111,37 +181,96 @@ export function StudioChatComposer({
           onChange={setInputText}
           onKeyDown={handleComposerKeyDown}
         />
+
         <div className={styles.toolbar}>
           <div className={styles.toolbarLeft}>
             <ToolbarIconButton label="上传文件" onClick={() => fileInputRef.current?.click()}>
               <PaperclipIcon />
             </ToolbarIconButton>
-            <ToolbarChipButton
-              active={isContextSelectorOpen}
-              label={selectedContextCount > 0 ? `上下文 ${selectedContextCount}` : "上下文"}
-              onClick={onToggleContextSelector}
-            >
-              <ContextIcon />
-            </ToolbarChipButton>
-            <div className={styles.modelPickerWrap} ref={modelPickerRef}>
+
+            <div className={styles.contextButtonWrap}>
+              <ToolbarChipButton
+                active={showContextSelector}
+                label={`上下文 ${selectedContextPaths.length}`}
+                onClick={() => setShowContextSelector((v) => !v)}
+                buttonRef={contextButtonRef}
+              >
+                <ContextIcon />
+              </ToolbarChipButton>
+
+              {showContextSelector && (
+                <div className={styles.contextSelector} ref={contextSelectorRef}>
+                  <p className={styles.contextLabel}>
+                    附加文档上下文 ({selectedContextPaths.length}/{totalFileCount})
+                  </p>
+                  <input
+                    type="text"
+                    className={styles.contextSearch}
+                    placeholder="搜索章节..."
+                    value={contextSearchQuery}
+                    onChange={(e) => setContextSearchQuery(e.target.value)}
+                  />
+                  <div className={styles.contextList}>
+                    {Object.entries(groupedContexts).map(([groupName, nodes]) => {
+                      if (nodes.length === 0) return null;
+                      return (
+                        <div key={groupName} className={styles.contextGroup}>
+                          <div
+                            className={`${styles.contextGroupHeader} ${expandedGroups[groupName] ? styles.contextGroupHeaderExpanded : ""}`}
+                            onClick={() => toggleGroup(groupName)}
+                          >
+                            <span className={styles.contextGroupIcon}>▶</span>
+                            <span>{groupName}</span>
+                            <span style={{ marginLeft: "auto", opacity: 0.6 }}>
+                              {nodes.length}
+                            </span>
+                          </div>
+                          {expandedGroups[groupName] && (
+                            <div className={styles.contextGroupItems}>
+                              {nodes.map((node) => (
+                                <label className={styles.contextItem} key={node.id}>
+                                  <Checkbox
+                                    checked={selectedContextPaths.includes(node.path)}
+                                    onChange={() => onToggleContext(node.path)}
+                                  />
+                                  <span className={styles.contextPath}>{node.label}</span>
+                                  <span className={styles.contextPathSecondary}>
+                                    {node.path.split("/").slice(-2, -1)[0]}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className={styles.modelPickerWrap}>
               <ToolbarChipButton
                 active={showModelPicker}
                 label={modelButtonLabel}
-                onClick={() => setShowModelPicker((current) => !current)}
+                onClick={() => setShowModelPicker((v) => !v)}
               >
                 <SparkIcon />
               </ToolbarChipButton>
-              {showModelPicker ? (
-                <div className={styles.modelPicker}>
+
+              {showModelPicker && (
+                <div className={styles.modelPicker} ref={modelPickerRef}>
                   <div className={styles.modelPickerHeader}>
                     <p className={styles.modelPickerTitle}>切换模型</p>
-                    <p className={styles.modelPickerHint}>{selectedCredentialLabel ?? "先选可用渠道，再决定模型名。"}</p>
+                    <p className={styles.modelPickerHint}>
+                      {selectedCredentialLabel ?? "先选可用渠道，再决定模型名。"}
+                    </p>
                   </div>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>渠道</span>
                     <AppSelect
-                      ariaLabel="渠道"
-                      options={providerOptions}
+                      aria-label="渠道"
+                      options={providerOptionsForSelect}
                       placeholder={isCredentialLoading ? "正在读取渠道..." : "选择可用渠道"}
                       value={settings.provider}
                       onChange={onProviderChange}
@@ -159,55 +288,32 @@ export function StudioChatComposer({
                     />
                   </label>
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
-          <Button disabled={!canSubmit} loading={isResponding} shape="round" type="primary" onClick={handleSubmit}>
+
+          <Button
+            disabled={!canChat || isResponding}
+            loading={isResponding}
+            shape="round"
+            type="primary"
+            onClick={handleSubmit}
+          >
             发送
           </Button>
         </div>
-        <p className={styles.hint}>
-          {buildStudioComposerHint({
-            attachmentCount: attachments.length,
-            canChat,
-            inputLength: inputText.length,
-            isResponding,
-          })}
-        </p>
-      </div>
-      <input
-        accept={STUDIO_ATTACHMENT_ACCEPT}
-        className={styles.hiddenInput}
-        multiple
-        ref={fileInputRef}
-        type="file"
-        onChange={(event) => {
-          onAttachFiles(event.target.files);
-          event.target.value = "";
-        }}
-      />
-    </footer>
-  );
-}
 
-function useDismissStudioPopover(
-  ref: RefObject<HTMLDivElement | null>,
-  active: boolean,
-  onDismiss: () => void,
-) {
-  useEffect(() => {
-    if (!active) {
-      return;
-    }
-    const handlePointerDown = (event: MouseEvent) => {
-      if (ref.current?.contains(event.target as Node)) {
-        return;
-      }
-      onDismiss();
-    };
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [active, onDismiss, ref]);
+        <input
+          accept={STUDIO_ATTACHMENT_ACCEPT}
+          className={styles.hiddenInput}
+          ref={fileInputRef}
+          type="file"
+          multiple
+          onChange={(e) => onAttachFiles(e.target.files)}
+        />
+      </div>
+    </div>
+  );
 }
 
 function ToolbarIconButton({
@@ -231,14 +337,21 @@ function ToolbarChipButton({
   children,
   label,
   onClick,
+  buttonRef,
 }: {
   active?: boolean;
   children: ReactNode;
   label: string;
   onClick: () => void;
+  buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
   return (
-    <button className={`${styles.chipButton} ${active ? styles.chipButtonActive : ""}`} type="button" onClick={onClick}>
+    <button
+      ref={buttonRef}
+      className={`${styles.chipButton} ${active ? styles.chipButtonActive : ""}`}
+      type="button"
+      onClick={onClick}
+    >
       <span className={styles.chipIcon}>{children}</span>
       <span className={styles.chipLabel}>{label}</span>
       <span className={styles.chipChevron}>⌄</span>

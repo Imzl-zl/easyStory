@@ -5,8 +5,8 @@ const PROJECT_SETTINGS_PATH_PATTERN = /^\/workspace\/project\/[^/]+\/settings(?:
 const LOBBY_PATH_PREFIX = "/workspace/lobby";
 const PROJECT_WORKSPACE_ITEMS = [
   { label: "创作", meta: "设定、大纲、章节", segment: "studio" },
-  { label: "推进", meta: "流程与进度", segment: "engine" },
-  { label: "洞察", meta: "分析与灵感", segment: "lab" },
+  { label: "推进", meta: "推进状态与下一步", segment: "engine" },
+  { label: "洞察", meta: "对作品的帮助", segment: "lab" },
 ] as const;
 const WORKSPACE_SIDEBAR_WIDTH = {
   collapsed: "88px",
