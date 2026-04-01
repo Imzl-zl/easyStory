@@ -158,9 +158,9 @@ function ProjectSettingEditorForm({
           <StatusBadge status={completeness?.status ?? "draft"} label={completeness?.status ?? "未检查"} />
         </div>
 
-        <fieldset className="border border-[var(--line-soft)] rounded-[var(--radius-lg)] p-7 m-0 bg-gradient-to-br from-[var(--bg-surface)] to-[rgba(255,255,255,0.95)] transition-all relative">
-          <legend className="text-[0.75rem] font-semibold text-[var(--text-secondary)] px-2 ml-2 tracking-[0.08em] uppercase">基本信息</legend>
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">基本信息</h3>
+          <div className="grid gap-x-8 gap-y-6 grid-cols-1 md:grid-cols-2">
             <ProjectSettingField label="题材">
               <input
                 className="ink-input"
@@ -194,11 +194,11 @@ function ProjectSettingEditorForm({
               />
             </ProjectSettingField>
           </div>
-        </fieldset>
+        </div>
 
-        <fieldset className="border border-[var(--line-soft)] rounded-[var(--radius-lg)] p-7 m-0 bg-gradient-to-br from-[var(--bg-surface)] to-[rgba(255,255,255,0.95)] transition-all relative">
-          <legend className="text-[0.75rem] font-semibold text-[var(--text-secondary)] px-2 ml-2 tracking-[0.08em] uppercase">角色设定</legend>
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">角色设定</h3>
+          <div className="grid gap-x-8 gap-y-6 grid-cols-1 md:grid-cols-2">
             <ProjectSettingField label="主角姓名">
               <input
                 className="ink-input"
@@ -224,11 +224,11 @@ function ProjectSettingEditorForm({
               />
             </ProjectSettingField>
           </div>
-        </fieldset>
+        </div>
 
-        <fieldset className="border border-[var(--line-soft)] rounded-[var(--radius-lg)] p-7 m-0 bg-gradient-to-br from-[var(--bg-surface)] to-[rgba(255,255,255,0.95)] transition-all relative">
-          <legend className="text-[0.75rem] font-semibold text-[var(--text-secondary)] px-2 ml-2 tracking-[0.08em] uppercase">世界观</legend>
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">世界观</h3>
+          <div className="grid gap-x-8 gap-y-6 grid-cols-1 md:grid-cols-2">
             <ProjectSettingField label="世界名称">
               <input
                 className="ink-input"
@@ -254,11 +254,11 @@ function ProjectSettingEditorForm({
               />
             </ProjectSettingField>
           </div>
-        </fieldset>
+        </div>
 
-        <fieldset className="border border-[var(--line-soft)] rounded-[var(--radius-lg)] p-7 m-0 bg-gradient-to-br from-[var(--bg-surface)] to-[rgba(255,255,255,0.95)] transition-all relative">
-          <legend className="text-[0.75rem] font-semibold text-[var(--text-secondary)] px-2 ml-2 tracking-[0.08em] uppercase">规模设定</legend>
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">规模设定</h3>
+          <div className="grid gap-x-8 gap-y-6 grid-cols-1 md:grid-cols-2">
             <ProjectSettingField label="目标字数">
               <input
                 className="ink-input"
@@ -292,9 +292,9 @@ function ProjectSettingEditorForm({
               />
             </ProjectSettingField>
           </div>
-        </fieldset>
+        </div>
 
-        <div className="relative rounded-[var(--radius-md)] transition-all focus-within:shadow-[0_0_0_3px_rgba(90,122,107,0.12),0_2px_8px_rgba(90,122,107,0.08)] focus-within:bg-[rgba(255,255,255,0.02)]">
+        <div className="relative transition-all duration-300 focus-within:drop-shadow-[0_0_8px_rgba(90,122,107,0.15)]">
           <ProjectSettingField label="核心冲突">
             <textarea
               className="ink-textarea min-h-32"
@@ -306,7 +306,7 @@ function ProjectSettingEditorForm({
           </ProjectSettingField>
         </div>
 
-        <div className="relative rounded-[var(--radius-md)] transition-all focus-within:shadow-[0_0_0_3px_rgba(90,122,107,0.12),0_2px_8px_rgba(90,122,107,0.08)] focus-within:bg-[rgba(255,255,255,0.02)]">
+        <div className="relative transition-all duration-300 focus-within:drop-shadow-[0_0_8px_rgba(90,122,107,0.15)]">
           <ProjectSettingField label="剧情走向">
             <textarea
               className="ink-textarea min-h-32"
@@ -318,7 +318,7 @@ function ProjectSettingEditorForm({
           </ProjectSettingField>
         </div>
 
-        <div className="relative rounded-[var(--radius-md)] transition-all focus-within:shadow-[0_0_0_3px_rgba(90,122,107,0.12),0_2px_8px_rgba(90,122,107,0.08)] focus-within:bg-[rgba(255,255,255,0.02)]">
+        <div className="relative transition-all duration-300 focus-within:drop-shadow-[0_0_8px_rgba(90,122,107,0.15)]">
           <ProjectSettingField label="特殊要求">
             <textarea
               className="ink-textarea min-h-28"
