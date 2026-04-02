@@ -57,7 +57,20 @@ def _add_probe_command(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     parser.add_argument("--extra-headers", help="Temporarily merge extra headers from a JSON object")
     parser.add_argument("--prompt", help="Ask a real prompt instead of the fixed verification phrase")
     parser.add_argument("--system-prompt", help="Optional system prompt used with --prompt")
-    parser.add_argument("--stream", action="store_true", help="Use the provider's streaming response mode")
+    output_mode_group = parser.add_mutually_exclusive_group()
+    output_mode_group.add_argument(
+        "--stream",
+        action="store_true",
+        dest="stream",
+        help="Use the provider's streaming response mode (default)",
+    )
+    output_mode_group.add_argument(
+        "--buffered",
+        action="store_false",
+        dest="stream",
+        help="Force the provider's buffered JSON response mode",
+    )
+    parser.set_defaults(stream=True)
     parser.add_argument("--show-request", action="store_true", help="Print the prepared request")
     parser.add_argument("--print-response", action="store_true", help="Print the raw response body")
     parser.add_argument("--dry-run", action="store_true", help="Build request only, do not send")

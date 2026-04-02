@@ -2,6 +2,8 @@
 
 本目录包含 easyStory AI 小说创作平台的所有设计和技术文档。
 
+当前推荐从 [docs/README.md](./docs/README.md) 进入文档索引，避免仓库根目录与 `docs/` 相对路径混淆。
+
 ---
 
 ## 文档导航

@@ -3,7 +3,7 @@
 import { useMemo, useTransition, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Button, Message } from "@arco-design/web-react";
+import { Message } from "@arco-design/web-react";
 
 import { DocumentTree } from "@/features/studio/components/document-tree";
 import { MarkdownDocumentEditor } from "@/features/studio/components/markdown-document-editor";
@@ -22,6 +22,12 @@ import type { DocumentTreeNode } from "@/features/studio/components/studio-page-
 type StudioPageProps = {
   projectId: string;
 };
+
+const STUDIO_TOOLBAR_BUTTON_CLASS = "ink-button-secondary whitespace-nowrap";
+const STUDIO_STALE_BADGE_CLASS =
+  "inline-flex items-center gap-2 h-8 px-3.5 rounded-full border border-[rgba(90,122,107,0.16)] bg-[rgba(90,122,107,0.08)] text-[0.72rem] font-semibold tracking-[0.16em] uppercase text-[var(--accent-primary)]";
+const STUDIO_STALE_BADGE_DOT_CLASS =
+  "inline-flex h-1.5 w-1.5 rounded-full bg-[var(--accent-tertiary)] shadow-[0_0_0_4px_rgba(196,167,125,0.12)]";
 
 export function StudioPage({ projectId }: StudioPageProps) {
   const router = useRouter();
@@ -126,20 +132,19 @@ export function StudioPage({ projectId }: StudioPageProps) {
           <p className="m-0 text-xs text-[var(--text-secondary)] opacity-70">{projectName} · 正文优先，目录与助手都只是辅助桌面，不抢主舞台。</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button shape="round" size="small" type="secondary" onClick={toggleChat}>
+          <button className={STUDIO_TOOLBAR_BUTTON_CLASS} type="button" onClick={toggleChat}>
             {chatOpen ? "收起助手" : "展开助手"}
-          </Button>
-          <Button
-            shape="round"
-            size="small"
-            type="secondary"
+          </button>
+          <button
+            className={STUDIO_TOOLBAR_BUTTON_CLASS}
+            type="button"
             onClick={() => router.push(`/workspace/project/${projectId}/engine`)}
           >
             作品推进
-          </Button>
+          </button>
           {staleChapters.length > 0 ? (
-            <span className="relative inline-flex items-center h-[26px] px-3 rounded bg-gradient-to-br from-[var(--accent-primary)] to-[#5a7a60] text-white text-[0.68rem] font-semibold tracking-widest uppercase shadow-[0_2px_8px_rgba(107,143,113,0.25),inset_0_1px_0_rgba(255,255,255,0.15)] overflow-hidden">
-              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[inkShimmer_4s_ease-in-out_infinite]" />
+            <span className={STUDIO_STALE_BADGE_CLASS}>
+              <span aria-hidden="true" className={STUDIO_STALE_BADGE_DOT_CLASS} />
               {staleChapters.length} 个章节待整理
             </span>
           ) : null}
@@ -176,29 +181,37 @@ export function StudioPage({ projectId }: StudioPageProps) {
         </main>
 
         {chatOpen ? (
-          <aside className="relative z-5 flex flex-col bg-gradient-to-b from-[rgba(254,253,251,0.98)] to-[rgba(249,247,243,0.95)] border-l border-[rgba(44,36,22,0.08)] shadow-[-2px_0_20px_rgba(44,36,22,0.03),inset_1px_0_0_rgba(255,255,255,0.5)] animate-[slideFromRight_0.5s_cubic-bezier(0.16,1,0.3,1)]">
+          <aside className="relative z-5 flex min-w-0 flex-col overflow-hidden bg-gradient-to-b from-[rgba(254,253,251,0.98)] to-[rgba(249,247,243,0.95)] border-l border-[rgba(44,36,22,0.08)] shadow-[-2px_0_20px_rgba(44,36,22,0.03),inset_1px_0_0_rgba(255,255,255,0.5)] animate-[slideFromRight_0.5s_cubic-bezier(0.16,1,0.3,1)]">
             <div className="absolute top-0 left-0 w-0.5 h-full bg-gradient-to-b from-transparent via-[#c4a76c] to-transparent opacity-25" />
             <AiChatPanel
+              activeConversationId={chatModel.activeConversationId}
               attachments={chatModel.attachments}
               availableContexts={documentTree}
               canChat={chatModel.credentialModel.canChat}
+              composerText={chatModel.composerText}
+              conversationSummaries={chatModel.conversationSummaries}
+              createConversation={chatModel.createConversation}
               credentialNotice={chatModel.credentialModel.credentialNotice}
               credentialSettingsHref={chatModel.credentialModel.credentialSettingsHref}
               credentialState={chatModel.credentialModel.credentialState}
               currentDocumentPath={documentPath}
+              deleteConversation={chatModel.deleteConversation}
               isCredentialLoading={chatModel.credentialModel.isCredentialLoading}
               isResponding={chatModel.isResponding}
               messages={chatModel.messages}
               onCopyMarkdown={handleCopyMarkdown}
               onAppendToDocument={handleAppendToDocument}
               onAttachFiles={chatModel.handleAttachFiles}
+              onComposerTextChange={chatModel.setComposerText}
               onCreateNewDocument={handleCreateNewDocument}
               onModelNameChange={chatModel.handleModelNameChange}
               onProviderChange={chatModel.handleProviderChange}
               onRemoveAttachment={chatModel.handleRemoveAttachment}
               onSendMessage={chatModel.handleSendMessage}
+              onStreamOutputChange={chatModel.handleStreamOutputChange}
               onToggleContext={chatModel.handleToggleContext}
               providerOptions={chatModel.credentialModel.providerOptions}
+              selectConversation={chatModel.selectConversation}
               selectedContextPaths={chatModel.selectedContextPaths}
               selectedCredentialLabel={chatModel.selectedCredentialLabel}
               settings={chatModel.settings}

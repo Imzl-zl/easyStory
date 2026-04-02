@@ -63,6 +63,7 @@ async def test_assistant_api_requires_auth_and_returns_content(monkeypatch, tmp_
                 json={
                     "agent_id": "agent.general_assistant",
                     "hook_ids": ["hook.before_news_lookup"],
+                    "stream": False,
                     "messages": [{"role": "user", "content": "今天有什么新闻？"}],
                 },
             )

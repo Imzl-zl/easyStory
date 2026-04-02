@@ -1,13 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ApiError } from "@/lib/api/client";
-
 import {
-  buildAssistantRetryFailure,
-  buildAssistantStreamRecoveryNotice,
   buildIncubatorAssistantTurnPayload,
-  shouldRetryAssistantWithoutStream,
 } from "./incubator-assistant-request-support";
 import {
   createIncubatorInitialMessages,
@@ -44,23 +39,4 @@ test("incubator assistant request support prefers agent id when selected", () =>
   );
   assert.equal(payload.agent_id, "agent.user.story-coach-a1b2c3");
   assert.equal("skill_id" in payload, false);
-});
-
-test("incubator assistant request support skips retry for clear client errors", () => {
-  assert.equal(
-    shouldRetryAssistantWithoutStream(new ApiError("参数非法", 422, "参数非法")),
-    false,
-  );
-  assert.equal(
-    shouldRetryAssistantWithoutStream(new ApiError("上游超时", 504, "上游超时")),
-    true,
-  );
-});
-
-test("incubator assistant request support builds readable recovery copy", () => {
-  assert.match(buildAssistantStreamRecoveryNotice(), /自动改为完整返回/);
-  assert.match(
-    buildAssistantRetryFailure(new Error("第一次失败"), new Error("第二次失败")).message,
-    /第一次错误：第一次失败；重试错误：第二次失败/,
-  );
 });

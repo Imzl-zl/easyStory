@@ -101,7 +101,7 @@ function AuthHero({ copy }: Readonly<{ copy: AuthCopy }>) {
       </div>
       <div className="grid gap-4.5 p-6 rounded-[22px] bg-gradient-to-b from-[rgba(250,246,237,0.94)] to-[rgba(247,241,231,0.88)]">
         <p className="font-serif text-xl leading-relaxed text-[var(--text-primary)]">
-          "让产品先呈现作品与创作动作，而不是资源类型和后台配置。"
+          “让产品先呈现作品与创作动作，而不是资源类型和后台配置。”
         </p>
         <ol className="grid gap-4 list-none">
           {CREATION_STEPS.map(([title, detail]) => (
@@ -228,7 +228,7 @@ function Field({
     <label className="grid gap-2">
       <span className="text-[var(--text-secondary)] text-[13px] font-medium">{label}</span>
       <input
-        className="w-full min-h-12 px-3.5 border border-[rgba(61,61,61,0.09)] rounded-3.5 bg-[rgba(255,255,255,0.92)] transition-all hover:border-[rgba(61,61,61,0.2)] focus:border-[rgba(90,122,107,0.52)] focus:shadow-[0_0_0_4px_rgba(90,122,107,0.1)] focus:outline-none placeholder:text-[var(--text-placeholder)]"
+        className="ink-input ink-input-roomy"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         {...props}

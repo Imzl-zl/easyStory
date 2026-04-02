@@ -9,15 +9,12 @@ import {
   useNormalizeLobbySettingsRoute,
   type LobbySettingsRouteState,
 } from "@/features/lobby/components/lobby-settings-route";
+import { LobbyAssistantSettingsPanel } from "@/features/lobby/components/lobby-assistant-settings-panel";
 import { type LobbySettingsTab } from "@/features/lobby/components/lobby-settings-support";
 import { LobbySettingsSidebar } from "@/features/lobby/components/lobby-settings-sidebar";
 import { AssistantAgentsPanel } from "@/features/settings/components/assistant-agents-panel";
-import { AssistantConfigFileMapPanel } from "@/features/settings/components/assistant-config-file-map-panel";
-import { AssistantGettingStartedPanel } from "@/features/settings/components/assistant-getting-started-panel";
 import { AssistantHooksPanel } from "@/features/settings/components/assistant-hooks-panel";
 import { AssistantMcpPanel } from "@/features/settings/components/assistant-mcp-panel";
-import { AssistantPreferencesPanel } from "@/features/settings/components/assistant-preferences-panel";
-import { AssistantRulesEditor } from "@/features/settings/components/assistant-rules-editor";
 import { AssistantSkillsPanel } from "@/features/settings/components/assistant-skills-panel";
 import { CredentialCenter } from "@/features/settings/components/credential-center";
 import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
@@ -101,22 +98,14 @@ function LobbySettingsContent({
 }>) {
   if (route.tab === "assistant") {
     return (
-      <div className="space-y-4">
-        <AssistantGettingStartedPanel
-          onOpenCredentials={() =>
-            navigationGuard(() => handleLobbySettingsTabChange("credentials", route.setParams))
-          }
-          onOpenSkills={() => navigationGuard(() => handleLobbySettingsTabChange("skills", route.setParams))}
-        />
-        <AssistantConfigFileMapPanel />
-        <AssistantPreferencesPanel onDirtyChange={onAssistantPreferencesDirtyChange} />
-        <AssistantRulesEditor
-          description="保存后，新聊天会自动带上这些规则。"
-          onDirtyChange={onAssistantRulesDirtyChange}
-          scope="user"
-          title="个人长期规则"
-        />
-      </div>
+      <LobbyAssistantSettingsPanel
+        onAssistantPreferencesDirtyChange={onAssistantPreferencesDirtyChange}
+        onAssistantRulesDirtyChange={onAssistantRulesDirtyChange}
+        onOpenCredentials={() =>
+          navigationGuard(() => handleLobbySettingsTabChange("credentials", route.setParams))
+        }
+        onOpenSkills={() => navigationGuard(() => handleLobbySettingsTabChange("skills", route.setParams))}
+      />
     );
   }
 

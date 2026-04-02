@@ -1,13 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Message } from "@arco-design/web-react";
 
-import {
-  buildAssistantRetryFailure,
-  buildAssistantStreamRecoveryNotice,
-  shouldRetryAssistantWithoutStream,
-} from "@/features/lobby/components/incubator-assistant-request-support";
 import { runAssistantTurn, runAssistantTurnStream } from "@/lib/api/assistant";
 import { getErrorMessage } from "@/lib/api/client";
 
@@ -33,6 +28,7 @@ import {
   STUDIO_PENDING_REPLY_MESSAGE,
   type StudioChatMessage,
 } from "./studio-chat-support";
+import { useStudioChatState } from "./studio-chat-state";
 
 type UseStudioChatModelOptions = {
   currentDocumentContent: string;
@@ -45,42 +41,48 @@ export function useStudioChatModel({
   currentDocumentPath,
   projectId,
 }: UseStudioChatModelOptions) {
+  const state = useStudioChatState(projectId);
   const [attachments, setAttachments] = useState<StudioChatAttachment[]>([]);
-  const [messages, setMessages] = useState<StudioChatMessage[]>([]);
-  const [selectedContextPaths, setSelectedContextPaths] = useState<string[]>([]);
-  const [settings, setSettings] = useState(INITIAL_STUDIO_CHAT_SETTINGS);
   const [isResponding, setIsResponding] = useState(false);
   const hasUserMessage = useMemo(
-    () => messages.some((message) => message.role === "user"),
-    [messages],
+    () => state.messages.some((message) => message.role === "user"),
+    [state.messages],
   );
   const credentialModel = useStudioChatCredentialModel(
     projectId,
     hasUserMessage,
-    settings,
-    setSettings,
+    state.settings,
+    state.setSettings,
   );
 
+  useEffect(() => {
+    setAttachments([]);
+  }, [state.activeConversationId]);
+
   const handleToggleContext = useCallback((path: string) => {
-    setSelectedContextPaths((current) =>
+    state.setSelectedContextPaths((current) =>
       current.includes(path)
         ? current.filter((item) => item !== path)
         : [...current, path],
     );
-  }, []);
+  }, [state]);
 
   const handleProviderChange = useCallback((provider: string) => {
-    setSettings((current) =>
+    state.setSettings((current) =>
       buildNextStudioChatSettingsForProvider(
         credentialModel.credentialOptions,
         current,
         provider,
       ));
-  }, [credentialModel.credentialOptions]);
+  }, [credentialModel.credentialOptions, state]);
 
   const handleModelNameChange = useCallback((value: string) => {
-    setSettings((current) => ({ ...current, modelName: value }));
-  }, []);
+    state.setSettings((current) => ({ ...current, modelName: value }));
+  }, [state]);
+
+  const handleStreamOutputChange = useCallback((value: boolean) => {
+    state.setSettings((current) => ({ ...current, streamOutput: value }));
+  }, [state]);
 
   const handleAttachFiles = useCallback(async (files: FileList | null) => {
     if (!files) {
@@ -109,12 +111,13 @@ export function useStudioChatModel({
       Message.warning(credentialModel.credentialNotice ?? "当前没有可用模型连接。");
       return;
     }
+    const conversationId = state.activeConversationId;
     const userMessage = buildStudioUserMessage({
       attachments,
       content,
       currentDocumentContent,
       currentDocumentPath,
-      selectedContextPaths,
+      selectedContextPaths: state.selectedContextPaths,
     });
 
     const assistantMessage = createStudioChatMessage(
@@ -122,34 +125,47 @@ export function useStudioChatModel({
       STUDIO_PENDING_REPLY_MESSAGE,
       { status: "pending" },
     );
-    const nextMessages = [...messages, userMessage];
+    const nextMessages = [...state.messages, userMessage];
     const payload = buildStudioAssistantTurnPayload({
       messages: nextMessages,
       projectId,
-      settings,
+      settings: state.settings,
     });
 
-    setMessages((current) => [...current, userMessage, assistantMessage]);
+    state.patchConversationSession(conversationId, (current) => ({
+      ...current,
+      composerText: "",
+      messages: [...current.messages, userMessage, assistantMessage],
+    }));
     setAttachments([]);
     setIsResponding(true);
 
     try {
-      const result = settings.streamOutput
-        ? await runStudioChatStream(payload, assistantMessage.id, setMessages)
+      const result = state.settings.streamOutput
+        ? await runStudioChatStream(payload, assistantMessage.id, (updater) => {
+          state.patchConversationSession(conversationId, (current) => ({
+            ...current,
+            messages: updater(current.messages),
+          }));
+        })
         : await runAssistantTurn(payload);
-      setMessages((current) =>
-        replaceStudioChatMessage(
-          current,
+      state.patchConversationSession(conversationId, (current) => ({
+        ...current,
+        messages: replaceStudioChatMessage(
+          current.messages,
           assistantMessage.id,
           buildCompletedStudioMessage(assistantMessage.id, result.content),
-        ));
+        ),
+      }));
     } catch (error) {
-      setMessages((current) =>
-        replaceStudioChatMessage(
-          current,
+      state.patchConversationSession(conversationId, (current) => ({
+        ...current,
+        messages: replaceStudioChatMessage(
+          current.messages,
           assistantMessage.id,
-          buildFailedStudioMessage(assistantMessage.id, current, error),
-        ));
+          buildFailedStudioMessage(assistantMessage.id, current.messages, error),
+        ),
+      }));
       Message.error(getErrorMessage(error));
     } finally {
       setIsResponding(false);
@@ -160,29 +176,35 @@ export function useStudioChatModel({
     currentDocumentContent,
     currentDocumentPath,
     isResponding,
-    messages,
     projectId,
-    selectedContextPaths,
-    settings,
+    state,
     attachments,
   ]);
 
   return {
+    activeConversationId: state.activeConversationId,
     attachments: extractStudioChatAttachmentMeta(attachments),
+    composerText: state.composerText,
+    conversationSummaries: state.conversationSummaries,
     credentialModel,
+    createConversation: state.createConversation,
+    deleteConversation: state.deleteConversation,
     handleAttachFiles,
     handleModelNameChange,
     handleProviderChange,
     handleRemoveAttachment,
     handleSendMessage,
+    handleStreamOutputChange,
     handleToggleContext,
     isResponding,
-    messages,
-    selectedContextPaths,
+    messages: state.messages,
+    selectConversation: state.selectConversation,
+    selectedContextPaths: state.selectedContextPaths,
     selectedCredentialLabel: credentialModel.selectedCredential?.displayLabel ?? null,
-    settings,
+    setComposerText: state.setComposerText,
+    settings: state.settings,
     visibleModelLabel: resolveStudioModelButtonLabel({
-      modelName: settings.modelName,
+      modelName: state.settings.modelName,
       selectedCredential: credentialModel.selectedCredential,
     }),
   };
@@ -221,26 +243,14 @@ function buildFailedStudioMessage(
 async function runStudioChatStream(
   payload: Parameters<typeof runAssistantTurn>[0],
   messageId: string,
-  setMessages: React.Dispatch<React.SetStateAction<StudioChatMessage[]>>,
+  updateMessages: (updater: (current: StudioChatMessage[]) => StudioChatMessage[]) => void,
 ) {
-  try {
-    return await runAssistantTurnStream(payload, {
-      onChunk: (delta) => {
-        setMessages((current) =>
-          appendStudioChatMessageDelta(current, messageId, delta));
-      },
-    });
-  } catch (error) {
-    if (!shouldRetryAssistantWithoutStream(error)) {
-      throw error;
-    }
-    Message.info(buildAssistantStreamRecoveryNotice());
-    try {
-      return await runAssistantTurn(payload);
-    } catch (retryError) {
-      throw buildAssistantRetryFailure(error, retryError);
-    }
-  }
+  return runAssistantTurnStream(payload, {
+    onChunk: (delta) => {
+      updateMessages((current) =>
+        appendStudioChatMessageDelta(current, messageId, delta));
+    },
+  });
 }
 
 function buildStudioUserMessage(options: {

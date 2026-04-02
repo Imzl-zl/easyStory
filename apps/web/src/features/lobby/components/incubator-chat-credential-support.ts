@@ -155,8 +155,8 @@ export function resolveHydratedIncubatorChatSettings(
   };
 }
 
-export function prefersBufferedOutput(option: IncubatorCredentialOption | null) {
-  return option?.apiDialect === "gemini_generate_content";
+export function prefersBufferedOutput(_option: IncubatorCredentialOption | null) {
+  return false;
 }
 
 function compareIncubatorCredentialOptions(

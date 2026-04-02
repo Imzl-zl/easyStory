@@ -27,7 +27,7 @@ type AssistantTurnStreamEvent =
 export function runAssistantTurn(payload: AssistantTurnPayload) {
   return requestJson<AssistantTurnResult>("/api/v1/assistant/turn", {
     method: "POST",
-    body: payload,
+    body: { ...payload, stream: false },
   });
 }
 

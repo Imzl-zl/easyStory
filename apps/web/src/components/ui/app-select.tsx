@@ -16,9 +16,11 @@ type AppSelectProps = {
   density?: "default" | "roomy";
   disabled?: boolean;
   emptyText?: string;
+  getPopupContainer?: (node: HTMLElement) => Element;
   id?: string;
   options: ReadonlyArray<AppSelectOption>;
   placeholder?: string;
+  popupClassName?: string;
   value?: string;
   onChange: (value: string) => void;
 };
@@ -37,9 +39,11 @@ export function AppSelect({
   density = "default",
   disabled = false,
   emptyText = DEFAULT_EMPTY_TEXT,
+  getPopupContainer,
   id,
   options,
   placeholder,
+  popupClassName,
   value,
   onChange,
 }: Readonly<AppSelectProps>) {
@@ -56,9 +60,14 @@ export function AppSelect({
     <Select
       aria-label={ariaLabel}
       allowClear={false}
-      className={`w-full ${density === "roomy" ? "min-h-[2.9rem] p-[0.62rem_0.95rem]" : ""} ${className ?? ""}`}
+      className={buildClassName(
+        "w-full",
+        density === "roomy" ? "min-h-[2.9rem] p-[0.62rem_0.95rem]" : undefined,
+        className,
+      )}
       disabled={disabled}
       dropdownMenuClassName="grid gap-[0.18rem]"
+      getPopupContainer={getPopupContainer}
       id={id}
       notFoundContent={emptyText}
       placeholder={placeholder}
@@ -66,7 +75,10 @@ export function AppSelect({
       size="default"
       triggerProps={{
         autoAlignPopupMinWidth: true,
-        className: "p-[0.28rem] border border-[var(--dropdown-border)] rounded-4 bg-[var(--dropdown-bg)] shadow-[var(--dropdown-shadow)] backdrop-blur-xl",
+        className: buildClassName(
+          "p-[0.28rem] border border-[var(--dropdown-border)] rounded-4 bg-[var(--dropdown-bg)] shadow-[var(--dropdown-shadow)] backdrop-blur-xl",
+          popupClassName,
+        ),
       }}
       value={resolvedValue}
       renderFormat={() => (

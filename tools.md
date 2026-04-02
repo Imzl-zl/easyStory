@@ -80,6 +80,9 @@
 - provider interop 本地 probe 若使用 `--model` 覆写，最终请求体中的探测模型也必须同步覆写，不能只改展示值。
 - Anthropic Messages 请求当前默认把 `system_prompt` 编码为 text block 数组，而不是裸字符串；官方两种都允许，但兼容代理对数组更稳。
 - Gemini probe 对简单连通性验证应显式压低思考配置；否则某些 `gemini-flash-latest` 代理会落到带默认 thinking 的 Gemini 3 变体，直接把 probe token 吃在内部思考上，表面看是“返回半句”，实际是上游 `finishReason=MAX_TOKENS`。
+- assistant / provider interop 当前正式流式口径：`AssistantTurnRequestDTO.stream` 默认 `true`；前端若明确走 JSON 路径，必须显式发送 `stream=false`，不能依赖后端默认值。
+- incubator / studio 聊天当前不再做“流式失败自动退回非流”的静默降级；需要让真实上游错误直接暴露，便于定位中转兼容问题。
+- credential verifier 与 `scripts/provider_interop_check.py probe` 当前默认走流式；Gemini verification/probe 会注入最小思考配置，避免默认 thinking 吃掉验证输出预算。
 - 受保护 API 统一走 `app.modules.user.entry.http.dependencies.get_current_user`（async 版），不保留 `get_current_user_async` 第二命名入口。
 - 当业务 service 文件超出 300 行时，优先保持公开 `Service + factory` 不变，只把"查询/权限 helper""状态变更 helper""DTO 映射与归一化 helper"下沉到 `*_support.py`；不要用改公开命名来掩盖内部结构问题。
 - `workflow events` SSE 端点需要 `Authorization: Bearer`；前端不要用原生 `EventSource`，统一走 `fetch + ReadableStream`，并区分正常 EOF 静默重连与错误重连提示。

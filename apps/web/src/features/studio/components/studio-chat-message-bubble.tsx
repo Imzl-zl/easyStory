@@ -13,6 +13,16 @@ type StudioChatMessageBubbleProps = {
   onCreateNewDocument: (markdown: string) => void;
 };
 
+const MESSAGE_BUBBLE_BASE_CLASS =
+  "relative mb-3.5 w-full min-w-0 max-w-[calc(100%-2rem)] overflow-hidden rounded-[22px] px-4 py-3.5 text-sm leading-relaxed animate-[fadeIn_0.3s_ease_forwards]";
+const ASSISTANT_MESSAGE_CLASS = "mr-8 bg-[rgba(90,122,107,0.08)]";
+const USER_MESSAGE_CLASS = "ml-8 bg-[rgba(255,255,255,0.72)]";
+const MESSAGE_CONTENT_CLASS = "min-w-0 max-w-full overflow-hidden text-[var(--text-primary)] text-sm leading-relaxed";
+const MARKDOWN_CONTENT_CLASS =
+  "min-w-0 max-w-full overflow-hidden break-words [overflow-wrap:anywhere] text-sm leading-relaxed [&_a]:break-all [&_a]:text-[var(--accent-primary)] [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent-primary)] [&_blockquote]:py-0.5 [&_blockquote]:pl-3 [&_blockquote]:text-[var(--text-secondary)] [&_blockquote]:break-words [&_blockquote]:[overflow-wrap:anywhere] [&_code]:break-words [&_code]:rounded-[var(--radius-xs)] [&_code]:bg-[rgba(135,131,120,0.15)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.88em] [&_code]:text-[#9b3f2e] [&_h1]:my-3 [&_h1]:mb-1.5 [&_h2]:my-3 [&_h2]:mb-1.5 [&_h3]:my-3 [&_h3]:mb-1.5 [&_img]:h-auto [&_img]:max-w-full [&_li]:break-words [&_li]:[overflow-wrap:anywhere] [&_p]:my-2 [&_p]:break-words [&_p]:[overflow-wrap:anywhere] [&_pre]:my-3 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre_code]:break-normal [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-inherit";
+const ATTACHMENT_PILL_CLASS =
+  "inline-flex max-w-full items-center min-h-7 break-all px-2.5 py-1 rounded-full bg-[rgba(61,61,61,0.06)] text-[var(--text-secondary)] text-[0.72rem] leading-relaxed";
+
 export function StudioChatMessageBubble({
   message,
   onAppendToDocument,
@@ -24,18 +34,18 @@ export function StudioChatMessageBubble({
 
   return (
     <article
-      className={`relative mb-3.5 px-4 py-3.5 rounded-[22px] text-sm leading-relaxed animate-[fadeIn_0.3s_ease_forwards] ${isAssistant ? "mr-8 bg-[rgba(90,122,107,0.08)]" : "ml-8 bg-[rgba(255,255,255,0.72)]"} ${message.status === "error" ? "shadow-[inset_0_0_0_1px_rgba(178,65,46,0.12)]" : ""}`}
+      className={`${MESSAGE_BUBBLE_BASE_CLASS} ${isAssistant ? ASSISTANT_MESSAGE_CLASS : USER_MESSAGE_CLASS} ${message.status === "error" ? "shadow-[inset_0_0_0_1px_rgba(178,65,46,0.12)]" : ""}`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
       <p className="m-0 mb-1.5 text-[0.66rem] font-semibold tracking-widest uppercase text-[var(--text-tertiary)]">{isAssistant ? "助手" : "你"}</p>
-      <div className="text-[var(--text-primary)] text-sm leading-relaxed">
-        {isAssistant ? <MarkdownContent content={message.content} /> : <p className="m-0 whitespace-pre-wrap break-words">{message.content}</p>}
+      <div className={MESSAGE_CONTENT_CLASS}>
+        {isAssistant ? <MarkdownContent content={message.content} /> : <p className="m-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>}
       </div>
       {message.attachments?.length ? (
         <div className="flex flex-wrap gap-1.5 mt-3">
           {message.attachments.map((attachment) => (
-            <span className="inline-flex items-center min-h-7 px-2.5 py-1 rounded-full bg-[rgba(61,61,61,0.06)] text-[var(--text-secondary)] text-[0.72rem] leading-relaxed" key={attachment.id}>
+            <span className={ATTACHMENT_PILL_CLASS} key={attachment.id}>
               {attachment.name} · {formatStudioChatAttachmentSize(attachment.size)}
             </span>
           ))}
@@ -61,7 +71,7 @@ export function StudioChatMessageBubble({
 function MarkdownContent({ content }: { content: string }) {
   return (
     <div
-      className="text-sm leading-relaxed [&_h1]:my-3 [&_h1]:mb-1.5 [&_h2]:my-3 [&_h2]:mb-1.5 [&_h3]:my-3 [&_h3]:mb-1.5 [&_p]:my-2 [&_blockquote]:my-2 [&_blockquote]:py-0.5 [&_blockquote]:pl-3 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent-primary)] [&_blockquote]:text-[var(--text-secondary)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-[var(--radius-xs)] [&_code]:bg-[rgba(135,131,120,0.15)] [&_code]:text-[#9b3f2e] [&_code]:font-mono [&_code]:text-[0.88em]"
+      className={MARKDOWN_CONTENT_CLASS}
       dangerouslySetInnerHTML={{ __html: renderStudioMarkdown(content) }}
     />
   );
@@ -83,7 +93,7 @@ function renderStudioMarkdown(text: string) {
     .replace(/\n/gim, "<br>");
 
   html = html.replace(/```(\w*)\n([\s\S]*?)```/gim, (_, lang, code) =>
-    `<pre class="my-3 px-3.5 py-3 rounded-2xl bg-[rgba(61,61,61,0.05)] text-[var(--text-primary)] font-mono text-xs leading-relaxed overflow-x-auto" data-lang="${lang}"><code>${code.trim()}</code></pre>`);
+    `<pre class="my-3 max-w-full overflow-x-auto rounded-2xl bg-[rgba(61,61,61,0.05)] px-3.5 py-3 text-[var(--text-primary)] font-mono text-xs leading-relaxed" data-lang="${lang}"><code>${code.trim()}</code></pre>`);
 
   return html;
 }

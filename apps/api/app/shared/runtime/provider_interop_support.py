@@ -9,10 +9,10 @@ from typing import Any
 from dotenv import dotenv_values
 
 from .errors import ConfigurationError
+from .gemini_probe_support import apply_gemini_probe_thinking_config
 from .llm_protocol import (
     LLMConnection,
     LLMGenerateRequest,
-    PreparedLLMHttpRequest,
     build_verification_request,
     normalize_api_dialect,
     normalize_auth_strategy,
@@ -36,7 +36,6 @@ DEFAULT_PROVIDER_INTEROP_ENV_PATH = Path(".env.provider-interop.local")
 DEFAULT_PROVIDER_INTEROP_RATE_LIMIT_PATH = Path(".runtime/provider-interop.rate-limit.json")
 RATE_LIMIT_WINDOW_SECONDS = 60
 PROBE_MAX_TOKENS = 256
-GEMINI_MINIMAL_THINKING_LEVEL = "minimal"
 
 
 @dataclass(frozen=True)
@@ -147,7 +146,7 @@ def build_provider_interop_probe_request(
             )
         )
         if profile.connection.api_dialect == "gemini_generate_content":
-            return _apply_gemini_probe_thinking_config(request, profile.model_name)
+            return apply_gemini_probe_thinking_config(request, profile.model_name)
         return request
     return build_verification_request(profile.connection)
 
@@ -242,28 +241,6 @@ def _resolve_api_key(api_key_env: str, env_values: dict[str, str | None]) -> str
     if value is None or not value.strip():
         raise ConfigurationError(f"Missing API key value for env var: {api_key_env}")
     return value.strip()
-
-
-def _apply_gemini_probe_thinking_config(
-    request: PreparedLLMHttpRequest,
-    model_name: str,
-) -> PreparedLLMHttpRequest:
-    body = dict(request.json_body)
-    generation_config = dict(body.get("generationConfig") or {})
-    generation_config["thinkingConfig"] = _build_gemini_probe_thinking_config(model_name)
-    body["generationConfig"] = generation_config
-    return PreparedLLMHttpRequest(
-        method=request.method,
-        url=request.url,
-        headers=request.headers,
-        json_body=body,
-    )
-
-
-def _build_gemini_probe_thinking_config(model_name: str) -> dict[str, int | str]:
-    if "2.5" in model_name.lower():
-        return {"thinkingBudget": 0}
-    return {"thinkingLevel": GEMINI_MINIMAL_THINKING_LEVEL}
 
 
 def _load_env_values(env_path: str | Path) -> dict[str, str | None]:

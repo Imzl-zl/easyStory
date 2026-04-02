@@ -13,6 +13,7 @@
 
 - 凭证与模型连接闭环：安全存储、endpoint policy、`api_dialect` 路由、auth strategy override、公网 http 显式测试开关、本地 provider interop probe、旧库 schema reconcile，以及连接级 `context_window_tokens / default_max_output_tokens`
 - provider interop 深化闭环：本地 probe 已支持 `prompt/system_prompt/extra_headers/stream`，并对 Gemini probe 注入最小思考配置，避免默认 thinking 吞掉输出预算
+- assistant / provider interop 流式口径已收口：assistant turn 后端默认 `stream=true`，前端非流 JSON 调用显式传 `stream=false`；credential verifier 与 provider interop probe 默认走流式；incubator / studio 聊天已移除“流式失败自动退回非流”
 - Credential Center 高级兼容设置闭环：凭证现正式支持 `auth_strategy / api_key_header_name / extra_headers`，前后端和运行时请求链已对齐；其中 `extra_headers` 已收口为仅允许非敏感元数据头；连接级默认输出上限现已真实接入 runtime fallback
 - 项目与前置资产闭环：project CRUD、setting completeness、story asset generation / confirm
 - 内容主链路闭环：outline / opening_plan / chapter / content version、章节确认与 stale 传播

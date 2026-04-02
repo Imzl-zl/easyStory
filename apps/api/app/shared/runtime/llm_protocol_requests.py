@@ -4,6 +4,7 @@ from typing import Any
 from urllib.parse import quote, urlsplit
 
 from .errors import ConfigurationError
+from .gemini_probe_support import apply_gemini_probe_thinking_config
 from .llm_endpoint_policy import normalize_custom_base_url
 from .llm_protocol_types import (
     ANTHROPIC_VERSION,
@@ -39,7 +40,7 @@ def build_verification_request(connection: LLMConnection) -> PreparedLLMHttpRequ
         default_model=connection.default_model,
         provider_label="credential verification",
     )
-    return prepare_generation_request(
+    request = prepare_generation_request(
         LLMGenerateRequest(
             connection=connection,
             model_name=model_name,
@@ -51,6 +52,9 @@ def build_verification_request(connection: LLMConnection) -> PreparedLLMHttpRequ
             top_p=1.0,
         )
     )
+    if normalize_api_dialect(connection.api_dialect) == "gemini_generate_content":
+        return apply_gemini_probe_thinking_config(request, model_name)
+    return request
 
 
 def _build_openai_chat_request(request: LLMGenerateRequest) -> PreparedLLMHttpRequest:

@@ -147,11 +147,7 @@ function DocumentTreeNodeItem({
           )}
           <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap tracking-tight">{node.label}</span>
           {node.icon === "stale" ? (
-            <span className="inline-flex items-center justify-center w-2 h-2 ml-auto rounded-full bg-[#c4a76c] shadow-[0_0_0_2px_rgba(196,167,108,0.2)] animate-[stalePulse_2.5s_ease-in-out_infinite]" title="需要更新">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="12" cy="12" r="4" />
-              </svg>
-            </span>
+            <span className="inline-flex h-2.5 w-2.5 ml-auto rounded-full bg-[#c4a76c] shadow-[0_0_0_3px_rgba(196,167,108,0.14)]" title="需要更新" />
           ) : null}
         </button>
       </Dropdown>

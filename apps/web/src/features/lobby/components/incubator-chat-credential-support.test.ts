@@ -224,7 +224,7 @@ test("incubator chat credential support prefers saved assistant preference befor
   );
 });
 
-test("incubator chat credential support defaults gemini connections to buffered output", () => {
+test("incubator chat credential support keeps gemini connections on stream output by default", () => {
   assert.deepEqual(
     resolveHydratedIncubatorChatSettings(
       { maxOutputTokens: "", modelName: "", provider: "", streamOutput: true },
@@ -241,7 +241,7 @@ test("incubator chat credential support defaults gemini connections to buffered 
       maxOutputTokens: "4096",
       modelName: "gemini-2.5-flash",
       provider: "薄荷",
-      streamOutput: false,
+      streamOutput: true,
     },
   );
 });

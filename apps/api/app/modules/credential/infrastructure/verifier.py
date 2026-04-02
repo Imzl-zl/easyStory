@@ -2,22 +2,28 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import re
 from typing import Protocol
 
 import httpx
 
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from app.shared.runtime.llm_protocol import (
-    HttpJsonResponse,
     LLMConnection,
+    NormalizedLLMResponse,
     PreparedLLMHttpRequest,
     VERIFY_MODEL_REPLY,
     build_verification_request,
-    parse_generation_response,
-    send_json_http_request,
+)
+from app.shared.runtime.provider_interop_stream_support import (
+    build_stream_probe_request,
+    execute_stream_probe_request,
 )
 
 VERIFY_TIMEOUT_SECONDS = 5
+STREAM_HTTP_ERROR_PATTERN = re.compile(
+    r"^LLM streaming request failed: HTTP (?P<status>\d{3})(?: - (?P<detail>.*))?$"
+)
 
 
 @dataclass(frozen=True)
@@ -41,17 +47,22 @@ class AsyncCredentialVerifier(Protocol):
     ) -> CredentialVerificationResult: ...
 
 
-class AsyncCredentialRequestSender(Protocol):
-    async def __call__(self, request: PreparedLLMHttpRequest) -> HttpJsonResponse: ...
+class AsyncCredentialStreamRequestSender(Protocol):
+    async def __call__(
+        self,
+        request: PreparedLLMHttpRequest,
+        *,
+        api_dialect: str,
+    ) -> NormalizedLLMResponse: ...
 
 
 class AsyncHttpCredentialVerifier:
     def __init__(
         self,
         *,
-        request_sender: AsyncCredentialRequestSender | None = None,
+        stream_request_sender: AsyncCredentialStreamRequestSender | None = None,
     ) -> None:
-        self.request_sender = request_sender or _default_request_sender
+        self.stream_request_sender = stream_request_sender or _default_stream_request_sender
 
     async def verify(
         self,
@@ -66,25 +77,30 @@ class AsyncHttpCredentialVerifier:
         extra_headers: dict[str, str] | None = None,
     ) -> CredentialVerificationResult:
         try:
-            request = build_verification_request(
-                LLMConnection(
-                    api_dialect=api_dialect,
-                    api_key=api_key,
-                    base_url=base_url,
-                    default_model=default_model,
-                    auth_strategy=auth_strategy,
-                    api_key_header_name=api_key_header_name,
-                    extra_headers=extra_headers,
-                )
+            request = build_stream_probe_request(
+                build_verification_request(
+                    LLMConnection(
+                        api_dialect=api_dialect,
+                        api_key=api_key,
+                        base_url=base_url,
+                        default_model=default_model,
+                        auth_strategy=auth_strategy,
+                        api_key_header_name=api_key_header_name,
+                        extra_headers=extra_headers,
+                    )
+                ),
+                api_dialect=api_dialect,
             )
-            response = await self.request_sender(request)
+            normalized = await self.stream_request_sender(
+                request,
+                api_dialect=api_dialect,
+            )
         except ConfigurationError as exc:
+            _raise_stream_http_error(provider, exc)
             raise BusinessRuleError(str(exc)) from exc
         except httpx.RequestError as exc:
             raise BusinessRuleError(f"无法连接到 {provider}") from exc
-        if response.status_code >= 400:
-            self._raise_http_error(provider, response)
-        self._validate_probe_response(api_dialect, provider, response)
+        self._validate_probe_response(provider, normalized)
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
             message="验证成功",
@@ -92,47 +108,42 @@ class AsyncHttpCredentialVerifier:
 
     def _validate_probe_response(
         self,
-        api_dialect: str,
         provider: str,
-        response: HttpJsonResponse,
+        response: NormalizedLLMResponse,
     ) -> None:
-        payload = response.json_body
-        if payload is None:
-            raise BusinessRuleError(f"无法验证 {provider} 凭证: 验证响应不是合法 JSON")
-        try:
-            normalized = parse_generation_response(api_dialect, payload)
-        except ConfigurationError as exc:
-            raise BusinessRuleError(f"无法验证 {provider} 凭证: 验证响应结构异常") from exc
-
-        actual_reply = normalized.content.strip()
+        actual_reply = response.content.strip()
         if actual_reply != VERIFY_MODEL_REPLY:
             raise BusinessRuleError(
                 f"无法验证 {provider} 凭证: 验证响应不匹配，预期“{VERIFY_MODEL_REPLY}”，实际“{actual_reply or '空响应'}”"
             )
 
-    def _raise_http_error(self, provider: str, response: HttpJsonResponse) -> None:
-        if response.status_code in {401, 403}:
-            raise BusinessRuleError("API Key 无效")
-        if response.status_code == 402:
-            raise BusinessRuleError("该 Key 余额不足")
-        if response.status_code == 404:
-            raise BusinessRuleError(f"{provider} 接口地址无效或接口类型不匹配")
-        message = _extract_error_message(response)
-        raise BusinessRuleError(f"无法验证 {provider} 凭证: HTTP {response.status_code} - {message}")
+
+def _raise_stream_http_error(provider: str, error: ConfigurationError) -> None:
+    detail = str(error).strip()
+    match = STREAM_HTTP_ERROR_PATTERN.match(detail)
+    if match is None:
+        return
+    status_code = int(match.group("status"))
+    error_detail = match.group("detail") or "unknown error"
+    if status_code in {401, 403}:
+        raise BusinessRuleError("API Key 无效") from error
+    if status_code == 402:
+        raise BusinessRuleError("该 Key 余额不足") from error
+    if status_code == 404:
+        raise BusinessRuleError(f"{provider} 接口地址无效或接口类型不匹配") from error
+    raise BusinessRuleError(
+        f"无法验证 {provider} 凭证: HTTP {status_code} - {error_detail}"
+    ) from error
 
 
-def _extract_error_message(response: HttpJsonResponse) -> str:
-    if response.json_body is not None:
-        error = response.json_body.get("error")
-        if isinstance(error, dict) and isinstance(error.get("message"), str):
-            return error["message"]
-        if isinstance(error, str):
-            return error
-        message = response.json_body.get("message")
-        if isinstance(message, str):
-            return message
-    return response.text.strip() or "unknown error"
-
-
-async def _default_request_sender(request: PreparedLLMHttpRequest) -> HttpJsonResponse:
-    return await send_json_http_request(request, timeout_seconds=VERIFY_TIMEOUT_SECONDS)
+async def _default_stream_request_sender(
+    request: PreparedLLMHttpRequest,
+    *,
+    api_dialect: str,
+) -> NormalizedLLMResponse:
+    return await execute_stream_probe_request(
+        request,
+        api_dialect=api_dialect,
+        print_response=False,
+        timeout_seconds=VERIFY_TIMEOUT_SECONDS,
+    )

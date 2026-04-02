@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
-import { Button, Checkbox, Input } from "@arco-design/web-react";
+import { Button, Checkbox, Input, Radio } from "@arco-design/web-react";
 
-import { AppSelect } from "@/components/ui/app-select";
 import type { DocumentTreeNode } from "@/features/studio/components/studio-page-support";
 
 import { STUDIO_ATTACHMENT_ACCEPT, type StudioChatAttachmentMeta } from "./studio-chat-attachment-support";
@@ -16,50 +15,62 @@ type StudioChatComposerProps = {
   attachments: StudioChatAttachmentMeta[];
   availableContexts: DocumentTreeNode[];
   canChat: boolean;
+  composerText: string;
   credentialNotice: string | null;
   credentialSettingsHref: string;
   isCredentialLoading: boolean;
   isResponding: boolean;
   modelButtonLabel: string;
   onAttachFiles: (files: FileList | null) => void;
+  onComposerTextChange: (value: string) => void;
   onModelNameChange: (value: string) => void;
   onProviderChange: (provider: string) => void;
   onRemoveAttachment: (attachmentId: string) => void;
   onSendMessage: (message: string) => void;
+  onStreamOutputChange: (value: boolean) => void;
   onToggleContext: (path: string) => void;
   providerOptions: StudioProviderOption[];
   selectedContextPaths: string[];
   selectedCredentialLabel: string | null;
-  settings: Pick<StudioChatSettings, "modelName" | "provider">;
+  settings: Pick<StudioChatSettings, "modelName" | "provider" | "streamOutput">;
 };
+
+const MODEL_PICKER_PANEL_CLASS =
+  "absolute bottom-full right-0 z-40 mb-2 w-[min(22rem,calc(100vw-2rem))] max-h-[min(30rem,calc(100vh-4.5rem))] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-[rgba(44,36,22,0.1)] bg-white/95 p-3.5 shadow-[0_18px_46px_rgba(44,36,22,0.18)] backdrop-blur-sm";
+const MODEL_PICKER_PROVIDER_LIST_CLASS =
+  "mt-2 grid gap-1 rounded-xl border border-[rgba(44,36,22,0.1)] bg-[rgba(249,247,243,0.92)] p-1 max-h-56 overflow-y-auto";
 
 export function StudioChatComposer({
   attachments,
   availableContexts,
   canChat,
+  composerText,
   credentialNotice,
   credentialSettingsHref,
   isCredentialLoading,
   isResponding,
   modelButtonLabel,
   onAttachFiles,
+  onComposerTextChange,
   onModelNameChange,
   onProviderChange,
   onRemoveAttachment,
   onSendMessage,
+  onStreamOutputChange,
   onToggleContext,
   providerOptions,
   selectedContextPaths,
   selectedCredentialLabel,
   settings,
 }: Readonly<StudioChatComposerProps>) {
-  const [inputText, setInputText] = useState("");
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showProviderList, setShowProviderList] = useState(false);
   const [showContextSelector, setShowContextSelector] = useState(false);
   const [contextSearchQuery, setContextSearchQuery] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ 设定: true, 大纲: true, 章节: true });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modelPickerRef = useRef<HTMLDivElement>(null);
+  const modelButtonRef = useRef<HTMLButtonElement>(null);
   const contextSelectorRef = useRef<HTMLDivElement>(null);
   const contextButtonRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
@@ -68,9 +79,12 @@ export function StudioChatComposer({
     setExpandedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }));
   }, []);
 
-  const providerOptionsForSelect = useMemo(
-    () => providerOptions.map((p) => ({ label: p.label, value: p.value })),
-    [providerOptions],
+  const currentProviderOption = useMemo(
+    () =>
+      providerOptions.find((option) => option.value === settings.provider)
+      ?? providerOptions[0]
+      ?? null,
+    [providerOptions, settings.provider],
   );
 
   const filteredContexts = useMemo(() => {
@@ -111,14 +125,24 @@ export function StudioChatComposer({
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (modelPickerRef.current && !modelPickerRef.current.contains(event.target as Node)) {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest(".arco-trigger-popup")) {
+        return;
+      }
+      if (
+        modelPickerRef.current &&
+        !modelPickerRef.current.contains(target as Node) &&
+        modelButtonRef.current &&
+        !modelButtonRef.current.contains(target as Node)
+      ) {
+        setShowProviderList(false);
         setShowModelPicker(false);
       }
       if (
         contextSelectorRef.current &&
-        !contextSelectorRef.current.contains(event.target as Node) &&
+        !contextSelectorRef.current.contains(target as Node) &&
         contextButtonRef.current &&
-        !contextButtonRef.current.contains(event.target as Node)
+        !contextButtonRef.current.contains(target as Node)
       ) {
         setShowContextSelector(false);
       }
@@ -128,12 +152,33 @@ export function StudioChatComposer({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleToggleContextSelector = useCallback(() => {
+    setShowModelPicker(false);
+    setShowProviderList(false);
+    setShowContextSelector((visible) => !visible);
+  }, []);
+
+  const handleToggleModelPicker = useCallback(() => {
+    setShowContextSelector(false);
+    setShowProviderList(false);
+    setShowModelPicker((visible) => !visible);
+  }, []);
+
+  const handleToggleProviderList = useCallback(() => {
+    setShowProviderList((visible) => !visible);
+  }, []);
+
+  const handleSelectProvider = useCallback((provider: string) => {
+    setShowProviderList(false);
+    onProviderChange(provider);
+  }, [onProviderChange]);
+
   const handleSubmit = useCallback(() => {
-    const trimmed = inputText.trim();
-    if (!trimmed || isResponding) return;
+    const trimmed = composerText.trim();
+    if (!trimmed || isResponding || !canChat) return;
     onSendMessage(trimmed);
-    setInputText("");
-  }, [inputText, isResponding, onSendMessage]);
+    onComposerTextChange("");
+  }, [canChat, composerText, isResponding, onComposerTextChange, onSendMessage]);
 
   const handleComposerKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -145,8 +190,8 @@ export function StudioChatComposer({
   );
 
   return (
-    <div className="relative shrink-0 border-t border-[rgba(44,36,22,0.08)] bg-gradient-to-b from-[var(--bg-surface)] to-[rgba(248,243,235,0.92)]" ref={composerRef}>
-      <div className="relative p-3">
+    <div className="relative z-20 shrink-0 border-t border-[rgba(44,36,22,0.08)] bg-gradient-to-b from-[var(--bg-surface)] to-[rgba(248,243,235,0.92)]" ref={composerRef}>
+      <div className="relative z-20 p-3">
         {credentialNotice ? (
           <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-[rgba(178,65,46,0.08)] text-sm text-[var(--accent-danger)]">
             <p className="flex-1">{credentialNotice}</p>
@@ -176,8 +221,8 @@ export function StudioChatComposer({
           autoSize={{ maxRows: 6, minRows: 2 }}
           className="w-full text-sm leading-relaxed resize-none border border-[rgba(44,36,22,0.1)] rounded-lg bg-white/80 focus:border-[var(--accent-primary)] focus:shadow-[0_0_0_3px_rgba(107,143,113,0.12)] transition-all placeholder:text-[var(--text-muted)]"
           placeholder={canChat ? "写你的要求，或直接带文件进来一起改。" : "先启用可用模型后再开始提问"}
-          value={inputText}
-          onChange={setInputText}
+          value={composerText}
+          onChange={onComposerTextChange}
           onKeyDown={handleComposerKeyDown}
         />
 
@@ -191,14 +236,17 @@ export function StudioChatComposer({
               <ToolbarChipButton
                 active={showContextSelector}
                 label={`上下文 ${selectedContextPaths.length}`}
-                onClick={() => setShowContextSelector((v) => !v)}
+                onClick={handleToggleContextSelector}
                 buttonRef={contextButtonRef}
               >
                 <ContextIcon />
               </ToolbarChipButton>
 
               {showContextSelector && (
-                <div className="absolute bottom-full left-0 mb-2 w-72 max-h-80 overflow-hidden rounded-xl border border-[rgba(44,36,22,0.1)] bg-white/95 backdrop-blur-sm shadow-lg" ref={contextSelectorRef}>
+                <div
+                  className="absolute bottom-full left-0 z-30 mb-2 w-[min(22rem,calc(100vw-2rem))] max-h-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-[rgba(44,36,22,0.1)] bg-white/95 shadow-[0_18px_46px_rgba(44,36,22,0.16)] backdrop-blur-sm"
+                  ref={contextSelectorRef}
+                >
                   <p className="px-3 py-2 text-xs font-medium text-[var(--text-secondary)] border-b border-[rgba(44,36,22,0.06)]">
                     附加文档上下文 ({selectedContextPaths.length}/{totalFileCount})
                   </p>
@@ -230,8 +278,8 @@ export function StudioChatComposer({
                                     checked={selectedContextPaths.includes(node.path)}
                                     onChange={() => onToggleContext(node.path)}
                                   />
-                                  <span className="text-sm truncate flex-1">{node.label}</span>
-                                  <span className="text-xs text-[var(--text-muted)] truncate max-w-[80px]">
+                                  <span className="min-w-0 flex-1 truncate text-sm">{node.label}</span>
+                                  <span className="max-w-[80px] shrink-0 truncate text-xs text-[var(--text-muted)]">
                                     {node.path.split("/").slice(-2, -1)[0]}
                                   </span>
                                 </label>
@@ -250,31 +298,70 @@ export function StudioChatComposer({
               <ToolbarChipButton
                 active={showModelPicker}
                 label={modelButtonLabel}
-                onClick={() => setShowModelPicker((v) => !v)}
+                onClick={handleToggleModelPicker}
+                buttonRef={modelButtonRef}
               >
                 <SparkIcon />
               </ToolbarChipButton>
 
               {showModelPicker && (
-                <div className="absolute bottom-full left-0 mb-2 w-64 rounded-xl border border-[rgba(44,36,22,0.1)] bg-white/95 backdrop-blur-sm shadow-lg p-3" ref={modelPickerRef}>
+                <div
+                  className={MODEL_PICKER_PANEL_CLASS}
+                  ref={modelPickerRef}
+                >
                   <div className="mb-3">
                     <p className="text-sm font-medium text-[var(--text-primary)]">切换模型</p>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">
                       {selectedCredentialLabel ?? "先选可用渠道，再决定模型名。"}
                     </p>
                   </div>
-                  <label className="block mb-2">
-                    <span className="text-xs font-medium text-[var(--text-secondary)] mb-1 block">渠道</span>
-                    <AppSelect
-                      aria-label="渠道"
-                      options={providerOptionsForSelect}
-                      placeholder={isCredentialLoading ? "正在读取渠道..." : "选择可用渠道"}
-                      value={settings.provider}
-                      onChange={onProviderChange}
-                    />
+                  <label className="grid gap-1.5">
+                    <span className="text-xs font-medium text-[var(--text-secondary)]">渠道</span>
+                    <div className="relative">
+                      <button
+                        aria-expanded={showProviderList}
+                        className="flex min-h-10 w-full items-center justify-between gap-3 rounded-xl border border-[rgba(44,36,22,0.1)] bg-white/92 px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors hover:border-[rgba(107,143,113,0.3)] focus:outline-none focus:ring-2 focus:ring-[rgba(107,143,113,0.18)]"
+                        type="button"
+                        onClick={handleToggleProviderList}
+                      >
+                        <span className="min-w-0 flex-1 truncate font-medium">
+                          {currentProviderOption?.label ?? (isCredentialLoading ? "正在读取渠道..." : "选择可用渠道")}
+                        </span>
+                        <span className={`shrink-0 text-[10px] opacity-60 transition-transform ${showProviderList ? "rotate-180" : ""}`}>⌄</span>
+                      </button>
+                      {showProviderList ? (
+                        <div className={MODEL_PICKER_PROVIDER_LIST_CLASS}>
+                          {providerOptions.length > 0 ? (
+                            providerOptions.map((option) => {
+                              const selected = option.value === settings.provider;
+                              return (
+                                <button
+                                  className={`flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${selected ? "bg-[rgba(107,143,113,0.12)] text-[var(--accent-primary)]" : "text-[var(--text-primary)] hover:bg-[rgba(107,143,113,0.06)]"}`}
+                                  key={option.value}
+                                  type="button"
+                                  onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    handleSelectProvider(option.value);
+                                  }}
+                                >
+                                  <span className="text-sm font-medium leading-relaxed">{option.label}</span>
+                                  {option.description ? (
+                                    <span className="text-xs leading-relaxed text-[var(--text-muted)]">{option.description}</span>
+                                  ) : null}
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <p className="px-3 py-3 text-sm text-[var(--text-muted)]">
+                              {isCredentialLoading ? "正在读取渠道..." : "当前没有可用渠道"}
+                            </p>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
                   </label>
-                  <label className="block">
-                    <span className="text-xs font-medium text-[var(--text-secondary)] mb-1 block">模型</span>
+                  <label className="mt-3 grid gap-1.5">
+                    <span className="text-xs font-medium text-[var(--text-secondary)]">模型</span>
                     <Input
                       allowClear
                       autoComplete="off"
@@ -284,6 +371,25 @@ export function StudioChatComposer({
                       onChange={onModelNameChange}
                     />
                   </label>
+                  <div className="mt-3 rounded-[14px] border border-[rgba(44,36,22,0.08)] bg-[rgba(249,247,243,0.92)] px-3 py-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="m-0 text-[12px] font-medium text-[var(--text-primary)]">回复显示方式</p>
+                        <p className="m-0 text-[11px] leading-4 text-[var(--text-secondary)]">仅当前项目聊天生效</p>
+                      </div>
+                      <Radio.Group
+                        aria-label="回复显示方式"
+                        mode="fill"
+                        size="small"
+                        type="button"
+                        value={settings.streamOutput ? "stream" : "buffered"}
+                        onChange={(value) => onStreamOutputChange(value === "stream")}
+                      >
+                        <Radio value="stream">边写边显示</Radio>
+                        <Radio value="buffered">生成后整体显示</Radio>
+                      </Radio.Group>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

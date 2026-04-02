@@ -68,6 +68,7 @@ async def execute_stream_probe_request(
     *,
     api_dialect: str,
     print_response: bool,
+    timeout_seconds: int = DEFAULT_REQUEST_TIMEOUT_SECONDS,
 ) -> NormalizedLLMResponse:
     text_parts: list[str] = []
     raw_events: list[dict[str, Any]] = []
@@ -75,6 +76,7 @@ async def execute_stream_probe_request(
         request,
         api_dialect=api_dialect,
         print_status=True,
+        timeout_seconds=timeout_seconds,
     ):
         raw_events.append({"event": event.event_name, "data": event.payload})
         if event.delta:
@@ -104,9 +106,10 @@ async def iterate_stream_request(
     api_dialect: str,
     print_status: bool = False,
     should_stop: StreamStopChecker | None = None,
+    timeout_seconds: int = DEFAULT_REQUEST_TIMEOUT_SECONDS,
 ) -> AsyncIterator[ParsedStreamEvent]:
     buffer = StreamEventBuffer(event_name=None, data_lines=[])
-    async with httpx.AsyncClient(timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS) as client:
+    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
         async with client.stream(
             request.method,
             request.url,

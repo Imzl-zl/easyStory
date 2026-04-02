@@ -101,9 +101,7 @@ const config: Config = {
         'slide-from-left': 'slideFromLeft 500ms cubic-bezier(0.16, 1, 0.3, 1)',
         'slide-from-right': 'slideFromRight 500ms cubic-bezier(0.16, 1, 0.3, 1)',
         'ink-fade-in': 'inkFadeIn 400ms cubic-bezier(0.16, 1, 0.3, 1)',
-        'ink-shimmer': 'inkShimmer 4s ease-in-out infinite',
         'typing-pulse': 'typingPulse 1.4s ease-in-out infinite',
-        'stale-pulse': 'stalePulse 2.5s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -130,17 +128,9 @@ const config: Config = {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
-        inkShimmer: {
-          '0%, 100%': { transform: 'translateX(-100%)' },
-          '50%': { transform: 'translateX(100%)' },
-        },
         typingPulse: {
           '0%, 100%': { opacity: '0.4' },
           '50%': { opacity: '1' },
-        },
-        stalePulse: {
-          '0%, 100%': { opacity: '1', transform: 'scale(1)' },
-          '50%': { opacity: '0.6', transform: 'scale(1.1)' },
         },
       },
     },

@@ -6,16 +6,12 @@ import type { UseMutationResult } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
-import { showAppNotice } from "@/components/ui/app-notice";
 import { runAssistantTurn, runAssistantTurnStream } from "@/lib/api/assistant";
 import { buildIncubatorConversationDraft, createProject } from "@/lib/api/projects";
 import type { AssistantTurnResult, ProjectIncubatorConversationDraft, ProjectSetting } from "@/lib/api/types";
 
 import {
-  buildAssistantRetryFailure,
-  buildAssistantStreamRecoveryNotice,
   buildIncubatorAssistantTurnPayload,
-  shouldRetryAssistantWithoutStream,
 } from "./incubator-assistant-request-support";
 import { useChatState } from "./incubator-chat-state";
 import {
@@ -152,31 +148,14 @@ export function useIncubatorAssistantMutation(
       if (!settings.streamOutput) {
         return runAssistantTurn(payload);
       }
-      try {
-        return await runAssistantTurnStream(payload, {
-          onChunk: (delta) => {
-            patchConversationSession(submission.conversationId, (current) => ({
-              ...current,
-              messages: appendIncubatorMessageDelta(current.messages, submission.pendingAssistant.id, delta),
-            }));
-          },
-        });
-      } catch (error) {
-        if (!shouldRetryAssistantWithoutStream(error)) {
-          throw error;
-        }
-        try {
-          const result = await runAssistantTurn(payload);
-          showAppNotice({
-            content: buildAssistantStreamRecoveryNotice(),
-            title: "聊天提示",
-            tone: "info",
-          });
-          return result;
-        } catch (retryError) {
-          throw buildAssistantRetryFailure(error, retryError);
-        }
-      }
+      return runAssistantTurnStream(payload, {
+        onChunk: (delta) => {
+          patchConversationSession(submission.conversationId, (current) => ({
+            ...current,
+            messages: appendIncubatorMessageDelta(current.messages, submission.pendingAssistant.id, delta),
+          }));
+        },
+      });
     },
   });
 }
