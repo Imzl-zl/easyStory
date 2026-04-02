@@ -73,6 +73,7 @@ export type CredentialApiDialect =
   | "anthropic_messages"
   | "gemini_generate_content";
 export type CredentialAuthStrategy = "bearer" | "x_api_key" | "x_goog_api_key" | "custom_header";
+export type CredentialRuntimeKind = "server-python" | "server-node" | "browser";
 
 export type CredentialView = {
   id: string;
@@ -89,6 +90,10 @@ export type CredentialView = {
   auth_strategy: CredentialAuthStrategy | null;
   api_key_header_name: string | null;
   extra_headers: Record<string, string> | null;
+  user_agent_override: string | null;
+  client_name: string | null;
+  client_version: string | null;
+  runtime_kind: CredentialRuntimeKind | null;
   is_active: boolean;
   last_verified_at: string | null;
 };
@@ -107,6 +112,10 @@ export type CredentialCreatePayload = {
   auth_strategy?: CredentialAuthStrategy | null;
   api_key_header_name?: string | null;
   extra_headers?: Record<string, string> | null;
+  user_agent_override?: string | null;
+  client_name?: string | null;
+  client_version?: string | null;
+  runtime_kind?: CredentialRuntimeKind | null;
 };
 
 export type CredentialUpdatePayload = {
@@ -120,6 +129,10 @@ export type CredentialUpdatePayload = {
   auth_strategy?: CredentialAuthStrategy | null;
   api_key_header_name?: string | null;
   extra_headers?: Record<string, string> | null;
+  user_agent_override?: string | null;
+  client_name?: string | null;
+  client_version?: string | null;
+  runtime_kind?: CredentialRuntimeKind | null;
 };
 
 export type CredentialVerifyResult = {

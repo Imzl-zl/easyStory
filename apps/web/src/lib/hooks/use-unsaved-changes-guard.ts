@@ -55,6 +55,45 @@ export function useUnsavedChangesGuard({
   }, [isDirty]);
 
   useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (
+        !isDirty
+        || event.defaultPrevented
+        || event.button !== 0
+        || event.metaKey
+        || event.ctrlKey
+        || event.shiftKey
+        || event.altKey
+      ) {
+        return;
+      }
+      if (!(event.target instanceof Element)) {
+        return;
+      }
+      const link = event.target.closest("a[href]");
+      if (!(link instanceof HTMLAnchorElement) || link.target === "_blank" || link.hasAttribute("download")) {
+        return;
+      }
+      const nextUrl = new URL(link.href, window.location.href);
+      if (nextUrl.origin !== window.location.origin) {
+        return;
+      }
+      const nextPath = `${nextUrl.pathname}${nextUrl.search}`;
+      if (nextPath === stableUrlRef.current) {
+        return;
+      }
+      event.preventDefault();
+      openNavigationConfirm(() => {
+        startTransition(() => {
+          router.push(nextPath);
+        });
+      });
+    };
+    document.addEventListener("click", handleDocumentClick);
+    return () => document.removeEventListener("click", handleDocumentClick);
+  }, [isDirty, openNavigationConfirm, router]);
+
+  useEffect(() => {
     const handlePopState = () => {
       if (!isDirty) {
         return;

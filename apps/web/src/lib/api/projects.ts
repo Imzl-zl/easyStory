@@ -8,6 +8,8 @@ import type {
   ProjectIncubatorDraftPayload,
   ProjectCreatePayload,
   ProjectDetail,
+  ProjectDocument,
+  ProjectDocumentSavePayload,
   ProjectPreparationStatus,
   ProjectSetting,
   ProjectSettingSnapshot,
@@ -56,6 +58,23 @@ export function createProjectFromIncubator(payload: ProjectIncubatorCreatePayloa
 
 export function getProject(projectId: string) {
   return requestJson<ProjectDetail>(`/api/v1/projects/${projectId}`);
+}
+
+export function getProjectDocument(projectId: string, path: string) {
+  const search = new URLSearchParams({ path }).toString();
+  return requestJson<ProjectDocument>(`/api/v1/projects/${projectId}/documents?${search}`);
+}
+
+export function saveProjectDocument(
+  projectId: string,
+  path: string,
+  payload: ProjectDocumentSavePayload,
+) {
+  const search = new URLSearchParams({ path }).toString();
+  return requestJson<ProjectDocument>(`/api/v1/projects/${projectId}/documents?${search}`, {
+    method: "PUT",
+    body: payload,
+  });
 }
 
 export function deleteProject(projectId: string) {

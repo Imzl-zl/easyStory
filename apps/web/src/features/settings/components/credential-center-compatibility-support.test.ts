@@ -19,3 +19,13 @@ test("parseExtraHeadersText rejects non-token header names", () => {
     /不是合法的 HTTP 请求头名称/,
   );
 });
+
+test("parseExtraHeadersText rejects runtime-managed user-agent header", () => {
+  assert.throws(
+    () =>
+      parseExtraHeadersText('{ "User-Agent": "fake-cli" }', {
+        apiDialect: "openai_chat_completions",
+      }),
+    /系统托管的请求头/,
+  );
+});

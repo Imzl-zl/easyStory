@@ -122,7 +122,7 @@ infrastructure -> domain models
 - `workflow` 通过调用 `content/review/context/export` 的公开服务完成协作。
 
 ## 10. 真值源规则
-- `ProjectSetting` 是项目设定真值源
+- `ProjectSetting` 是项目结构化摘要真值源，用于展示、投影和机器默认值，不再作为创作流程的硬阻塞条件
 - `contents + content_versions` 是正文真值源
 - `artifacts` 不是正文真值源
 - 配置缓存表不是业务主真值源

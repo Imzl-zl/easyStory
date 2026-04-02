@@ -31,17 +31,17 @@ test("incubator chat draft support marks warning drafts as directly usable", () 
   };
 
   assert.deepEqual(buildDraftGuidance(draft), {
-    actionLabel: "让 AI 补齐这些内容",
+    actionLabel: "让 AI 补一版摘要",
     detail: "当前缺少 整体气质、篇幅规划。这不影响创建项目，也不影响后面继续用 AI 生成大纲。",
     statusLabel: "可继续",
-    summary: "现在就能继续，剩下的是可补可不补的建议项。",
+    summary: "现在就能继续，剩下的是建议补齐的摘要项。",
   });
   assert.equal(shouldOfferDraftAiCompletion(draft), true);
   assert.match(buildDraftAiCompletionPrompt(draft), /不要再让我自己填表/);
   assert.match(buildDraftAiCompletionPrompt(draft), /整体气质、篇幅规划/);
 });
 
-test("incubator chat draft support marks blocked drafts as needing AI completion first", () => {
+test("incubator chat draft support treats partial drafts as usable summary warnings", () => {
   const draft: ProjectIncubatorConversationDraft = {
     follow_up_questions: ["主角现在最想达成什么？"],
     project_setting: {
@@ -50,17 +50,17 @@ test("incubator chat draft support marks blocked drafts as needing AI completion
     },
     setting_completeness: {
       issues: [
-        { field: "protagonist.goal", level: "blocked", message: "缺少主角核心目标" },
-        { field: "core_conflict", level: "blocked", message: "缺少核心冲突" },
+        { field: "protagonist.goal", level: "warning", message: "建议补一句主角目标，便于后续摘要和检索" },
+        { field: "core_conflict", level: "warning", message: "建议补一句核心冲突，方便快速看出故事张力" },
       ],
-      status: "blocked",
+      status: "warning",
     },
   };
 
   assert.deepEqual(buildDraftGuidance(draft), {
-    actionLabel: "让 AI 先补一版",
-    detail: "还差 主角设定、核心冲突。你不用自己填，点一下就能让 AI 先补成可继续创作的一版。",
-    statusLabel: "待补全",
-    summary: "还差关键信息，补一下再继续会更顺。",
+    actionLabel: "让 AI 补一版摘要",
+    detail: "当前缺少 主角设定、核心冲突。这不影响创建项目，也不影响后面继续用 AI 生成大纲。",
+    statusLabel: "可继续",
+    summary: "现在就能继续，剩下的是建议补齐的摘要项。",
   });
 });

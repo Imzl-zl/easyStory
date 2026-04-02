@@ -50,11 +50,20 @@ test("resolveCredentialActionFeedback keeps non-verify actions semantic and stab
   });
 });
 
-test("normalizeCredentialActionErrorMessage rewrites verifier mismatch into user-facing Chinese", () => {
+test("normalizeCredentialActionErrorMessage rewrites empty probe content into user-facing Chinese", () => {
   assert.equal(
     normalizeCredentialActionErrorMessage(
-      "无法验证 薄荷 凭证: 验证响应不匹配，预期“今天天气真好。”，实际“Gemini 3 Pro is no longer available. Please switch to Gemini 3.1 Pro in the latest version of Antigravity.”",
+      "无法验证 薄荷 凭证: 测试消息没有返回可用内容",
     ),
-    "连接“薄荷”验证失败：当前默认模型已不可用，请换成可用模型后再试。上游提示：Gemini 3 Pro is no longer available. Please switch to Gemini 3.1 Pro in the latest version of Antigravity.",
+    "连接“薄荷”验证失败：测试消息没有拿到可用回复。请检查默认模型、接口类型或上游兼容设置。",
+  );
+});
+
+test("normalizeCredentialActionErrorMessage keeps backend normalized upstream errors readable", () => {
+  assert.equal(
+    normalizeCredentialActionErrorMessage(
+      "无法验证 OpenAI 凭证: 当前默认模型已不可用，请换成可用模型后再试。上游提示：Gemini 3 Pro is no longer available. Please switch to Gemini 3.1 Pro.",
+    ),
+    "连接“OpenAI”验证失败：当前默认模型已不可用，请换成可用模型后再试。上游提示：Gemini 3 Pro is no longer available. Please switch to Gemini 3.1 Pro.",
   );
 });

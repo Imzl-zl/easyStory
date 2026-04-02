@@ -9,8 +9,8 @@ from app.modules.credential.models import ModelCredential
 from app.modules.observability.service import AuditLogService
 
 from .credential_mutation_support import record_audit
-from .credential_service_support import to_verify_result
 from .dto import CredentialVerifyResultDTO
+from .credential_view_support import to_verify_result
 
 
 async def verify_credential_record(
@@ -34,6 +34,10 @@ async def verify_credential_record(
             auth_strategy=credential.auth_strategy,
             api_key_header_name=credential.api_key_header_name,
             extra_headers=credential.extra_headers,
+            user_agent_override=credential.user_agent_override,
+            client_name=credential.client_name,
+            client_version=credential.client_version,
+            runtime_kind=credential.runtime_kind,
         )
     except Exception as exc:
         record_audit(

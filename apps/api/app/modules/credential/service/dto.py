@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.shared.runtime.llm_protocol import LlmApiDialect, LlmAuthStrategy
+from app.shared.runtime.llm_protocol import LlmApiDialect, LlmAuthStrategy, LlmRuntimeKind
 
 CredentialOwnerType = Literal["system", "user", "project"]
 CredentialExtraHeaders = dict[str, str]
@@ -14,6 +14,7 @@ CREDENTIAL_CONTEXT_WINDOW_TOKENS_MIN = 256
 CREDENTIAL_CONTEXT_WINDOW_TOKENS_MAX = 2_000_000
 CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MIN = 128
 CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MAX = 131_072
+CREDENTIAL_USER_AGENT_OVERRIDE_MAX_LENGTH = 300
 
 
 class CredentialCreateDTO(BaseModel):
@@ -40,6 +41,13 @@ class CredentialCreateDTO(BaseModel):
     auth_strategy: LlmAuthStrategy | None = None
     api_key_header_name: str | None = Field(default=None, max_length=100)
     extra_headers: CredentialExtraHeaders | None = None
+    user_agent_override: str | None = Field(
+        default=None,
+        max_length=CREDENTIAL_USER_AGENT_OVERRIDE_MAX_LENGTH,
+    )
+    client_name: str | None = Field(default=None, max_length=100)
+    client_version: str | None = Field(default=None, max_length=50)
+    runtime_kind: LlmRuntimeKind | None = None
 
 
 class CredentialUpdateDTO(BaseModel):
@@ -63,6 +71,13 @@ class CredentialUpdateDTO(BaseModel):
     auth_strategy: LlmAuthStrategy | None = None
     api_key_header_name: str | None = Field(default=None, max_length=100)
     extra_headers: CredentialExtraHeaders | None = None
+    user_agent_override: str | None = Field(
+        default=None,
+        max_length=CREDENTIAL_USER_AGENT_OVERRIDE_MAX_LENGTH,
+    )
+    client_name: str | None = Field(default=None, max_length=100)
+    client_version: str | None = Field(default=None, max_length=50)
+    runtime_kind: LlmRuntimeKind | None = None
 
 
 class CredentialViewDTO(BaseModel):
@@ -80,6 +95,10 @@ class CredentialViewDTO(BaseModel):
     auth_strategy: LlmAuthStrategy | None
     api_key_header_name: str | None
     extra_headers: CredentialExtraHeaders | None
+    user_agent_override: str | None
+    client_name: str | None
+    client_version: str | None
+    runtime_kind: LlmRuntimeKind | None
     is_active: bool
     last_verified_at: datetime | None
 

@@ -3,7 +3,7 @@
 ## Concepts
 
 - 本文件记录跨会话稳定协作知识，不替代 `docs/`、`config/` 或当前代码。
-- 当前标准创作主链路：`ProjectSetting -> Outline -> OpeningPlan -> ChapterTask -> Chapter`。
+- 当前标准创作主链路：`ProjectSetting(结构化摘要) -> Outline -> OpeningPlan -> ChapterTask -> Chapter`。
 - 后端实现边界固定为：`Entry -> Service -> Engine -> Infrastructure`。
 
 ## Source Lookup
@@ -74,15 +74,19 @@
 - 新实现优先补服务和测试，再接路由；保持 API 只做装配，不直接写业务规则。
 - 所有业务模块公开面已收敛为 async-only：统一 `Service + create_*_service` 命名，不保留 `Async*` 镜像类或 `create_async_*` 第二导出面。内部若只剩 async 一套实现，把 `*_async` 名称改回业务语义名。
 - LLM 供应商兼容层当前最佳实践入口：`api_dialect` 只决定协议格式与解析；鉴权方式由 `auth_strategy` / `api_key_header_name` 显式 override，不再硬绑在 dialect 上。
-- Credential Center 当前正式支持的高级兼容字段只保留三类：`auth_strategy`、`api_key_header_name`、`extra_headers`；这三项同时作用于保存、验证和运行时请求，不引入 2API 风格的 prefix / alias / provider 路由复杂度。
+- Credential Center 当前正式支持的高级连接字段：`auth_strategy`、`api_key_header_name`、`extra_headers`、`user_agent_override`、`client_name`、`client_version`、`runtime_kind`；这些字段同时作用于保存、验证和运行时请求，不引入 2API 风格的 prefix / alias / provider 路由复杂度。
 - `model_credentials` 当前额外支持两类连接级 token 配置：`context_window_tokens` 只记录模型上下文窗口，不伪造成通用上游请求参数；`default_max_output_tokens` 会作为 runtime 的默认输出预算 fallback。
-- `extra_headers` 只用于非敏感元数据头（如 Referer、租户标识）；鉴权类 header 不允许塞进这里，必须走 `auth_strategy / api_key_header_name`。
+- `extra_headers` 只用于非敏感元数据头（如 Referer、租户标识）；鉴权类 header 和 `User-Agent` 不允许塞进这里，必须分别走 `auth_strategy / api_key_header_name` 和 `user_agent_override / client_name / client_version / runtime_kind`。
+- 客户端预设只是帮你把一条常见 `User-Agent` 模板写入 `user_agent_override`；运行时若存在 `user_agent_override` 会优先发送它，不会再拼接下面的应用名/版本/运行环境。
 - provider interop 本地 probe 若使用 `--model` 覆写，最终请求体中的探测模型也必须同步覆写，不能只改展示值。
 - Anthropic Messages 请求当前默认把 `system_prompt` 编码为 text block 数组，而不是裸字符串；官方两种都允许，但兼容代理对数组更稳。
 - Gemini probe 对简单连通性验证应显式压低思考配置；否则某些 `gemini-flash-latest` 代理会落到带默认 thinking 的 Gemini 3 变体，直接把 probe token 吃在内部思考上，表面看是“返回半句”，实际是上游 `finishReason=MAX_TOKENS`。
 - assistant / provider interop 当前正式流式口径：`AssistantTurnRequestDTO.stream` 默认 `true`；前端若明确走 JSON 路径，必须显式发送 `stream=false`，不能依赖后端默认值。
+- `ProjectSetting` 当前仍是运行时上下文投影输入之一：字段缺口只产生 `warning`，不会阻塞继续生成；但摘要一旦保存为新值，已确认的大纲 / 开篇设计 / 章节任务 / 正文仍需按 impact 标记为 stale，不能静默混用旧产物。
+- `Studio` 当前已补齐项目文稿文件读写：`GET/PUT /api/v1/projects/{project_id}/documents?path=...`，文件默认落在 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；其中 `设定/*`、`附录/*` 和 `大纲/章节规划.md` 走文件层，首次无文件时会按 `ProjectSetting` 摘要或现有章节列表回填初始内容；正式 `大纲 / 开篇设计 / 正文章节` 继续走 `contents + content_versions` 真值链，不写入项目文件目录。
 - incubator / studio 聊天当前不再做“流式失败自动退回非流”的静默降级；需要让真实上游错误直接暴露，便于定位中转兼容问题。
 - credential verifier 与 `scripts/provider_interop_check.py probe` 当前默认走流式；Gemini verification/probe 会注入最小思考配置，避免默认 thinking 吃掉验证输出预算。
+- credential verifier 当前仍发送普通短聊天提示以压低成本，但成功条件已经放宽为“拿到可用文本回复”；不再要求模型精确复读固定句子，也不在提示词里显式暴露“验证/测试”语义；只对空响应和明显的上游模型错误文本判失败。
 - 受保护 API 统一走 `app.modules.user.entry.http.dependencies.get_current_user`（async 版），不保留 `get_current_user_async` 第二命名入口。
 - 当业务 service 文件超出 300 行时，优先保持公开 `Service + factory` 不变，只把"查询/权限 helper""状态变更 helper""DTO 映射与归一化 helper"下沉到 `*_support.py`；不要用改公开命名来掩盖内部结构问题。
 - `workflow events` SSE 端点需要 `Authorization: Bearer`；前端不要用原生 `EventSource`，统一走 `fetch + ReadableStream`，并区分正常 EOF 静默重连与错误重连提示。

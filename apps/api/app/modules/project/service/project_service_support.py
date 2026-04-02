@@ -9,7 +9,6 @@ from sqlalchemy.orm import selectinload
 from app.modules.content.models import Content
 from app.modules.project.models import Project
 from app.modules.project.schemas import ProjectSetting
-from app.shared.runtime.errors import BusinessRuleError
 
 from .dto import (
     PreparationChapterTaskCountsDTO,
@@ -46,10 +45,7 @@ def build_project_statement(
 
 
 def ensure_setting_allows_preparation(project: Project) -> SettingCompletenessResultDTO:
-    result = evaluate_setting(project)
-    if result.status == "blocked":
-        raise BusinessRuleError(format_blocked_message(result.issues))
-    return result
+    return evaluate_setting(project)
 
 
 def evaluate_setting(project: Project) -> SettingCompletenessResultDTO:
@@ -91,14 +87,12 @@ def mark_related_content_stale(project: Project) -> list[ProjectSettingImpactIte
     return build_content_stale_impacts(impacted_contents)
 
 
-def build_content_stale_impacts(
-    contents: list[Content],
-) -> list[ProjectSettingImpactItemDTO]:
+def build_content_stale_impacts(contents: list[Content]) -> list[ProjectSettingImpactItemDTO]:
     counts = Counter(content.content_type for content in contents)
     impacts: list[ProjectSettingImpactItemDTO] = []
     for target in SETTING_IMPACT_ORDER:
         count = counts.get(target, 0)
-        if count:
+        if count > 0:
             impacts.append(build_setting_impact_item(target, count))
     return impacts
 
@@ -109,7 +103,7 @@ def build_setting_impact_summary(
     stale_chapter_task_count: int,
 ) -> ProjectSettingImpactSummaryDTO:
     items = list(content_impacts)
-    if stale_chapter_task_count:
+    if stale_chapter_task_count > 0:
         items.append(build_setting_impact_item("chapter_tasks", stale_chapter_task_count))
     return ProjectSettingImpactSummaryDTO(
         has_impact=bool(items),
@@ -130,17 +124,14 @@ def build_setting_impact_item(
     )
 
 
-def format_setting_impact_message(
-    target: str,
-    count: int,
-) -> str:
+def format_setting_impact_message(target: str, count: int) -> str:
     if target == "outline":
-        return "已确认大纲将标记为 stale，需要重新确认"
+        return "已确认大纲将标记为 stale，需要重新确认。"
     if target == "opening_plan":
-        return "已确认开篇设计将标记为 stale，需要在大纲稳定后重新确认"
+        return "已确认开篇设计将标记为 stale，需要在大纲稳定后重新确认。"
     if target == "chapter":
-        return f"{count} 个已确认章节将标记为 stale，需要按范围复核正文"
-    return f"{count} 个章节任务将标记为 stale，需要重新执行 chapter_split"
+        return f"{count} 个已确认章节将标记为 stale，需要按范围复核正文。"
+    return f"{count} 个章节任务将标记为 stale，需要重新执行章节拆分。"
 
 
 def resolve_asset_step_status(
@@ -158,9 +149,7 @@ def resolve_asset_step_status(
     return "draft"
 
 
-def count_chapter_tasks(
-    tasks,
-) -> PreparationChapterTaskCountsDTO:
+def count_chapter_tasks(tasks) -> PreparationChapterTaskCountsDTO:
     counts = PreparationChapterTaskCountsDTO()
     for task in tasks:
         if task.status == "pending":
@@ -207,12 +196,12 @@ def current_version(content: Content):
 
 
 def collect_setting_issues(setting: ProjectSetting) -> list[SettingCompletenessIssueDTO]:
-    issues = build_required_issues(setting)
-    issues.extend(build_optional_issues(setting))
+    issues = build_primary_summary_issues(setting)
+    issues.extend(build_optional_summary_issues(setting))
     return issues
 
 
-def build_required_issues(setting: ProjectSetting) -> list[SettingCompletenessIssueDTO]:
+def build_primary_summary_issues(setting: ProjectSetting) -> list[SettingCompletenessIssueDTO]:
     issues: list[SettingCompletenessIssueDTO] = []
     protagonist = setting.protagonist
     world_setting = setting.world_setting
@@ -227,64 +216,47 @@ def build_required_issues(setting: ProjectSetting) -> list[SettingCompletenessIs
         )
     )
     if not setting.genre:
-        issues.append(issue("genre", "blocked", "缺少题材/类型"))
+        issues.append(issue("genre", "建议补一句题材/类型，方便快速识别项目方向"))
     if not has_protagonist_entry:
         issues.append(
             issue(
                 "protagonist.identity",
-                "blocked",
-                "主角核心信息缺失，至少需要身份或初始处境",
+                "建议补一句主角身份或初始处境，方便快速浏览人物入口",
             )
         )
     if not (protagonist and protagonist.goal):
-        issues.append(issue("protagonist.goal", "blocked", "缺少主角核心目标"))
+        issues.append(issue("protagonist.goal", "建议补一句主角目标，便于后续摘要和检索"))
     if not setting.core_conflict:
-        issues.append(issue("core_conflict", "blocked", "缺少核心冲突"))
+        issues.append(issue("core_conflict", "建议补一句核心冲突，方便快速看出故事张力"))
     if not has_world_baseline:
         issues.append(
             issue(
                 "world_setting",
-                "blocked",
-                "缺少世界基线，至少需要时代背景、世界规则、力量体系或关键地点",
+                "建议补一句时代背景、世界规则、力量体系或关键地点，方便快速定位世界基线",
             )
         )
     return issues
 
 
-def build_optional_issues(setting: ProjectSetting) -> list[SettingCompletenessIssueDTO]:
+def build_optional_summary_issues(setting: ProjectSetting) -> list[SettingCompletenessIssueDTO]:
     issues: list[SettingCompletenessIssueDTO] = []
     scale = setting.scale
     has_scale = bool(scale and (scale.target_words or scale.target_chapters))
     if not setting.tone:
-        issues.append(issue("tone", "warning", "缺少基调/风格"))
+        issues.append(issue("tone", "建议补一句基调/风格，方便统一整体气质"))
     if not has_scale:
-        issues.append(
-            issue(
-                "scale",
-                "warning",
-                "缺少目标篇幅或章节规模，后续预算与规划精度会下降",
-            )
-        )
+        issues.append(issue("scale", "建议补一下目标篇幅或章节规模，方便预算和规划"))
     return issues
 
 
 def resolve_status(issues: list[SettingCompletenessIssueDTO]) -> str:
-    if any(item.level == "blocked" for item in issues):
-        return "blocked"
     if issues:
         return "warning"
     return "ready"
 
 
-def format_blocked_message(issues: list[SettingCompletenessIssueDTO]) -> str:
-    blocked_messages = [item.message for item in issues if item.level == "blocked"]
-    details = "；".join(dict.fromkeys(blocked_messages))
-    return f"项目设定未完成，无法继续：{details}"
-
-
 def issue(
     field: str,
-    level: str,
     message: str,
 ) -> SettingCompletenessIssueDTO:
-    return SettingCompletenessIssueDTO(field=field, level=level, message=message)
+    return SettingCompletenessIssueDTO(field=field, level="warning", message=message)

@@ -95,6 +95,18 @@ def cleanup_project_export_directory(
         shutil.rmtree(project_export_dir)
 
 
+def cleanup_project_document_directory(
+    document_root: Path,
+    project_id: uuid.UUID,
+) -> None:
+    resolved_root = document_root.resolve()
+    project_document_dir = (document_root / "projects" / str(project_id)).resolve()
+    if not project_document_dir.is_relative_to(resolved_root):
+        raise BusinessRuleError("Project document path escaped document root")
+    if project_document_dir.exists():
+        shutil.rmtree(project_document_dir)
+
+
 def mark_project_deleted(project: Project) -> None:
     project.deleted_at = datetime.now(UTC)
 

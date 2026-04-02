@@ -34,6 +34,10 @@ class FakeVerifier:
         auth_strategy: str | None,
         api_key_header_name: str | None,
         extra_headers: dict[str, str] | None,
+        user_agent_override: str | None,
+        client_name: str | None,
+        client_version: str | None,
+        runtime_kind: str | None,
     ) -> CredentialVerificationResult:
         assert provider == "openai"
         assert api_key == "sk-secret-1234"
@@ -43,6 +47,10 @@ class FakeVerifier:
         assert auth_strategy == "custom_header"
         assert api_key_header_name == "api-key"
         assert extra_headers == {"X-Trace-Id": "api-check"}
+        assert user_agent_override == "codex-cli/0.118.0 (server; node)"
+        assert client_name == "easyStory"
+        assert client_version == "0.1"
+        assert runtime_kind == "server-python"
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
             message="验证成功",
@@ -81,6 +89,10 @@ async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> 
                     "auth_strategy": "custom_header",
                     "api_key_header_name": "api-key",
                     "extra_headers": {"X-Trace-Id": "api-check"},
+                    "user_agent_override": "codex-cli/0.118.0 (server; node)",
+                    "client_name": "easyStory",
+                    "client_version": "0.1",
+                    "runtime_kind": "server-python",
                 },
                 headers=headers,
             )
@@ -94,6 +106,10 @@ async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> 
             assert payload["auth_strategy"] == "custom_header"
             assert payload["api_key_header_name"] == "api-key"
             assert payload["extra_headers"] == {"X-Trace-Id": "api-check"}
+            assert payload["user_agent_override"] == "codex-cli/0.118.0 (server; node)"
+            assert payload["client_name"] == "easyStory"
+            assert payload["client_version"] == "0.1"
+            assert payload["runtime_kind"] == "server-python"
             assert payload["masked_key"] == "sk-...1234"
 
             list_response = await client.get("/api/v1/credentials", headers=headers)

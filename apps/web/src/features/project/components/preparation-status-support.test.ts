@@ -33,7 +33,7 @@ test("buildPreparationStatusRows keeps setting and asset descriptions aligned wi
   assert.deepEqual(rows, [
     {
       description: "建议补齐题材倾向。",
-      label: "设定完整度",
+      label: "结构化摘要",
       status: "warning",
     },
     {

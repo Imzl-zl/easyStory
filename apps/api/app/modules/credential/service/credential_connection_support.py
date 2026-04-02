@@ -8,12 +8,14 @@ from app.shared.runtime.llm_protocol import (
     normalize_api_dialect,
     normalize_auth_strategy,
     normalize_http_header_name,
+    normalize_runtime_kind,
     resolve_api_key_header_name,
     resolve_auth_strategy,
 )
 
 CONTENT_TYPE_HEADER_NAME = "content-type"
 ANTHROPIC_VERSION_HEADER_NAME = "anthropic-version"
+USER_AGENT_HEADER_NAME = "user-agent"
 SENSITIVE_EXTRA_HEADER_NAMES = frozenset(
     {
         "authorization",
@@ -43,6 +45,12 @@ def normalize_connection_settings(credential: ModelCredential) -> None:
         auth_strategy=credential.auth_strategy,
         api_key_header_name=credential.api_key_header_name,
     )
+    credential.user_agent_override = normalize_user_agent_override(credential.user_agent_override)
+    credential.client_name, credential.client_version, credential.runtime_kind = normalize_client_identity_settings(
+        client_name=credential.client_name,
+        client_version=credential.client_version,
+        runtime_kind=credential.runtime_kind,
+    )
 
 
 def build_runtime_credential_payload(
@@ -60,7 +68,36 @@ def build_runtime_credential_payload(
         "auth_strategy": credential.auth_strategy,
         "api_key_header_name": credential.api_key_header_name,
         "extra_headers": copy_extra_headers(credential.extra_headers),
+        "user_agent_override": credential.user_agent_override,
+        "client_name": credential.client_name,
+        "client_version": credential.client_version,
+        "runtime_kind": credential.runtime_kind,
     }
+
+
+def normalize_client_identity_settings(
+    *,
+    client_name: str | None,
+    client_version: str | None,
+    runtime_kind: str | None,
+) -> tuple[str | None, str | None, str | None]:
+    normalized_name = _normalize_optional_string(client_name)
+    normalized_version = _normalize_optional_string(client_version)
+    normalized_runtime_kind = normalize_runtime_kind(runtime_kind)
+    if normalized_name is None and (normalized_version is not None or normalized_runtime_kind is not None):
+        raise ConfigurationError("client_name is required when client_version or runtime_kind is provided")
+    if normalized_name is None:
+        return None, None, None
+    return normalized_name, normalized_version, normalized_runtime_kind
+
+
+def normalize_user_agent_override(user_agent_override: str | None) -> str | None:
+    normalized = _normalize_optional_string(user_agent_override)
+    if normalized is None:
+        return None
+    if "\r" in normalized or "\n" in normalized:
+        raise ConfigurationError("user_agent_override must be a single-line header value")
+    return normalized
 
 
 def normalize_auth_strategy_override(
@@ -191,6 +228,7 @@ def _build_runtime_reserved_headers(
     include_auth_header: bool = True,
 ) -> set[str]:
     reserved_headers = {CONTENT_TYPE_HEADER_NAME}
+    reserved_headers.add(USER_AGENT_HEADER_NAME)
     if normalize_api_dialect(api_dialect) == "anthropic_messages":
         reserved_headers.add(ANTHROPIC_VERSION_HEADER_NAME)
     if not include_auth_header:
@@ -212,3 +250,10 @@ def _looks_like_sensitive_header_name(header_name: str) -> bool:
     if normalized in SENSITIVE_EXTRA_HEADER_NAMES:
         return True
     return any(fragment in normalized for fragment in SENSITIVE_EXTRA_HEADER_FRAGMENTS)
+
+
+def _normalize_optional_string(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None

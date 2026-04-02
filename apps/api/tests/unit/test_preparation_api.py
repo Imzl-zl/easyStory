@@ -134,12 +134,13 @@ async def test_preparation_endpoints_drive_outline_to_opening_plan_flow(monkeypa
         )
         headers = _auth_headers(owner_id)
         async with started_async_client(app) as client:
-            outline_blocked = await client.put(
+            outline_draft = await client.put(
                 f"/api/v1/projects/{project_id}/outline",
                 json={"title": "大纲", "content_text": "第一卷：入宗与逃亡"},
                 headers=headers,
             )
-            assert outline_blocked.status_code == 422
+            assert outline_draft.status_code == 200
+            assert outline_draft.json()["status"] == "draft"
 
             setting_response = await client.put(
                 f"/api/v1/projects/{project_id}/setting",
@@ -178,14 +179,6 @@ async def test_preparation_endpoints_drive_outline_to_opening_plan_flow(monkeypa
                 headers=headers,
             )
             assert opening_plan_blocked.status_code == 422
-
-            outline_response = await client.put(
-                f"/api/v1/projects/{project_id}/outline",
-                json={"title": "大纲", "content_text": "第一卷：入宗与逃亡"},
-                headers=headers,
-            )
-            assert outline_response.status_code == 200
-            assert outline_response.json()["status"] == "draft"
 
             outline_approve = await client.post(
                 f"/api/v1/projects/{project_id}/outline/approve",

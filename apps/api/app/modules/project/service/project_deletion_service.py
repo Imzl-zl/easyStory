@@ -23,6 +23,7 @@ from .project_deletion_support import (
     build_deleted_project_id_statement,
     build_project_cleanup_statements,
     build_soft_deleted_project_statement,
+    cleanup_project_document_directory,
     cleanup_project_export_directory,
     ensure_project_is_soft_deleted,
     ensure_positive_project_trash_value,
@@ -56,10 +57,12 @@ class ProjectDeletionService:
         project_service: ProjectService,
         audit_log_service: AuditLogService,
         export_root: Path,
+        project_document_root: Path,
     ) -> None:
         self.project_service = project_service
         self.audit_log_service = audit_log_service
         self.export_root = export_root
+        self.project_document_root = project_document_root
 
     async def soft_delete_project(
         self,
@@ -260,7 +263,7 @@ class ProjectDeletionService:
     ) -> str:
         detail = str(exc) or exc.__class__.__name__
         if project_deleted:
-            return f"项目已删除，但导出目录清理失败: {detail}"
+            return f"项目已删除，但文件清理失败: {detail}"
         return f"项目清理失败: {detail}"
 
     async def _physically_delete_loaded_project(
@@ -279,3 +282,4 @@ class ProjectDeletionService:
             await db.rollback()
             raise
         cleanup_project_export_directory(self.export_root, project.id)
+        cleanup_project_document_directory(self.project_document_root, project.id)

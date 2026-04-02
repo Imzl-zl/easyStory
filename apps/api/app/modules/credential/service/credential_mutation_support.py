@@ -10,7 +10,7 @@ from app.modules.observability.service import AUDIT_ENTITY_MODEL_CREDENTIAL, Aud
 from app.modules.project.service import ProjectService
 
 from .credential_query_support import require_actor_credential
-from .credential_service_support import to_view
+from .credential_view_support import to_view
 from .dto import CredentialViewDTO
 
 

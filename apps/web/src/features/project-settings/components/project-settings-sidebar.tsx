@@ -44,7 +44,7 @@ export function ProjectSettingsSidebar({
       <div className="space-y-1 rounded-[18px] bg-[rgba(248,243,235,0.78)] px-4 py-3">
         <h2 className="font-serif text-lg font-semibold text-[var(--text-primary)]">项目设置</h2>
         <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
-          管理项目设定、规则、AI 偏好、Skills、MCP 和操作记录
+          查看项目摘要，并管理规则、AI 偏好、Skills、MCP 和操作记录
         </p>
       </div>
 
@@ -60,11 +60,11 @@ export function ProjectSettingsSidebar({
       <nav className="mt-4 space-y-1" role="tablist" aria-label="项目设置导航">
         <TabButton
           active={tab === "setting"}
-          description="项目基础资料"
+          description="快速浏览并更新项目主信息"
           disabled={isPending}
           dirty={dirtyState.setting}
           icon={<SettingsIcon className="w-4 h-4" />}
-          label="设定"
+          label="摘要"
           onClick={() => onSelectTab("setting")}
         />
         <TabButton

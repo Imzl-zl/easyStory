@@ -33,11 +33,19 @@ class FakeVerifier:
         auth_strategy: str | None,
         api_key_header_name: str | None,
         extra_headers: dict[str, str] | None,
+        user_agent_override: str | None,
+        client_name: str | None,
+        client_version: str | None,
+        runtime_kind: str | None,
     ) -> CredentialVerificationResult:
         assert provider
         assert api_key
         assert api_dialect
         assert default_model
+        assert user_agent_override is None or user_agent_override
+        assert client_name is None or client_name
+        assert client_version is None or client_version
+        assert runtime_kind is None or runtime_kind
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
             message="验证成功",
@@ -139,6 +147,125 @@ def test_create_credential_persists_connection_overrides(db, monkeypatch) -> Non
     assert created.auth_strategy == "custom_header"
     assert created.api_key_header_name == "api-key"
     assert created.extra_headers == {"X-Trace-Id": "story-run"}
+
+
+def test_create_credential_persists_client_identity(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+
+    created = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(
+                client_name=" easyStory ",
+                client_version=" 0.1 ",
+                runtime_kind="server-python",
+            ),
+            actor_user_id=user.id,
+        )
+    )
+
+    assert created.client_name == "easyStory"
+    assert created.client_version == "0.1"
+    assert created.runtime_kind == "server-python"
+
+
+def test_create_credential_persists_user_agent_override(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+
+    created = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(user_agent_override=" codex-cli/0.118.0 (server; node) "),
+            actor_user_id=user.id,
+        )
+    )
+
+    assert created.user_agent_override == "codex-cli/0.118.0 (server; node)"
+
+
+def test_update_credential_can_clear_client_identity(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+    credential = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(
+                client_name="easyStory",
+                client_version="0.1",
+                runtime_kind="server-python",
+            ),
+            actor_user_id=user.id,
+        )
+    )
+
+    updated = asyncio.run(
+        service.update_credential(
+            async_db(db),
+            credential.id,
+            CredentialUpdateDTO(
+                client_name="",
+                client_version="",
+                runtime_kind=None,
+            ),
+            actor_user_id=user.id,
+        )
+    )
+
+    assert updated.client_name is None
+    assert updated.client_version is None
+    assert updated.runtime_kind is None
+
+
+def test_update_credential_can_clear_user_agent_override(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+    credential = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(user_agent_override="codex-cli/0.118.0 (server; node)"),
+            actor_user_id=user.id,
+        )
+    )
+
+    updated = asyncio.run(
+        service.update_credential(
+            async_db(db),
+            credential.id,
+            CredentialUpdateDTO(user_agent_override=""),
+            actor_user_id=user.id,
+        )
+    )
+
+    assert updated.user_agent_override is None
+
+
+def test_update_credential_rejects_client_version_without_client_name(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+    credential = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(),
+            actor_user_id=user.id,
+        )
+    )
+
+    with pytest.raises(ConfigurationError, match="client_name is required"):
+        asyncio.run(
+            service.update_credential(
+                async_db(db),
+                credential.id,
+                CredentialUpdateDTO(client_version="0.1"),
+                actor_user_id=user.id,
+            )
+        )
 
 
 def test_create_credential_persists_token_limits(db, monkeypatch) -> None:
@@ -244,6 +371,21 @@ def test_create_credential_rejects_sensitive_extra_headers(db, monkeypatch) -> N
             service.create_credential(
                 async_db(db),
                 _create_payload(extra_headers={"X-Auth-Token": "secret-token"}),
+                actor_user_id=user.id,
+            )
+        )
+
+
+def test_create_credential_rejects_runtime_managed_user_agent_header(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+
+    with pytest.raises(ConfigurationError, match="runtime-managed headers"):
+        asyncio.run(
+            service.create_credential(
+                async_db(db),
+                _create_payload(extra_headers={"User-Agent": "fake-cli/1.0"}),
                 actor_user_id=user.id,
             )
         )

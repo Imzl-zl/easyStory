@@ -96,6 +96,10 @@ def test_create_session_factory_reconciles_legacy_model_credentials_table(tmp_pa
         "context_window_tokens",
         "default_max_output_tokens",
         "default_model",
+        "user_agent_override",
+        "client_name",
+        "client_version",
+        "runtime_kind",
     } <= columns
 
     with reconciled_engine.connect() as connection:

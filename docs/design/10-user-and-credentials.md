@@ -99,7 +99,11 @@ Project 新增 `owner_id`（FK → users.id），与 User 为多对一关系。
 | `default_model` | 连接级默认模型名，用于连通性验证和运行时 `model.name` 缺省回退 |
 | `auth_strategy` | 可选；显式覆盖鉴权方式，未设置时跟随 `api_dialect` 默认值 |
 | `api_key_header_name` | 可选；仅在 `custom_header` 模式下指定 API Key 写入哪个 Header |
-| `extra_headers` | 可选；附加请求头 JSON 对象，仅用于 Referer、租户标识等非敏感元数据 Header；鉴权类 Header 必须走 `auth_strategy / api_key_header_name` |
+| `extra_headers` | 可选；附加请求头 JSON 对象，仅用于 Referer、租户标识等非敏感元数据 Header；鉴权类 Header 和 `User-Agent` 不允许放这里 |
+| `user_agent_override` | 可选；显式覆盖最终发送的 `User-Agent`，适合中转站要求特定客户端标识的场景 |
+| `client_name` | 可选；客户端应用名，用于生成运行时 `User-Agent` |
+| `client_version` | 可选；客户端版本号，用于补到 `User-Agent` |
+| `runtime_kind` | 可选；客户端运行环境：`server-python / server-node / browser` |
 | `last_verified_at` | 最后一次连通性测试通过时间 |
 
 ---
@@ -146,7 +150,7 @@ credential_security:
 - **存储**: API Key 使用 AES-256-GCM 加密后存入数据库，master key 从环境变量获取
 - **传输**: API 返回凭证信息时，Key 始终掩码显示（如 `sk-...xxxx`）
 - **Endpoint 边界**: 自定义 `base_url` 默认只允许公网 `https` endpoint；`localhost` / RFC1918 私网 / 其他本地地址默认拒绝，只有 `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS=true` 时才允许显式接入本地或私有模型网关
-- **兼容字段边界**: Credential Center 只支持少量通用兼容字段：`auth_strategy / api_key_header_name / extra_headers`。其中 `extra_headers` 只承载非敏感元数据头，不回退成第二套鉴权入口。不在主业务里引入 2API 风格的 provider 路由、模型池、prefix 或别名路由规则
+- **兼容字段边界**: Credential Center 只支持少量通用连接字段：`auth_strategy / api_key_header_name / extra_headers / user_agent_override / client_name / client_version / runtime_kind`。其中 `extra_headers` 只承载非敏感元数据头，不回退成第二套鉴权入口；`User-Agent` 由 `user_agent_override` 或客户端标识字段生成，不允许手工塞进 `extra_headers`
 - **审计**: MVP 记录凭证的 create / update / delete / verify / enable / disable 等安全事件
 - **派生**: 加密密钥通过 PBKDF2 从 master key 派生，非直接使用
 
@@ -178,9 +182,10 @@ credential_security:
 ### 7.2 设计要点
 
 - 验证不再通过 `/models` 或探测式接口猜兼容；统一按用户显式选择的 `api_dialect` 发最小生成请求
-- 验证请求会复用凭证上的 `auth_strategy / api_key_header_name / extra_headers`，保证“保存后可用”和“验证时可用”是同一套连接配置
-- `api_key_header_name` 不允许覆盖运行时保留头（如 `Content-Type`、Anthropic 的 `anthropic-version`）；`extra_headers` 若看起来是 token / secret / auth 头，会在保存阶段直接失败
-- 测试请求使用极小输出上限与固定短提示，避免产生实际费用
+- 验证请求会复用凭证上的 `auth_strategy / api_key_header_name / extra_headers / user_agent_override / client_name / client_version / runtime_kind`，保证“保存后可用”和“验证时可用”是同一套连接配置
+- `api_key_header_name` 不允许覆盖运行时保留头（如 `Content-Type`、Anthropic 的 `anthropic-version`）；`extra_headers` 若看起来是 token / secret / auth 头或尝试覆盖 `User-Agent`，会在保存阶段直接失败
+- `user_agent_override` 优先级高于自动生成的客户端标识；界面里的客户端预设只是在这个字段里填一条可编辑模板，不代表真正模拟了官方 CLI 的完整网络身份
+- 测试请求使用极小输出上限与普通短聊天提示，避免产生实际费用；验证成功条件是“拿到可用文本响应”，不要求模型精确复读固定句子
 - `default_model` 是验证请求的必需模型名，同时也是运行时 `model.name` 缺省时的连接级回退值
 - `base_url` 的安全策略在创建、更新、验证和运行时统一生效，避免旧数据绕过入口校验
 - 测试结果记录到 `last_verified_at`，用户可在 UI 查看凭证状态

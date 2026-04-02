@@ -64,6 +64,27 @@ export type ProjectDetail = ProjectSummary & {
   project_setting: ProjectSetting | null;
 };
 
+export type ProjectDocumentSource =
+  | "file"
+  | "outline"
+  | "opening_plan"
+  | "chapter"
+  | "setting_summary"
+  | "chapter_plan"
+  | "empty";
+
+export type ProjectDocument = {
+  project_id: string;
+  path: string;
+  content: string;
+  source: ProjectDocumentSource;
+  updated_at: string | null;
+};
+
+export type ProjectDocumentSavePayload = {
+  content: string;
+};
+
 export type ProjectTrashCleanupFailure = {
   project_id: string;
   message: string;
@@ -79,12 +100,12 @@ export type ProjectTrashCleanupResult = {
 
 export type SettingCompletenessIssue = {
   field: string;
-  level: "warning" | "blocked";
+  level: "warning";
   message: string;
 };
 
 export type SettingCompletenessResult = {
-  status: "ready" | "warning" | "blocked";
+  status: "ready" | "warning";
   issues: SettingCompletenessIssue[];
 };
 

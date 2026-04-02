@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Button } from "@arco-design/web-react";
 
+import { showAppNotice } from "@/components/ui/app-notice";
+import { matchAssistantMarkdownDocument } from "@/features/shared/assistant/assistant-markdown-document-support";
 import type { IncubatorCredentialState } from "@/features/lobby/components/incubator-chat-credential-support";
 import {
   INCUBATOR_INPUT_MAX_LENGTH,
@@ -77,13 +79,45 @@ export function MessageBubble({
     ? "bg-[rgba(255,251,245,0.96)] text-[var(--text-primary)] shadow-[0_10px_22px_rgba(58,45,29,0.05)]"
     : "bg-[rgba(46,111,106,0.14)] text-[var(--text-primary)] shadow-[0_10px_18px_rgba(46,111,106,0.08)]";
   const statusClassName = resolveMessageStatusClassName(status);
+  const documentMatch = isAssistant ? matchAssistantMarkdownDocument(content) : null;
 
   return (
     <article className={`max-w-[84%] md:max-w-[80%] xl:max-w-[78%] rounded-[16px] border px-3 py-2 ${alignmentClassName} ${className} ${statusClassName}`}>
       <p className="text-[10px] font-medium tracking-[0.12em] text-[var(--text-secondary)]">
         {isAssistant ? "AI" : "你"}
       </p>
-      <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-6">{content}</p>
+      {documentMatch ? (
+        <div className="mt-1 space-y-2">
+          {documentMatch.leadingText ? (
+            <p className="whitespace-pre-wrap break-words text-[13px] leading-6">{documentMatch.leadingText}</p>
+          ) : null}
+          <section className="overflow-hidden rounded-[14px] border border-[rgba(44,36,22,0.1)] bg-[rgba(58,45,29,0.03)]">
+            <header className="flex items-center justify-between gap-3 border-b border-[rgba(44,36,22,0.08)] bg-[rgba(255,255,255,0.72)] px-3 py-2">
+              <div className="min-w-0">
+                <p className="m-0 text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--text-secondary)]">Markdown 文档</p>
+                <p className="m-0 text-[10px] leading-5 text-[var(--text-muted)]">已自动识别为整段文档。</p>
+              </div>
+              <button
+                className="shrink-0 rounded-full border border-[rgba(44,36,22,0.08)] bg-white px-2.5 py-1 text-[10.5px] font-medium text-[var(--text-secondary)] transition hover:bg-[rgba(255,255,255,0.92)]"
+                type="button"
+                onClick={() => {
+                  void copyMarkdownDocument(documentMatch.body);
+                }}
+              >
+                复制
+              </button>
+            </header>
+            <pre className="m-0 max-w-full overflow-x-auto whitespace-pre-wrap break-words px-3 py-2.5 text-[12px] leading-6 text-[var(--text-primary)] [overflow-wrap:anywhere]">
+              <code>{documentMatch.body}</code>
+            </pre>
+          </section>
+          {documentMatch.trailingText ? (
+            <p className="whitespace-pre-wrap break-words text-[13px] leading-6">{documentMatch.trailingText}</p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-6">{content}</p>
+      )}
       {isAssistant && hookResults && hookResults.length > 0 ? (
         <p className="mt-2 rounded-[12px] bg-[rgba(248,243,235,0.72)] px-2.5 py-1.5 text-[11px] leading-5 text-[var(--text-secondary)]">
           已执行 {hookResults.length} 个自动动作
@@ -142,4 +176,16 @@ function resolveMessageStatusClassName(status: "pending" | "error" | undefined) 
     return "border-[rgba(58,124,165,0.14)] bg-[rgba(58,124,165,0.08)]";
   }
   return "border-[var(--line-soft)]";
+}
+
+async function copyMarkdownDocument(content: string) {
+  try {
+    await navigator.clipboard.writeText(content);
+    showAppNotice({ content: "已复制到剪贴板。", tone: "success" });
+  } catch {
+    showAppNotice({
+      content: "复制失败，请检查浏览器剪贴板权限后重试。",
+      tone: "danger",
+    });
+  }
 }

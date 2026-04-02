@@ -87,23 +87,21 @@ def test_scaffold_preparation_assets_create_blank_current_versions(db):
     assert opening_plan.content_text == ""
 
 
-def test_save_outline_requires_non_blocked_project_setting(db):
+def test_save_outline_allows_missing_project_setting(db):
     project = create_project(db)
     service = create_story_asset_service()
 
-    try:
-        asyncio.run(
-            service.save_asset_draft(
-                async_db(db),
-                project.id,
-                "outline",
-                StoryAssetSaveDTO(title="主线大纲", content_text="故事从这里开始"),
-            )
+    result = asyncio.run(
+        service.save_asset_draft(
+            async_db(db),
+            project.id,
+            "outline",
+            StoryAssetSaveDTO(title="主线大纲", content_text="故事从这里开始"),
         )
-    except BusinessRuleError as exc:
-        assert "项目设定未完成" in exc.message
-    else:
-        raise AssertionError("expected BusinessRuleError")
+    )
+
+    assert result.content_type == "outline"
+    assert result.status == "draft"
 
 
 def test_save_opening_plan_requires_approved_outline(db):

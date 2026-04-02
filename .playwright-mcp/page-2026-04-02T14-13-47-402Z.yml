@@ -1,0 +1,179 @@
+- generic [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e12] [cursor=pointer]:
+    - img [ref=e13]
+  - alert [ref=e16]
+  - link "跳到主内容" [ref=e17] [cursor=pointer]:
+    - /url: "#workspace-main"
+  - generic [ref=e18]:
+    - banner [ref=e19]:
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - link "返回书架" [ref=e22] [cursor=pointer]:
+            - /url: /workspace/lobby
+            - generic [ref=e23]: ←
+            - text: 返回书架
+          - generic [ref=e24]:
+            - generic [ref=e25]: 当前项目
+            - generic [ref=e26]: 创作工作台
+        - navigation "工作台导航" [ref=e27]:
+          - link "创作" [ref=e28] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/studio
+          - link "推进" [ref=e29] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/engine
+          - link "洞察" [ref=e30] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/lab
+        - generic [ref=e31]:
+          - link "项目设置" [ref=e32] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/settings
+          - generic [ref=e33]:
+            - generic [ref=e35]: z
+            - generic [ref=e36]: zhanglu
+          - button "退出" [ref=e37] [cursor=pointer]
+    - main [ref=e38]:
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e43]:
+            - paragraph [ref=e44]: 王云飞的警匪故事
+            - heading "灵感碎片.md" [level=1] [ref=e45]
+          - generic [ref=e46]:
+            - button "保存文件" [ref=e205] [cursor=pointer]
+            - button "收起助手" [ref=e48] [cursor=pointer]
+            - button "作品推进" [ref=e49] [cursor=pointer]
+        - complementary [ref=e50]:
+          - navigation "作品目录" [ref=e52]:
+            - generic [ref=e54]:
+              - heading "创作结构" [level=2] [ref=e55]
+              - paragraph [ref=e56]: 设定 · 大纲 · 正文
+            - list [ref=e57]:
+              - listitem [ref=e58]:
+                - button "设定" [expanded] [ref=e59] [cursor=pointer]:
+                  - img [ref=e61]
+                  - generic [ref=e63]: 设定
+                - list [ref=e64]:
+                  - listitem [ref=e65]:
+                    - button "世界观.md" [ref=e66] [cursor=pointer]:
+                      - img [ref=e68]
+                      - generic: 世界观.md
+                  - listitem [ref=e71]:
+                    - button "人物设定.md" [ref=e72] [cursor=pointer]:
+                      - img [ref=e74]
+                      - generic: 人物设定.md
+                  - listitem [ref=e77]:
+                    - button "势力关系.md" [ref=e78] [cursor=pointer]:
+                      - img [ref=e80]
+                      - generic: 势力关系.md
+                  - listitem [ref=e83]:
+                    - button "伏笔与坑.md" [ref=e84] [cursor=pointer]:
+                      - img [ref=e86]
+                      - generic: 伏笔与坑.md
+              - listitem [ref=e89]:
+                - button "大纲" [expanded] [ref=e90] [cursor=pointer]:
+                  - img [ref=e92]
+                  - generic [ref=e94]: 大纲
+                - list [ref=e95]:
+                  - listitem [ref=e96]:
+                    - button "总大纲.md" [ref=e97] [cursor=pointer]:
+                      - img [ref=e99]
+                      - generic: 总大纲.md
+                  - listitem [ref=e102]:
+                    - button "开篇设计.md" [ref=e103] [cursor=pointer]:
+                      - img [ref=e105]
+                      - generic: 开篇设计.md
+                  - listitem [ref=e108]:
+                    - button "章节规划.md" [ref=e109] [cursor=pointer]:
+                      - img [ref=e111]
+                      - generic: 章节规划.md
+              - listitem [ref=e114]:
+                - button "正文" [expanded] [ref=e115] [cursor=pointer]:
+                  - img [ref=e117]
+                  - generic [ref=e119]: 正文
+              - listitem [ref=e120]:
+                - button "附录" [expanded] [ref=e121] [cursor=pointer]:
+                  - img [ref=e123]
+                  - generic [ref=e125]: 附录
+                - list [ref=e126]:
+                  - listitem [ref=e127]:
+                    - button "灵感碎片.md" [ref=e128] [cursor=pointer]:
+                      - img [ref=e130]
+                      - generic: 灵感碎片.md
+        - main [ref=e133]:
+          - generic [ref=e134]:
+            - generic [ref=e135]:
+              - generic [ref=e137]:
+                - generic [ref=e138]:
+                  - heading "灵感碎片.md" [level=2] [ref=e139]
+                  - generic [ref=e140]: 未保存
+                - paragraph [ref=e141]: 附录/灵感碎片.md
+              - generic [ref=e143]:
+                - button "编辑" [ref=e144] [cursor=pointer]
+                - button "分栏" [ref=e145] [cursor=pointer]
+                - button "预览" [active] [ref=e146] [cursor=pointer]
+            - generic [ref=e208]:
+              - heading "测试预览滚动" [level=1] [ref=e209]
+              - text: 第一段。
+              - text: 第二段。
+              - text: 第三段。
+              - text: 第四段。
+              - text: 第五段。
+              - text: 第六段。
+              - text: 第七段。
+              - text: 第八段。
+              - text: 第九段。
+              - text: 第十段。
+              - text: 第十一段。
+              - text: 第十二段。
+              - text: 第十三段。
+              - text: 第十四段。
+              - text: 第十五段。
+              - text: 第十六段。
+              - text: 第十七段。
+              - text: 第十八段。
+              - text: 第十九段。
+              - text: 第二十段。
+              - text: 第二十一段。
+              - text: 第二十二段。
+              - text: 第二十三段。
+              - text: 第二十四段。
+              - text: 第二十五段。
+              - text: 第二十六段。
+              - text: 第二十七段。
+              - text: 第二十八段。
+              - text: 第二十九段。
+              - text: 第三十段。
+            - generic [ref=e150]:
+              - generic [ref=e151]: 217 字符 · 32 词
+              - generic [ref=e152]: 文件未保存
+        - complementary [ref=e153]:
+          - complementary [ref=e155]:
+            - generic [ref=e158]:
+              - generic [ref=e159]:
+                - heading "共创助手" [level=2] [ref=e160]
+                - generic [ref=e161]: 创作中
+              - paragraph [ref=e162]: 围绕当前文稿推进，模型、上下文和文件都收进底部工具条。
+              - paragraph [ref=e163]: 当前文稿 · 附录/灵感碎片.md
+              - generic [ref=e165]:
+                - button "历史对话 新对话 1 条" [ref=e166]:
+                  - generic [ref=e167]:
+                    - generic [ref=e168]: 历史对话
+                    - generic [ref=e169]: 新对话
+                  - generic [ref=e170]: 1 条
+                - button "新对话" [ref=e171] [cursor=pointer]
+            - generic [ref=e173]:
+              - generic [ref=e174]: ✦
+              - paragraph [ref=e175]: 把问题、片段，或者文件直接丢进来就行。
+              - paragraph [ref=e176]: 上下文、模型、文件都收进底部工具条，主舞台只留给对话和正文。
+            - generic [ref=e178]:
+              - textbox "写你的要求，或直接带文件进来一起改。" [ref=e179]
+              - generic [ref=e180]:
+                - generic [ref=e181]:
+                  - button "上传文件" [ref=e182]:
+                    - img [ref=e183]
+                  - button "上下文 0 ⌄" [ref=e186]:
+                    - img [ref=e188]
+                    - generic [ref=e190]: 上下文 0
+                    - generic [ref=e191]: ⌄
+                  - button "gemini-2.5-flash ⌄" [ref=e193]:
+                    - img [ref=e195]
+                    - generic [ref=e197]: gemini-2.5-flash
+                    - generic [ref=e198]: ⌄
+                - button "发送" [ref=e199] [cursor=pointer]

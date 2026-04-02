@@ -36,8 +36,8 @@ from .credential_service_support import (
     apply_update_payload,
     build_credential,
     normalize_provider,
-    to_view,
 )
+from .credential_view_support import to_view
 from .credential_verification_support import verify_credential_record
 
 AUDIT_CREATE = "credential_create"
@@ -110,6 +110,10 @@ class CredentialService:
             auth_strategy=payload.auth_strategy,
             api_key_header_name=payload.api_key_header_name,
             extra_headers=payload.extra_headers,
+            user_agent_override=payload.user_agent_override,
+            client_name=payload.client_name,
+            client_version=payload.client_version,
+            runtime_kind=payload.runtime_kind,
         )
         db.add(credential)
         await db.flush()

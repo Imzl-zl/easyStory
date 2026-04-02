@@ -14,6 +14,15 @@ PROJECT_INCUBATOR_MODEL_NAME_MAX_LENGTH = 100
 PROJECT_INCUBATOR_CONVERSATION_TEXT_MAX_LENGTH = 8000
 
 ProjectStatus = Literal["draft", "active", "completed", "archived"]
+ProjectDocumentSource = Literal[
+    "file",
+    "outline",
+    "opening_plan",
+    "chapter",
+    "setting_summary",
+    "chapter_plan",
+    "empty",
+]
 SettingImpactAction = Literal["mark_stale"]
 SettingImpactTarget = Literal["outline", "opening_plan", "chapter", "chapter_tasks"]
 PreparationAssetStepStatus = Literal["not_started", "draft", "approved", "stale", "archived"]
@@ -183,14 +192,30 @@ class ProjectSettingUpdateDTO(BaseModel):
     project_setting: ProjectSetting
 
 
+class ProjectDocumentSaveDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    content: str
+
+
+class ProjectDocumentDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: uuid.UUID
+    path: str = Field(min_length=1)
+    content: str
+    source: ProjectDocumentSource
+    updated_at: datetime | None
+
+
 class SettingCompletenessIssueDTO(BaseModel):
     field: str
-    level: Literal["warning", "blocked"]
+    level: Literal["warning"]
     message: str
 
 
 class SettingCompletenessResultDTO(BaseModel):
-    status: Literal["ready", "warning", "blocked"]
+    status: Literal["ready", "warning"]
     issues: list[SettingCompletenessIssueDTO]
 
 

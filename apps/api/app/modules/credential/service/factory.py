@@ -30,8 +30,28 @@ class _UnsupportedCredentialVerifier:
         base_url: str | None,
         api_dialect: str,
         default_model: str | None,
+        auth_strategy: str | None = None,
+        api_key_header_name: str | None = None,
+        extra_headers: dict[str, str] | None = None,
+        user_agent_override: str | None = None,
+        client_name: str | None = None,
+        client_version: str | None = None,
+        runtime_kind: str | None = None,
     ) -> CredentialVerificationResult:
-        del provider, api_key, base_url, api_dialect, default_model
+        del (
+            provider,
+            api_key,
+            base_url,
+            api_dialect,
+            default_model,
+            auth_strategy,
+            api_key_header_name,
+            extra_headers,
+            user_agent_override,
+            client_name,
+            client_version,
+            runtime_kind,
+        )
         raise RuntimeError("Credential resolution service does not support verification")
 
 

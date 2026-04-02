@@ -13,6 +13,7 @@ __all__ = [
     "ModelPrice",
     "ModelPricing",
     "PluginRegistry",
+    "PROJECT_DOCUMENT_ROOT_DIR",
     "StreamableHttpMcpToolCaller",
     "SkillTemplateRenderer",
     "TokenCounter",
@@ -26,6 +27,10 @@ def __getattr__(name: str):
         from .storage_paths import EXPORT_ROOT_DIR
 
         return EXPORT_ROOT_DIR
+    if name == "PROJECT_DOCUMENT_ROOT_DIR":
+        from .storage_paths import PROJECT_DOCUMENT_ROOT_DIR
+
+        return PROJECT_DOCUMENT_ROOT_DIR
     if name == "LLMToolProvider":
         from .llm_tool_provider import LLMToolProvider
 

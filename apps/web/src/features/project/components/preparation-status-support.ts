@@ -23,7 +23,6 @@ const NEXT_STEP_LABELS: Record<PreparationNextStep, string> = {
 const STATUS_LABELS: Record<string, string> = {
   ready: "就绪",
   warning: "警告",
-  blocked: "阻塞",
   not_started: "未开始",
   draft: "草稿",
   approved: "已确认",
@@ -47,7 +46,7 @@ export function buildPreparationStatusRows(
 ): PreparationStatusRow[] {
   return [
     {
-      label: "设定完整度",
+      label: "结构化摘要",
       status: preparation.setting.status,
       description: describeSettingStatus(preparation.setting),
     },
@@ -79,7 +78,7 @@ export function formatPreparationStatusLabel(status: string): string {
 
 function describeSettingStatus(setting: ProjectPreparationStatus["setting"]): string {
   if (setting.issues.length === 0) {
-    return "关键信息已满足前置创作要求。";
+    return "结构化摘要已覆盖主要信息，后续可继续在项目文档里维护详细设定。";
   }
   return setting.issues.map((issue) => issue.message).join(" / ");
 }

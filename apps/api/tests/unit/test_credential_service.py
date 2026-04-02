@@ -40,6 +40,10 @@ class FakeVerifier:
         auth_strategy: str | None,
         api_key_header_name: str | None,
         extra_headers: dict[str, str] | None,
+        user_agent_override: str | None,
+        client_name: str | None,
+        client_version: str | None,
+        runtime_kind: str | None,
     ) -> CredentialVerificationResult:
         assert provider
         assert api_key
@@ -49,6 +53,10 @@ class FakeVerifier:
         assert auth_strategy is None
         assert api_key_header_name is None
         assert extra_headers is None
+        assert user_agent_override is None
+        assert client_name is None
+        assert client_version is None
+        assert runtime_kind is None
         return CredentialVerificationResult(
             verified_at=self.verified_at,
             message="验证成功",
@@ -102,6 +110,10 @@ def test_create_user_credential_encrypts_and_audits(db, monkeypatch) -> None:
     assert result.auth_strategy is None
     assert result.api_key_header_name is None
     assert result.extra_headers is None
+    assert result.user_agent_override is None
+    assert result.client_name is None
+    assert result.client_version is None
+    assert result.runtime_kind is None
     assert result.masked_key == "sk-...1234"
     assert audits[-1].event_type == "credential_create"
 

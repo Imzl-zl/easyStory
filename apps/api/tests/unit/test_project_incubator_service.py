@@ -90,7 +90,7 @@ async def test_project_incubator_service_builds_draft_from_builtin_template(tmp_
         assert draft.project_setting.world_setting is not None
         assert draft.project_setting.world_setting.era_baseline == "灵气衰退后的修真界"
         assert draft.project_setting.core_conflict == "主角被追杀后试图重返宗门"
-        assert draft.setting_completeness.status == "blocked"
+        assert draft.setting_completeness.status == "warning"
         assert [item.field for item in draft.setting_completeness.issues] == [
             "protagonist.goal",
             "tone",
@@ -126,7 +126,7 @@ async def test_project_incubator_service_reports_unmapped_supported_gap(tmp_path
             )
 
         assert draft.project_setting.genre == "科幻"
-        assert draft.setting_completeness.status == "blocked"
+        assert draft.setting_completeness.status == "warning"
         assert draft.applied_answers == []
         assert [(item.variable, item.reason) for item in draft.unmapped_answers] == [
             ("nickname", "unsupported_variable")
@@ -221,7 +221,7 @@ async def test_project_incubator_service_creates_project_from_builtin_template(t
         assert created.project.project_setting is not None
         assert created.project.project_setting.genre == "玄幻"
         assert created.project.project_setting.core_conflict == "主角被追杀后试图重返宗门"
-        assert created.setting_completeness.status == "blocked"
+        assert created.setting_completeness.status == "warning"
         assert [item.field for item in created.setting_completeness.issues] == [
             "protagonist.goal",
             "tone",
@@ -267,7 +267,7 @@ async def test_project_incubator_service_creates_project_and_preserves_unmapped_
         assert created.project.name == "映射缺口项目"
         assert created.project.project_setting is not None
         assert created.project.project_setting.genre == "科幻"
-        assert created.setting_completeness.status == "blocked"
+        assert created.setting_completeness.status == "warning"
         assert created.applied_answers == []
         assert [(item.variable, item.reason) for item in created.unmapped_answers] == [
             ("nickname", "unsupported_variable")

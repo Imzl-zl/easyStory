@@ -354,6 +354,84 @@ def test_execute_merges_extra_headers_without_overriding_auth() -> None:
     assert result["content"] == "extra header 结果"
 
 
+def test_execute_builds_user_agent_from_client_identity() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "choices": [{"message": {"content": "ua 结果"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            },
+            text="",
+        )
+
+    provider = LLMToolProvider(request_sender=request_sender)
+    asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "看下 UA",
+                "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                "credential": {
+                    "api_key": "test-key",
+                    "api_dialect": "openai_chat_completions",
+                    "client_name": "easyStory",
+                    "client_version": "0.1",
+                    "runtime_kind": "server-python",
+                },
+            },
+        )
+    )
+
+    request = captured["request"]
+    assert request.headers["User-Agent"] == "easyStory/0.1 (server; python)"
+
+
+def test_execute_prefers_user_agent_override_over_client_identity() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "choices": [{"message": {"content": "生成结果"}}],
+                "usage": {
+                    "prompt_tokens": 12,
+                    "completion_tokens": 34,
+                    "total_tokens": 46,
+                },
+            },
+            text="",
+        )
+
+    provider = LLMToolProvider(request_sender=request_sender)
+    result = asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "测试提示词",
+                "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                "credential": {
+                    "api_key": "test-key",
+                    "api_dialect": "openai_chat_completions",
+                    "user_agent_override": "codex-cli/0.118.0 (server; node)",
+                    "client_name": "easyStory",
+                    "client_version": "0.1",
+                    "runtime_kind": "server-python",
+                },
+            },
+        )
+    )
+
+    request = captured["request"]
+    assert request.headers["User-Agent"] == "codex-cli/0.118.0 (server; node)"
+    assert result["content"] == "生成结果"
+
+
 def test_execute_reports_gemini_finish_reason_when_response_has_no_parts() -> None:
     async def request_sender(_request):
         return HttpJsonResponse(

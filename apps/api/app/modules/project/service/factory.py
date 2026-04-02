@@ -5,8 +5,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from app.modules.config_registry import ConfigLoader
+from app.modules.project.infrastructure import ProjectDocumentFileStore
 from app.modules.observability.service import AuditLogService, create_audit_log_service
-from app.shared.runtime import EXPORT_ROOT_DIR, LLMToolProvider, SkillTemplateRenderer, ToolProvider
+from app.shared.runtime import (
+    EXPORT_ROOT_DIR,
+    LLMToolProvider,
+    PROJECT_DOCUMENT_ROOT_DIR,
+    SkillTemplateRenderer,
+    ToolProvider,
+)
 
 from .project_incubator_service import ProjectIncubatorService
 from .project_deletion_service import ProjectDeletionService
@@ -21,11 +28,15 @@ DEFAULT_CONFIG_ROOT = Path(__file__).resolve().parents[6] / "config"
 
 
 def create_project_service() -> ProjectService:
-    return ProjectService()
+    return ProjectService(document_file_store=ProjectDocumentFileStore(_default_project_document_root()))
 
 
 def _default_export_root() -> Path:
     return Path(__file__).resolve().parents[4] / EXPORT_ROOT_DIR
+
+
+def _default_project_document_root() -> Path:
+    return Path(__file__).resolve().parents[4] / PROJECT_DOCUMENT_ROOT_DIR
 
 
 def create_project_management_service(
@@ -71,9 +82,11 @@ def create_project_deletion_service(
     project_service: ProjectService | None = None,
     audit_log_service: AuditLogService | None = None,
     export_root: Path | None = None,
+    project_document_root: Path | None = None,
 ) -> ProjectDeletionService:
     return ProjectDeletionService(
         project_service=project_service or create_project_service(),
         audit_log_service=audit_log_service or create_audit_log_service(),
         export_root=export_root or _default_export_root(),
+        project_document_root=project_document_root or _default_project_document_root(),
     )

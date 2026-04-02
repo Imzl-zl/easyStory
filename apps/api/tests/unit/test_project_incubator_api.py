@@ -64,7 +64,7 @@ async def test_project_incubator_api_builds_project_setting_draft(
         assert body["project_setting"]["protagonist"]["identity"] == "宗门弃徒"
         assert body["project_setting"]["world_setting"]["era_baseline"] == "灵气衰退后的修真界"
         assert body["project_setting"]["core_conflict"] == "主角被追杀后试图重返宗门"
-        assert body["setting_completeness"]["status"] == "blocked"
+        assert body["setting_completeness"]["status"] == "warning"
         assert [item["field"] for item in body["setting_completeness"]["issues"]] == [
             "protagonist.goal",
             "tone",
@@ -169,7 +169,7 @@ async def test_project_incubator_api_creates_project_from_template_answers(
             assert body["project"]["allow_system_credential_pool"] is True
             assert body["project"]["project_setting"]["genre"] == "玄幻"
             assert body["project"]["project_setting"]["core_conflict"] == "主角被追杀后试图重返宗门"
-            assert body["setting_completeness"]["status"] == "blocked"
+            assert body["setting_completeness"]["status"] == "warning"
             assert [item["field"] for item in body["setting_completeness"]["issues"]] == [
                 "protagonist.goal",
                 "tone",

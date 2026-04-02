@@ -83,11 +83,18 @@ def test_project_deletion_service_physically_deletes_all_related_project_data(
     tmp_path,
 ) -> None:
     export_root = tmp_path / "exports"
+    project_document_root = tmp_path / "project-documents"
     owner, project, related_ids, credential_ids = seed_project_graph(
         db,
         export_root=export_root,
     )
-    service = create_project_deletion_service(export_root=export_root)
+    project_document_dir = project_document_root / "projects" / str(project.id) / "documents" / "附录"
+    project_document_dir.mkdir(parents=True, exist_ok=True)
+    (project_document_dir / "灵感.md").write_text("# 灵感\n\n残留文件", encoding="utf-8")
+    service = create_project_deletion_service(
+        export_root=export_root,
+        project_document_root=project_document_root,
+    )
 
     asyncio.run(service.soft_delete_project(async_db(db), project.id, owner_id=owner.id))
     asyncio.run(service.physical_delete_project(async_db(db), project.id, owner_id=owner.id))
@@ -114,6 +121,7 @@ def test_project_deletion_service_physically_deletes_all_related_project_data(
     assert db.get(ModelCredential, credential_ids["project_credential_id"]) is None
     assert db.get(ModelCredential, credential_ids["system_credential_id"]) is not None
     assert not (export_root / str(project.id)).exists()
+    assert not (project_document_root / "projects" / str(project.id)).exists()
 
 
 def test_project_deletion_service_hides_other_users_projects(db, tmp_path) -> None:
@@ -211,7 +219,7 @@ def test_project_deletion_service_reports_cleanup_failures_without_aborting(
     assert result.skipped_count == 0
     assert result.failed_count == 1
     assert result.failed_items[0].project_id == second_project.id
-    assert "导出目录清理失败" in result.failed_items[0].message
+    assert "文件清理失败" in result.failed_items[0].message
     assert db.get(Project, first_project.id) is None
     assert db.get(Project, second_project.id) is None
 

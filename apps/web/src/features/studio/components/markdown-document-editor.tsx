@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { Button } from "@arco-design/web-react";
 
 import type { DocumentTreeNode } from "@/features/studio/components/studio-page-support";
 
@@ -9,6 +8,8 @@ type MarkdownDocumentEditorProps = {
   documentPath: string | null;
   documentNode: DocumentTreeNode | null;
   content: string;
+  isLoading?: boolean;
+  saveNoun?: "文稿" | "文件";
   onChange: (content: string) => void;
   onSave: () => void;
   isSaving?: boolean;
@@ -19,6 +20,8 @@ export function MarkdownDocumentEditor({
   documentPath,
   documentNode,
   content,
+  isLoading = false,
+  saveNoun = "文稿",
   onChange,
   onSave,
   isSaving = false,
@@ -30,11 +33,11 @@ export function MarkdownDocumentEditor({
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
     if ((event.metaKey || event.ctrlKey) && event.key === "s") {
       event.preventDefault();
-      if (!isSaving && hasUnsavedChanges) {
+      if (!isLoading && !isSaving && hasUnsavedChanges) {
         onSave();
       }
-    }
-  }, [isSaving, hasUnsavedChanges, onSave]);
+    } 
+  }, [isLoading, isSaving, hasUnsavedChanges, onSave]);
 
   if (!documentPath) {
     return (
@@ -57,17 +60,22 @@ export function MarkdownDocumentEditor({
   }
 
   return (
-    <div className="relative flex flex-col h-full min-h-0 bg-[#fefdfb]">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#fefdfb]">
       <div className="absolute inset-0 opacity-[0.015] pointer-events-none [background-image:url('data:image/svg+xml,%3Csvg_viewBox%3D%220%200%20400%20400%22_xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cfilter_id%3D%22n%22%3E%3CfeTurbulence_type%3D%22fractalNoise%22_baseFrequency%3D%221.5%22_numOctaves%3D%224%22_stitchTiles%3D%22stitch%22%2F%3E%3C%2Ffilter%3E%3Crect_width%3D%22100%25%22_height%3D%22100%25%22_filter%3D%22url(%23n)%22%2F%3E%3C%2Fsvg%3E')]" />
       
-      <header className="relative z-10 flex items-center justify-between gap-4 px-6 py-4 bg-gradient-to-b from-white/95 to-[rgba(254,253,251,0.7)] border-b border-[rgba(44,36,22,0.05)]">
-        <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-[var(--accent-primary)] to-transparent opacity-15" />
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <p className="m-0 text-[0.68rem] font-semibold tracking-widest uppercase text-[var(--text-muted)]">{documentPath}</p>
-          <h2 className="m-0 font-serif text-lg font-bold tracking-tight text-[var(--text-primary)]">{documentNode?.label ?? "未命名文档"}</h2>
+      <header className="relative z-10 flex shrink-0 items-center justify-between gap-3 px-4 py-2.5 bg-gradient-to-b from-white/96 to-[rgba(254,253,251,0.76)] border-b border-[rgba(44,36,22,0.05)] lg:px-5">
+        <div className="absolute bottom-0 left-5 right-5 h-px bg-gradient-to-r from-transparent via-[var(--accent-primary)] to-transparent opacity-15" />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 className="m-0 truncate font-serif text-[0.98rem] font-bold tracking-tight text-[var(--text-primary)]">{documentNode?.label ?? "未命名文档"}</h2>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] ${hasUnsavedChanges ? "bg-[rgba(196,167,108,0.14)] text-[var(--accent-warning)]" : "bg-[rgba(90,122,107,0.08)] text-[var(--accent-primary)]"}`}>
+              {hasUnsavedChanges ? "未保存" : "已同步"}
+            </span>
+          </div>
+          <p className="m-0 truncate text-[0.72rem] text-[var(--text-muted)]">{documentPath}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-[rgba(44,36,22,0.04)] rounded-md p-0.5">
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="hidden sm:flex bg-[rgba(44,36,22,0.04)] rounded-md p-0.5">
             {(["edit", "split", "preview"] as const).map((mode) => (
               <button
                 key={mode}
@@ -79,44 +87,41 @@ export function MarkdownDocumentEditor({
               </button>
             ))}
           </div>
-          <Button
-            type="secondary"
-            shape="round"
-            size="small"
-            loading={isSaving}
-            disabled={!hasUnsavedChanges}
-            onClick={onSave}
-          >
-            {isSaving ? "保存中…" : hasUnsavedChanges ? "提醒保存" : "未改动"}
-          </Button>
+          <span className="hidden text-[0.68rem] font-medium text-[var(--text-muted)] lg:inline">Ctrl/⌘+S</span>
         </div>
       </header>
       
-      <div className={`relative z-10 flex flex-1 min-h-0 overflow-hidden ${viewMode === "split" ? "[&>*]:w-1/2" : ""}`} data-mode={viewMode}>
+      <div
+        className={`relative z-10 grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] overflow-hidden ${viewMode === "split" ? "grid-cols-2 divide-x divide-[rgba(44,36,22,0.05)]" : "grid-cols-1"}`}
+        data-mode={viewMode}
+      >
         {viewMode !== "preview" ? (
-          <div className="flex flex-col flex-1 min-w-0 bg-transparent">
+          <section className="h-full min-h-0 min-w-0 overflow-hidden bg-transparent">
             <textarea
               ref={textareaRef}
-              className="flex-1 w-full max-w-[800px] mx-auto min-h-0 px-6 pt-10 pb-14 border-none bg-transparent text-[var(--text-primary)] font-serif text-base leading-8 tracking-wide resize-none outline-none placeholder:text-[#a09080] placeholder:italic"
+              className="block h-full min-h-0 w-full resize-none overflow-y-auto border-none bg-transparent px-7 pt-7 pb-12 text-[var(--text-primary)] font-serif text-[0.98rem] leading-8 tracking-wide outline-none placeholder:text-[#a09080] placeholder:italic lg:px-10 lg:pt-8"
               value={content}
+              readOnly={isLoading}
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="开始整理你的设定、章节或正文…"
+              placeholder={isLoading ? "正在载入文稿…" : "开始整理你的设定、章节或正文…"}
               spellCheck={false}
             />
-          </div>
+          </section>
         ) : null}
         {viewMode !== "edit" ? (
-          <div className="flex flex-col flex-1 min-w-0 overflow-y-auto bg-gradient-to-r from-[rgba(44,36,22,0.02)] to-transparent [background-size:1px_100%]">
-            <MarkdownPreview content={content} />
-          </div>
+          <section className="h-full min-h-0 min-w-0 overflow-hidden bg-gradient-to-r from-[rgba(44,36,22,0.02)] to-transparent [background-size:1px_100%]">
+            <div className="h-full min-h-0 overflow-y-auto">
+              <MarkdownPreview content={content} />
+            </div>
+          </section>
         ) : null}
       </div>
       
-      <footer aria-live="polite" className="flex items-center justify-between gap-3 px-6 py-2.5 bg-gradient-to-b from-[rgba(254,253,251,0.5)] to-white/80 border-t border-[rgba(44,36,22,0.05)]">
+      <footer aria-live="polite" className="flex shrink-0 items-center justify-between gap-3 px-4 py-1.5 bg-gradient-to-b from-[rgba(254,253,251,0.5)] to-white/80 border-t border-[rgba(44,36,22,0.05)] lg:px-5">
         <span className="text-xs text-[var(--text-muted)]">{content.length} 字符 · {content.split(/\s+/).filter(Boolean).length} 词</span>
-        <span className={`text-xs ${hasUnsavedChanges ? "text-[var(--accent-warning)]" : "text-[var(--text-muted)]"}`}>
-          {hasUnsavedChanges ? "本地未保存" : "已就绪"}
+        <span className={`text-xs ${isLoading || hasUnsavedChanges ? "text-[var(--accent-warning)]" : "text-[var(--text-muted)]"}`}>
+          {isLoading ? `正在载入${saveNoun}` : hasUnsavedChanges ? `${saveNoun}未保存` : `${saveNoun}已同步`}
         </span>
       </footer>
     </div>
@@ -148,7 +153,7 @@ function MarkdownPreview({ content }: { content: string }) {
 
   return (
     <div
-      className="w-full max-w-[800px] mx-auto px-6 pt-10 pb-14 text-[var(--text-primary)] font-serif text-base leading-8 tracking-wide [&_h1]:my-6 [&_h1]:mb-3 [&_h1]:text-[1.7rem] [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:leading-tight [&_h1:first-child]:mt-0 [&_h2]:my-5 [&_h2]:mb-2.5 [&_h2]:text-[1.35rem] [&_h2]:font-bold [&_h2]:leading-relaxed [&_h3]:my-4 [&_h3]:mb-2 [&_h3]:text-[1.1rem] [&_h3]:font-semibold [&_h3]:leading-relaxed [&_p]:my-3 [&_blockquote]:my-3.5 [&_blockquote]:py-0.5 [&_blockquote]:pl-3.5 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent-primary)] [&_blockquote]:text-[var(--text-secondary)] [&_blockquote]:italic [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:bg-[rgba(44,36,22,0.06)] [&_code]:text-[#8b4335] [&_code]:font-mono [&_code]:text-[0.88em] [&_a]:text-[var(--accent-primary)] [&_a]:underline [&_a]:underline-offset-2 [&_ul]:my-3 [&_ol]:my-3 [&_ul]:pl-5 [&_ol]:pl-5 [&_li]:my-1 [&_li]:pl-1"
+      className="box-border w-full max-w-[820px] mx-auto px-6 py-8 text-[var(--text-primary)] font-serif text-base leading-8 tracking-wide [&_h1]:my-6 [&_h1]:mb-3 [&_h1]:text-[1.7rem] [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:leading-tight [&_h1:first-child]:mt-0 [&_h2]:my-5 [&_h2]:mb-2.5 [&_h2]:text-[1.35rem] [&_h2]:font-bold [&_h2]:leading-relaxed [&_h3]:my-4 [&_h3]:mb-2 [&_h3]:text-[1.1rem] [&_h3]:font-semibold [&_h3]:leading-relaxed [&_p]:my-3 [&_blockquote]:my-3.5 [&_blockquote]:py-0.5 [&_blockquote]:pl-3.5 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent-primary)] [&_blockquote]:text-[var(--text-secondary)] [&_blockquote]:italic [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:bg-[rgba(44,36,22,0.06)] [&_code]:text-[#8b4335] [&_code]:font-mono [&_code]:text-[0.88em] [&_a]:text-[var(--accent-primary)] [&_a]:underline [&_a]:underline-offset-2 [&_ul]:my-3 [&_ol]:my-3 [&_ul]:pl-5 [&_ol]:pl-5 [&_li]:my-1 [&_li]:pl-1"
       dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
     />
   );

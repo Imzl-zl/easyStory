@@ -52,6 +52,9 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
   const currentProjectId = resolveWorkspaceProjectId(pathname);
   const workspaceItems = buildWorkspaceItems(currentProjectId, lastProjectId);
   const pageMode = resolvePageMode(pathname);
+  const shellClassName = pageMode === "studio"
+    ? "flex h-[100dvh] flex-col overflow-hidden [background:radial-gradient(circle_at_top_left,rgba(90,122,107,0.06),transparent_26%),var(--bg-canvas)]"
+    : "min-h-screen pb-[max(env(safe-area-inset-bottom),0px)] [background:radial-gradient(circle_at_top_left,rgba(90,122,107,0.06),transparent_26%),var(--bg-canvas)]";
 
   useEffect(() => {
     if (currentProjectId) {
@@ -62,7 +65,7 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
   return (
     <AuthGuard>
       <a className="absolute top-3 left-3 z-30 -translate-y-[140%] focus-visible:translate-y-0" href="#workspace-main">跳到主内容</a>
-      <div className="min-h-screen pb-[max(env(safe-area-inset-bottom),0px)] [background:radial-gradient(circle_at_top_left,rgba(90,122,107,0.06),transparent_26%),var(--bg-canvas)]" data-page-mode={pageMode}>
+      <div className={shellClassName} data-page-mode={pageMode}>
         <WorkspaceHeader
           currentProjectId={currentProjectId}
           onLogout={clearSession}
@@ -71,8 +74,8 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
           userName={user?.username ?? "未登录"}
           workspaceItems={workspaceItems}
         />
-        <main className={pageMode === "studio" ? "w-full min-h-[calc(100vh-49px)]" : "w-[min(100%-2.5rem,1560px)] mx-auto"} id="workspace-main">
-          <div className={pageMode === "studio" ? "min-h-[calc(100vh-49px)]" : "min-h-[calc(100vh-72px)] py-5 pb-7"}>{children}</div>
+        <main className={pageMode === "studio" ? "w-full flex-1 min-h-0 overflow-hidden" : "w-[min(100%-2.5rem,1560px)] mx-auto"} id="workspace-main">
+          <div className={pageMode === "studio" ? "h-full min-h-0 overflow-hidden" : "min-h-[calc(100vh-72px)] py-5 pb-7"}>{children}</div>
         </main>
       </div>
     </AuthGuard>
@@ -113,7 +116,7 @@ function WorkspaceHeader({
 
   return (
     <header className={`sticky top-0 z-20 border-b backdrop-blur-xl ${pageMode === "studio" ? "border-[rgba(61,61,61,0.04)] bg-[rgba(255,253,251,0.94)]" : "border-[rgba(61,61,61,0.06)] bg-[rgba(248,246,241,0.88)]"}`}>
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 w-[min(100%-2.5rem,1560px)] mx-auto py-3">
+      <div className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 w-[min(100%-2.5rem,1560px)] mx-auto ${pageMode === "studio" ? "py-2.5" : "py-3"}`}>
         <div className="flex items-center gap-4 min-w-0">
           <Link className="inline-flex items-center gap-1.5 text-[var(--text-secondary)] text-sm font-medium whitespace-nowrap hover:text-[var(--text-primary)]" href="/workspace/lobby">
             <span aria-hidden="true">←</span>

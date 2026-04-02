@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Button } from "@arco-design/web-react";
 
+import { matchAssistantMarkdownDocument } from "@/features/shared/assistant/assistant-markdown-document-support";
+
 import { formatStudioChatAttachmentSize } from "./studio-chat-attachment-support";
 import type { StudioChatMessage } from "./studio-chat-support";
 
@@ -31,6 +33,10 @@ export function StudioChatMessageBubble({
 }: Readonly<StudioChatMessageBubbleProps>) {
   const [showActions, setShowActions] = useState(false);
   const isAssistant = message.role === "assistant";
+  const documentMatch = isAssistant
+    ? matchAssistantMarkdownDocument(message.rawMarkdown || message.content)
+    : null;
+  const actionContent = documentMatch?.body ?? message.rawMarkdown ?? message.content;
 
   return (
     <article
@@ -40,7 +46,13 @@ export function StudioChatMessageBubble({
     >
       <p className="m-0 mb-1.5 text-[0.66rem] font-semibold tracking-widest uppercase text-[var(--text-tertiary)]">{isAssistant ? "助手" : "你"}</p>
       <div className={MESSAGE_CONTENT_CLASS}>
-        {isAssistant ? <MarkdownContent content={message.content} /> : <p className="m-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>}
+        {isAssistant ? (
+          <MarkdownContent
+            content={message.content}
+            documentMatch={documentMatch}
+            onCopyMarkdown={onCopyMarkdown}
+          />
+        ) : <p className="m-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>}
       </div>
       {message.attachments?.length ? (
         <div className="flex flex-wrap gap-1.5 mt-3">
@@ -53,13 +65,13 @@ export function StudioChatMessageBubble({
       ) : null}
       {isAssistant && message.status !== "pending" && showActions ? (
         <div className="flex flex-wrap gap-1.5 mt-3">
-          <Button size="mini" shape="round" type="secondary" onClick={() => onCopyMarkdown(message.rawMarkdown || message.content)}>
+          <Button size="mini" shape="round" type="secondary" onClick={() => onCopyMarkdown(actionContent)}>
             复制 Markdown
           </Button>
-          <Button size="mini" shape="round" type="secondary" onClick={() => onAppendToDocument(message.rawMarkdown || message.content)}>
+          <Button size="mini" shape="round" type="secondary" onClick={() => onAppendToDocument(actionContent)}>
             追加到文档
           </Button>
-          <Button size="mini" shape="round" type="secondary" onClick={() => onCreateNewDocument(message.rawMarkdown || message.content)}>
+          <Button size="mini" shape="round" type="secondary" onClick={() => onCreateNewDocument(actionContent)}>
             新建文档
           </Button>
         </div>
@@ -68,7 +80,49 @@ export function StudioChatMessageBubble({
   );
 }
 
-function MarkdownContent({ content }: { content: string }) {
+function MarkdownContent({
+  content,
+  documentMatch,
+  onCopyMarkdown,
+}: {
+  content: string;
+  documentMatch: ReturnType<typeof matchAssistantMarkdownDocument>;
+  onCopyMarkdown: (markdown: string) => void;
+}) {
+  if (documentMatch) {
+    return (
+      <div className="space-y-2">
+        {documentMatch.leadingText ? (
+          <MarkdownHtmlContent content={documentMatch.leadingText} />
+        ) : null}
+        <section className="my-1 overflow-hidden rounded-[18px] border border-[rgba(44,36,22,0.1)] bg-[rgba(58,45,29,0.03)]">
+          <header className="flex items-center justify-between gap-3 border-b border-[rgba(44,36,22,0.08)] bg-[rgba(255,255,255,0.72)] px-3 py-2">
+            <div className="min-w-0">
+              <p className="m-0 text-[11px] font-semibold tracking-[0.12em] uppercase text-[var(--text-secondary)]">Markdown 文档</p>
+              <p className="m-0 text-[11px] leading-5 text-[var(--text-muted)]">已自动识别为整段文档，支持直接复制。</p>
+            </div>
+            <button
+              className="shrink-0 rounded-full border border-[rgba(44,36,22,0.08)] bg-white px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)] transition hover:bg-[rgba(255,255,255,0.92)]"
+              type="button"
+              onClick={() => onCopyMarkdown(documentMatch.body)}
+            >
+              复制
+            </button>
+          </header>
+          <pre className="m-0 max-w-full overflow-x-auto whitespace-pre-wrap break-words px-3.5 py-3 text-[12px] leading-6 text-[var(--text-primary)] [overflow-wrap:anywhere]">
+            <code>{documentMatch.body}</code>
+          </pre>
+        </section>
+        {documentMatch.trailingText ? (
+          <MarkdownHtmlContent content={documentMatch.trailingText} />
+        ) : null}
+      </div>
+    );
+  }
+  return <MarkdownHtmlContent content={content} />;
+}
+
+function MarkdownHtmlContent({ content }: { content: string }) {
   return (
     <div
       className={MARKDOWN_CONTENT_CLASS}

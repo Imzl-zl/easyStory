@@ -12,6 +12,7 @@ from app.shared.settings import get_settings
 from app.shared.runtime.errors import ConfigurationError
 
 from .base import Base
+from .bootstrap_model_credentials_support import reconcile_model_credentials_schema
 
 DEFAULT_DB_DIR = ".runtime"
 DEFAULT_DB_NAME = "easystory.db"
@@ -19,14 +20,6 @@ ALEMBIC_CONFIG_FILENAME = "alembic.ini"
 ALEMBIC_DIRNAME = "alembic"
 ALEMBIC_HEAD_TARGET = "head"
 ALEMBIC_VERSION_TABLE = "alembic_version"
-MODEL_CREDENTIALS_TABLE = "model_credentials"
-API_DIALECT_COLUMN = "api_dialect"
-DEFAULT_MODEL_COLUMN = "default_model"
-CONTEXT_WINDOW_TOKENS_COLUMN = "context_window_tokens"
-DEFAULT_MAX_OUTPUT_TOKENS_COLUMN = "default_max_output_tokens"
-OPENAI_CHAT_DIALECT = "openai_chat_completions"
-ANTHROPIC_MESSAGES_DIALECT = "anthropic_messages"
-ANTHROPIC_PROVIDER = "anthropic"
 SQLITE_ASYNC_DRIVER = "sqlite+aiosqlite"
 SQLITE_DRIVER = "sqlite"
 POSTGRES_ASYNC_DRIVER = "postgresql+asyncpg"
@@ -212,11 +205,11 @@ def _build_invalid_alembic_state_message(database_url: str) -> str:
 
 def _bootstrap_legacy_database(connection: Connection) -> None:
     Base.metadata.create_all(connection)
-    _reconcile_model_credentials_schema(connection)
+    reconcile_model_credentials_schema(connection)
 
 
 def _reconcile_database_schema(connection: Connection) -> None:
-    _reconcile_model_credentials_schema(connection)
+    reconcile_model_credentials_schema(connection)
 
 
 def _upgrade_database_schema(database_url: str, connection: Connection | None = None) -> None:
@@ -244,67 +237,3 @@ def _build_alembic_config(
     if connection is not None:
         config.attributes["connection"] = connection
     return config
-
-
-def _reconcile_model_credentials_schema(connection: Connection) -> None:
-    inspector = inspect(connection)
-    if MODEL_CREDENTIALS_TABLE not in inspector.get_table_names():
-        return
-    columns = {column["name"] for column in inspector.get_columns(MODEL_CREDENTIALS_TABLE)}
-    _add_missing_model_credential_columns(connection, columns)
-    _backfill_model_credential_api_dialect(connection)
-
-
-def _add_missing_model_credential_columns(
-    connection: Connection,
-    columns: set[str],
-) -> None:
-    if API_DIALECT_COLUMN not in columns:
-        connection.execute(
-            text(f"ALTER TABLE {MODEL_CREDENTIALS_TABLE} ADD COLUMN {API_DIALECT_COLUMN} VARCHAR(50)")
-        )
-        columns.add(API_DIALECT_COLUMN)
-    if DEFAULT_MODEL_COLUMN not in columns:
-        connection.execute(
-            text(
-                f"ALTER TABLE {MODEL_CREDENTIALS_TABLE} "
-                f"ADD COLUMN {DEFAULT_MODEL_COLUMN} VARCHAR(100)"
-            )
-        )
-        columns.add(DEFAULT_MODEL_COLUMN)
-    if CONTEXT_WINDOW_TOKENS_COLUMN not in columns:
-        connection.execute(
-            text(
-                f"ALTER TABLE {MODEL_CREDENTIALS_TABLE} "
-                f"ADD COLUMN {CONTEXT_WINDOW_TOKENS_COLUMN} INTEGER"
-            )
-        )
-        columns.add(CONTEXT_WINDOW_TOKENS_COLUMN)
-    if DEFAULT_MAX_OUTPUT_TOKENS_COLUMN not in columns:
-        connection.execute(
-            text(
-                f"ALTER TABLE {MODEL_CREDENTIALS_TABLE} "
-                f"ADD COLUMN {DEFAULT_MAX_OUTPUT_TOKENS_COLUMN} INTEGER"
-            )
-        )
-        columns.add(DEFAULT_MAX_OUTPUT_TOKENS_COLUMN)
-
-
-def _backfill_model_credential_api_dialect(connection: Connection) -> None:
-    connection.execute(
-        text(
-            f"""
-            UPDATE {MODEL_CREDENTIALS_TABLE}
-            SET {API_DIALECT_COLUMN} = CASE
-                WHEN lower(provider) = :anthropic_provider THEN :anthropic_dialect
-                ELSE :default_dialect
-            END
-            WHERE {API_DIALECT_COLUMN} IS NULL OR trim({API_DIALECT_COLUMN}) = ''
-            """
-        ),
-        {
-            "anthropic_provider": ANTHROPIC_PROVIDER,
-            "anthropic_dialect": ANTHROPIC_MESSAGES_DIALECT,
-            "default_dialect": OPENAI_CHAT_DIALECT,
-        },
-    )

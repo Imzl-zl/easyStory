@@ -170,6 +170,7 @@ X-Trace-Id: req_20260402_001
 | `api_dialect` | 区分 `openai_responses / anthropic_messages / gemini_generate_content / openai_chat_completions` |
 | `auth_strategy` | 区分 `bearer / x-api-key / x-goog-api-key / bearer-or-jwt` |
 | `api_key_header_name` | 显式保存真实头名，不要靠 provider 名硬编码 |
+| `user_agent_override` | 显式覆盖最终发送的 `User-Agent`，适合中转站要求特定客户端标识 |
 | `client_name` | 你的产品名，例如 `easyStory` |
 | `client_version` | 你的客户端版本，用于 `User-Agent` 和排错 |
 | `runtime_kind` | 记录 `server-python / server-node / browser` |
@@ -182,6 +183,13 @@ X-Trace-Id: req_20260402_001
 1. 不要把“兼容 OpenAI SDK”误解成“兼容任意 OpenAI 风格客户端身份”。
 2. 不要把 `User-Agent` 当作协议兼容层的主真值。
 3. 浏览器接入要按“运行时边界”设计，不要按“头字符串长得像不像浏览器”设计。
+
+当前 easyStory 运行时已按这套边界落地：
+
+- `model_credentials` 正式保存 `user_agent_override / client_name / client_version / runtime_kind`
+- 运行时若存在 `user_agent_override` 会优先直接发送它；没有时再根据 `client_name / client_version / runtime_kind` 自动生成 `User-Agent`
+- Credential Center 提供 `Codex CLI / Claude Code / Gemini CLI / Chrome 浏览器` 这类客户端预设；预设本质上只是可编辑的 `User-Agent` 模板
+- `extra_headers` 不允许覆盖 `User-Agent`
 
 ---
 

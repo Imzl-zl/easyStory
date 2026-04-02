@@ -10,6 +10,8 @@ from app.modules.project.service import (
     ProjectCreateDTO,
     ProjectDeletionService,
     ProjectDetailDTO,
+    ProjectDocumentDTO,
+    ProjectDocumentSaveDTO,
     ProjectIncubatorConversationDraftDTO,
     ProjectIncubatorConversationDraftRequestDTO,
     ProjectIncubatorCreateRequestDTO,
@@ -162,6 +164,40 @@ async def get_project(
     return await project_management_service.get_project(
         db,
         project_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/{project_id}/documents", response_model=ProjectDocumentDTO)
+async def get_project_document(
+    project_id: uuid.UUID,
+    path: str = Query(min_length=1),
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> ProjectDocumentDTO:
+    return await project_service.get_project_document(
+        db,
+        project_id,
+        path,
+        owner_id=current_user.id,
+    )
+
+
+@router.put("/{project_id}/documents", response_model=ProjectDocumentDTO)
+async def save_project_document(
+    project_id: uuid.UUID,
+    payload: ProjectDocumentSaveDTO,
+    path: str = Query(min_length=1),
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> ProjectDocumentDTO:
+    return await project_service.save_project_document(
+        db,
+        project_id,
+        path,
+        payload,
         owner_id=current_user.id,
     )
 

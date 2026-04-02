@@ -15,21 +15,12 @@ type DraftGuidance = {
 export function buildDraftGuidance(
   draft: ProjectIncubatorConversationDraft,
 ): DraftGuidance {
-  const blockedIssues = draft.setting_completeness.issues.filter((issue) => issue.level === "blocked");
-  if (blockedIssues.length > 0) {
-    return {
-      actionLabel: "让 AI 先补一版",
-      detail: `还差 ${formatIssueLabels(blockedIssues)}。你不用自己填，点一下就能让 AI 先补成可继续创作的一版。`,
-      statusLabel: "待补全",
-      summary: "还差关键信息，补一下再继续会更顺。",
-    };
-  }
   if (draft.setting_completeness.issues.length > 0) {
     return {
-      actionLabel: "让 AI 补齐这些内容",
+      actionLabel: "让 AI 补一版摘要",
       detail: `当前缺少 ${formatIssueLabels(draft.setting_completeness.issues)}。这不影响创建项目，也不影响后面继续用 AI 生成大纲。`,
       statusLabel: "可继续",
-      summary: "现在就能继续，剩下的是可补可不补的建议项。",
+      summary: "现在就能继续，剩下的是建议补齐的摘要项。",
     };
   }
   return {

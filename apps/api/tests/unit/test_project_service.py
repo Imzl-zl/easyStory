@@ -1,8 +1,15 @@
 import asyncio
 
 from app.modules.content.models import Content, ContentVersion
+import pytest
 
-from app.modules.project.service import ProjectService, ProjectSettingUpdateDTO
+from app.modules.project.infrastructure import ProjectDocumentFileStore
+from app.modules.project.service import (
+    ProjectDocumentSaveDTO,
+    ProjectService,
+    ProjectSettingUpdateDTO,
+)
+from app.shared.runtime.errors import BusinessRuleError
 from tests.unit.async_service_support import async_db
 
 from tests.unit.models.helpers import (
@@ -15,7 +22,7 @@ from tests.unit.models.helpers import (
 )
 
 
-def test_update_project_setting_syncs_summary_and_marks_related_content_stale(db):
+def test_update_project_setting_marks_derived_assets_stale_when_summary_changes(db):
     project = create_project(
         db,
         project_setting=ready_project_setting(
@@ -96,11 +103,11 @@ def test_update_project_setting_syncs_summary_and_marks_related_content_stale(db
     assert result.target_words == 800000
     assert result.impact.has_impact is True
     assert result.impact.total_affected_entries == 4
-    assert [(item.target, item.count) for item in result.impact.items] == [
-        ("outline", 1),
-        ("opening_plan", 1),
-        ("chapter", 1),
-        ("chapter_tasks", 1),
+    assert [item.target for item in result.impact.items] == [
+        "outline",
+        "opening_plan",
+        "chapter",
+        "chapter_tasks",
     ]
     assert project.genre == "仙侠"
     assert project.target_words == 800000
@@ -129,7 +136,7 @@ def test_update_project_setting_returns_empty_impact_when_value_is_unchanged(db)
     assert result.impact.items == []
 
 
-def test_check_setting_completeness_returns_blocked_and_warning_issues(db):
+def test_check_setting_completeness_returns_warning_issues_for_summary_gaps(db):
     project = create_project(
         db,
         project_setting={
@@ -141,16 +148,16 @@ def test_check_setting_completeness_returns_blocked_and_warning_issues(db):
     result = asyncio.run(ProjectService().check_setting_completeness(async_db(db), project.id))
 
     issue_fields = {issue.field: issue.level for issue in result.issues}
-    assert result.status == "blocked"
-    assert issue_fields["protagonist.identity"] == "blocked"
-    assert issue_fields["protagonist.goal"] == "blocked"
-    assert issue_fields["core_conflict"] == "blocked"
-    assert issue_fields["world_setting"] == "blocked"
+    assert result.status == "warning"
+    assert issue_fields["protagonist.identity"] == "warning"
+    assert issue_fields["protagonist.goal"] == "warning"
+    assert issue_fields["core_conflict"] == "warning"
+    assert issue_fields["world_setting"] == "warning"
     assert issue_fields["tone"] == "warning"
     assert issue_fields["scale"] == "warning"
 
 
-def test_get_preparation_status_points_to_setting_when_project_is_incomplete(db):
+def test_get_preparation_status_points_to_outline_when_project_summary_is_incomplete(db):
     project = create_project(
         db,
         project_setting={"genre": "玄幻"},
@@ -158,12 +165,12 @@ def test_get_preparation_status_points_to_setting_when_project_is_incomplete(db)
 
     result = asyncio.run(ProjectService().get_preparation_status(async_db(db), project.id))
 
-    assert result.setting.status == "blocked"
+    assert result.setting.status == "warning"
     assert result.outline.step_status == "not_started"
     assert result.opening_plan.step_status == "not_started"
     assert result.chapter_tasks.step_status == "not_started"
     assert result.can_start_workflow is False
-    assert result.next_step == "setting"
+    assert result.next_step == "outline"
 
 
 def test_get_preparation_status_identifies_workflow_gate_when_assets_ready(db):
@@ -214,6 +221,99 @@ def test_get_preparation_status_flags_stale_tasks_under_active_workflow(db):
     assert result.chapter_tasks.counts.stale == 1
     assert result.can_start_workflow is False
     assert result.next_step == "chapter_tasks"
+
+
+def test_get_project_document_uses_outline_seed_when_file_missing(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    _create_story_asset(db, project.id, "outline", "approved", "这是从数据库回填的大纲内容")
+
+    result = asyncio.run(
+        ProjectService(
+            document_file_store=ProjectDocumentFileStore(tmp_path),
+        ).get_project_document(
+            async_db(db),
+            project.id,
+            "大纲/总大纲.md",
+        )
+    )
+
+    assert result.source == "outline"
+    assert result.content == "这是从数据库回填的大纲内容"
+    assert result.updated_at is None
+
+
+def test_get_project_document_ignores_shadow_file_for_canonical_outline_path(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    _create_story_asset(db, project.id, "outline", "approved", "这是数据库中的正式大纲")
+    file_store = ProjectDocumentFileStore(tmp_path)
+    file_store.save_project_document(project.id, "大纲/总大纲.md", "这是旧的影子文件")
+
+    result = asyncio.run(
+        ProjectService(document_file_store=file_store).get_project_document(
+            async_db(db),
+            project.id,
+            "大纲/总大纲.md",
+        )
+    )
+
+    assert result.source == "outline"
+    assert result.content == "这是数据库中的正式大纲"
+
+
+def test_save_project_document_persists_markdown_file(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    service = ProjectService(document_file_store=ProjectDocumentFileStore(tmp_path))
+
+    saved = asyncio.run(
+        service.save_project_document(
+            async_db(db),
+            project.id,
+            "设定/世界观.md",
+            ProjectDocumentSaveDTO(content="# 世界观\n\n这里是文件保存后的内容。"),
+        )
+    )
+    loaded = asyncio.run(
+        service.get_project_document(
+            async_db(db),
+            project.id,
+            "设定/世界观.md",
+        )
+    )
+
+    assert saved.source == "file"
+    assert loaded.source == "file"
+    assert loaded.content == "# 世界观\n\n这里是文件保存后的内容。"
+    assert (tmp_path / "projects" / str(project.id) / "documents" / "设定" / "世界观.md").exists()
+
+
+def test_save_project_document_rejects_canonical_content_paths(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    service = ProjectService(document_file_store=ProjectDocumentFileStore(tmp_path))
+
+    with pytest.raises(BusinessRuleError, match="正式内容真值"):
+        asyncio.run(
+            service.save_project_document(
+                async_db(db),
+                project.id,
+                "正文/第001章.md",
+                ProjectDocumentSaveDTO(content="# 正文\n\n不应该写到文件层"),
+            )
+        )
+
+
+def test_save_project_document_rejects_parent_path_escape(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    service = ProjectService(document_file_store=ProjectDocumentFileStore(tmp_path))
+
+    with pytest.raises(BusinessRuleError, match="非法目录跳转"):
+        asyncio.run(
+            service.save_project_document(
+                async_db(db),
+                project.id,
+                "../逃逸.md",
+                ProjectDocumentSaveDTO(content="不应该写出项目目录"),
+            )
+        )
 
 
 def _create_story_asset(

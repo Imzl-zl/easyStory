@@ -15,6 +15,7 @@ LlmApiDialect = Literal[
     "gemini_generate_content",
 ]
 LlmAuthStrategy = Literal["bearer", "x_api_key", "x_goog_api_key", "custom_header"]
+LlmRuntimeKind = Literal["server-python", "server-node", "browser"]
 
 DEFAULT_API_DIALECT: LlmApiDialect = "openai_chat_completions"
 DEFAULT_AUTH_STRATEGY_BY_DIALECT: dict[LlmApiDialect, LlmAuthStrategy] = {
@@ -38,6 +39,7 @@ SUPPORTED_API_DIALECTS = frozenset(
     }
 )
 SUPPORTED_AUTH_STRATEGIES = frozenset({"bearer", "x_api_key", "x_goog_api_key", "custom_header"})
+SUPPORTED_RUNTIME_KINDS = frozenset({"server-python", "server-node", "browser"})
 DEFAULT_BASE_URLS: dict[LlmApiDialect, str] = {
     "openai_chat_completions": "https://api.openai.com",
     "openai_responses": "https://api.openai.com",
@@ -46,12 +48,11 @@ DEFAULT_BASE_URLS: dict[LlmApiDialect, str] = {
 }
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 60
-VERIFY_MODEL_REPLY = "今天天气真好。"
 VERIFY_USER_PROMPT = (
-    "这是一次模型连接验证。请只回复这句话，不要添加额外内容：今天天气真好。"
+    "今天天气怎么样？"
 )
 VERIFY_SYSTEM_PROMPT = (
-    "你正在执行模型连接验证。请严格按要求回复，不要添加解释、标点变化或额外文本。"
+    "请像日常聊天一样，用一句简短中文直接回答用户问题，不要使用 Markdown。"
 )
 VERIFY_MAX_TOKENS = 32
 JSON_OBJECT_RESPONSE_FORMAT = "json_object"
@@ -67,6 +68,10 @@ class LLMConnection:
     auth_strategy: LlmAuthStrategy | None = None
     api_key_header_name: str | None = None
     extra_headers: dict[str, str] | None = None
+    user_agent_override: str | None = None
+    client_name: str | None = None
+    client_version: str | None = None
+    runtime_kind: LlmRuntimeKind | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +125,15 @@ def normalize_auth_strategy(auth_strategy: str | None) -> LlmAuthStrategy | None
         return None
     if normalized not in SUPPORTED_AUTH_STRATEGIES:
         raise ConfigurationError(f"Unsupported auth_strategy: {auth_strategy}")
+    return normalized  # type: ignore[return-value]
+
+
+def normalize_runtime_kind(runtime_kind: str | None) -> LlmRuntimeKind | None:
+    normalized = _normalize_optional_string(runtime_kind)
+    if normalized is None:
+        return None
+    if normalized not in SUPPORTED_RUNTIME_KINDS:
+        raise ConfigurationError(f"Unsupported runtime_kind: {runtime_kind}")
     return normalized  # type: ignore[return-value]
 
 

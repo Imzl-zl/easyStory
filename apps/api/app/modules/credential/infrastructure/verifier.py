@@ -12,7 +12,6 @@ from app.shared.runtime.llm_protocol import (
     LLMConnection,
     NormalizedLLMResponse,
     PreparedLLMHttpRequest,
-    VERIFY_MODEL_REPLY,
     build_verification_request,
 )
 from app.shared.runtime.provider_interop_stream_support import (
@@ -21,6 +20,19 @@ from app.shared.runtime.provider_interop_stream_support import (
 )
 
 VERIFY_TIMEOUT_SECONDS = 5
+VERIFY_EMPTY_CONTENT_MESSAGE = "测试消息没有返回可用内容"
+RETIRED_MODEL_MARKERS = (
+    "is no longer available",
+    "please switch to",
+)
+MODEL_CONFIGURATION_ERROR_MARKERS = (
+    "not supported for this model",
+    "unsupported model",
+    "invalid model",
+    "unknown model",
+    "does not exist",
+    "model_not_found",
+)
 STREAM_HTTP_ERROR_PATTERN = re.compile(
     r"^LLM streaming request failed: HTTP (?P<status>\d{3})(?: - (?P<detail>.*))?$"
 )
@@ -44,6 +56,10 @@ class AsyncCredentialVerifier(Protocol):
         auth_strategy: str | None,
         api_key_header_name: str | None,
         extra_headers: dict[str, str] | None,
+        user_agent_override: str | None,
+        client_name: str | None,
+        client_version: str | None,
+        runtime_kind: str | None,
     ) -> CredentialVerificationResult: ...
 
 
@@ -75,6 +91,10 @@ class AsyncHttpCredentialVerifier:
         auth_strategy: str | None = None,
         api_key_header_name: str | None = None,
         extra_headers: dict[str, str] | None = None,
+        user_agent_override: str | None = None,
+        client_name: str | None = None,
+        client_version: str | None = None,
+        runtime_kind: str | None = None,
     ) -> CredentialVerificationResult:
         try:
             request = build_stream_probe_request(
@@ -87,6 +107,10 @@ class AsyncHttpCredentialVerifier:
                         auth_strategy=auth_strategy,
                         api_key_header_name=api_key_header_name,
                         extra_headers=extra_headers,
+                        user_agent_override=user_agent_override,
+                        client_name=client_name,
+                        client_version=client_version,
+                        runtime_kind=runtime_kind,
                     )
                 ),
                 api_dialect=api_dialect,
@@ -112,10 +136,13 @@ class AsyncHttpCredentialVerifier:
         response: NormalizedLLMResponse,
     ) -> None:
         actual_reply = response.content.strip()
-        if actual_reply != VERIFY_MODEL_REPLY:
+        if not actual_reply:
             raise BusinessRuleError(
-                f"无法验证 {provider} 凭证: 验证响应不匹配，预期“{VERIFY_MODEL_REPLY}”，实际“{actual_reply or '空响应'}”"
+                f"无法验证 {provider} 凭证: {VERIFY_EMPTY_CONTENT_MESSAGE}"
             )
+        upstream_error = _normalize_probe_error_message(actual_reply)
+        if upstream_error is not None:
+            raise BusinessRuleError(f"无法验证 {provider} 凭证: {upstream_error}")
 
 
 def _raise_stream_http_error(provider: str, error: ConfigurationError) -> None:
@@ -147,3 +174,13 @@ async def _default_stream_request_sender(
         print_response=False,
         timeout_seconds=VERIFY_TIMEOUT_SECONDS,
     )
+
+
+def _normalize_probe_error_message(reply: str) -> str | None:
+    normalized_reply = reply.strip()
+    lowered_reply = normalized_reply.lower()
+    if any(marker in lowered_reply for marker in RETIRED_MODEL_MARKERS):
+        return f"当前默认模型已不可用，请换成可用模型后再试。上游提示：{normalized_reply}"
+    if any(marker in lowered_reply for marker in MODEL_CONFIGURATION_ERROR_MARKERS):
+        return f"默认模型或接口类型不匹配。上游提示：{normalized_reply}"
+    return None

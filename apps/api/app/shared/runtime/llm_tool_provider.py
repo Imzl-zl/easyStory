@@ -13,6 +13,7 @@ from .llm_protocol import (
     PreparedLLMHttpRequest,
     normalize_api_dialect,
     normalize_auth_strategy,
+    normalize_runtime_kind,
     parse_generation_response,
     prepare_generation_request,
     resolve_model_name,
@@ -211,6 +212,10 @@ def _build_connection(credential: dict[str, Any]) -> LLMConnection:
         auth_strategy=normalize_auth_strategy(_optional_string(credential.get("auth_strategy"))),
         api_key_header_name=_optional_string(credential.get("api_key_header_name")),
         extra_headers=_optional_string_mapping(credential.get("extra_headers")),
+        user_agent_override=_optional_string(credential.get("user_agent_override")),
+        client_name=_optional_string(credential.get("client_name")),
+        client_version=_optional_string(credential.get("client_version")),
+        runtime_kind=normalize_runtime_kind(_optional_string(credential.get("runtime_kind"))),
     )
 
 

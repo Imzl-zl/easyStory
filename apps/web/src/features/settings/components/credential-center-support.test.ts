@@ -29,6 +29,10 @@ test("buildCredentialCreatePayload maps project scope and trims default base url
       authStrategy: "",
       apiKeyHeaderName: "",
       extraHeadersText: "",
+      userAgentOverride: "",
+      clientName: "",
+      clientVersion: "",
+      runtimeKind: "",
       provider: " OpenAI ",
     },
     projectId: "project-1",
@@ -48,6 +52,10 @@ test("buildCredentialCreatePayload maps project scope and trims default base url
     auth_strategy: null,
     api_key_header_name: null,
     extra_headers: null,
+    user_agent_override: null,
+    client_name: null,
+    client_version: null,
+    runtime_kind: null,
   });
 });
 
@@ -63,6 +71,10 @@ test("buildCredentialUpdatePayload only sends changed fields and rotates key whe
     authStrategy: "custom_header",
     apiKeyHeaderName: "api-key",
     extraHeadersText: '{ "X-Trace-Id": "trace-001" }',
+    userAgentOverride: " codex-cli/0.118.0 (server; node) ",
+    clientName: " easyStory ",
+    clientVersion: " 0.1 ",
+    runtimeKind: "server-python",
     provider: "openai",
   });
   assert.deepEqual(payload, {
@@ -76,6 +88,10 @@ test("buildCredentialUpdatePayload only sends changed fields and rotates key whe
     auth_strategy: "custom_header",
     api_key_header_name: "api-key",
     extra_headers: { "X-Trace-Id": "trace-001" },
+    user_agent_override: "codex-cli/0.118.0 (server; node)",
+    client_name: "easyStory",
+    client_version: "0.1",
+    runtime_kind: "server-python",
   });
 });
 
@@ -93,6 +109,10 @@ test("buildCredentialUpdatePayload can clear custom base url without sending unc
       authStrategy: "",
       apiKeyHeaderName: "",
       extraHeadersText: "",
+      userAgentOverride: "",
+      clientName: "",
+      clientVersion: "",
+      runtimeKind: "",
       provider: "openai",
     },
   );
@@ -115,6 +135,10 @@ test("buildCredentialUpdatePayload rejects clearing an existing default model", 
         authStrategy: "",
         apiKeyHeaderName: "",
         extraHeadersText: "",
+        userAgentOverride: "",
+        clientName: "",
+        clientVersion: "",
+        runtimeKind: "",
         provider: "openai",
       }),
     /不支持清空默认模型/,
@@ -125,15 +149,19 @@ test("buildCredentialCreatePayload parses extra headers json and keeps custom he
   const payload = buildCredentialCreatePayload({
     formState: {
       apiDialect: "openai_chat_completions",
-          apiKey: "secret-key",
-          baseUrl: "https://proxy.example.com",
-          defaultModel: "gpt-4o-mini",
-          contextWindowTokens: "",
-          defaultMaxOutputTokens: "",
-          displayName: "OpenAI Proxy",
-          authStrategy: "custom_header",
-          apiKeyHeaderName: "api-key",
+      apiKey: "secret-key",
+      baseUrl: "https://proxy.example.com",
+      defaultModel: "gpt-4o-mini",
+      contextWindowTokens: "",
+      defaultMaxOutputTokens: "",
+      displayName: "OpenAI Proxy",
+      authStrategy: "custom_header",
+      apiKeyHeaderName: "api-key",
       extraHeadersText: '{ "X-Trace-Id": "trace-009" }',
+      userAgentOverride: "",
+      clientName: "",
+      clientVersion: "",
+      runtimeKind: "",
       provider: "proxy",
     },
     projectId: null,
@@ -159,12 +187,44 @@ test("buildCredentialCreatePayload rejects invalid extra headers json", () => {
           authStrategy: "",
           apiKeyHeaderName: "",
           extraHeadersText: '["bad"]',
+          userAgentOverride: "",
+          clientName: "",
+          clientVersion: "",
+          runtimeKind: "",
           provider: "openai",
         },
         projectId: null,
         scope: "user",
       }),
     /JSON 对象/,
+  );
+});
+
+test("buildCredentialCreatePayload rejects client identity without client name", () => {
+  assert.throws(
+    () =>
+      buildCredentialCreatePayload({
+        formState: {
+          apiDialect: "openai_chat_completions",
+          apiKey: "secret-key",
+          baseUrl: "https://api.openai.com",
+          defaultModel: "gpt-4o-mini",
+          contextWindowTokens: "",
+          defaultMaxOutputTokens: "",
+          displayName: "OpenAI",
+          authStrategy: "",
+          apiKeyHeaderName: "",
+          extraHeadersText: "",
+          userAgentOverride: "",
+          clientName: "",
+          clientVersion: "0.1",
+          runtimeKind: "",
+          provider: "openai",
+        },
+        projectId: null,
+        scope: "user",
+      }),
+    /必须先填写应用名/,
   );
 });
 
@@ -183,6 +243,10 @@ test("buildCredentialCreatePayload rejects runtime-managed auth header names", (
           authStrategy: "custom_header",
           apiKeyHeaderName: "anthropic-version",
           extraHeadersText: "",
+          userAgentOverride: "",
+          clientName: "",
+          clientVersion: "",
+          runtimeKind: "",
           provider: "proxy",
         },
         projectId: null,
@@ -207,6 +271,10 @@ test("buildCredentialCreatePayload rejects sensitive extra headers even when aut
           authStrategy: "",
           apiKeyHeaderName: "",
           extraHeadersText: '{ "Authorization": "Bearer should-not-be-here" }',
+          userAgentOverride: "",
+          clientName: "",
+          clientVersion: "",
+          runtimeKind: "",
           provider: "proxy",
         },
         projectId: null,
@@ -249,6 +317,48 @@ test("isCredentialFormDirty ignores edit changes that normalize back to the same
   );
 });
 
+test("buildCredentialUpdatePayload can clear client identity fields", () => {
+  const payload = buildCredentialUpdatePayload(
+    createCredential({
+      client_name: "easyStory",
+      client_version: "0.1",
+      runtime_kind: "server-python",
+    }),
+    {
+      ...createCredentialFormFromView(
+        createCredential({
+          client_name: "easyStory",
+          client_version: "0.1",
+          runtime_kind: "server-python",
+        }),
+      ),
+      clientName: "",
+      clientVersion: "",
+      runtimeKind: "",
+    },
+  );
+  assert.deepEqual(payload, {
+    client_name: null,
+    client_version: null,
+    runtime_kind: null,
+  });
+});
+
+test("buildCredentialUpdatePayload can clear user agent override", () => {
+  const payload = buildCredentialUpdatePayload(
+    createCredential({ user_agent_override: "codex-cli/0.118.0 (server; node)" }),
+    {
+      ...createCredentialFormFromView(
+        createCredential({ user_agent_override: "codex-cli/0.118.0 (server; node)" }),
+      ),
+      userAgentOverride: "",
+    },
+  );
+  assert.deepEqual(payload, {
+    user_agent_override: null,
+  });
+});
+
 function createCredential(overrides: Partial<CredentialView> = {}): CredentialView {
   return {
     id: "credential-1",
@@ -265,6 +375,10 @@ function createCredential(overrides: Partial<CredentialView> = {}): CredentialVi
     auth_strategy: null,
     api_key_header_name: null,
     extra_headers: null,
+    user_agent_override: null,
+    client_name: null,
+    client_version: null,
+    runtime_kind: null,
     is_active: true,
     last_verified_at: null,
     ...overrides,

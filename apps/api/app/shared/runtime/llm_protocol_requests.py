@@ -22,6 +22,13 @@ from .llm_protocol_types import (
     resolve_model_name,
 )
 
+USER_AGENT_HEADER_NAME = "User-Agent"
+RUNTIME_KIND_LABELS = {
+    "server-python": "server; python",
+    "server-node": "server; node",
+    "browser": "browser",
+}
+
 
 def prepare_generation_request(request: LLMGenerateRequest) -> PreparedLLMHttpRequest:
     dialect = normalize_api_dialect(request.connection.api_dialect)
@@ -219,9 +226,25 @@ def _build_request_headers(
     headers = dict(connection.extra_headers or {})
     headers["Content-Type"] = "application/json"
     headers.update(_build_auth_headers(connection))
+    user_agent = _build_user_agent(connection)
+    if user_agent is not None:
+        headers[USER_AGENT_HEADER_NAME] = user_agent
     if extra_headers:
         headers.update(extra_headers)
     return headers
+
+
+def _build_user_agent(connection: LLMConnection) -> str | None:
+    if connection.user_agent_override is not None:
+        return connection.user_agent_override
+    if connection.client_name is None:
+        return None
+    user_agent = connection.client_name
+    if connection.client_version:
+        user_agent = f"{user_agent}/{connection.client_version}"
+    if connection.runtime_kind:
+        user_agent = f"{user_agent} ({RUNTIME_KIND_LABELS[connection.runtime_kind]})"
+    return user_agent
 
 
 def _build_auth_headers(connection: LLMConnection) -> dict[str, str]:

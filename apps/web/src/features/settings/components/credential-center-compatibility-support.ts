@@ -4,6 +4,7 @@ export type CredentialAuthStrategyValue = CredentialAuthStrategy | "";
 
 const CONTENT_TYPE_HEADER_NAME = "content-type";
 const ANTHROPIC_VERSION_HEADER_NAME = "anthropic-version";
+const USER_AGENT_HEADER_NAME = "user-agent";
 const HTTP_HEADER_TOKEN_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 const SENSITIVE_EXTRA_HEADER_NAMES = new Set([
   "authorization",
@@ -173,6 +174,7 @@ function buildRuntimeManagedHeaderNames(
 ): Set<string> {
   const effectiveAuthStrategy = authStrategy ?? getDefaultAuthStrategy(apiDialect);
   const reservedHeaders = new Set<string>([CONTENT_TYPE_HEADER_NAME]);
+  reservedHeaders.add(USER_AGENT_HEADER_NAME);
   if (apiDialect === "anthropic_messages") {
     reservedHeaders.add(ANTHROPIC_VERSION_HEADER_NAME);
   }

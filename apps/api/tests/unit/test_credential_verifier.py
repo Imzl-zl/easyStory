@@ -53,6 +53,10 @@ def test_verify_credential_uses_generation_probe_request() -> None:
             auth_strategy="custom_header",
             api_key_header_name="api-key",
             extra_headers={"X-Trace-Id": "trace-verify"},
+            user_agent_override=None,
+            client_name="easyStory",
+            client_version="0.1",
+            runtime_kind="server-python",
         )
     )
 
@@ -61,6 +65,7 @@ def test_verify_credential_uses_generation_probe_request() -> None:
     assert request.headers["Accept"] == "text/event-stream"
     assert request.headers["api-key"] == "test-key"
     assert request.headers["X-Trace-Id"] == "trace-verify"
+    assert request.headers["User-Agent"] == "easyStory/0.1 (server; python)"
     assert request.json_body["model"] == "gpt-4o-mini"
     assert request.json_body["stream"] is True
     assert request.json_body["messages"][-1]["content"] == VERIFY_USER_PROMPT
@@ -69,14 +74,34 @@ def test_verify_credential_uses_generation_probe_request() -> None:
     assert result.message == "验证成功"
 
 
-def test_verify_credential_rejects_probe_content_mismatch() -> None:
+def test_verify_credential_accepts_non_exact_probe_reply() -> None:
     async def stream_request_sender(_request, *, api_dialect):
         assert api_dialect == "openai_chat_completions"
-        return _ok_response("Gemini 3 Pro is no longer available.")
+        return _ok_response("今天天气真好。\n补充一句说明也没关系。")
+
+    verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
+    result = asyncio.run(
+        verifier.verify(
+            provider="openai",
+            api_key="test-key",
+            base_url=None,
+            api_dialect="openai_chat_completions",
+            default_model="gpt-4o-mini",
+            client_name="easyStory",
+        )
+    )
+
+    assert result.message == "验证成功"
+
+
+def test_verify_credential_rejects_empty_probe_content() -> None:
+    async def stream_request_sender(_request, *, api_dialect):
+        assert api_dialect == "openai_chat_completions"
+        return _ok_response("   ")
 
     verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
 
-    with pytest.raises(BusinessRuleError, match="验证响应不匹配"):
+    with pytest.raises(BusinessRuleError, match="测试消息没有返回可用内容"):
         asyncio.run(
             verifier.verify(
                 provider="openai",
@@ -84,6 +109,50 @@ def test_verify_credential_rejects_probe_content_mismatch() -> None:
                 base_url=None,
                 api_dialect="openai_chat_completions",
                 default_model="gpt-4o-mini",
+                user_agent_override=None,
+                client_name="easyStory",
+            )
+        )
+
+
+def test_verify_credential_rejects_retired_model_message() -> None:
+    async def stream_request_sender(_request, *, api_dialect):
+        assert api_dialect == "openai_chat_completions"
+        return _ok_response("Gemini 3 Pro is no longer available. Please switch to Gemini 3.1 Pro.")
+
+    verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
+
+    with pytest.raises(BusinessRuleError, match="当前默认模型已不可用"):
+        asyncio.run(
+            verifier.verify(
+                provider="openai",
+                api_key="test-key",
+                base_url=None,
+                api_dialect="openai_chat_completions",
+                default_model="gpt-4o-mini",
+                user_agent_override=None,
+                client_name="easyStory",
+            )
+        )
+
+
+def test_verify_credential_rejects_model_configuration_error_message() -> None:
+    async def stream_request_sender(_request, *, api_dialect):
+        assert api_dialect == "openai_chat_completions"
+        return _ok_response("MEDIUM is not supported for this model.")
+
+    verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
+
+    with pytest.raises(BusinessRuleError, match="默认模型或接口类型不匹配"):
+        asyncio.run(
+            verifier.verify(
+                provider="openai",
+                api_key="test-key",
+                base_url=None,
+                api_dialect="openai_chat_completions",
+                default_model="gpt-4o-mini",
+                user_agent_override=None,
+                client_name="easyStory",
             )
         )
 
@@ -103,6 +172,8 @@ def test_verify_credential_surfaces_stream_protocol_error() -> None:
                 base_url=None,
                 api_dialect="openai_chat_completions",
                 default_model="gpt-4o-mini",
+                user_agent_override=None,
+                client_name="easyStory",
             )
         )
 
@@ -123,6 +194,8 @@ def test_verify_openai_responses_uses_input_text_blocks() -> None:
             base_url="https://proxy.example.com",
             api_dialect="openai_responses",
             default_model="gpt-4.1-mini",
+            user_agent_override="codex-cli/0.118.0 (server; node)",
+            client_name="easyStory",
         )
     )
 
@@ -135,6 +208,7 @@ def test_verify_openai_responses_uses_input_text_blocks() -> None:
     ]
     assert request.json_body["instructions"] == VERIFY_SYSTEM_PROMPT
     assert request.json_body["stream"] is True
+    assert request.headers["User-Agent"] == "codex-cli/0.118.0 (server; node)"
     assert captured["api_dialect"] == "openai_responses"
     assert result.message == "验证成功"
 
@@ -155,6 +229,7 @@ def test_verify_gemini_request_includes_user_role_and_prompt() -> None:
             base_url="https://proxy.example.com",
             api_dialect="gemini_generate_content",
             default_model="gemini-2.5-pro",
+            client_name="easyStory",
         )
     )
 
@@ -190,6 +265,7 @@ def test_verify_credential_maps_authentication_error() -> None:
                 base_url=None,
                 api_dialect="openai_chat_completions",
                 default_model="gpt-4o-mini",
+                client_name="easyStory",
             )
         )
 
@@ -209,6 +285,7 @@ def test_verify_credential_surfaces_connection_error() -> None:
                 base_url=None,
                 api_dialect="openai_chat_completions",
                 default_model="gpt-4o-mini",
+                client_name="easyStory",
             )
         )
 

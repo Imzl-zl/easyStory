@@ -1,24 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
+import { CredentialClientIdentityFields } from "@/features/settings/components/credential-center-client-identity-fields";
+import { CredentialCompatibilityPanel } from "@/features/settings/components/credential-center-compatibility-panel";
 import type { CredentialCenterFeedback } from "@/features/settings/components/credential-center-feedback";
 import {
   API_DIALECT_SELECT_OPTIONS,
-  AUTH_STRATEGY_SELECT_OPTIONS,
   CredentialSelectField,
-  describeDefaultAuthStrategy,
   FieldInput,
-  StaticField,
   updateApiDialectState,
+  StaticField,
 } from "@/features/settings/components/credential-center-form-fields";
 import { CredentialTokenFields } from "@/features/settings/components/credential-center-token-fields";
-import {
-  createInitialCredentialForm,
-  isCredentialFormDirty,
-  type CredentialFormState,
-} from "@/features/settings/components/credential-center-support";
+import { createInitialCredentialForm, isCredentialFormDirty, type CredentialFormState } from "@/features/settings/components/credential-center-support";
 import type { CredentialApiDialect, CredentialView } from "@/lib/api/types";
 
 type CredentialCenterFormMode = "create" | "edit";
@@ -64,7 +59,8 @@ export function CredentialCenterForm({
     >
       <FormIntro mode={mode} />
       <BasicFields formState={formState} layout={layout} mode={mode} setFormState={setFormState} />
-      <CompatibilitySettings formState={formState} layout={layout} setFormState={setFormState} />
+      <ClientIdentityPanel formState={formState} layout={layout} setFormState={setFormState} />
+      <CredentialCompatibilityPanel formState={formState} layout={layout} setFormState={setFormState} />
       <FeedbackNotice feedback={feedback} />
       <FormActions isDirty={isDirty} isPending={isPending} mode={mode} onReset={onReset} />
     </form>
@@ -181,7 +177,7 @@ function BasicFields({
   );
 }
 
-function CompatibilitySettings({
+function ClientIdentityPanel({
   formState,
   layout,
   setFormState,
@@ -194,61 +190,22 @@ function CompatibilitySettings({
   const descriptionClassName = layout === "full" ? "xl:col-span-2" : undefined;
 
   return (
-    <details className="rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.56)] p-4">
-      <summary className="cursor-pointer text-[13px] font-medium leading-5 text-[var(--text-primary)]">
-        兼容设置
-        <span className="ml-2 text-xs text-[var(--text-secondary)]">大多数情况不用改</span>
-      </summary>
-      <div className={layout === "full" ? "mt-4 grid gap-4 xl:grid-cols-2" : "mt-4 grid gap-4"}>
-        <p className={`text-[13px] leading-6 text-[var(--text-secondary)] ${descriptionClassName ?? ""}`}>
-          只有当上游服务要求特殊请求头或特殊密钥位置时，才需要修改这里。
+    <section className="rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
+      <div className="space-y-1">
+        <h4 className="text-[13px] font-medium leading-5 text-[var(--text-primary)]">客户端标识</h4>
+        <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+          某些中转站会按客户端标识分流。需要伪装成 Codex CLI、Claude Code、Gemini CLI 或浏览器时，优先在这里设置。
         </p>
-        <CredentialSelectField
-          className={fieldClassName}
-          description={`当前服务类型默认会使用：${describeDefaultAuthStrategy(formState.apiDialect)}。`}
-          label="密钥放置方式"
-          options={AUTH_STRATEGY_SELECT_OPTIONS}
-          value={formState.authStrategy}
-          onChange={(value) =>
-            setFormState((current) => {
-              const nextAuthStrategy = value;
-              return {
-                ...current,
-                authStrategy: nextAuthStrategy as typeof current.authStrategy,
-                apiKeyHeaderName: nextAuthStrategy === "custom_header" ? current.apiKeyHeaderName : "",
-              };
-            })
-          }
-        />
-        <FieldInput
-          autoComplete="off"
-          className={fieldClassName}
-          description="只有在上游明确要求自定义请求头名称时才需要填写。"
-          disabled={formState.authStrategy !== "custom_header"}
-          label="自定义密钥请求头"
-          name="apiKeyHeaderName"
-          placeholder="例如：api-key"
-          value={formState.apiKeyHeaderName}
-          onChange={(value) => setFormState((current) => ({ ...current, apiKeyHeaderName: value }))}
-        />
-        <label className={`block ${descriptionClassName ?? ""}`}>
-          <span className="label-text">额外请求头</span>
-          <textarea
-            autoComplete="off"
-            className="ink-textarea min-h-32"
-            name="extraHeadersText"
-            placeholder={'例如：{\n  "HTTP-Referer": "https://app.example.com",\n  "X-Title": "easyStory"\n}'}
-            value={formState.extraHeadersText}
-            onChange={(event) =>
-              setFormState((current) => ({ ...current, extraHeadersText: event.target.value }))
-            }
-          />
-          <p className="mt-2 text-xs text-[var(--text-secondary)]">
-            这里适合填写站点来源、租户标识这类补充信息。不要在这里填写 Token、Secret 或鉴权头。
-          </p>
-        </label>
       </div>
-    </details>
+      <div className={layout === "full" ? "mt-4 grid gap-4 xl:grid-cols-2" : "mt-4 grid gap-4"}>
+        <CredentialClientIdentityFields
+          className={fieldClassName}
+          descriptionClassName={descriptionClassName}
+          formState={formState}
+          setFormState={setFormState}
+        />
+      </div>
+    </section>
   );
 }
 

@@ -3,17 +3,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from app.modules.credential.infrastructure import CredentialVerificationResult
 from app.modules.credential.models import ModelCredential
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm_protocol import normalize_api_dialect, normalize_custom_base_url
 
 from .credential_connection_support import (
-    copy_extra_headers,
     normalize_api_key_header_name_override,
     normalize_auth_strategy_override,
+    normalize_client_identity_settings,
     normalize_connection_settings,
     normalize_extra_headers,
+    normalize_user_agent_override,
 )
 from .credential_token_support import (
     normalize_context_window_tokens,
@@ -21,11 +21,7 @@ from .credential_token_support import (
     update_context_window_tokens,
     update_default_max_output_tokens,
 )
-from .dto import CredentialUpdateDTO, CredentialVerifyResultDTO, CredentialViewDTO
-
-MASKED_KEY_MIN_LENGTH = 7
-MASKED_VISIBLE_PREFIX = 3
-MASKED_VISIBLE_SUFFIX = 4
+from .dto import CredentialUpdateDTO
 
 
 @dataclass(frozen=True)
@@ -45,6 +41,8 @@ def apply_update_payload(
     update_auth_strategy(credential, payload, changes)
     update_api_key_header_name(credential, payload, changes)
     update_extra_headers(credential, payload, changes)
+    update_user_agent_override(credential, payload, changes)
+    update_client_identity(credential, payload, changes)
     update_display_name(credential, payload, changes)
     update_base_url(credential, payload, changes)
     update_default_model(credential, payload, changes)
@@ -70,6 +68,10 @@ def build_credential(
     auth_strategy: str | None,
     api_key_header_name: str | None,
     extra_headers: dict[str, str] | None,
+    user_agent_override: str | None,
+    client_name: str | None,
+    client_version: str | None,
+    runtime_kind: str | None,
 ) -> ModelCredential:
     credential = ModelCredential(
         owner_type=owner_type,
@@ -85,11 +87,14 @@ def build_credential(
         auth_strategy=auth_strategy,
         api_key_header_name=api_key_header_name,
         extra_headers=extra_headers,
+        user_agent_override=user_agent_override,
+        client_name=client_name,
+        client_version=client_version,
+        runtime_kind=runtime_kind,
         is_active=True,
     )
     normalize_connection_settings(credential)
     return credential
-
 
 def update_api_dialect(
     credential: ModelCredential,
@@ -162,6 +167,55 @@ def update_extra_headers(
     changes["extra_headers"] = "updated"
 
 
+def update_client_identity(
+    credential: ModelCredential,
+    payload: CredentialUpdateDTO,
+    changes: dict[str, str],
+) -> None:
+    if not any(
+        (
+            _field_was_provided(payload, "client_name"),
+            _field_was_provided(payload, "client_version"),
+            _field_was_provided(payload, "runtime_kind"),
+        )
+    ):
+        return
+    client_name, client_version, runtime_kind = normalize_client_identity_settings(
+        client_name=payload.client_name if _field_was_provided(payload, "client_name") else credential.client_name,
+        client_version=(
+            payload.client_version
+            if _field_was_provided(payload, "client_version")
+            else credential.client_version
+        ),
+        runtime_kind=payload.runtime_kind if _field_was_provided(payload, "runtime_kind") else credential.runtime_kind,
+    )
+    if (
+        client_name == credential.client_name
+        and client_version == credential.client_version
+        and runtime_kind == credential.runtime_kind
+    ):
+        return
+    credential.client_name = client_name
+    credential.client_version = client_version
+    credential.runtime_kind = runtime_kind
+    credential.last_verified_at = None
+    changes["client_identity"] = "updated"
+
+def update_user_agent_override(
+    credential: ModelCredential,
+    payload: CredentialUpdateDTO,
+    changes: dict[str, str],
+) -> None:
+    if not _field_was_provided(payload, "user_agent_override"):
+        return
+    user_agent_override = normalize_user_agent_override(payload.user_agent_override)
+    if user_agent_override == credential.user_agent_override:
+        return
+    credential.user_agent_override = user_agent_override
+    credential.last_verified_at = None
+    changes["user_agent_override"] = "updated"
+
+
 def update_display_name(
     credential: ModelCredential,
     payload: CredentialUpdateDTO,
@@ -225,42 +279,6 @@ def rotate_api_key(
     changes["api_key"] = "rotated"
 
 
-def to_view(
-    credential: ModelCredential,
-    *,
-    decrypt_api_key: Callable[[str], str],
-) -> CredentialViewDTO:
-    return CredentialViewDTO(
-        id=credential.id,
-        owner_type=credential.owner_type,
-        owner_id=credential.owner_id,
-        provider=credential.provider,
-        api_dialect=normalize_api_dialect(credential.api_dialect),
-        display_name=credential.display_name,
-        masked_key=mask_key(decrypt_api_key(credential.encrypted_key)),
-        base_url=credential.base_url,
-        default_model=credential.default_model,
-        context_window_tokens=credential.context_window_tokens,
-        default_max_output_tokens=credential.default_max_output_tokens,
-        auth_strategy=credential.auth_strategy,
-        api_key_header_name=credential.api_key_header_name,
-        extra_headers=copy_extra_headers(credential.extra_headers),
-        is_active=credential.is_active,
-        last_verified_at=credential.last_verified_at,
-    )
-
-
-def to_verify_result(
-    credential: ModelCredential,
-    result: CredentialVerificationResult,
-) -> CredentialVerifyResultDTO:
-    return CredentialVerifyResultDTO(
-        credential_id=credential.id,
-        last_verified_at=result.verified_at,
-        message=result.message,
-    )
-
-
 def normalize_provider(provider: str) -> str:
     return provider.strip().lower()
 
@@ -280,9 +298,3 @@ def normalize_base_url(base_url: str | None) -> str | None:
 
 def _field_was_provided(payload: CredentialUpdateDTO, field_name: str) -> bool:
     return field_name in payload.model_fields_set
-
-
-def mask_key(api_key: str) -> str:
-    if len(api_key) < MASKED_KEY_MIN_LENGTH:
-        return "***"
-    return f"{api_key[:MASKED_VISIBLE_PREFIX]}...{api_key[-MASKED_VISIBLE_SUFFIX:]}"

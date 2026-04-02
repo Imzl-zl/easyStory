@@ -56,14 +56,14 @@ agents (Agent，智能体)
 | template_id | UUID | 模板 ID |
 | owner_id | UUID | 所属用户 ID（FK → users.id） |
 | deleted_at | TIMESTAMP | 软删除时间（回收站） |
-| project_setting | JSONB | 项目设定（ProjectSetting，长期约束唯一真值源） |
+| project_setting | JSONB | 项目结构化摘要（快速浏览、机器投影和默认值） |
 | allow_system_credential_pool | BOOLEAN | 是否允许解析到系统级默认凭证池，默认 false |
 | created_at | TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | 更新时间 |
 
-> `project_setting` 在 MVP 中直接承载结构化 `ProjectSetting` 文档，不作为运行态杂项配置大杂烩。运行时快照、模板配置和节点临时参数应分别进入 `workflow_snapshot`、`Template.config`、`NodeExecution.input/output` 等边界明确的位置。
+> `project_setting` 在当前阶段承载结构化 `ProjectSetting` 摘要，不作为运行态杂项配置大杂烩。运行时快照、模板配置和节点临时参数应分别进入 `workflow_snapshot`、`Template.config`、`NodeExecution.input/output` 等边界明确的位置。
 >
-> 当前 `ProjectSetting` 采用固定 schema：`genre`、`sub_genre`、`target_readers`、`tone`、`core_conflict`、`plot_direction`、`protagonist`、`key_supporting_roles`、`world_setting`、`scale`、`special_requirements`。禁止继续写入 `worldview`、`target_length` 等模糊旧键。
+> 当前 `ProjectSetting` 采用固定 schema：`genre`、`sub_genre`、`target_readers`、`tone`、`core_conflict`、`plot_direction`、`protagonist`、`key_supporting_roles`、`world_setting`、`scale`、`special_requirements`。禁止继续写入 `worldview`、`target_length` 等模糊旧键；同时不要把这套固定 schema 误当成完整创作设定真值，它更适合做摘要展示和上下文投影。
 >
 > `allow_system_credential_pool` 是显式安全开关，默认关闭；仅当该值为 `true` 时，凭证解析才允许继续回退到系统级默认凭证池。
 
@@ -459,7 +459,7 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 
 **节点执行监控**：`NodeExecution` 表的 `retry_count`、`error_message`、`execution_time_ms` 字段支持节点执行的监控和调试。
 
-**文件系统存储**：导出文件存储在文件系统而非数据库 BLOB，提高性能和可维护性。
+**文件系统存储**：导出文件存储在文件系统而非数据库 BLOB，提高性能和可维护性。`Studio` 当前新增的项目文稿文件也走文件系统目录 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；它们只承载 `设定/*`、`附录/*`、`大纲/章节规划.md` 等工作文稿，不替代 `Content + content_versions` 的正式正文真值，正式 `大纲 / 开篇设计 / 正文章节` 继续使用数据库内容链。
 
 ---
 
@@ -509,7 +509,11 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 | default_max_output_tokens | INTEGER | 可选；连接级默认单次回复上限，运行时可作为默认输出预算 |
 | auth_strategy | VARCHAR(50) | 可选鉴权覆盖：`bearer / x_api_key / x_goog_api_key / custom_header`；未设置时跟随 `api_dialect` 默认值 |
 | api_key_header_name | VARCHAR(100) | 可选；仅在 `custom_header` 模式下指定 API Key Header 名称 |
-| extra_headers | JSONB | 可选；附加请求头对象，不允许覆盖运行时保留头 |
+| extra_headers | JSONB | 可选；附加请求头对象，不允许覆盖运行时保留头或手工写入 `User-Agent` |
+| user_agent_override | VARCHAR(300) | 可选；显式覆盖最终发送的 `User-Agent` |
+| client_name | VARCHAR(100) | 可选；客户端应用名，用于生成运行时 `User-Agent` |
+| client_version | VARCHAR(50) | 可选；客户端版本号，用于补到 `User-Agent` |
+| runtime_kind | VARCHAR(50) | 可选；运行环境：`server-python / server-node / browser` |
 | is_active | BOOLEAN | 是否启用，默认 true |
 | last_verified_at | TIMESTAMP | 最后连通性测试通过时间 |
 | created_at | TIMESTAMP | 创建时间 |
