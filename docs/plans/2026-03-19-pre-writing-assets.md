@@ -1,5 +1,9 @@
 # easyStory 前置创作资产实施计划
 
+> 文档状态：历史实施记录
+>
+> 当前正式边界请以 [前置创作资产](../design/19-pre-writing-assets.md)、[创作设定](../design/06-creative-setup.md)、[系统架构设计](../specs/architecture.md) 和当前代码为准。本计划保留为当时的实施拆解，不单独代表当前真值。
+
 **Goal:** 为 easyStory 增加“前置创作资产”能力，明确并落地 `ProjectSetting -> Outline -> OpeningPlan -> ChapterTask -> Chapter` 的标准创作链路，提升章节生成稳定性和前几章质量。
 
 **Source of Truth:** [前置创作资产](../design/19-pre-writing-assets.md)、[创作设定](../design/06-creative-setup.md)、[上下文注入](../design/02-context-injection.md)、[章节生成](../design/04-chapter-generation.md)。与本计划有冲突时，以设计文档为准。

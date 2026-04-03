@@ -1,0 +1,153 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - link "跳到主内容" [ref=e12] [cursor=pointer]:
+    - /url: "#workspace-main"
+  - generic [ref=e13]:
+    - banner [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - link "返回书架" [ref=e17] [cursor=pointer]:
+            - /url: /workspace/lobby
+            - generic [ref=e18]: ←
+            - text: 返回书架
+          - generic [ref=e19]:
+            - generic [ref=e20]: 当前项目
+            - generic [ref=e21]: 创作工作台
+        - navigation "工作台导航" [ref=e22]:
+          - link "创作" [ref=e23] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/studio
+          - link "推进" [ref=e24] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/engine
+          - link "洞察" [ref=e25] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/lab
+        - generic [ref=e26]:
+          - link "项目设置" [ref=e27] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/settings
+          - generic [ref=e28]:
+            - generic [ref=e30]: z
+            - generic [ref=e31]: zhanglu
+          - button "退出" [ref=e32] [cursor=pointer]
+    - main [ref=e33]:
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - heading "世界观.md" [level=1] [ref=e38]
+          - generic [ref=e39]:
+            - generic [ref=e40]: 设定
+            - paragraph [ref=e41]: 王云飞的警匪故事 · 设定/世界观.md
+          - generic [ref=e42]:
+            - button "文件已保存" [disabled] [ref=e43]
+            - button "收起助手" [ref=e44] [cursor=pointer]
+            - button "作品推进" [ref=e45] [cursor=pointer]
+        - complementary [ref=e46]:
+          - navigation "作品目录" [ref=e48]:
+            - generic [ref=e50]:
+              - heading "创作结构" [level=2] [ref=e51]
+              - paragraph [ref=e52]: 设定 · 大纲 · 正文
+            - list [ref=e53]:
+              - listitem [ref=e54]:
+                - button "设定" [expanded] [ref=e55] [cursor=pointer]:
+                  - img [ref=e57]
+                  - generic [ref=e59]: 设定
+                - list [ref=e60]:
+                  - listitem [ref=e61]:
+                    - button "世界观.md" [ref=e62] [cursor=pointer]:
+                      - img [ref=e64]
+                      - generic [ref=e67]: 世界观.md
+                  - listitem [ref=e68]:
+                    - button "人物设定.md" [ref=e69] [cursor=pointer]:
+                      - img [ref=e71]
+                      - generic [ref=e74]: 人物设定.md
+                  - listitem [ref=e75]:
+                    - button "势力关系.md" [ref=e76] [cursor=pointer]:
+                      - img [ref=e78]
+                      - generic [ref=e81]: 势力关系.md
+                  - listitem [ref=e82]:
+                    - button "伏笔与坑.md" [ref=e83] [cursor=pointer]:
+                      - img [ref=e85]
+                      - generic [ref=e88]: 伏笔与坑.md
+              - listitem [ref=e89]:
+                - button "大纲" [expanded] [ref=e90] [cursor=pointer]:
+                  - img [ref=e92]
+                  - generic [ref=e94]: 大纲
+                - list [ref=e95]:
+                  - listitem [ref=e96]:
+                    - button "总大纲.md" [ref=e97] [cursor=pointer]:
+                      - img [ref=e99]
+                      - generic [ref=e102]: 总大纲.md
+                  - listitem [ref=e103]:
+                    - button "开篇设计.md" [ref=e104] [cursor=pointer]:
+                      - img [ref=e106]
+                      - generic [ref=e109]: 开篇设计.md
+                  - listitem [ref=e110]:
+                    - button "章节规划.md" [ref=e111] [cursor=pointer]:
+                      - img [ref=e113]
+                      - generic [ref=e116]: 章节规划.md
+              - listitem [ref=e117]:
+                - button "正文" [expanded] [ref=e118] [cursor=pointer]:
+                  - img [ref=e120]
+                  - generic [ref=e122]: 正文
+              - listitem [ref=e123]:
+                - button "附录" [expanded] [ref=e124] [cursor=pointer]:
+                  - img [ref=e126]
+                  - generic [ref=e128]: 附录
+                - list [ref=e129]:
+                  - listitem [ref=e130]:
+                    - button "灵感碎片.md" [ref=e131] [cursor=pointer]:
+                      - img [ref=e133]
+                      - generic [ref=e136]: 灵感碎片.md
+        - main [ref=e137]:
+          - generic [ref=e138]:
+            - generic [ref=e139]:
+              - generic [ref=e141]:
+                - generic [ref=e142]:
+                  - heading "世界观.md" [level=2] [ref=e143]
+                  - generic [ref=e144]: 已同步
+                - paragraph [ref=e145]: 设定/世界观.md
+              - generic [ref=e146]:
+                - generic [ref=e147]:
+                  - button "编辑" [ref=e148] [cursor=pointer]
+                  - button "分栏" [ref=e149] [cursor=pointer]
+                  - button "预览" [ref=e150] [cursor=pointer]
+                - generic [ref=e151]: Ctrl/⌘+S
+            - textbox "开始整理你的设定、章节或正文…" [ref=e154]: "# 世界观设定 - 题材：警匪 - 时代基线：香港80，90年代 - 世界规则：80、90年代香港的社会背景、江湖规矩和警匪生态 - 力量体系：黑帮与警队 ## 关键地点 - 香港"
+            - generic [ref=e155]:
+              - generic [ref=e156]: 92 字符 · 14 词
+              - generic [ref=e157]: 文件已同步
+        - complementary [ref=e158]:
+          - complementary [ref=e160]:
+            - generic [ref=e163]:
+              - generic [ref=e164]:
+                - generic [ref=e165]:
+                  - heading "共创助手" [level=2] [ref=e166]
+                  - generic [ref=e167]: 读取中
+                - generic [ref=e169]:
+                  - button "+ 新对话" [ref=e170]:
+                    - generic [ref=e171]: +
+                    - generic [ref=e172]: 新对话
+                  - button "历史 这是一条刷新后应该保留下来的草稿。 2 条" [ref=e173]:
+                    - generic [ref=e174]: 历史
+                    - generic [ref=e175]: 这是一条刷新后应该保留下来的草稿。
+                    - generic [ref=e176]: 2 条
+                    - generic [ref=e177]: ▾
+              - paragraph [ref=e178]: 当前文稿 · 设定/世界观.md
+            - generic [ref=e180]:
+              - generic [ref=e181]: ✦
+              - paragraph [ref=e182]: 先接入一个可用模型，再开始共创。
+              - paragraph [ref=e183]: 上下文、模型、文件都收进底部工具条，主舞台只留给对话和正文。
+            - generic [ref=e185]:
+              - textbox "先启用可用模型后再开始提问" [ref=e186]: 这是一条刷新后应该保留下来的草稿。
+              - generic [ref=e187]:
+                - generic [ref=e188]:
+                  - button "上传文件" [ref=e189]:
+                    - img [ref=e190]
+                  - button "上下文 0 ⌄" [ref=e193]:
+                    - img [ref=e195]
+                    - generic [ref=e197]: 上下文 0
+                    - generic [ref=e198]: ⌄
+                  - button "gemini-2.5-flash ⌄" [ref=e200]:
+                    - img [ref=e202]
+                    - generic [ref=e204]: gemini-2.5-flash
+                    - generic [ref=e205]: ⌄
+                - button "发送" [disabled] [ref=e206]

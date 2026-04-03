@@ -37,7 +37,7 @@ export type AssistantHookResult = {
 
 export type AssistantTurnResult = {
   agent_id: string | null;
-  skill_id: string;
+  skill_id: string | null;
   provider: string;
   model_name: string;
   content: string;

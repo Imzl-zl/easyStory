@@ -33,6 +33,7 @@ from .assistant_hook_support import (
     serialize_hook_error,
 )
 from .assistant_execution_support import (
+    AssistantExecutionSpec,
     build_after_assistant_payload,
     build_before_assistant_payload,
     build_hook_agent_variables,
@@ -305,7 +306,7 @@ class AssistantService:
             owner_id=owner_id,
             project_id=prepared.project_id,
             agent_id=prepared.spec.agent_id,
-            skill_id=prepared.spec.skill.id,
+            skill_id=prepared.spec.skill_id,
             assistant_model=prepared.spec.model,
         )
 
@@ -335,7 +336,7 @@ class AssistantService:
             owner_id=owner_id,
             project_id=prepared.project_id,
             agent_id=prepared.spec.agent_id,
-            skill_id=prepared.spec.skill.id,
+            skill_id=prepared.spec.skill_id,
             assistant_model=prepared.spec.model,
         )
         return build_turn_response(
@@ -366,7 +367,7 @@ class AssistantService:
         owner_id: uuid.UUID,
         project_id: uuid.UUID | None,
         agent_id: str | None,
-        skill_id: str,
+        skill_id: str | None,
         assistant_model: ModelConfig,
     ) -> list[AssistantHookResultDTO]:
         context = AssistantHookExecutionContext(
@@ -426,7 +427,7 @@ class AssistantService:
         owner_id: uuid.UUID,
         project_id: uuid.UUID | None,
         agent_id: str | None,
-        skill_id: str,
+        skill_id: str | None,
         assistant_model: ModelConfig,
     ) -> None:
         error_payload = dict(payload)
@@ -455,7 +456,7 @@ class AssistantService:
         before_payload: dict[str, Any],
         owner_id: uuid.UUID,
         project_id: uuid.UUID | None,
-        spec,
+        spec: AssistantExecutionSpec,
         system_prompt: str | None,
     ) -> dict[str, Any]:
         try:
@@ -476,7 +477,7 @@ class AssistantService:
                 owner_id=owner_id,
                 project_id=project_id,
                 agent_id=spec.agent_id,
-                skill_id=spec.skill.id,
+                skill_id=spec.skill_id,
                 assistant_model=spec.model,
             )
             raise
@@ -490,7 +491,7 @@ class AssistantService:
         before_payload: dict[str, Any],
         owner_id: uuid.UUID,
         project_id: uuid.UUID | None,
-        spec,
+        spec: AssistantExecutionSpec,
         system_prompt: str | None,
         should_stop: Callable[[], Awaitable[bool]] | None = None,
     ) -> AsyncIterator[LLMStreamEvent]:
@@ -516,7 +517,7 @@ class AssistantService:
                 owner_id=owner_id,
                 project_id=project_id,
                 agent_id=spec.agent_id,
-                skill_id=spec.skill.id,
+                skill_id=spec.skill_id,
                 assistant_model=spec.model,
             )
             raise

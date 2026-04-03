@@ -34,8 +34,8 @@ class AssistantTurnRequestDTO(BaseModel):
 
     @model_validator(mode="after")
     def validate_target(self) -> "AssistantTurnRequestDTO":
-        if bool(self.agent_id) == bool(self.skill_id):
-            raise ValueError("Exactly one of agent_id or skill_id must be provided")
+        if self.agent_id and self.skill_id:
+            raise ValueError("agent_id and skill_id cannot both be provided")
         return self
 
 
@@ -48,7 +48,7 @@ class AssistantHookResultDTO(BaseModel):
 
 class AssistantTurnResponseDTO(BaseModel):
     agent_id: str | None
-    skill_id: str
+    skill_id: str | None
     provider: str
     model_name: str
     content: str

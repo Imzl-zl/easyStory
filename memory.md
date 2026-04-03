@@ -7,7 +7,7 @@
 
 - 后端测试：最近一次已知全量 `cd apps/api && ruff check app tests && pytest -q` 通过（记录日期：2026-03-23）
 - 前端检查：最近一次已知 `pnpm --dir apps/web exec tsc --noEmit` + `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-03-30）
-- 最后更新：2026-03-30
+- 最后更新：2026-04-03
 
 ## 已完成能力
 
@@ -23,8 +23,8 @@
 - assistant 规则层当前闭环：已支持用户规则 `/api/v1/assistant/rules/me` 与项目规则 `/api/v1/assistant/rules/projects/{project_id}`；运行时自动注入“用户长期规则 + 当前项目规则”，Web 全局设置与项目设置已补入口；规则真值文件分别落在 `apps/api/.runtime/assistant-config/users/<user_id>/AGENTS.md` 与 `apps/api/.runtime/assistant-config/projects/<project_id>/AGENTS.md`
 - 多用户 assistant 体验第二轮收口：全局设置已整理为“AI 助手 / 模型连接”双入口，AI 偏好正式露出并与个人长期规则形成同一用户心智；孵化聊天默认会优先使用个人 AI 偏好，退出登录时会清空工作台项目上下文，避免账号串用；AI 偏好真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/preferences.yaml`
 - assistant 项目层配置闭环：项目设置页现已支持“项目长期规则 / 项目 AI 偏好 / 项目 Skills / 项目 MCP”；真值文件写入 `projects/<project_id>/AGENTS.md`、`preferences.yaml`、`skills/<skill_id>/SKILL.md`、`mcp_servers/<server_id>/MCP.yaml`；运行时按 `项目 -> 用户 -> 系统` 解析，其中 AI 偏好做字段级覆盖，Skills / MCP 做同 ID 命中覆盖
-- assistant 配置方向已进一步收口：后续继续靠拢 Claude 的“文件放到约定位置即可生效”模式，但只保留适合小说创作场景的两层作用域（全局 / 项目）；普通用户主路径聚焦 `规则文件 / Skills / MCP`，`Agents / Hooks` 降到高级能力，不再作为一线配置心智
-- assistant 前端 Claude 化第二阶段收口：全局设置与聊天页现已统一主路径，默认先引导“个人长期规则 + Skills + 模型连接”，`Agents / Hooks / MCP` 收进更明确的次级区域；同时 `Skills / Agents / Hooks / MCP` 设置页已支持“可视化编辑 / 按文件编辑”双模式，AI 设置首页也已加入用户层 / 项目层 / 系统层文件层级说明；用户可直接按 `SKILL.md / AGENT.md / HOOK.yaml / MCP.yaml` 约定编辑，不改变底层配置真值与运行时装配协议
+- assistant 配置方向已进一步收口：后续继续靠拢 Claude 的“文件放到约定位置即可生效”模式，但只保留适合小说创作场景的两层作用域（全局 / 项目）；普通用户主路径改为 `规则文件 / 当前会话 / 文稿上下文 / 模型连接`，`Skill / Agent / MCP` 变成显式增强能力，`Agents / Hooks` 保留为高级能力
+- assistant 前端 Claude 化第二阶段收口：全局设置与聊天页现已统一主路径，默认先引导“个人长期规则 + 当前会话 + 模型连接”；`Skills / Agents / Hooks / MCP` 收进更明确的次级区域，并继续支持“可视化编辑 / 按文件编辑”双模式；用户仍可直接按 `SKILL.md / AGENT.md / HOOK.yaml / MCP.yaml` 约定编辑，但这些文件不再等同于普通聊天默认主链
 - 用户自定义 Skills 最小闭环：大厅设置现已新增独立 `Skills` 页签，用户可创建、编辑、启用/停用、删除自己的 Skill，并在聊天页“模型与连接”里直接切换；Skill 真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/skills/<skill_id>/SKILL.md`
 - 用户自定义 Agents 最小闭环：大厅设置现已新增独立 `Agents` 页签，用户可创建、编辑、启用/停用、删除自己的 Agent，并在聊天页“模型与连接”里直接切换；Agent 真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/agents/<agent_id>/AGENT.md`
 - 用户自定义 Hooks 最小闭环：大厅设置现已新增独立 `Hooks` 页签，用户可创建、编辑、启用/停用、删除自己的 Hook，并在聊天页“模型与连接”里按当前会话选择启用；Hook 真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/hooks/<hook_id>/HOOK.yaml`
@@ -65,7 +65,7 @@
 - endpoint 安全策略必须同时落在写入入口和运行时出口
 - 程序化 Alembic 优先复用现有 `connection` / `engine`，不要退回字符串化 URL
 - config_registry 对外暴露语义化 DTO，写回前必须 staged full-config 校验，未知字段直接失败
-- `assistant runtime` 当前采用显式 `agent_id/skill_id + hook_ids` 装配，不把配置自动全局注入任意对话；`mcp` 当前通过 hook/plugin 路径可执行，agent 通用 tool-calling 仍是下一阶段
+- `assistant runtime` 当前正式口径：默认可直接走“规则 + 当前会话消息历史”的纯聊天；`skill_id` / `agent_id` 现在是可选增强而非硬前提，且 Studio 聊天已移除默认内置 Skill 绑定；`mcp` 继续通过 hook/plugin 路径执行，agent 通用 tool-calling 仍是下一阶段
 - 用户 Hook 当前正式支持 `agent | mcp` 两类动作；MCP 会先解析用户自己的 `mcp_servers/<server_id>/MCP.yaml`，找不到再回退系统 MCP
 - 多用户 assistant 配置当前正式口径：平台可保留系统内置 `skill/agent/hook/mcp/workflow` 作为可选能力；普通用户当前正式拥有个人偏好、个人长期规则、个人 Skills、个人 Agents、个人 Hooks、个人 MCP、项目长期规则和项目 AI 偏好；这些能力当前均以文件为主真值；用户自定义 `Workflows` 仍待补齐
 - runtime hardening 当前已补齐：assistant hook-agent 会按 agent 类型传 `response_format`；MCP provider 会显式拒绝 disabled server / `is_error=true`；workflow staged config 会拒绝 assistant-only hook 事件和 before/after stage 错绑

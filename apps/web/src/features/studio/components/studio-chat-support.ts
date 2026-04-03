@@ -1,5 +1,4 @@
 import type { AssistantPreferences, AssistantTurnPayload } from "@/lib/api/types";
-import { ASSISTANT_DEFAULT_CHAT_SKILL_ID } from "@/features/shared/assistant/assistant-defaults";
 import {
   buildAssistantModelOverride,
   resolveFailedIncubatorReply,
@@ -20,13 +19,6 @@ import {
 
 const STUDIO_CONTEXT_PREVIEW_MAX_LENGTH = 6000;
 const STUDIO_CONTEXT_SELECTION_MAX_COUNT = 8;
-const STUDIO_SYSTEM_MESSAGE = [
-  "你是 easyStory 创作台里的小说协作助手。",
-  "围绕当前文稿直接给可继续落笔的内容，不要转成后台配置或流程说明。",
-  "优先帮用户补结构、顺段落、改措辞、续写场景、梳理冲突。",
-  "如果上下文不完整，先基于已给文稿做最稳妥的建议，不要假装看过未提供的正文。",
-  "回答保持中文，尽量贴近创作者工作流，少术语，少空话。",
-].join("\n");
 
 export const STUDIO_PENDING_REPLY_MESSAGE = "正在贴合当前文稿整理思路…";
 
@@ -115,13 +107,9 @@ export function buildStudioAssistantTurnPayload(options: {
   settings: StudioChatSettings;
 }): AssistantTurnPayload {
   return {
-    messages: [
-      { content: STUDIO_SYSTEM_MESSAGE, role: "system" as const },
-      ...buildStudioPayloadMessages(options.messages),
-    ],
+    messages: buildStudioPayloadMessages(options.messages),
     model: buildAssistantModelOverride(options.settings),
     project_id: options.projectId,
-    skill_id: ASSISTANT_DEFAULT_CHAT_SKILL_ID,
   };
 }
 

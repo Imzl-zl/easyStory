@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
   buildStudioPathWithParams,
+  getStudioPanelLabel,
   listStudioPanelOptions,
+  resolveDefaultDocumentPathFromPanel,
   resolveStudioChapterListState,
   resolveSelectedChapterNumber,
   resolveStudioPanel,
@@ -13,6 +15,13 @@ test("resolveStudioPanel falls back to setting for invalid values", () => {
   assert.equal(resolveStudioPanel("chapter"), "chapter");
   assert.equal(resolveStudioPanel("invalid"), "setting");
   assert.equal(resolveStudioPanel(null), "setting");
+});
+
+test("getStudioPanelLabel returns the visible label for each panel", () => {
+  assert.equal(getStudioPanelLabel("setting"), "设定");
+  assert.equal(getStudioPanelLabel("outline"), "大纲");
+  assert.equal(getStudioPanelLabel("opening-plan"), "开篇设计");
+  assert.equal(getStudioPanelLabel("chapter"), "章节");
 });
 
 test("buildStudioPathWithParams removes empty values without leaving trailing question mark", () => {
@@ -40,6 +49,31 @@ test("resolveSelectedChapterNumber prefers explicit chapter, then first stale, t
   assert.equal(resolveSelectedChapterNumber(chapters as never, "1"), 1);
   assert.equal(resolveSelectedChapterNumber(chapters as never, null), 2);
   assert.equal(resolveSelectedChapterNumber([{ chapter_number: 3, status: "draft" }] as never, null), 3);
+});
+
+test("resolveDefaultDocumentPathFromPanel maps explicit panel routes to canonical documents", () => {
+  const chapters = [
+    { chapter_number: 2, status: "approved" },
+    { chapter_number: 7, status: "stale" },
+  ] as const;
+
+  assert.equal(resolveDefaultDocumentPathFromPanel("setting", undefined, null), "设定/世界观.md");
+  assert.equal(resolveDefaultDocumentPathFromPanel("outline", undefined, null), "大纲/总大纲.md");
+  assert.equal(
+    resolveDefaultDocumentPathFromPanel("opening-plan", undefined, null),
+    "大纲/开篇设计.md",
+  );
+  assert.equal(
+    resolveDefaultDocumentPathFromPanel("chapter", chapters as never, null),
+    "正文/第007章.md",
+  );
+  assert.equal(
+    resolveDefaultDocumentPathFromPanel("chapter", chapters as never, "2"),
+    "正文/第002章.md",
+  );
+  assert.equal(resolveDefaultDocumentPathFromPanel("chapter", [] as never, null), null);
+  assert.equal(resolveDefaultDocumentPathFromPanel(null, chapters as never, null), null);
+  assert.equal(resolveDefaultDocumentPathFromPanel("invalid", chapters as never, null), null);
 });
 
 test("resolveStudioChapterListState distinguishes loading, error, empty and ready", () => {

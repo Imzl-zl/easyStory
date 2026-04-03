@@ -1,8 +1,12 @@
 # easyStory 前端 UI 重构计划
 
+> 文档状态：历史实施记录
+>
+> 当前 UI 真值请以 [docs/ui/README.md](../ui/README.md)、[前端页面 / 组件 / 样式对照](../ui/frontend-page-component-style-map.md)、相关页面级 UI 文档和当前前端代码为准。本计划保留为当时的重构路线，不再单独代表当前 UI 真值。
+
 **Goal:** 在不重写主路由和核心数据链的前提下，把 easyStory 现有前端逐步收口为 creator-first 的创作产品，让主路径页面统一符合“书架 -> 起稿 -> 创作 -> 推进 -> 洞察”的产品心智。
 
-**Source of Truth:** [UI 设计文档](../ui/ui-design.md)、[UI 实施指南](../ui/implementation-guide.md)、[UI 实施状态](../ui/IMPLEMENTATION-STATUS.md)。涉及业务语义时，以对应设计文档为准；涉及运行时样式时，以 `apps/web/src/app/globals.css` 与 `apps/web/tailwind.config.ts` 为准。
+**Source of Truth:** [UI 文档导航](../ui/README.md)、[前端页面 / 组件 / 样式对照](../ui/frontend-page-component-style-map.md)。涉及运行时样式时，以 `apps/web/src/app/globals.css` 与 `apps/web/tailwind.config.ts` 为准。
 
 ---
 
@@ -109,8 +113,8 @@ apps/web/src/lib/utils/cn.ts
 
 **文档挂钩：**
 
-- `docs/ui/ui-design.md` 中的 Workspace Shell 语义
-- `docs/ui/implementation-guide.md` 中的分层和样式约束
+- `docs/ui/README.md` 的 UI 主入口
+- `docs/ui/frontend-page-component-style-map.md` 的页面与样式定位
 
 **重构方向：**
 
@@ -131,7 +135,7 @@ apps/web/src/lib/utils/cn.ts
 
 **文档挂钩：**
 
-- `docs/ui/ui-design.md` 的 Lobby 语义
+- `docs/ui/README.md` 的 UI 主入口
 - `apps/web/UI-V2-README.md` 的 Lobby ASCII 草图
 
 **重构方向：**
@@ -158,7 +162,7 @@ apps/web/src/lib/utils/cn.ts
 
 **文档挂钩：**
 
-- `docs/ui/ui-design.md` 的 Incubator 语义
+- `docs/ui/README.md` 的 UI 主入口
 - `docs/design/06-creative-setup.md`
 - `docs/design/19-pre-writing-assets.md`
 - `apps/web/UI-V2-README.md` 的 Incubator ASCII 草图
@@ -188,7 +192,7 @@ apps/web/src/lib/utils/cn.ts
 
 **文档挂钩：**
 
-- `docs/ui/ui-design.md` 的 Studio 语义
+- `docs/ui/README.md` 的 UI 主入口
 - `docs/design/05-content-editor.md`
 - `docs/design/02-context-injection.md`
 - `docs/design/04-chapter-generation.md`
@@ -215,7 +219,7 @@ apps/web/src/lib/utils/cn.ts
 
 **文档挂钩：**
 
-- `docs/ui/ui-design.md` 的 Engine 语义
+- `docs/ui/README.md` 的 UI 主入口
 - `docs/design/01-core-workflow.md`
 - `docs/design/03-review-and-fix.md`
 - `docs/design/08-cost-and-safety.md`
@@ -242,7 +246,7 @@ apps/web/src/lib/utils/cn.ts
 
 **文档挂钩：**
 
-- `docs/ui/ui-design.md` 的 Lab 语义
+- `docs/ui/README.md` 的 UI 主入口
 - `docs/design/07-novel-analysis.md`
 - `docs/design/13-ai-preference-learning.md`
 - `docs/design/14-foreshadowing-tracking.md`
@@ -267,7 +271,7 @@ apps/web/src/lib/utils/cn.ts
 
 **文档挂钩：**
 
-- `docs/ui/ui-design.md` 中“高级配置不进入一级导航”的规则
+- `docs/ui/README.md` 中的当前 UI 文档入口与边界说明
 - `docs/plans/2026-03-28-multi-user-assistant-rules-phase1.md`
 - `docs/design/10-user-and-credentials.md`
 
@@ -292,7 +296,7 @@ apps/web/src/lib/utils/cn.ts
 
 **文档挂钩：**
 
-- `docs/ui/ui-design.md` 的 Lobby 语义与导航约束
+- `docs/ui/README.md` 的当前 UI 文档入口与导航边界
 - `docs/design/18-data-backup.md`
 - `docs/specs/config-format.md`
 
@@ -364,10 +368,8 @@ apps/web/src/lib/utils/cn.ts
 
 ### 6.1 UI 设计参考
 
-- `docs/ui/ui-design.md`
-- `docs/ui/implementation-guide.md`
-- `docs/ui/IMPLEMENTATION-STATUS.md`
-- `docs/ui/ui-design-v2.md`
+- `docs/ui/README.md`
+- `docs/ui/frontend-page-component-style-map.md`
 - `apps/web/UI-V2-README.md`
 
 ### 6.2 业务设计参考

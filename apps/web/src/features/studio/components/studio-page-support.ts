@@ -22,6 +22,15 @@ const STUDIO_PANEL_OPTIONS: Array<{
   { key: "chapter", label: "章节" },
 ];
 
+const PANEL_DEFAULT_DOCUMENT_PATHS: Record<
+  Exclude<StudioPanelKey, "chapter">,
+  string
+> = {
+  setting: "设定/世界观.md",
+  outline: "大纲/总大纲.md",
+  "opening-plan": "大纲/开篇设计.md",
+};
+
 export const DEFAULT_DOCUMENT_TREE: DocumentTreeNode[] = [
   {
     id: "folder-settings",
@@ -101,6 +110,10 @@ export function listStudioPanelOptions() {
   return STUDIO_PANEL_OPTIONS;
 }
 
+export function getStudioPanelLabel(panel: StudioPanelKey) {
+  return STUDIO_PANEL_OPTIONS.find((item) => item.key === panel)?.label ?? "设定";
+}
+
 export function resolveStudioChapterListState({
   chapters,
   errorMessage,
@@ -144,6 +157,24 @@ export function resolveStudioPanel(value: string | null): StudioPanelKey {
   return STUDIO_PANEL_OPTIONS.some((item) => item.key === value)
     ? (value as StudioPanelKey)
     : "setting";
+}
+
+export function resolveDefaultDocumentPathFromPanel(
+  panelValue: string | null,
+  chapters: ChapterSummary[] | undefined,
+  rawChapter: string | null,
+) {
+  const panel = STUDIO_PANEL_OPTIONS.find((item) => item.key === panelValue)?.key;
+  if (!panel) {
+    return null;
+  }
+  if (panel === "chapter") {
+    const chapterNumber = resolveSelectedChapterNumber(chapters, rawChapter);
+    return chapterNumber === null
+      ? null
+      : `正文/第${String(chapterNumber).padStart(3, "0")}章.md`;
+  }
+  return PANEL_DEFAULT_DOCUMENT_PATHS[panel];
 }
 
 export function resolveDocumentPathFromNode(node: DocumentTreeNode): string {

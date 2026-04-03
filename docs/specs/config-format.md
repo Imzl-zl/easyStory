@@ -115,7 +115,7 @@ apps/api/.runtime/assistant-config/
 
 > `/config` 负责系统内置能力；`apps/api/.runtime/assistant-config/` 负责用户和项目自己的 assistant 配置。后端运行时环境变量仍通过 `apps/api/.env` 注入，详见 [8.1 后端运行时 Settings](#81-后端运行时-settings)。
 >
-> 当前普通用户主路径正式聚焦 `AGENTS.md / SKILL.md / MCP.yaml`。运行时统一按 `项目层 -> 用户层 -> 系统层` 解析；其中 `preferences.yaml` 只覆盖显式填写的字段，`Skills / MCP` 则在同 ID 命中后整份项目文件覆盖用户或系统定义。
+> 当前普通用户主路径正式聚焦“规则文件 + 当前会话 + 文稿上下文 + 模型连接”。`SKILL.md / AGENT.md / MCP.yaml` 是显式增强能力，不是普通聊天的硬前提。运行时统一按 `项目层 -> 用户层 -> 系统层` 解析配置；其中 `preferences.yaml` 只覆盖显式填写的字段，`Skills / MCP` 只在被显式引用时才参与运行时装配。
 
 ---
 

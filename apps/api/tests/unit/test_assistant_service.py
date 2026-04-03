@@ -758,6 +758,71 @@ async def test_assistant_service_injects_user_and_project_rules(tmp_path) -> Non
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
+async def test_assistant_service_runs_without_skill_using_rules_and_current_conversation(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    service.plugin_registry = build_assistant_plugin_registry(service, config_loader=loader)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-no-skill")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+        async with async_session_factory() as session:
+            await service.assistant_rule_service.update_user_rules(
+                session,
+                payload=AssistantRuleProfileUpdateDTO(enabled=True, content="回答时先给一句方向判断。"),
+                owner_id=owner.id,
+            )
+            await service.assistant_rule_service.update_project_rules(
+                session,
+                project.id,
+                payload=AssistantRuleProfileUpdateDTO(
+                    enabled=True,
+                    content="这个项目统一保持冷峻克制的语气。",
+                ),
+                owner_id=owner.id,
+            )
+            payload = AssistantTurnRequestDTO(
+                project_id=project.id,
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+                messages=[
+                    AssistantMessageDTO(role="user", content="先帮我看一下上一个版本的问题。"),
+                    AssistantMessageDTO(role="assistant", content="上一版的问题是冲突落得太快。"),
+                    AssistantMessageDTO(role="user", content="那这一版开头怎么改更稳？"),
+                ],
+            )
+            response = await service.turn(session, payload, owner_id=owner.id)
+
+        assert response.skill_id is None
+        assert response.content.startswith("主回复：")
+        prompt = tool_provider.requests[0]["prompt"]
+        system_prompt = tool_provider.requests[0]["system_prompt"] or ""
+        assert "【当前会话历史】" in prompt
+        assert "用户：先帮我看一下上一个版本的问题。" in prompt
+        assert "助手：上一版的问题是冲突落得太快。" in prompt
+        assert "【用户当前消息】" in prompt
+        assert "那这一版开头怎么改更稳？" in prompt
+        assert "【用户长期规则】" in system_prompt
+        assert "回答时先给一句方向判断。" in system_prompt
+        assert "【当前项目规则】" in system_prompt
+        assert "这个项目统一保持冷峻克制的语气。" in system_prompt
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
 async def test_assistant_service_applies_user_model_preferences(tmp_path) -> None:
     config_root = _build_config_root(tmp_path)
     loader = ConfigLoader(config_root)

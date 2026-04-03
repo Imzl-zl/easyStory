@@ -23,13 +23,13 @@ export function DocumentTree({
   onDeleteNode,
 }: Readonly<DocumentTreeProps>) {
   return (
-    <nav aria-label="作品目录" className="relative flex flex-col h-full overflow-hidden bg-gradient-to-b from-[#fefdfb] to-[#f9f7f3]">
+    <nav aria-label="作品目录" className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#fefdfb] to-[#f9f7f3]">
       <div className="absolute inset-0 opacity-[0.02] pointer-events-none [background-image:url('data:image/svg+xml,%3Csvg_viewBox%3D%220%200%20400%20400%22_xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cfilter_id%3D%22n%22%3E%3CfeTurbulence_type%3D%22fractalNoise%22_baseFrequency%3D%221.2%22_numOctaves%3D%223%22_stitchTiles%3D%22stitch%22%2F%3E%3C%2Ffilter%3E%3Crect_width%3D%22100%25%22_height%3D%22100%25%22_filter%3D%22url(%23n)%22%2F%3E%3C%2Fsvg%3E')]" />
       <div className="absolute top-0 left-0 right-0 h-[150px] bg-gradient-to-b from-white/50 to-transparent pointer-events-none" />
       
-      <div className="relative z-10 px-5 pt-7 pb-5">
+      <div className="relative z-10 px-4 pt-6 pb-4">
         <div className="flex flex-col gap-1.5">
-          <h2 className="m-0 font-serif text-xl font-bold tracking-tight text-[var(--text-primary)]">创作结构</h2>
+          <h2 className="m-0 font-serif text-[1.45rem] font-bold tracking-tight text-[var(--text-primary)]">创作结构</h2>
           <p className="m-0 text-xs text-[var(--text-muted)] leading-relaxed">设定 · 大纲 · 正文</p>
         </div>
         {onAddNode ? (
@@ -47,7 +47,7 @@ export function DocumentTree({
         ) : null}
       </div>
       
-      <ul className="relative z-10 flex-1 min-h-0 overflow-y-auto px-3 pb-5 scrollbar-thin [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-[2px] [&::-webkit-scrollbar-thumb]:bg-[rgba(44,36,22,0.12)]">
+      <ul className="relative z-10 flex-1 min-h-0 overflow-y-auto px-2.5 pb-4 scrollbar-thin [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-[2px] [&::-webkit-scrollbar-thumb]:bg-[rgba(44,36,22,0.12)]">
         {tree.map((node) => (
           <DocumentTreeNodeItem
             key={node.id}

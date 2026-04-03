@@ -98,7 +98,7 @@
 - `workflow hooks` 现已真实接入 runtime：通过 `PluginRegistry.execute` 分发 `script/webhook/agent/mcp`，默认事件覆盖 `before_node_start / before_generate / after_generate / before_review / after_review / on_review_fail / before_fix / after_fix / after_node_end / on_error`；新增 provider 继续沿这条 registry 抽象扩展，不要把类型判断塞回 runtime 主链。
 - `workflow` 节点级 `hooks.before/after` 现在有 staged 校验：assistant-only 事件（如 `before_assistant_response`）不能挂到 workflow node，且 hook event 必须落在匹配的 stage（如 `after_generate -> after`）。
 - `McpPluginProvider` 当前最佳实践语义：`server.enabled=false` 直接视为配置错误；上游返回 `is_error=true` 直接抛显式异常，不做“成功返回但结果里带错误”的静默降级。
-- `assistant runtime` 当前已落地：`/api/v1/assistant/turn` 支持非 workflow 对话，skill 负责 prompt、hook 负责生命周期、`mcp` 通过 PluginRegistry 执行；agent 通用 tool-calling 仍未实现。
+- `assistant runtime` 当前已落地：`/api/v1/assistant/turn` 支持非 workflow 对话，默认可直接走“规则 + 当前会话消息历史”的纯聊天；显式传 `skill_id` 时再用 Skill 负责 prompt，传 `agent_id` 时由 Agent 绑定 Skill；`hook` 负责生命周期，`mcp` 通过 PluginRegistry 执行；agent 通用 tool-calling 仍未实现。
 - assistant 规则层当前正式口径：`/api/v1/assistant/rules/me` 管理用户长期规则，`/api/v1/assistant/rules/projects/{project_id}` 管理项目规则；运行时按 `系统提示 -> 用户规则 -> 项目规则` 顺序叠加；规则真值文件分别写入 `apps/api/.runtime/assistant-config/users/<user_id>/AGENTS.md` 与 `apps/api/.runtime/assistant-config/projects/<project_id>/AGENTS.md`
 - assistant AI 偏好当前正式口径：`/api/v1/assistant/preferences` 管理个人默认连接/模型，`/api/v1/assistant/preferences/projects/{project_id}` 管理项目级覆盖；真值文件分别写入 `apps/api/.runtime/assistant-config/users/<user_id>/preferences.yaml` 与 `apps/api/.runtime/assistant-config/projects/<project_id>/preferences.yaml`
 - assistant Skills 当前正式口径：`/api/v1/assistant/skills` 管理用户 Skill，`/api/v1/assistant/skills/projects/{project_id}` 管理项目 Skill；真值文件分别写入 `users/<user_id>/skills/<skill_id>/SKILL.md` 与 `projects/<project_id>/skills/<skill_id>/SKILL.md`，运行时按 `项目 -> 用户 -> 系统` 解析同 ID Skill
@@ -107,8 +107,8 @@
 - assistant MCP 当前正式口径：`/api/v1/assistant/mcp-servers` 管理用户 MCP，`/api/v1/assistant/mcp-servers/projects/{project_id}` 管理项目 MCP；真值文件分别写入 `users/<user_id>/mcp_servers/<server_id>/MCP.yaml` 与 `projects/<project_id>/mcp_servers/<server_id>/MCP.yaml`，运行时按 `项目 -> 用户 -> 系统` 解析同 ID MCP
 - assistant hook agent 当前也会继承用户偏好与项目规则；不要再假设只有主回复会吃到 `preferences/rules`，否则前后两次 `llm.generate` 会出现口径漂移。
 - assistant 用户 Hook 的最小正式能力当前只支持两类事件：`before_assistant_response` / `after_assistant_response`；动作类型支持 `agent | mcp`。其中 agent 动作在未单独配模型时，运行时直接继承当前聊天已解析好的模型；mcp 动作通过 `server_id + tool_name + arguments + input_mapping` 调用用户或系统 MCP。
-- assistant 前端 Claude 化当前口径：第一阶段先把主路径统一收口为“长期规则 + Skills + 模型连接”，`Agents / Hooks / MCP` 放入更明确的次级区域；第二阶段已把 `Skills / Agents / Hooks / MCP` 设置页补成“可视化编辑 / 按文件编辑”双模式，AI 设置首页也明确展示“用户层 / 项目层 / 系统层”文件层级；当前项目设置页已补齐项目 Skills / MCP，普通用户主路径统一按 `规则文件 + Skills + MCP` 理解即可，`Agents / Hooks` 保持高级能力。
-- assistant 配置产品方向当前正式口径：面向小说创作用户时，主路径应优先收口为 `规则文件 + Skills + MCP`，参考 Claude Code 的“约定目录 + 文件即配置 + 自动发现”方式，而不是继续扩张后台资源心智；作用域默认只保留 `全局(用户)` 与 `项目` 两层，项目层覆盖全局层；`Agents / Hooks` 保留为高级能力或内部能力，不作为主心智。
+- assistant 前端 Claude 化当前口径：主路径已继续收口为“长期规则 + 当前会话 + 文稿上下文 + 模型连接”；`Skills / Agents / Hooks / MCP` 进入更明确的次级区域，并保留“可视化编辑 / 按文件编辑”双模式。当前项目设置页已补齐项目 Skills / MCP，但这些能力不再代表普通聊天的默认主链。
+- assistant 配置产品方向当前正式口径：面向小说创作用户时，主路径应优先收口为 `规则文件 + 当前会话 + 文稿上下文 + 模型连接`；`Skill / Agent / MCP` 属于显式增强层，不是普通聊天硬前提。作用域默认只保留 `全局(用户)` 与 `项目` 两层，项目层覆盖全局层；`Agents / Hooks` 保留为高级能力或内部能力，不作为主心智。
 - 前端多用户切换账号时，退出登录必须同步清空 `workspace` 持久化里的 `lastProjectId / lastWorkflowByProject`；`sidebarPreference` 仍保留为设备级偏好。
 - 读取 `request.app.state`、容器字段或内存注入对象的 accessor，如果不做 I/O 就保持同步 `def`；不为"全 async"把纯 accessor 改成 coroutine。
 - async 语义审查时，不要误把基础设施事实命名当成待清理对象；`AsyncSessionFactory`、`create_async_session_factory`、`get_async_db_session`、`AsyncCredentialVerifier` 是真实底层边界，应保留。

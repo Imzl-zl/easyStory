@@ -16,12 +16,14 @@
 
 真值边界如下：
 
-- 产品语义与一级页面原则：`docs/ui/ui-design.md`
-- 全局 design token、`SectionCard`、`.ink-*`、`.label-text`：`apps/web/src/app/globals.css`
+- UI 文档入口：`docs/ui/README.md`
+- 页面/样式定位：`docs/ui/frontend-page-component-style-map.md`
+- 全局 design token、`.ink-*`、`.label-text`：`apps/web/src/app/globals.css`
 - 路由入口：`apps/web/src/app/workspace/project/[projectId]/settings/page.tsx`
 - 页面骨架与 query 规则：`apps/web/src/features/project-settings/components/project-settings-page.tsx`
-- 页面壳层样式：`apps/web/src/features/project-settings/components/project-settings-page.module.css`
-- 项目设定编辑器：`apps/web/src/features/studio/components/project-setting-editor.tsx`
+- 页面内容装配：`apps/web/src/features/project-settings/components/project-settings-content.tsx`
+- 项目摘要面板：`apps/web/src/features/project-settings/components/project-setting-summary-panel.tsx`
+- 项目摘要编辑器：`apps/web/src/features/project-settings/components/project-setting-summary-editor.tsx`
 - 项目规则 / AI 偏好 / Skills / MCP：`apps/web/src/features/settings/components/*`
 - 项目审计：`apps/web/src/features/project-settings/components/project-audit-panel.tsx`
 
@@ -41,13 +43,14 @@
 
 ### 2.2 页面骨架
 
-- 桌面端采用 `280px + 1fr` 双列布局，页面最大宽度 `1600px`
+- 桌面端采用 `280px + 1fr` 双列布局，外层页面最大宽度 `1600px`
 - 左侧为 sticky 侧栏，负责：
   - 项目标题与状态
   - 标签页导航
   - 跳转到 Studio / Engine / 项目凭证
   - `PreparationStatusPanel`
-- 右侧为内容区，每个 tab 外层统一包一层 `contentCard`
+- 右侧为内容区，当前在桌面端进一步收口为 `max-w-3xl`
+- 每个 tab 外层统一包一层轻量内容卡
 - 页面只在壳层层面控制布局；tab 内部结构由各自面板决定
 
 ### 2.3 交互保护

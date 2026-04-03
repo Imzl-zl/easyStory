@@ -1,5 +1,9 @@
 # 多用户 Assistant 配置优化（Phase 1）
 
+> 文档状态：历史实施记录
+>
+> 当前 assistant / Studio 聊天主路径请以 [Assistant 运行时与聊天主路径](../design/20-assistant-runtime-chat-mode.md)、[系统架构设计](../specs/architecture.md) 和当前代码为准。本计划保留为当时的阶段性实施背景，不再单独代表当前运行时真值。
+
 ## 问题
 
 当前 easyStory 的业务资源已经是多用户模型，但 AI 配置层仍偏单租户：

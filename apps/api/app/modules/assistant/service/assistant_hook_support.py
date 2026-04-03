@@ -22,7 +22,7 @@ class AssistantHookExecutionContext:
     owner_id: uuid.UUID
     payload: dict[str, Any]
     assistant_agent_id: str | None
-    assistant_skill_id: str
+    assistant_skill_id: str | None
     assistant_model: ModelConfig
     project_id: uuid.UUID | None
 
@@ -37,7 +37,7 @@ def build_assistant_hook_payload(
     *,
     event: str,
     agent_id: str | None,
-    skill_id: str,
+    skill_id: str | None,
     project_id: uuid.UUID | None,
     messages: list[dict[str, str]],
     input_data: dict[str, Any],

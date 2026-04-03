@@ -1,5 +1,9 @@
 # easyStory UI 说明
 
+> 文档状态：历史草图参考
+>
+> 当前 UI 真值请以 `docs/ui/README.md`、`docs/ui/frontend-page-component-style-map.md` 和前端实际代码为准。本文保留 ASCII 草图与概念表达，不再单独代表当前实现。
+
 这个文件说明 `apps/web` 当前的创作者产品 UI 基线。下面的 ASCII 图保留用于表达页面语义和布局草图，但它们不是独立 demo 路由，也不是另一套 `v2` 文件结构。
 
 ---
@@ -135,6 +139,6 @@ Studio 是写作主舞台，不是三块后台面板并排。
 
 ## 5. 相关文档
 
-- `docs/ui/ui-design.md`
-- `docs/ui/implementation-guide.md`
-- `docs/ui/ui-design-v2.md`
+- `docs/ui/README.md`
+- `docs/ui/frontend-page-component-style-map.md`
+- `docs/ui/project-settings-ui-redesign.md`

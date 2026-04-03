@@ -206,9 +206,9 @@ export function StudioChatComposer({
 
   return (
     <div className="relative z-20 shrink-0 border-t border-[rgba(44,36,22,0.08)] bg-gradient-to-b from-[var(--bg-surface)] to-[rgba(248,243,235,0.92)]" ref={composerRef}>
-      <div className="relative z-20 p-3">
+      <div className="relative z-20 px-3 py-2.5">
         {credentialNotice ? (
-          <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-[rgba(178,65,46,0.08)] text-sm text-[var(--accent-danger)]">
+          <div className="mb-2 flex items-center gap-2 rounded-lg bg-[rgba(178,65,46,0.08)] px-3 py-2 text-sm text-[var(--accent-danger)]">
             <p className="flex-1">{credentialNotice}</p>
             <Link className="font-medium underline underline-offset-2 hover:no-underline" href={credentialSettingsHref}>
               模型连接
@@ -217,7 +217,7 @@ export function StudioChatComposer({
         ) : null}
 
         {attachments.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5 mb-2">
+          <div className="mb-1.5 flex flex-wrap gap-1.5">
             {attachments.map((attachment) => (
               <button
                 className="inline-flex items-center gap-1.5 h-6 px-2 rounded-md bg-[rgba(107,143,113,0.12)] text-xs text-[var(--text-primary)] hover:bg-[rgba(107,143,113,0.2)] transition-colors"
@@ -233,7 +233,7 @@ export function StudioChatComposer({
         ) : null}
 
         <Input.TextArea
-          autoSize={{ maxRows: 6, minRows: 2 }}
+          autoSize={{ maxRows: 5, minRows: 2 }}
           className="w-full text-sm leading-relaxed resize-none border border-[rgba(44,36,22,0.1)] rounded-lg bg-white/80 focus:border-[var(--accent-primary)] focus:shadow-[0_0_0_3px_rgba(107,143,113,0.12)] transition-all placeholder:text-[var(--text-muted)]"
           placeholder={canChat ? "写你的要求，或直接带文件进来一起改。" : "先启用可用模型后再开始提问"}
           value={composerText}
@@ -241,7 +241,7 @@ export function StudioChatComposer({
           onKeyDown={handleComposerKeyDown}
         />
 
-        <div className="flex items-center justify-between gap-2 mt-2">
+        <div className="mt-1.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1">
             <ToolbarIconButton label="上传文件" onClick={() => fileInputRef.current?.click()}>
               <PaperclipIcon />
@@ -446,7 +446,7 @@ function ToolbarIconButton({
   onClick: () => void;
 }) {
   return (
-    <button aria-label={label} className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.1)] hover:text-[var(--text-primary)] transition-colors" type="button" onClick={onClick}>
+    <button aria-label={label} className="flex h-[30px] w-[30px] items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-[rgba(107,143,113,0.1)] hover:text-[var(--text-primary)]" type="button" onClick={onClick}>
       {children}
     </button>
   );
@@ -468,7 +468,7 @@ function ToolbarChipButton({
   return (
     <button
       ref={buttonRef}
-      className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-medium transition-colors ${active ? "bg-[rgba(107,143,113,0.15)] text-[var(--accent-primary)]" : "bg-[rgba(44,36,22,0.05)] text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.1)]"}`}
+      className={`inline-flex h-[26px] items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium transition-colors ${active ? "bg-[rgba(107,143,113,0.15)] text-[var(--accent-primary)]" : "bg-[rgba(44,36,22,0.05)] text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.1)]"}`}
       type="button"
       onClick={onClick}
     >

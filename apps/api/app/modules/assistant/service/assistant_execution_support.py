@@ -13,7 +13,13 @@ from app.shared.runtime import SkillTemplateRenderer
 from app.shared.runtime.errors import ConfigurationError
 
 from .assistant_hook_support import AssistantHookExecutionContext, build_assistant_hook_payload
-from .assistant_prompt_support import build_skill_variables, resolve_model, validate_skill_input
+from .assistant_prompt_support import (
+    build_skill_variables,
+    format_conversation_history,
+    require_latest_user_message,
+    resolve_model,
+    validate_skill_input,
+)
 from .dto import AssistantHookResultDTO, AssistantTurnRequestDTO, AssistantTurnResponseDTO
 from .preferences_dto import AssistantPreferencesDTO
 from .preferences_support import apply_preferred_model
@@ -22,7 +28,8 @@ from .preferences_support import apply_preferred_model
 @dataclass(frozen=True)
 class AssistantExecutionSpec:
     agent_id: str | None
-    skill: SkillConfig
+    skill_id: str | None
+    skill: SkillConfig | None
     system_prompt: str | None
     model: ModelConfig
     mcp_servers: list[str]
@@ -56,17 +63,30 @@ def resolve_execution_spec(
         model = resolve_model(preferred_model, payload.model, context_label=agent.id)
         return AssistantExecutionSpec(
             agent_id=agent.id,
+            skill_id=skill.id,
             skill=skill,
             system_prompt=agent.system_prompt,
             model=model,
             mcp_servers=list(agent.mcp_servers),
         )
+    if payload.skill_id is None:
+        preferred_model = apply_preferred_model(None, preferences)
+        model = resolve_model(preferred_model, payload.model, context_label="assistant turn")
+        return AssistantExecutionSpec(
+            agent_id=None,
+            skill_id=None,
+            skill=None,
+            system_prompt=None,
+            model=model,
+            mcp_servers=[],
+        )
     skill_loader = load_skill or config_loader.load_skill
-    skill = skill_loader(payload.skill_id or "")
+    skill = skill_loader(payload.skill_id)
     preferred_model = apply_preferred_model(skill.model, preferences)
     model = resolve_model(preferred_model, payload.model, context_label=skill.id)
     return AssistantExecutionSpec(
         agent_id=None,
+        skill_id=skill.id,
         skill=skill,
         system_prompt=None,
         model=model,
@@ -77,15 +97,26 @@ def resolve_execution_spec(
 def render_prompt(
     *,
     template_renderer: SkillTemplateRenderer,
-    skill: SkillConfig,
+    skill: SkillConfig | None,
     payload: AssistantTurnRequestDTO,
 ) -> str:
+    if skill is None:
+        return render_message_only_prompt(payload.messages)
     variables = build_skill_variables(skill, payload.messages, payload.input_data)
     validate_skill_input(skill, variables)
     try:
         return template_renderer.render(skill.prompt, variables)
     except (SecurityError, UndefinedError) as exc:
         raise ConfigurationError(f"Assistant prompt render failed: {exc}") from exc
+
+
+def render_message_only_prompt(messages: list[Any]) -> str:
+    latest_user_message = require_latest_user_message(messages)
+    sections = [f"【用户当前消息】\n{latest_user_message}"]
+    history = format_conversation_history(messages[:-1])
+    if history:
+        sections.insert(0, f"【当前会话历史】\n{history}")
+    return "\n\n".join(sections)
 
 
 def require_agent_skill(skill_loader: Callable[[str], SkillConfig], agent: AgentConfig) -> SkillConfig:
@@ -140,7 +171,7 @@ def build_before_assistant_payload(
     return build_assistant_hook_payload(
         event="before_assistant_response",
         agent_id=spec.agent_id,
-        skill_id=spec.skill.id,
+        skill_id=spec.skill_id,
         project_id=project_id,
         messages=messages,
         input_data=payload.input_data,
@@ -158,7 +189,7 @@ def build_after_assistant_payload(
     return build_assistant_hook_payload(
         event="after_assistant_response",
         agent_id=spec.agent_id,
-        skill_id=spec.skill.id,
+        skill_id=spec.skill_id,
         project_id=project_id,
         messages=messages,
         input_data=payload.input_data,
@@ -175,7 +206,7 @@ def build_turn_response(
 ) -> AssistantTurnResponseDTO:
     return AssistantTurnResponseDTO(
         agent_id=spec.agent_id,
-        skill_id=spec.skill.id,
+        skill_id=spec.skill_id,
         provider=spec.model.provider or "",
         model_name=raw_output.get("model_name") or spec.model.name or "",
         content=content,

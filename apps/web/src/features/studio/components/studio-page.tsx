@@ -15,7 +15,10 @@ import {
   buildDocumentTreeFromChapters,
   buildStudioPathWithParams,
   findNodeByPath,
+  getStudioPanelLabel,
   listStaleChapters,
+  resolveDefaultDocumentPathFromPanel,
+  resolveStudioPanel,
 } from "@/features/studio/components/studio-page-support";
 import { listChapters } from "@/lib/api/content";
 import { getProject } from "@/lib/api/projects";
@@ -33,6 +36,10 @@ const STUDIO_STALE_BADGE_CLASS =
   "inline-flex items-center gap-2 h-8 px-3.5 rounded-full border border-[rgba(90,122,107,0.16)] bg-[rgba(90,122,107,0.08)] text-[0.72rem] font-semibold tracking-[0.16em] uppercase text-[var(--accent-primary)]";
 const STUDIO_STALE_BADGE_DOT_CLASS =
   "inline-flex h-1.5 w-1.5 rounded-full bg-[var(--accent-tertiary)] shadow-[0_0_0_4px_rgba(196,167,125,0.12)]";
+const STUDIO_GRID_WITH_CHAT_CLASS =
+  "grid [grid-template-columns:1fr] lg:[grid-template-columns:236px_minmax(0,1fr)_minmax(392px,0.72fr)] xl:[grid-template-columns:244px_minmax(0,1fr)_minmax(408px,0.76fr)] [grid-template-rows:auto_minmax(0,1fr)] h-full min-h-0 bg-[#fefdfb] relative overflow-hidden";
+const STUDIO_GRID_WITHOUT_CHAT_CLASS =
+  "grid [grid-template-columns:1fr] lg:[grid-template-columns:236px_minmax(0,1fr)] [grid-template-rows:auto_minmax(0,1fr)] h-full min-h-0 bg-[#fefdfb] relative overflow-hidden";
 
 export function StudioPage({ projectId }: StudioPageProps) {
   const router = useRouter();
@@ -42,7 +49,9 @@ export function StudioPage({ projectId }: StudioPageProps) {
   const currentSearch = searchParams.toString();
   const currentUrl = currentSearch ? `${pathname}?${currentSearch}` : pathname;
 
-  const documentPath = searchParams.get("doc");
+  const rawDocumentPath = searchParams.get("doc");
+  const rawPanel = searchParams.get("panel");
+  const rawChapter = searchParams.get("chapter");
   const chatOpen = searchParams.get("chat") !== "0";
 
   const projectQuery = useQuery({
@@ -59,6 +68,12 @@ export function StudioPage({ projectId }: StudioPageProps) {
     return buildDocumentTreeFromChapters(chaptersQuery.data ?? []);
   }, [chaptersQuery.data]);
 
+  const fallbackDocumentPath = useMemo(() => {
+    return resolveDefaultDocumentPathFromPanel(rawPanel, chaptersQuery.data, rawChapter);
+  }, [chaptersQuery.data, rawChapter, rawPanel]);
+
+  const documentPath = rawDocumentPath ?? fallbackDocumentPath;
+
   const selectedNode = useMemo(() => {
     if (!documentPath) {
       return null;
@@ -68,7 +83,16 @@ export function StudioPage({ projectId }: StudioPageProps) {
 
   const staleChapters = useMemo(() => listStaleChapters(chaptersQuery.data), [chaptersQuery.data]);
   const projectName = projectQuery.data?.name ?? "正在加载项目…";
-  const headerTitle = selectedNode?.label ?? "选择一份文稿开始写作";
+  const activePanel = resolveStudioPanel(rawPanel);
+  const activePanelLabel = getStudioPanelLabel(activePanel);
+  const headerSectionLabel = documentPath?.split("/")[0] ?? (rawPanel ? activePanelLabel : "创作台");
+  const headerMeta = selectedNode
+    ? `${projectName} · ${documentPath}`
+    : rawPanel === "chapter"
+      ? `${projectName} · 当前还没有可直接打开的章节文稿`
+      : fallbackDocumentPath
+        ? `${projectName} · 已切到 ${activePanelLabel} 默认文稿`
+        : `${projectName} · 从左侧目录选择文稿开始编辑`;
   const documentModel = useStudioDocumentModel({
     projectId,
     documentPath,
@@ -123,19 +147,23 @@ export function StudioPage({ projectId }: StudioPageProps) {
   const saveButtonClass = documentModel.hasUnsavedChanges
     ? STUDIO_SAVE_BUTTON_CLASS
     : `${STUDIO_TOOLBAR_BUTTON_CLASS} h-9 px-4 text-[13px]`;
+  const studioGridClassName = chatOpen ? STUDIO_GRID_WITH_CHAT_CLASS : STUDIO_GRID_WITHOUT_CHAT_CLASS;
 
   return (
     <>
-      <div className="grid [grid-template-columns:1fr] lg:[grid-template-columns:248px_minmax(0,1fr)_360px] [grid-template-rows:auto_minmax(0,1fr)] h-full min-h-0 bg-[#fefdfb] relative overflow-hidden">
+      <div className={studioGridClassName}>
         <div className="fixed -top-1/2 -right-[20%] w-full h-[150%] pointer-events-none [background:radial-gradient(ellipse_at_60%_40%,rgba(107,143,113,0.15)_0%,transparent_50%),radial-gradient(ellipse_at_30%_70%,rgba(196,167,108,0.12)_0%,transparent_40%)]" />
 
-        <div className="col-span-3 flex justify-between items-center gap-4 px-5 py-2.5 bg-gradient-to-b from-white/98 to-white/88 backdrop-blur-xl border-b border-[rgba(44,36,22,0.06)] relative z-10 animate-[inkFadeIn_0.4s_cubic-bezier(0.16,1,0.3,1)]">
+        <div className="col-span-full flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-gradient-to-b from-white/98 to-white/88 backdrop-blur-xl border-b border-[rgba(44,36,22,0.06)] relative z-10 animate-[inkFadeIn_0.4s_cubic-bezier(0.16,1,0.3,1)] lg:px-5">
           <div className="absolute bottom-[-1px] left-0 right-0 h-px bg-gradient-to-r from-transparent via-[var(--accent-primary)] to-transparent opacity-30" />
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <p className="m-0 truncate text-[0.68rem] font-semibold tracking-[0.14em] uppercase text-[var(--accent-primary)] opacity-80">{projectName}</p>
-            <h1 className="m-0 truncate font-serif text-[1.12rem] font-bold tracking-tight text-[var(--text-primary)]">{headerTitle}</h1>
+          <h1 className="sr-only">{selectedNode?.label ?? "创作工作台"}</h1>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="inline-flex shrink-0 items-center rounded-full border border-[rgba(90,122,107,0.16)] bg-[rgba(90,122,107,0.08)] px-3 py-1 text-[0.7rem] font-semibold tracking-[0.12em] uppercase text-[var(--accent-primary)]">
+              {headerSectionLabel}
+            </span>
+            <p className="m-0 truncate text-[0.78rem] text-[var(--text-secondary)]">{headerMeta}</p>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               className={saveButtonClass}
               disabled={!documentPath || documentModel.isDocumentLoading || documentModel.isSaving || !documentModel.hasUnsavedChanges}
@@ -175,13 +203,6 @@ export function StudioPage({ projectId }: StudioPageProps) {
               tree={documentTree}
               onSelectNode={handleSelectNode}
             />
-            {staleChapters.length > 0 ? (
-              <div className="relative mx-4 my-4 px-5 py-4 pl-6 rounded-lg bg-gradient-to-br from-[rgba(196,167,108,0.08)] to-[rgba(196,167,108,0.03)] border border-[rgba(196,167,108,0.2)] shadow-[0_4px_16px_rgba(196,167,108,0.1),inset_0_1px_0_rgba(255,255,255,0.3)]">
-                <div className="absolute top-0 left-0 w-[3px] h-full bg-gradient-to-b from-[#c4a76c] via-[rgba(196,167,108,0.5)] to-[#c4a76c] rounded-l-lg" />
-                <p className="m-0 mb-1 text-sm font-semibold text-[var(--text-primary)]">待更新章节</p>
-                <p className="m-0 text-xs text-[var(--text-secondary)] leading-relaxed">{staleChapters.length} 个章节需要重新整理到当前上下文。</p>
-              </div>
-            ) : null}
           </aside>
 
           <main className="relative z-1 flex min-h-0 flex-col overflow-hidden bg-[#fefdfb] shadow-[0_0_80px_rgba(44,36,22,0.04),inset_0_0_100px_rgba(255,255,255,0.5)] animate-[inkFadeIn_0.6s_cubic-bezier(0.16,1,0.3,1)]">

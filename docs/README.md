@@ -5,7 +5,7 @@
 | 文档类型 | 索引 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-04-02 |
-| 更新时间 | 2026-04-02 |
+| 更新时间 | 2026-04-03 |
 
 ---
 
@@ -33,7 +33,26 @@
 
 ---
 
-## 3. 使用说明
+## 3. 当前主文档
+
+如果你要看“当前 assistant / 创作聊天主路径”，先读：
+
+- [Assistant 运行时与聊天主路径](./design/20-assistant-runtime-chat-mode.md)
+- [系统架构设计](./specs/architecture.md)
+- [配置格式规范](./specs/config-format.md)
+
+如果你要判断“哪些文档是当前真值”，按这个顺序看：
+
+1. `docs/specs/*.md`
+2. `docs/design/*.md`
+3. 当前代码
+4. `docs/plans/*.md`
+
+`plans/` 默认视为实施记录或历史方案，不应直接覆盖 `specs/`、`design/` 和当前代码。
+
+---
+
+## 4. 使用说明
 
 - 查“请求怎么发”时，先看 [主流模型厂商请求参数参考](./specs/model-provider-request-params-reference.md)。
 - 查“请求头 / 浏览器 / User-Agent 怎么处理”时，看 [主流模型厂商请求头与客户端标识参考](./specs/model-provider-client-identity-and-headers-reference.md)。
