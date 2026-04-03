@@ -23,7 +23,7 @@ export function getApiBaseUrl(): string {
 
 type RequestOptions = {
   body?: unknown;
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   token?: string | null;
 };
 

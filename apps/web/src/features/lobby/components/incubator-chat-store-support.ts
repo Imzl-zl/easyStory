@@ -7,6 +7,7 @@ import {
   INCUBATOR_INTERRUPTED_REPLY_MESSAGE,
   INITIAL_INCUBATOR_CHAT_SETTINGS,
   resolveInterruptedIncubatorReply,
+  sanitizeIncubatorConversationMessages,
   type IncubatorChatMessage,
   type IncubatorChatSettings,
 } from "./incubator-chat-support";
@@ -314,13 +315,14 @@ function normalizeIncubatorMessages(
   messages: IncubatorChatMessage[],
   mode: typeof PERSISTED_MODE | typeof RUNTIME_MODE,
 ) {
-  if (messages.length === 0) {
+  const sanitizedMessages = sanitizeIncubatorConversationMessages(messages);
+  if (sanitizedMessages.length === 0) {
     return createIncubatorInitialMessages();
   }
   if (mode === RUNTIME_MODE) {
-    return messages;
+    return sanitizedMessages;
   }
-  return messages.map((message) => message.status !== "pending"
+  return sanitizedMessages.map((message) => message.status !== "pending"
     ? message
     : { ...message, content: buildInterruptedMessageContent(message.content), status: "error" as const });
 }

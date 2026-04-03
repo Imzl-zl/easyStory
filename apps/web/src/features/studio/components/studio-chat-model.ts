@@ -21,13 +21,14 @@ import {
   buildStudioUserRequestContent,
   createStudioChatMessage,
   INITIAL_STUDIO_CHAT_SETTINGS,
-  normalizeStudioAssistantReply,
   replaceStudioChatMessage,
   resolveStudioFailedReply,
   resolveStudioModelButtonLabel,
   STUDIO_PENDING_REPLY_MESSAGE,
   type StudioChatMessage,
 } from "./studio-chat-support";
+import { buildSucceededStudioConversationSession } from "./studio-chat-turn-support";
+import { useStudioChatSkillModel } from "./studio-chat-skill-model";
 import { useStudioChatState } from "./studio-chat-state";
 
 type UseStudioChatModelOptions = {
@@ -54,6 +55,12 @@ export function useStudioChatModel({
     state.settings,
     state.setSettings,
   );
+  const skillModel = useStudioChatSkillModel(projectId, {
+    activeConversationId: state.activeConversationId,
+    conversationSkillId: state.conversationSkillId,
+    nextTurnSkillId: state.nextTurnSkillId,
+    patchConversationSession: state.patchConversationSession,
+  });
 
   useEffect(() => {
     setAttachments([]);
@@ -126,10 +133,13 @@ export function useStudioChatModel({
       { status: "pending" },
     );
     const nextMessages = [...state.messages, userMessage];
+    const consumedNextTurnSkillId = state.nextTurnSkillId;
+    const activeSkillId = consumedNextTurnSkillId ?? state.conversationSkillId;
     const payload = buildStudioAssistantTurnPayload({
       messages: nextMessages,
       projectId,
       settings: state.settings,
+      skillId: activeSkillId,
     });
 
     state.patchConversationSession(conversationId, (current) => ({
@@ -149,14 +159,12 @@ export function useStudioChatModel({
           }));
         })
         : await runAssistantTurn(payload);
-      state.patchConversationSession(conversationId, (current) => ({
-        ...current,
-        messages: replaceStudioChatMessage(
-          current.messages,
-          assistantMessage.id,
-          buildCompletedStudioMessage(assistantMessage.id, result.content),
-        ),
-      }));
+      state.patchConversationSession(conversationId, (current) =>
+        buildSucceededStudioConversationSession(current, {
+          consumedNextTurnSkillId,
+          content: result.content,
+          messageId: assistantMessage.id,
+        }));
     } catch (error) {
       state.patchConversationSession(conversationId, (current) => ({
         ...current,
@@ -198,26 +206,17 @@ export function useStudioChatModel({
     handleToggleContext,
     isResponding,
     messages: state.messages,
+    remapDocumentPathReferences: state.remapDocumentPathReferences,
     selectConversation: state.selectConversation,
     selectedContextPaths: state.selectedContextPaths,
     selectedCredentialLabel: credentialModel.selectedCredential?.displayLabel ?? null,
     setComposerText: state.setComposerText,
     settings: state.settings,
+    skillModel,
     visibleModelLabel: resolveStudioModelButtonLabel({
       modelName: state.settings.modelName,
       selectedCredential: credentialModel.selectedCredential,
     }),
-  };
-}
-
-function buildCompletedStudioMessage(messageId: string, content: string) {
-  const normalized = normalizeStudioAssistantReply(content);
-  return {
-    content: normalized.content,
-    id: messageId,
-    rawMarkdown: content,
-    role: "assistant" as const,
-    status: normalized.status,
   };
 }
 

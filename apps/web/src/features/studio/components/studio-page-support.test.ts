@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildStudioDocumentEntryPath,
+  buildStudioDocumentTree,
   buildStudioPathWithParams,
+  findClosestRemainingFilePath,
   getStudioPanelLabel,
   listStudioPanelOptions,
   resolveDefaultDocumentPathFromPanel,
+  resolveStudioDocumentPath,
   resolveStudioChapterListState,
   resolveSelectedChapterNumber,
   resolveStudioPanel,
@@ -74,6 +78,196 @@ test("resolveDefaultDocumentPathFromPanel maps explicit panel routes to canonica
   assert.equal(resolveDefaultDocumentPathFromPanel("chapter", [] as never, null), null);
   assert.equal(resolveDefaultDocumentPathFromPanel(null, chapters as never, null), null);
   assert.equal(resolveDefaultDocumentPathFromPanel("invalid", chapters as never, null), null);
+});
+
+test("buildStudioDocumentEntryPath supports creating entries at project root", () => {
+  assert.equal(buildStudioDocumentEntryPath("", "项目说明", "file"), "项目说明.md");
+  assert.equal(buildStudioDocumentEntryPath("", "附录", "folder"), "附录");
+});
+
+test("buildStudioDocumentEntryPath preserves explicit json file names", () => {
+  assert.equal(buildStudioDocumentEntryPath("数据层", "人物关系", "file"), "数据层/人物关系.json");
+  assert.equal(buildStudioDocumentEntryPath("数据层", "势力关系.json", "file"), "数据层/势力关系.json");
+  assert.equal(buildStudioDocumentEntryPath("设定", "人物", "file"), "设定/人物.md");
+  assert.equal(buildStudioDocumentEntryPath("设定", "人物.json", "folder"), null);
+});
+
+test("buildStudioDocumentEntryPath normalizes chapter names under content roots", () => {
+  assert.equal(buildStudioDocumentEntryPath("正文", "1", "file"), "正文/第001章.md");
+  assert.equal(buildStudioDocumentEntryPath("正文/第一卷", "第7章", "file"), "正文/第一卷/第007章.md");
+  assert.equal(buildStudioDocumentEntryPath("正文", "章节一", "file"), null);
+});
+
+test("buildStudioDocumentTree keeps fixed slots while ordering template roots around them", () => {
+  const tree = buildStudioDocumentTree(
+    [{ chapter_number: 2, status: "draft" }] as never,
+    [
+      {
+        children: [],
+        label: "项目说明.md",
+        node_type: "file",
+        path: "项目说明.md",
+      },
+      {
+        children: [
+          {
+            children: [],
+            label: "世界观.md",
+            node_type: "file",
+            path: "设定/世界观.md",
+          },
+        ],
+        label: "设定",
+        node_type: "folder",
+        path: "设定",
+      },
+      {
+        children: [
+          {
+            children: [],
+            label: "章节规划.md",
+            node_type: "file",
+            path: "大纲/章节规划.md",
+          },
+        ],
+        label: "大纲",
+        node_type: "folder",
+        path: "大纲",
+      },
+      {
+        children: [],
+        label: "数据层",
+        node_type: "folder",
+        path: "数据层",
+      },
+      {
+        children: [],
+        label: "附录",
+        node_type: "folder",
+        path: "附录",
+      },
+    ] as never,
+  );
+
+  assert.deepEqual(
+    tree.map((node) => node.path),
+    ["项目说明.md", "设定", "数据层", "大纲", "正文", "附录"],
+  );
+  assert.equal(tree[1]?.canDelete, undefined);
+  assert.equal(tree[3]?.children?.[0]?.path, "大纲/总大纲.md");
+  assert.equal(tree[3]?.children?.[2]?.path, "大纲/章节规划.md");
+});
+
+test("buildStudioDocumentTree nests chapter documents under custom content folders", () => {
+  const tree = buildStudioDocumentTree(
+    [
+      { chapter_number: 1, status: "draft" },
+      { chapter_number: 2, status: "stale" },
+      { chapter_number: 3, status: "approved" },
+    ] as never,
+    [
+      {
+        children: [
+          {
+            children: [
+              {
+                children: [],
+                label: "第001章.md",
+                node_type: "file",
+                path: "正文/第一卷/第001章.md",
+              },
+              {
+                children: [],
+                label: "第002章.md",
+                node_type: "file",
+                path: "正文/第一卷/第002章.md",
+              },
+            ],
+            label: "第一卷",
+            node_type: "folder",
+            path: "正文/第一卷",
+          },
+        ],
+        label: "正文",
+        node_type: "folder",
+        path: "正文",
+      },
+    ] as never,
+  );
+
+  const contentRoot = tree.find((node) => node.path === "正文");
+  assert.ok(contentRoot);
+  assert.equal(contentRoot?.children?.[0]?.path, "正文/第一卷");
+  assert.equal(contentRoot?.children?.[0]?.canDelete, false);
+  assert.equal(contentRoot?.children?.[0]?.children?.[0]?.path, "正文/第一卷/第001章.md");
+  assert.equal(contentRoot?.children?.[0]?.children?.[0]?.origin, "database");
+  assert.equal(contentRoot?.children?.[1]?.path, "正文/第003章.md");
+});
+
+test("findClosestRemainingFilePath prefers nearby files after deletion", () => {
+  const tree = buildStudioDocumentTree(
+    [{ chapter_number: 1, status: "draft" }] as never,
+    [
+      {
+        children: [],
+        label: "项目说明.md",
+        node_type: "file",
+        path: "项目说明.md",
+      },
+      {
+        children: [
+          {
+            children: [],
+            label: "线索.md",
+            node_type: "file",
+            path: "附录/线索.md",
+          },
+          {
+            children: [],
+            label: "设定补充.md",
+            node_type: "file",
+            path: "附录/设定补充.md",
+          },
+        ],
+        label: "附录",
+        node_type: "folder",
+        path: "附录",
+      },
+    ] as never,
+  );
+
+  assert.equal(
+    findClosestRemainingFilePath(tree, "附录/线索.md", "附录/线索.md"),
+    "附录/设定补充.md",
+  );
+  assert.equal(
+    findClosestRemainingFilePath(tree, "附录/设定补充.md", "附录/设定补充.md"),
+    "附录/线索.md",
+  );
+});
+
+test("resolveStudioDocumentPath waits for tree readiness and falls back when raw path is missing", () => {
+  const tree = buildStudioDocumentTree(
+    [] as never,
+    [
+      {
+        children: [],
+        label: "项目说明.md",
+        node_type: "file",
+        path: "项目说明.md",
+      },
+      {
+        children: [],
+        label: "附录",
+        node_type: "folder",
+        path: "附录",
+      },
+    ] as never,
+  );
+
+  assert.equal(resolveStudioDocumentPath("项目说明.md", tree, false, "项目说明.md"), null);
+  assert.equal(resolveStudioDocumentPath("项目说明.md", tree, true, "项目说明.md"), "项目说明.md");
+  assert.equal(resolveStudioDocumentPath("附录/旧文件.md", tree, true, "项目说明.md"), "项目说明.md");
 });
 
 test("resolveStudioChapterListState distinguishes loading, error, empty and ready", () => {

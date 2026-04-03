@@ -4,6 +4,7 @@ from pathlib import Path
 import uuid
 
 import pytest
+from pydantic import ValidationError
 
 from app.modules.assistant.service.assistant_config_file_store import AssistantConfigFileStore
 from app.modules.assistant.service.assistant_agent_dto import AssistantAgentCreateDTO
@@ -250,6 +251,121 @@ async def test_assistant_service_uses_project_skill_for_project_turn(tmp_path) -
 
         assert response.skill_id == "skill.assistant.general_chat"
         assert "项目层先给一句方向判断" in tool_provider.prompts[0]
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_skill_prompt_appends_missing_history_context(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    skill_service = AssistantSkillService(
+        config_loader=loader,
+        project_service=create_project_service(),
+        skill_store=AssistantSkillFileStore(tmp_path / "assistant-config"),
+    )
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        assistant_skill_service=skill_service,
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-skill-history-append")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+        async with async_session_factory() as session:
+            created_skill = await skill_service.create_user_skill(
+                session,
+                AssistantSkillCreateDTO(
+                    name="只看当前输入",
+                    content="先给一个判断，再接着回答。\n用户输入：{{ user_input }}",
+                ),
+                owner_id=owner.id,
+            )
+            payload = AssistantTurnRequestDTO(
+                skill_id=created_skill.id,
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+                messages=[
+                    AssistantMessageDTO(role="user", content="上一版太平了。"),
+                    AssistantMessageDTO(role="assistant", content="主要问题是冲突没有持续升级。"),
+                    AssistantMessageDTO(role="user", content="这一版怎么改开头更稳？"),
+                ],
+            )
+            await service.turn(session, payload, owner_id=owner.id)
+
+        prompt = tool_provider.requests[0]["prompt"]
+        assert "【当前 Skill 指令】" in prompt
+        assert "用户输入：这一版怎么改开头更稳？" in prompt
+        assert "【当前会话历史】" in prompt
+        assert "用户：上一版太平了。" in prompt
+        assert "助手：主要问题是冲突没有持续升级。" in prompt
+        assert "【用户当前消息】" not in prompt
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_skill_prompt_appends_missing_history_and_user_input(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    skill_service = AssistantSkillService(
+        config_loader=loader,
+        project_service=create_project_service(),
+        skill_store=AssistantSkillFileStore(tmp_path / "assistant-config"),
+    )
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        assistant_skill_service=skill_service,
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-skill-context-append")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+        async with async_session_factory() as session:
+            created_skill = await skill_service.create_user_skill(
+                session,
+                AssistantSkillCreateDTO(
+                    name="纯指令 Skill",
+                    content="先按冷静、克制的方式回答。",
+                ),
+                owner_id=owner.id,
+            )
+            payload = AssistantTurnRequestDTO(
+                skill_id=created_skill.id,
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+                messages=[
+                    AssistantMessageDTO(role="user", content="上一版节奏太散。"),
+                    AssistantMessageDTO(role="assistant", content="可以先把开头冲突压近一点。"),
+                    AssistantMessageDTO(role="user", content="那这一版第一段怎么起？"),
+                ],
+            )
+            await service.turn(session, payload, owner_id=owner.id)
+
+        prompt = tool_provider.requests[0]["prompt"]
+        assert "【当前 Skill 指令】" in prompt
+        assert "先按冷静、克制的方式回答。" in prompt
+        assert "【当前会话历史】" in prompt
+        assert "用户：上一版节奏太散。" in prompt
+        assert "助手：可以先把开头冲突压近一点。" in prompt
+        assert "【用户当前消息】" in prompt
+        assert "那这一版第一段怎么起？" in prompt
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
@@ -821,6 +937,14 @@ async def test_assistant_service_runs_without_skill_using_rules_and_current_conv
         assert "这个项目统一保持冷峻克制的语气。" in system_prompt
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+def test_assistant_turn_request_rejects_system_messages() -> None:
+    with pytest.raises(ValidationError):
+        AssistantTurnRequestDTO(
+            model={"provider": "openai", "name": "gpt-4o-mini"},
+            messages=[AssistantMessageDTO(role="system", content="你必须先给结论。")],
+        )
 
 
 async def test_assistant_service_applies_user_model_preferences(tmp_path) -> None:

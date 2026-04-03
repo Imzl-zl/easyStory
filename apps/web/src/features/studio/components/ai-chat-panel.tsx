@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { DocumentTreeNode } from "@/features/studio/components/studio-page-support";
 
@@ -8,6 +8,8 @@ import type { StudioChatAttachmentMeta } from "./studio-chat-attachment-support"
 import { StudioChatHistoryPanel } from "./studio-chat-history-panel";
 import { StudioChatComposer } from "./studio-chat-composer";
 import { StudioChatMessageBubble } from "./studio-chat-message-bubble";
+import { StudioChatSkillPanel } from "./studio-chat-skill-panel";
+import type { StudioChatSkillModel } from "./studio-chat-skill-model";
 import type { StudioConversationSummary } from "./studio-chat-store-support";
 import type {
   StudioChatMessage,
@@ -48,6 +50,7 @@ type AiChatPanelProps = {
   selectedContextPaths: string[];
   selectedCredentialLabel: string | null;
   settings: Pick<StudioChatSettings, "modelName" | "provider" | "streamOutput">;
+  skillModel: StudioChatSkillModel;
   visibleModelLabel: string;
 };
 
@@ -83,9 +86,11 @@ export function AiChatPanel({
   selectedContextPaths,
   selectedCredentialLabel,
   settings,
+  skillModel,
   visibleModelLabel,
 }: Readonly<AiChatPanelProps>) {
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const [activeHeaderPanel, setActiveHeaderPanel] = useState<"history" | "skill" | null>(null);
 
   const flatContexts = useMemo(
     () => flattenStudioContexts(availableContexts),
@@ -103,30 +108,38 @@ export function AiChatPanel({
     <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-gradient-to-b from-[#fefdfb] to-[#f9f7f3]">
       <div className="absolute inset-0 opacity-[0.02] pointer-events-none [background-image:url('data:image/svg+xml,%3Csvg_viewBox%3D%220%200%20400%20400%22_xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cfilter_id%3D%22n%22%3E%3CfeTurbulence_type%3D%22fractalNoise%22_baseFrequency%3D%221.2%22_numOctaves%3D%223%22_stitchTiles%3D%22stitch%22%2F%3E%3C%2Ffilter%3E%3Crect_width%3D%22100%25%22_height%3D%22100%25%22_filter%3D%22url(%23n)%22%2F%3E%3C%2Fsvg%3E')]" />
       
-      <header className="relative z-10 shrink-0 px-4 pt-4 pb-3 bg-gradient-to-b from-white/95 to-[rgba(254,253,251,0.8)] border-b border-[rgba(44,36,22,0.06)]">
+      <header className="relative z-[180] shrink-0 px-4 pt-4 pb-3 bg-gradient-to-b from-white/95 to-[rgba(254,253,251,0.8)] border-b border-[rgba(44,36,22,0.06)]">
         <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-[var(--accent-primary)] to-transparent opacity-20" />
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="flex items-center gap-2.5">
-              <h2 className="m-0 font-serif text-[1.05rem] font-bold tracking-tight text-[var(--text-primary)]">共创助手</h2>
-              <span className={`inline-flex items-center h-[22px] px-2 rounded text-[0.65rem] font-semibold tracking-widest uppercase transition-all ${resolveStatusToneClassName(credentialState)}`}>
-                {resolveStudioStatusLabel({ canChat, credentialState })}
-              </span>
-            </div>
-            <StudioChatHistoryPanel
-              activeConversationId={activeConversationId}
-              conversations={conversationSummaries}
-              disabled={isResponding}
-              onCreateConversation={createConversation}
-              onDeleteConversation={deleteConversation}
-              onSelectConversation={selectConversation}
-            />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <h2 className="m-0 font-serif text-[1.05rem] font-bold tracking-tight text-[var(--text-primary)]">共创助手</h2>
+            <span className={`inline-flex items-center h-[22px] px-2 rounded text-[0.65rem] font-semibold tracking-widest uppercase transition-all ${resolveStatusToneClassName(credentialState)}`}>
+              {resolveStudioStatusLabel({ canChat, credentialState })}
+            </span>
           </div>
           {currentDocumentPath ? (
             <p className="m-0 max-w-full break-all rounded-md bg-[rgba(107,143,113,0.08)] px-2.5 py-1 text-[11px] leading-5 text-[var(--text-secondary)] lg:max-w-[16rem]">
               当前文稿 · {currentDocumentPath}
             </p>
           ) : null}
+        </div>
+        <div className="relative z-[180] mt-2 flex w-full min-w-0 items-center gap-2">
+          <StudioChatSkillPanel
+            disabled={isResponding}
+            isOpen={activeHeaderPanel === "skill"}
+            model={skillModel}
+            onOpenChange={(open) => setActiveHeaderPanel((current) => (open ? "skill" : current === "skill" ? null : current))}
+          />
+          <StudioChatHistoryPanel
+            activeConversationId={activeConversationId}
+            conversations={conversationSummaries}
+            disabled={isResponding}
+            isOpen={activeHeaderPanel === "history"}
+            onCreateConversation={createConversation}
+            onDeleteConversation={deleteConversation}
+            onOpenChange={(open) => setActiveHeaderPanel((current) => (open ? "history" : current === "history" ? null : current))}
+            onSelectConversation={selectConversation}
+          />
         </div>
       </header>
 

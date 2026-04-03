@@ -17,12 +17,13 @@ export function buildIncubatorAssistantTurnPayload(
   messages: IncubatorChatMessage[],
 ): AssistantTurnPayload {
   const agentId = resolveIncubatorAgentId(settings.agentId);
+  const skillId = resolveIncubatorSkillId(settings.skillId);
   return {
     hook_ids: resolveIncubatorHookIds(settings.hookIds),
     messages: buildAssistantTurnMessages(messages),
     model: buildAssistantModelOverride(settings),
     ...(agentId
       ? { agent_id: agentId }
-      : { skill_id: resolveIncubatorSkillId(settings.skillId) }),
+      : skillId ? { skill_id: skillId } : {}),
   };
 }

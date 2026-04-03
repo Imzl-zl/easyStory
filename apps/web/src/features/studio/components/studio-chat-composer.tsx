@@ -119,7 +119,8 @@ export function StudioChatComposer({
     const groups: { [key: string]: typeof filteredContexts } = {
       设定: [],
       大纲: [],
-      章节: [],
+      正文: [],
+      附录: [],
     };
 
     filteredContexts.forEach((node) => {
@@ -128,8 +129,10 @@ export function StudioChatComposer({
         groups["设定"].push(node);
       } else if (path.includes("大纲") || path.includes("outline")) {
         groups["大纲"].push(node);
+      } else if (path.includes("附录") || path.includes("appendix")) {
+        groups["附录"].push(node);
       } else {
-        groups["章节"].push(node);
+        groups["正文"].push(node);
       }
     });
 

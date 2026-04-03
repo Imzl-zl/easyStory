@@ -53,6 +53,8 @@
 
 - 会话 A 的消息不会自动注入到会话 B
 - 历史会话列表仅用于切换，不是默认上下文池
+- `messages` 只承载当前会话里的 `user / assistant` 消息
+- 规则、Skill、Agent system prompt 都不写回消息历史
 
 ### 2.4 Skill 是显式增强
 
@@ -193,6 +195,18 @@ MCP 是能力层，不是模板层。
 
 用户规则和项目规则如果存在，则通过 `system_prompt` 注入；若不存在，则 `system_prompt` 留空。
 
+Skill 模式的 prompt 装配规则：
+
+- 总是先放当前 Skill 指令
+- 若 Skill 模板没有显式引用 `conversation_history`，运行时自动追加 `【当前会话历史】`
+- 若 Skill 模板没有显式引用 `user_input`，运行时自动追加 `【用户当前消息】`
+- 若 Skill 模板显式引用 `messages_json`，视为它已自行接管整段消息上下文，运行时不再重复追加历史或当前消息
+
+这样可以保证：
+
+- Skill 模式默认仍遵守“规则 + Skill + 历史 + 当前消息”的主语义
+- 老 Skill 如果已经自己声明 `conversation_history / user_input / messages_json`，不会出现重复上下文
+
 ---
 
 ## 5. 产品交互建议
@@ -211,7 +225,7 @@ Studio 默认进入“普通对话”。
 
 Skill 应提供显式选择入口，但不抢占主路径。
 
-推荐支持两种语义：
+当前支持两种语义：
 
 - 本次使用一次
 - 当前会话持续使用

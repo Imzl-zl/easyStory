@@ -1,27 +1,43 @@
 "use client";
 
-import { useMemo, useTransition, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useTransition, useCallback, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Message } from "@arco-design/web-react";
 
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { DocumentTree } from "@/features/studio/components/document-tree";
-import { MarkdownDocumentEditor } from "@/features/studio/components/markdown-document-editor";
+import { StudioDocumentEditor } from "@/features/studio/components/studio-document-editor";
+import { StudioDocumentTreeDialog } from "@/features/studio/components/studio-document-tree-dialog";
 import { AiChatPanel } from "@/features/studio/components/ai-chat-panel";
 import { useStudioDocumentModel } from "@/features/studio/components/studio-document-model";
 import { useStudioChatModel } from "@/features/studio/components/studio-chat-model";
 import {
-  buildDocumentTreeFromChapters,
+  buildStudioDocumentEntryPath,
+  buildStudioDocumentTree,
   buildStudioPathWithParams,
+  findClosestRemainingFilePath,
   findNodeByPath,
+  findFirstFilePath,
   getStudioPanelLabel,
+  isDocumentTreePathAffected,
+  listDocumentTreeFilePaths,
   listStaleChapters,
+  readStudioDocumentEntryBaseName,
+  remapDocumentTreePath,
   resolveDefaultDocumentPathFromPanel,
+  resolveStudioDocumentPath,
   resolveStudioPanel,
 } from "@/features/studio/components/studio-page-support";
 import { listChapters } from "@/lib/api/content";
-import { getProject } from "@/lib/api/projects";
+import {
+  createProjectDocumentEntry,
+  deleteProjectDocumentEntry,
+  getProject,
+  listProjectDocumentTree,
+  renameProjectDocumentEntry,
+} from "@/lib/api/projects";
+import { getErrorMessage } from "@/lib/api/client";
 import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
 import type { DocumentTreeNode } from "@/features/studio/components/studio-page-support";
 
@@ -41,11 +57,20 @@ const STUDIO_GRID_WITH_CHAT_CLASS =
 const STUDIO_GRID_WITHOUT_CHAT_CLASS =
   "grid [grid-template-columns:1fr] lg:[grid-template-columns:236px_minmax(0,1fr)] [grid-template-rows:auto_minmax(0,1fr)] h-full min-h-0 bg-[#fefdfb] relative overflow-hidden";
 
+type DocumentTreeDialogState =
+  | { mode: "create-file" | "create-folder"; parentPath: string; parentLabel: string }
+  | { mode: "rename"; node: DocumentTreeNode }
+  | { mode: "delete"; node: DocumentTreeNode }
+  | null;
+
 export function StudioPage({ projectId }: StudioPageProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [, startTransition] = useTransition();
+  const [documentTreeDialog, setDocumentTreeDialog] = useState<DocumentTreeDialogState>(null);
+  const [documentTreeDialogValue, setDocumentTreeDialogValue] = useState("");
   const currentSearch = searchParams.toString();
   const currentUrl = currentSearch ? `${pathname}?${currentSearch}` : pathname;
 
@@ -64,15 +89,43 @@ export function StudioPage({ projectId }: StudioPageProps) {
     queryFn: () => listChapters(projectId),
   });
 
+  const projectDocumentTreeQuery = useQuery({
+    queryKey: ["project-document-tree", projectId],
+    queryFn: () => listProjectDocumentTree(projectId),
+  });
+
   const documentTree = useMemo(() => {
-    return buildDocumentTreeFromChapters(chaptersQuery.data ?? []);
-  }, [chaptersQuery.data]);
+    return buildStudioDocumentTree(chaptersQuery.data ?? [], projectDocumentTreeQuery.data);
+  }, [chaptersQuery.data, projectDocumentTreeQuery.data]);
 
   const fallbackDocumentPath = useMemo(() => {
-    return resolveDefaultDocumentPathFromPanel(rawPanel, chaptersQuery.data, rawChapter);
-  }, [chaptersQuery.data, rawChapter, rawPanel]);
+    const panelDocumentPath = resolveDefaultDocumentPathFromPanel(rawPanel, chaptersQuery.data, rawChapter);
+    if (panelDocumentPath) {
+      return panelDocumentPath;
+    }
+    if (rawPanel) {
+      return null;
+    }
+    if (!projectDocumentTreeQuery.data) {
+      return null;
+    }
+    return findFirstFilePath(documentTree);
+  }, [chaptersQuery.data, documentTree, projectDocumentTreeQuery.data, rawChapter, rawPanel]);
 
-  const documentPath = rawDocumentPath ?? fallbackDocumentPath;
+  const rawDocumentNode = useMemo(() => {
+    if (!rawDocumentPath) {
+      return null;
+    }
+    return findNodeByPath(documentTree, rawDocumentPath);
+  }, [documentTree, rawDocumentPath]);
+  const documentPath = useMemo(
+    () => resolveStudioDocumentPath(rawDocumentPath, documentTree, Boolean(projectDocumentTreeQuery.data), fallbackDocumentPath),
+    [documentTree, fallbackDocumentPath, projectDocumentTreeQuery.data, rawDocumentPath],
+  );
+  const documentPathSelectionSignal = useMemo(
+    () => Symbol(documentPath ?? "__studio-empty-document__"),
+    [documentPath],
+  );
 
   const selectedNode = useMemo(() => {
     if (!documentPath) {
@@ -80,6 +133,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
     }
     return findNodeByPath(documentTree, documentPath);
   }, [documentTree, documentPath]);
+  const availableDocumentPaths = useMemo(() => listDocumentTreeFilePaths(documentTree), [documentTree]);
 
   const staleChapters = useMemo(() => listStaleChapters(chaptersQuery.data), [chaptersQuery.data]);
   const projectName = projectQuery.data?.name ?? "正在加载项目…";
@@ -114,6 +168,87 @@ export function StudioPage({ projectId }: StudioPageProps) {
     });
   }, [currentSearch, pathname, router, startTransition]);
 
+  useEffect(() => {
+    if (!rawDocumentPath || !projectDocumentTreeQuery.data || rawDocumentNode) {
+      return;
+    }
+    Message.warning("目标文稿不存在，已切回可用文稿。");
+    updateParams({ doc: fallbackDocumentPath });
+  }, [fallbackDocumentPath, projectDocumentTreeQuery.data, rawDocumentNode, rawDocumentPath, updateParams]);
+
+  const closeDocumentTreeDialog = useCallback(() => {
+    setDocumentTreeDialog(null);
+    setDocumentTreeDialogValue("");
+  }, []);
+
+  const invalidateProjectDocumentTree = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["project-document-tree", projectId] });
+  }, [projectId, queryClient]);
+
+  const createDocumentEntryMutation = useMutation({
+    mutationFn: (payload: { kind: "file" | "folder"; path: string }) =>
+      createProjectDocumentEntry(projectId, payload),
+    onSuccess: async (entry) => {
+      await invalidateProjectDocumentTree();
+      closeDocumentTreeDialog();
+      Message.success(entry.node_type === "file" ? "已新建文稿" : "已新建目录");
+      if (entry.node_type !== "file") {
+        return;
+      }
+      navigationGuard.attemptNavigation(() => {
+        documentModel.discardUnsavedChanges();
+        updateParams({ doc: entry.path });
+      });
+    },
+    onError: (error) => {
+      Message.error(getErrorMessage(error));
+    },
+  });
+
+  const renameDocumentEntryMutation = useMutation({
+    mutationFn: (payload: { path: string; next_path: string }) =>
+      renameProjectDocumentEntry(projectId, payload),
+    onSuccess: async (entry, payload) => {
+      const nextDocumentPath = documentPath
+        ? remapDocumentTreePath(documentPath, payload.path, entry.path)
+        : null;
+      await invalidateProjectDocumentTree();
+      closeDocumentTreeDialog();
+      chatModel.remapDocumentPathReferences(payload.path, entry.path);
+      if (nextDocumentPath !== documentPath) {
+        documentModel.discardUnsavedChanges();
+        updateParams({ doc: nextDocumentPath });
+      }
+      Message.success(entry.node_type === "file" ? "已重命名文稿" : "已重命名目录");
+    },
+    onError: (error) => {
+      Message.error(getErrorMessage(error));
+    },
+  });
+
+  const deleteDocumentEntryMutation = useMutation({
+    mutationFn: (path: string) => deleteProjectDocumentEntry(projectId, path),
+    onSuccess: async (entry) => {
+      const currentDocumentAffected = documentPath
+        ? isDocumentTreePathAffected(documentPath, entry.path)
+        : false;
+      const nextDocumentPath = currentDocumentAffected
+        ? findClosestRemainingFilePath(documentTree, entry.path, documentPath)
+        : documentPath;
+      await invalidateProjectDocumentTree();
+      closeDocumentTreeDialog();
+      chatModel.remapDocumentPathReferences(entry.path, null);
+      if (currentDocumentAffected) {
+        documentModel.discardUnsavedChanges();
+        updateParams({ doc: nextDocumentPath });
+      }
+      Message.success(entry.node_type === "file" ? "已删除文稿" : "已删除目录");
+    },
+    onError: (error) => {
+      Message.error(getErrorMessage(error));
+    },
+  });
+
   const handleSelectNode = useCallback((node: DocumentTreeNode) => {
     if (node.type !== "file" || node.path === documentPath) {
       return;
@@ -128,8 +263,105 @@ export function StudioPage({ projectId }: StudioPageProps) {
     void copyMarkdownToClipboard(markdown);
   }, []);
 
+  const handleAddDocument = useCallback((parentPath: string) => {
+    setDocumentTreeDialog({
+      mode: "create-file",
+      parentPath,
+      parentLabel: readDocumentTreeLabel(parentPath),
+    });
+    setDocumentTreeDialogValue("");
+  }, []);
+
+  const handleAddFolder = useCallback((parentPath: string) => {
+    setDocumentTreeDialog({
+      mode: "create-folder",
+      parentPath,
+      parentLabel: readDocumentTreeLabel(parentPath),
+    });
+    setDocumentTreeDialogValue("");
+  }, []);
+
+  const handleRenameNode = useCallback((node: DocumentTreeNode) => {
+    setDocumentTreeDialog({ mode: "rename", node });
+    setDocumentTreeDialogValue(readStudioDocumentEntryBaseName(node));
+  }, []);
+
+  const handleDeleteNode = useCallback((node: DocumentTreeNode) => {
+    setDocumentTreeDialog({ mode: "delete", node });
+    setDocumentTreeDialogValue("");
+  }, []);
+
+  const handleConfirmDocumentTreeDialog = useCallback(() => {
+    if (!documentTreeDialog) {
+      return;
+    }
+    if (documentTreeDialog.mode === "create-file" || documentTreeDialog.mode === "create-folder") {
+      const kind = documentTreeDialog.mode === "create-file" ? "file" : "folder";
+      const path = buildStudioDocumentEntryPath(
+        documentTreeDialog.parentPath,
+        documentTreeDialogValue,
+        kind,
+      );
+      if (!path) {
+        Message.warning(readInvalidDocumentEntryNameMessage(kind, documentTreeDialog.parentPath));
+        return;
+      }
+      createDocumentEntryMutation.mutate({ kind, path });
+      return;
+    }
+    if (documentTreeDialog.mode !== "rename" && documentTreeDialog.mode !== "delete") {
+      return;
+    }
+    const targetNode = documentTreeDialog.node;
+
+    if (
+      documentPath
+      && documentModel.hasUnsavedChanges
+      && isDocumentTreePathAffected(documentPath, targetNode.path)
+    ) {
+      Message.warning("当前文稿有未保存修改，先保存或放弃后，再重命名或删除相关文稿。");
+      return;
+    }
+
+    if (documentTreeDialog.mode === "rename") {
+      const nextPath = buildStudioDocumentEntryPath(
+        readDocumentTreeParentPath(targetNode.path),
+        documentTreeDialogValue,
+        targetNode.type,
+      );
+      if (!nextPath) {
+        Message.warning(
+          readInvalidDocumentEntryNameMessage(
+            targetNode.type,
+            readDocumentTreeParentPath(targetNode.path),
+          ),
+        );
+        return;
+      }
+      if (nextPath === targetNode.path) {
+        Message.warning("名称没有变化。");
+        return;
+      }
+      renameDocumentEntryMutation.mutate({
+        path: targetNode.path,
+        next_path: nextPath,
+      });
+      return;
+    }
+
+    deleteDocumentEntryMutation.mutate(targetNode.path);
+  }, [
+    createDocumentEntryMutation,
+    deleteDocumentEntryMutation,
+    documentModel,
+    documentPath,
+    documentTreeDialog,
+    documentTreeDialogValue,
+    renameDocumentEntryMutation,
+  ]);
+
   const handleCreateNewDocument = useCallback(() => {
-    Message.info("新建文档写入能力正在接入。");
+    Message.info("先在左侧创作结构里新建文稿，再把内容整理到当前写作流里。");
   }, []);
 
   const toggleChat = useCallback(() => {
@@ -148,6 +380,12 @@ export function StudioPage({ projectId }: StudioPageProps) {
     ? STUDIO_SAVE_BUTTON_CLASS
     : `${STUDIO_TOOLBAR_BUTTON_CLASS} h-9 px-4 text-[13px]`;
   const studioGridClassName = chatOpen ? STUDIO_GRID_WITH_CHAT_CLASS : STUDIO_GRID_WITHOUT_CHAT_CLASS;
+  const documentTreeDialogCopy = buildDocumentTreeDialogCopy(documentTreeDialog);
+  const documentTreeDialogPending = documentTreeDialog?.mode === "rename"
+    ? renameDocumentEntryMutation.isPending
+    : documentTreeDialog?.mode === "delete"
+      ? deleteDocumentEntryMutation.isPending
+      : createDocumentEntryMutation.isPending;
 
   return (
     <>
@@ -200,14 +438,20 @@ export function StudioPage({ projectId }: StudioPageProps) {
             <div className="absolute top-0 right-0 w-0.5 h-full bg-gradient-to-b from-transparent via-[var(--accent-primary)] to-transparent opacity-20" />
             <DocumentTree
               selectedPath={documentPath}
+              selectedPathSignal={documentPathSelectionSignal}
               tree={documentTree}
+              onAddDocument={handleAddDocument}
+              onAddFolder={handleAddFolder}
+              onDeleteNode={handleDeleteNode}
+              onRenameNode={handleRenameNode}
               onSelectNode={handleSelectNode}
             />
           </aside>
 
           <main className="relative z-1 flex min-h-0 flex-col overflow-hidden bg-[#fefdfb] shadow-[0_0_80px_rgba(44,36,22,0.04),inset_0_0_100px_rgba(255,255,255,0.5)] animate-[inkFadeIn_0.6s_cubic-bezier(0.16,1,0.3,1)]">
             <div className="absolute inset-0 border-x border-[rgba(44,36,22,0.04)] pointer-events-none" />
-            <MarkdownDocumentEditor
+            <StudioDocumentEditor
+              availableDocumentPaths={availableDocumentPaths}
               documentPath={documentPath}
               documentNode={selectedNode}
               content={documentModel.documentContent}
@@ -217,6 +461,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
               onChange={documentModel.handleContentChange}
               onSave={documentModel.handleSave}
               hasUnsavedChanges={documentModel.hasUnsavedChanges}
+              projectId={projectId}
             />
           </main>
 
@@ -255,6 +500,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
                 selectedContextPaths={chatModel.selectedContextPaths}
                 selectedCredentialLabel={chatModel.selectedCredentialLabel}
                 settings={chatModel.settings}
+                skillModel={chatModel.skillModel}
                 visibleModelLabel={chatModel.visibleModelLabel}
               />
             </aside>
@@ -267,8 +513,98 @@ export function StudioPage({ projectId }: StudioPageProps) {
         onClose={navigationGuard.handleDialogClose}
         onConfirm={navigationGuard.handleDialogConfirm}
       />
+      <StudioDocumentTreeDialog
+        confirmLoading={documentTreeDialogPending}
+        description={documentTreeDialogCopy?.description ?? ""}
+        nameValue={documentTreeDialogValue}
+        okText={documentTreeDialogCopy?.okText ?? "确定"}
+        open={documentTreeDialog !== null}
+        title={documentTreeDialogCopy?.title ?? "管理文稿"}
+        onCancel={closeDocumentTreeDialog}
+        onConfirm={handleConfirmDocumentTreeDialog}
+        onNameChange={documentTreeDialogCopy?.requiresName ? setDocumentTreeDialogValue : undefined}
+      />
     </>
   );
+}
+
+function buildDocumentTreeDialogCopy(dialog: DocumentTreeDialogState): {
+  description: string;
+  okText: string;
+  requiresName: boolean;
+  title: string;
+} | null {
+  if (!dialog) {
+    return null;
+  }
+  if (dialog.mode === "create-file") {
+    return {
+      description: readCreateDocumentDescription(dialog.parentPath),
+      okText: isContentDocumentParentPath(dialog.parentPath) ? "新建章节" : "新建文稿",
+      requiresName: true,
+      title: isContentDocumentParentPath(dialog.parentPath) ? "新建章节" : "新建文稿",
+    };
+  }
+  if (dialog.mode === "create-folder") {
+    return {
+      description: isContentDocumentParentPath(dialog.parentPath)
+        ? `在“${dialog.parentLabel}”下新建卷目录或正文分组。`
+        : `在“${dialog.parentLabel}”下新建一个自定义目录。`,
+      okText: "新建目录",
+      requiresName: true,
+      title: "新建目录",
+    };
+  }
+  if (dialog.mode === "rename") {
+    return {
+      description: `修改“${dialog.node.label}”的名称。`,
+      okText: "确认重命名",
+      requiresName: true,
+      title: dialog.node.type === "file" ? "重命名文稿" : "重命名目录",
+    };
+  }
+  return dialog.mode === "delete"
+    ? {
+      description: dialog.node.type === "file"
+        ? `删除“${dialog.node.label}”后，这份自定义文稿将从项目文稿树中移除。`
+        : `删除“${dialog.node.label}”后，这个目录和其中的自定义文稿都会一起移除。`,
+      okText: "确认删除",
+      requiresName: false,
+      title: dialog.node.type === "file" ? "删除文稿" : "删除目录",
+    }
+    : null;
+}
+
+function readDocumentTreeParentPath(path: string) {
+  return path.split("/").slice(0, -1).join("/");
+}
+
+function readDocumentTreeLabel(path: string) {
+  if (!path) {
+    return "根目录";
+  }
+  return path.split("/").at(-1) ?? path;
+}
+
+function readInvalidDocumentEntryNameMessage(kind: "file" | "folder", parentPath = "") {
+  if (kind === "file") {
+    if (isContentDocumentParentPath(parentPath)) {
+      return "章节号不能为空，且只能输入类似 1、001 或 第1章。";
+    }
+    return "文稿名不能为空，不能包含斜杠；默认创建 .md，输入 .json 会保留为 JSON 文件。";
+  }
+  return "目录名不能为空，不能包含斜杠，也不能以 .md 或 .json 结尾。";
+}
+
+function readCreateDocumentDescription(parentPath: string) {
+  if (isContentDocumentParentPath(parentPath)) {
+    return `在“${readDocumentTreeLabel(parentPath)}”下新建章节文稿，输入章节号即可，例如 1 或第1章。`;
+  }
+  return `在“${readDocumentTreeLabel(parentPath)}”下新建一份文稿文件；默认是 .md，输入 .json 会直接创建 JSON。`;
+}
+
+function isContentDocumentParentPath(path: string) {
+  return path === "正文" || path.startsWith("正文/");
 }
 
 async function copyMarkdownToClipboard(markdown: string) {

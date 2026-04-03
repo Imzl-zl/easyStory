@@ -80,8 +80,6 @@ def validate_skill_input(skill: SkillConfig, input_data: dict[str, Any]) -> None
 
 
 def _format_message(message: AssistantMessageDTO) -> str:
-    if message.role == "system":
-        return f"系统：{message.content}"
     if message.role == "assistant":
         return f"助手：{message.content}"
     return f"用户：{message.content}"

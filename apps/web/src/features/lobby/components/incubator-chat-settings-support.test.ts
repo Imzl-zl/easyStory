@@ -28,7 +28,7 @@ test("incubator chat settings support keeps summary compact when using connectio
       maxOutputTokens: "8192",
       modelName: "",
       provider: "openai",
-      skillId: "skill.assistant.general_chat",
+      skillId: "",
       streamOutput: true,
     },
   } as never);
@@ -53,7 +53,7 @@ test("incubator chat settings support shows only changed summary items", () => {
       maxOutputTokens: "12000",
       modelName: "gpt-4.1-mini",
       provider: "openai",
-      skillId: "skill.assistant.general_chat",
+      skillId: "",
       streamOutput: false,
     },
   } as never);
@@ -74,7 +74,7 @@ test("incubator chat settings support syncs token limit when switching to a new 
     maxOutputTokens: "4096",
     modelName: "gpt-4.1",
     provider: "openai",
-    skillId: "skill.assistant.general_chat",
+    skillId: "",
     streamOutput: true,
   };
   let nextSettings: typeof initialSettings | null = null;
@@ -110,7 +110,7 @@ test("incubator chat settings support syncs token limit when switching to a new 
     maxOutputTokens: "12288",
     modelName: "claude-sonnet-4",
     provider: "anthropic",
-    skillId: "skill.assistant.general_chat",
+    skillId: "",
     streamOutput: true,
   });
 });

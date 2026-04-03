@@ -10,8 +10,13 @@ from app.modules.project.service import (
     ProjectCreateDTO,
     ProjectDeletionService,
     ProjectDetailDTO,
+    ProjectDocumentEntryCreateDTO,
+    ProjectDocumentEntryDTO,
+    ProjectDocumentEntryDeleteResultDTO,
+    ProjectDocumentEntryRenameDTO,
     ProjectDocumentDTO,
     ProjectDocumentSaveDTO,
+    ProjectDocumentTreeNodeDTO,
     ProjectIncubatorConversationDraftDTO,
     ProjectIncubatorConversationDraftRequestDTO,
     ProjectIncubatorCreateRequestDTO,
@@ -198,6 +203,68 @@ async def save_project_document(
         project_id,
         path,
         payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.get("/{project_id}/document-files/tree", response_model=list[ProjectDocumentTreeNodeDTO])
+async def list_project_document_tree(
+    project_id: uuid.UUID,
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> list[ProjectDocumentTreeNodeDTO]:
+    return await project_service.list_project_document_tree(
+        db,
+        project_id,
+        owner_id=current_user.id,
+    )
+
+
+@router.post("/{project_id}/document-files", response_model=ProjectDocumentEntryDTO, status_code=status.HTTP_201_CREATED)
+async def create_project_document_entry(
+    project_id: uuid.UUID,
+    payload: ProjectDocumentEntryCreateDTO,
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> ProjectDocumentEntryDTO:
+    return await project_service.create_project_document_entry(
+        db,
+        project_id,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.patch("/{project_id}/document-files/rename", response_model=ProjectDocumentEntryDTO)
+async def rename_project_document_entry(
+    project_id: uuid.UUID,
+    payload: ProjectDocumentEntryRenameDTO,
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> ProjectDocumentEntryDTO:
+    return await project_service.rename_project_document_entry(
+        db,
+        project_id,
+        payload,
+        owner_id=current_user.id,
+    )
+
+
+@router.delete("/{project_id}/document-files", response_model=ProjectDocumentEntryDeleteResultDTO)
+async def delete_project_document_entry(
+    project_id: uuid.UUID,
+    path: str = Query(min_length=1),
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> ProjectDocumentEntryDeleteResultDTO:
+    return await project_service.delete_project_document_entry(
+        db,
+        project_id,
+        path,
         owner_id=current_user.id,
     )
 

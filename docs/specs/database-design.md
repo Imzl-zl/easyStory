@@ -459,7 +459,7 @@ ORM 使用 SQLAlchemy 2.0，支持平滑切换，无需改业务代码。
 
 **节点执行监控**：`NodeExecution` 表的 `retry_count`、`error_message`、`execution_time_ms` 字段支持节点执行的监控和调试。
 
-**文件系统存储**：导出文件存储在文件系统而非数据库 BLOB，提高性能和可维护性。`Studio` 当前新增的项目文稿文件也走文件系统目录 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；它们只承载 `设定/*`、`附录/*`、`大纲/章节规划.md` 等工作文稿，不替代 `Content + content_versions` 的正式正文真值，正式 `大纲 / 开篇设计 / 正文章节` 继续使用数据库内容链。
+**文件系统存储**：导出文件存储在文件系统而非数据库 BLOB，提高性能和可维护性。`Studio` 当前新增的项目文稿文件也走文件系统目录 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；这层文件采用“一次性默认模板 + 用户可编辑工作台”语义，适合承载项目说明、设定细化、章节规划、时间轴、附录、校验与导出工作文稿，但不替代 `Content + content_versions` 的正式正文真值。正式 `大纲 / 开篇设计 / 正文章节` 继续使用数据库内容链，避免出现第二套正文主真值；`正文` 目录下允许存在卷目录和章节路径占位文件，它们只负责工作台树结构与导航投影，不承载正文内容本身。
 
 ---
 

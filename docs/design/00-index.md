@@ -26,10 +26,11 @@
 
 1. [01-core-workflow](./01-core-workflow.md)
 2. [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)
-3. [06-creative-setup](./06-creative-setup.md)
-4. [19-pre-writing-assets](./19-pre-writing-assets.md)
-5. [02-context-injection](./02-context-injection.md)
-6. [03-review-and-fix](./03-review-and-fix.md)
+3. [21-assistant-project-document-tools](./21-assistant-project-document-tools.md)
+4. [06-creative-setup](./06-creative-setup.md)
+5. [19-pre-writing-assets](./19-pre-writing-assets.md)
+6. [02-context-injection](./02-context-injection.md)
+7. [03-review-and-fix](./03-review-and-fix.md)
 
 ---
 
@@ -57,6 +58,7 @@
 | 18 | 数据备份 | [18-data-backup](./18-data-backup.md) | 🟡 | 回收站、执行日志、Prompt 回放 |
 | 19 | 前置创作资产 | [19-pre-writing-assets](./19-pre-writing-assets.md) | 🔴 | 设定、大纲、开篇、章节衔接 |
 | 20 | Assistant 主路径 | [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md) | 🔴 | 普通聊天、规则、Skill、Agent、MCP 分层 |
+| 21 | Assistant 项目文稿工具 | [21-assistant-project-document-tools](./21-assistant-project-document-tools.md) | 🟡 | 项目内文稿读写工具、统一路径路由、tool-calling 边界 |
 
 ---
 
@@ -64,7 +66,7 @@
 
 按主题找文档时，优先这样看：
 
-- Assistant / Studio 聊天：`20 -> specs/architecture -> specs/config-format`
+- Assistant / Studio 聊天：`20 -> 21 -> specs/architecture -> specs/config-format`
 - 创作准备链路：`06 -> 19 -> 04 -> 05`
 - Workflow / 审核 / 上下文：`01 -> 02 -> 03 -> 08 -> 09`
 - 凭证 / 用户 / 配置：`10 -> specs/config-format -> specs/database-design`

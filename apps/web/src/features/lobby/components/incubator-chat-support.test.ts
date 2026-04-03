@@ -7,11 +7,11 @@ import {
   buildIncubatorConversationFingerprint,
   buildIncubatorConversationText,
   buildSuggestedProjectName,
-  INCUBATOR_CHAT_SKILL_ID,
   createIncubatorInitialMessages,
   createIncubatorMessage,
   INCUBATOR_DEFAULT_PROVIDER,
   INCUBATOR_INTERRUPTED_REPLY_MESSAGE,
+  INCUBATOR_NO_SKILL_LABEL,
   INCUBATOR_PENDING_REPLY_MESSAGE,
   resolveIncubatorAssistantReply,
   resolveChatOutputModeLabel,
@@ -45,6 +45,13 @@ test("incubator chat support builds draft transcript from first user message onw
   );
 });
 
+test("incubator chat support starts from visible assistant welcome without hidden system prompt", () => {
+  const messages = createIncubatorInitialMessages();
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0]?.role, "assistant");
+  assert.equal(messages[0]?.hidden, undefined);
+});
+
 test("incubator chat support builds stable fingerprints and model overrides", () => {
   const messages = [
     ...createIncubatorInitialMessages(),
@@ -57,7 +64,7 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
       hookIds: [],
       modelName: "",
       provider: INCUBATOR_DEFAULT_PROVIDER,
-      skillId: INCUBATOR_CHAT_SKILL_ID,
+      skillId: "",
     })),
     {
       agentId: "",
@@ -65,7 +72,7 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
       hookIds: [],
       modelName: "",
       provider: INCUBATOR_DEFAULT_PROVIDER,
-      skillId: INCUBATOR_CHAT_SKILL_ID,
+      skillId: "",
     },
   );
   assert.equal(
@@ -94,14 +101,14 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
   );
   assert.equal(resolveChatOutputModeLabel(true), "边写边显示");
   assert.equal(resolveChatOutputModeLabel(false), "生成后整体显示");
-  assert.equal(resolveIncubatorSkillId(undefined), INCUBATOR_CHAT_SKILL_ID);
+  assert.equal(resolveIncubatorSkillId(undefined), "");
   assert.equal(resolveIncubatorAgentId(undefined), "");
   assert.deepEqual(resolveIncubatorHookIds(["hook.b", " hook.a ", "hook.b"]), ["hook.a", "hook.b"]);
   assert.deepEqual(toggleIncubatorHookId(["hook.a"], "hook.b"), ["hook.a", "hook.b"]);
   assert.deepEqual(toggleIncubatorHookId(["hook.a", "hook.b"], "hook.a"), ["hook.b"]);
   assert.equal(
     resolveIncubatorSkillLabel(
-      [{ label: "默认聊天助手", value: INCUBATOR_CHAT_SKILL_ID }],
+      [{ label: INCUBATOR_NO_SKILL_LABEL, value: "" }],
       "skill.user.story-helper-a1b2c3",
     ),
     "当前 Skill 不可用：skill.user.story-helper-a1b2c3",

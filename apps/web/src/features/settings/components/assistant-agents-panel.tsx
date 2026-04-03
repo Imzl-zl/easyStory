@@ -107,6 +107,7 @@ export function AssistantAgentsPanel({ onDirtyChange }: AssistantAgentsPanelProp
         defaultDescription: "系统内置",
         disabledDescription: "已停用，但 Agent 仍可继续绑定使用",
         includeDisabled: true,
+        includeSystemDefault: true,
       }),
     [skillListQuery.data],
   );

@@ -102,15 +102,42 @@ def render_prompt(
 ) -> str:
     if skill is None:
         return render_message_only_prompt(payload.messages)
+    referenced_variables = template_renderer.referenced_variables(skill.prompt)
     variables = build_skill_variables(skill, payload.messages, payload.input_data)
     validate_skill_input(skill, variables)
     try:
-        return template_renderer.render(skill.prompt, variables)
+        return render_skill_prompt(
+            rendered_skill_prompt=template_renderer.render(skill.prompt, variables),
+            messages=payload.messages,
+            referenced_variables=referenced_variables,
+        )
     except (SecurityError, UndefinedError) as exc:
         raise ConfigurationError(f"Assistant prompt render failed: {exc}") from exc
 
 
 def render_message_only_prompt(messages: list[Any]) -> str:
+    return render_message_context_sections(messages)
+
+
+def render_skill_prompt(
+    *,
+    rendered_skill_prompt: str,
+    messages: list[Any],
+    referenced_variables: set[str],
+) -> str:
+    sections = [f"【当前 Skill 指令】\n{rendered_skill_prompt.strip()}"]
+    if "messages_json" in referenced_variables:
+        return "\n\n".join(section for section in sections if section.strip())
+    latest_user_message = require_latest_user_message(messages)
+    history = format_conversation_history(messages[:-1])
+    if history and "conversation_history" not in referenced_variables:
+        sections.append(f"【当前会话历史】\n{history}")
+    if "user_input" not in referenced_variables:
+        sections.append(f"【用户当前消息】\n{latest_user_message}")
+    return "\n\n".join(section for section in sections if section.strip())
+
+
+def render_message_context_sections(messages: list[Any]) -> str:
     latest_user_message = require_latest_user_message(messages)
     sections = [f"【用户当前消息】\n{latest_user_message}"]
     history = format_conversation_history(messages[:-1])

@@ -17,8 +17,10 @@ type StudioChatHistoryPanelProps = {
   activeConversationId: string;
   conversations: StudioConversationSummary[];
   disabled?: boolean;
+  isOpen: boolean;
   onCreateConversation: () => void;
   onDeleteConversation: (conversationId: string) => void;
+  onOpenChange: (open: boolean) => void;
   onSelectConversation: (conversationId: string) => void;
 };
 
@@ -26,11 +28,12 @@ export function StudioChatHistoryPanel({
   activeConversationId,
   conversations,
   disabled = false,
+  isOpen,
   onCreateConversation,
   onDeleteConversation,
+  onOpenChange,
   onSelectConversation,
 }: Readonly<StudioChatHistoryPanelProps>) {
-  const [isOpen, setIsOpen] = useState(false);
   const [panelStyle, setPanelStyle] = useState<CSSProperties | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -44,33 +47,19 @@ export function StudioChatHistoryPanel({
     }
 
     function updatePanelPosition() {
-      const container = containerRef.current;
-      if (!container) {
-        return;
-      }
-      const rect = container.getBoundingClientRect();
-      const width = Math.max(rect.width, 300);
-      const viewportWidth = window.innerWidth;
-      const left = Math.max(12, Math.min(rect.left, viewportWidth - width - 12));
-      setPanelStyle({
-        left,
-        position: "fixed",
-        top: rect.bottom + 8,
-        width,
-        zIndex: 160,
-      });
+      setPanelStyle(resolveHistoryPanelStyle(containerRef.current));
     }
 
     function handlePointerDown(event: MouseEvent) {
       const target = event.target as Node;
       if (!containerRef.current?.contains(target) && !popupRef.current?.contains(target)) {
-        setIsOpen(false);
+        onOpenChange(false);
       }
     }
 
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsOpen(false);
+        onOpenChange(false);
       }
     }
 
@@ -86,12 +75,12 @@ export function StudioChatHistoryPanel({
       window.removeEventListener("resize", updatePanelPosition);
       window.removeEventListener("scroll", updatePanelPosition, true);
     };
-  }, [isOpen]);
+  }, [isOpen, onOpenChange]);
 
   const popup = isOpen && panelStyle
     ? createPortal(
       <div
-        className="overflow-hidden rounded-[20px] border border-[rgba(101,92,82,0.14)] bg-[#fffdf9] p-2 shadow-[0_18px_40px_rgba(58,45,29,0.14)] ring-1 ring-[rgba(255,255,255,0.88)]"
+        className="overflow-hidden rounded-[20px] border border-[rgba(101,92,82,0.14)] bg-[#fffdf9] p-2 shadow-[0_18px_40px_rgba(58,45,29,0.14)] ring-1 ring-[rgba(255,255,255,0.88)] animate-[slideFromRight_0.22s_cubic-bezier(0.16,1,0.3,1)]"
         ref={popupRef}
         style={panelStyle}
       >
@@ -113,7 +102,7 @@ export function StudioChatHistoryPanel({
                     type="button"
                     onClick={() => {
                       onSelectConversation(conversation.id);
-                      setIsOpen(false);
+                      onOpenChange(false);
                     }}
                   >
                     <div className="flex items-center gap-2">
@@ -143,7 +132,7 @@ export function StudioChatHistoryPanel({
                       event.preventDefault();
                       event.stopPropagation();
                       onDeleteConversation(conversation.id);
-                      setIsOpen(false);
+                      onOpenChange(false);
                     }}
                   />
                 </div>
@@ -157,47 +146,68 @@ export function StudioChatHistoryPanel({
     : null;
 
   return (
-    <div className="relative w-full max-w-[320px]" ref={containerRef}>
-      <div className="flex items-center gap-2">
-        <button
-          className="inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-full border border-[rgba(101,92,82,0.12)] bg-[#fffdfa] px-3 text-[11px] font-medium text-[var(--text-primary)] transition-[border-color,background-color] hover:border-[rgba(46,111,106,0.2)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={disabled}
-          type="button"
-          onClick={() => {
-            onCreateConversation();
-            setIsOpen(false);
-          }}
+    <div className="relative ml-auto flex min-w-0 w-[min(228px,100%)] items-center justify-end gap-2" ref={containerRef}>
+      <button
+        className="inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-full border border-[rgba(101,92,82,0.12)] bg-[#fffdfa] px-3 text-[11px] font-medium text-[var(--text-primary)] transition-[border-color,background-color] hover:border-[rgba(46,111,106,0.2)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={disabled}
+        type="button"
+        onClick={() => {
+          onCreateConversation();
+          onOpenChange(false);
+        }}
+      >
+        <span className="text-[13px] leading-none">+</span>
+        <span>新对话</span>
+      </button>
+      <button
+        aria-expanded={isOpen}
+        className="group flex h-[30px] min-w-0 flex-1 items-center gap-2 rounded-full border border-[rgba(101,92,82,0.12)] bg-[#fffdfa] px-3 text-left transition-[border-color,background-color,box-shadow] hover:border-[rgba(46,111,106,0.18)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={disabled}
+        title={activeConversation?.title ?? "新对话"}
+        type="button"
+        onClick={() => onOpenChange(!isOpen)}
+      >
+        <span className="inline-flex shrink-0 items-center rounded-full bg-[#f3ede3] px-2 py-0.5 text-[9.5px] leading-4 text-[var(--text-secondary)]">
+          历史
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-5 text-[var(--text-primary)]">
+          {activeConversation?.title ?? "新对话"}
+        </span>
+        <span className="inline-flex shrink-0 items-center rounded-full bg-[#f3ede3] px-1.5 py-0.5 text-[9px] leading-4 text-[var(--text-secondary)]">
+          {conversations.length} 条
+        </span>
+        <span
+          aria-hidden="true"
+          className={`shrink-0 text-[10px] text-[var(--text-secondary)] transition-transform ${isOpen ? "rotate-180" : ""}`}
         >
-          <span className="text-[13px] leading-none">+</span>
-          <span>新对话</span>
-        </button>
-        <button
-          aria-expanded={isOpen}
-          className="group flex h-[30px] min-w-0 flex-1 items-center gap-2 rounded-full border border-[rgba(101,92,82,0.12)] bg-[#fffdfa] px-3 text-left transition-[border-color,background-color,box-shadow] hover:border-[rgba(46,111,106,0.18)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={disabled}
-          type="button"
-          onClick={() => setIsOpen((current) => !current)}
-        >
-          <span className="inline-flex shrink-0 items-center rounded-full bg-[#f3ede3] px-2 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)]">
-            历史
-          </span>
-          <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-5 text-[var(--text-primary)]">
-            {activeConversation?.title ?? "新对话"}
-          </span>
-          <span className="inline-flex shrink-0 items-center rounded-full bg-[#f3ede3] px-2 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)]">
-            {conversations.length} 条
-          </span>
-          <span
-            aria-hidden="true"
-            className={`shrink-0 text-[10px] text-[var(--text-secondary)] transition-transform ${isOpen ? "rotate-180" : ""}`}
-          >
-            ▾
-          </span>
-        </button>
-      </div>
+          ▾
+        </span>
+      </button>
       {popup}
     </div>
   );
+}
+
+const HISTORY_PANEL_MIN_WIDTH = 300;
+const HISTORY_PANEL_VIEWPORT_MARGIN = 12;
+const HISTORY_PANEL_OFFSET = 8;
+
+function resolveHistoryPanelStyle(container: HTMLDivElement | null): CSSProperties | null {
+  if (!container) {
+    return null;
+  }
+  const rect = container.getBoundingClientRect();
+  const width = Math.max(rect.width, HISTORY_PANEL_MIN_WIDTH);
+  const maxLeft = window.innerWidth - width - HISTORY_PANEL_VIEWPORT_MARGIN;
+  const preferredLeft = rect.right - width;
+
+  return {
+    left: Math.max(HISTORY_PANEL_VIEWPORT_MARGIN, Math.min(preferredLeft, maxLeft)),
+    position: "fixed",
+    top: rect.bottom + HISTORY_PANEL_OFFSET,
+    width,
+    zIndex: 160,
+  };
 }
 
 function TrashIcon() {

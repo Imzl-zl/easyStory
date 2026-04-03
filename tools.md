@@ -83,7 +83,8 @@
 - Gemini probe 对简单连通性验证应显式压低思考配置；否则某些 `gemini-flash-latest` 代理会落到带默认 thinking 的 Gemini 3 变体，直接把 probe token 吃在内部思考上，表面看是“返回半句”，实际是上游 `finishReason=MAX_TOKENS`。
 - assistant / provider interop 当前正式流式口径：`AssistantTurnRequestDTO.stream` 默认 `true`；前端若明确走 JSON 路径，必须显式发送 `stream=false`，不能依赖后端默认值。
 - `ProjectSetting` 当前仍是运行时上下文投影输入之一：字段缺口只产生 `warning`，不会阻塞继续生成；但摘要一旦保存为新值，已确认的大纲 / 开篇设计 / 章节任务 / 正文仍需按 impact 标记为 stale，不能静默混用旧产物。
-- `Studio` 当前已补齐项目文稿文件读写：`GET/PUT /api/v1/projects/{project_id}/documents?path=...`，文件默认落在 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；其中 `设定/*`、`附录/*` 和 `大纲/章节规划.md` 走文件层，首次无文件时会按 `ProjectSetting` 摘要或现有章节列表回填初始内容；正式 `大纲 / 开篇设计 / 正文章节` 继续走 `contents + content_versions` 真值链，不写入项目文件目录。
+- `Studio` 当前已补齐项目文稿文件读写：`GET/PUT /api/v1/projects/{project_id}/documents?path=...`，文件默认落在 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；文件层现在支持 `.md + .json`，并采用“一次性默认模板 + 用户可编辑工作台”模式：默认会在新建项目时生成 `项目说明`、设定细分文稿、`数据层/*.json`、章节规划、时间轴、附录、校验、导出等空模板文件/目录，但这些模板项后续允许用户重命名、删除和扩展；正式 `大纲 / 开篇设计 / 正文章节` 继续走 `contents + content_versions` 真值链，不写入项目文件目录。`正文` 现在允许创建卷目录和章节路径占位文件；章节正文仍只通过 content 保存链更新。文稿模板只在项目创建时显式写入；读文稿/读树接口不再做隐式补模板或迁移。
+- `Studio` 前端当前也已按文件类型分流：`.md` 继续走 Markdown 编辑/预览；`.json` 走 JSON 编辑/预览，其中 `数据层/人物.json`、`势力.json`、`人物关系.json`、`势力关系.json`、`隶属关系.json` 会组合成只读关系图预览，`结构定义.json`、`事件.json` 和其它 JSON 保持格式化预览，不支持手工拖线改图。数据层图预览当前只认固定 collection key 对象：`characters / factions / character_relations / faction_relations / memberships`，不再兼容裸数组或旧关系混合格式。
 - incubator / studio 聊天当前不再做“流式失败自动退回非流”的静默降级；需要让真实上游错误直接暴露，便于定位中转兼容问题。
 - credential verifier 与 `scripts/provider_interop_check.py probe` 当前默认走流式；Gemini verification/probe 会注入最小思考配置，避免默认 thinking 吃掉验证输出预算。
 - credential verifier 当前仍发送普通短聊天提示以压低成本，但成功条件已经放宽为“拿到可用文本回复”；不再要求模型精确复读固定句子，也不在提示词里显式暴露“验证/测试”语义；只对空响应和明显的上游模型错误文本判失败。
@@ -98,7 +99,8 @@
 - `workflow hooks` 现已真实接入 runtime：通过 `PluginRegistry.execute` 分发 `script/webhook/agent/mcp`，默认事件覆盖 `before_node_start / before_generate / after_generate / before_review / after_review / on_review_fail / before_fix / after_fix / after_node_end / on_error`；新增 provider 继续沿这条 registry 抽象扩展，不要把类型判断塞回 runtime 主链。
 - `workflow` 节点级 `hooks.before/after` 现在有 staged 校验：assistant-only 事件（如 `before_assistant_response`）不能挂到 workflow node，且 hook event 必须落在匹配的 stage（如 `after_generate -> after`）。
 - `McpPluginProvider` 当前最佳实践语义：`server.enabled=false` 直接视为配置错误；上游返回 `is_error=true` 直接抛显式异常，不做“成功返回但结果里带错误”的静默降级。
-- `assistant runtime` 当前已落地：`/api/v1/assistant/turn` 支持非 workflow 对话，默认可直接走“规则 + 当前会话消息历史”的纯聊天；显式传 `skill_id` 时再用 Skill 负责 prompt，传 `agent_id` 时由 Agent 绑定 Skill；`hook` 负责生命周期，`mcp` 通过 PluginRegistry 执行；agent 通用 tool-calling 仍未实现。
+- `assistant runtime` 当前已落地：`/api/v1/assistant/turn` 支持非 workflow 对话，默认可直接走“规则 + 当前会话消息历史”的纯聊天；显式传 `skill_id` 时走“规则 + Skill + 当前会话历史 + 当前消息”，其中 runtime 会自动补齐 Skill 未显式声明的 `conversation_history / user_input`；传 `agent_id` 时由 Agent 绑定 Skill；`hook` 负责生命周期，`mcp` 通过 PluginRegistry 执行；agent 通用 tool-calling 仍未实现。
+- `assistant turn` 的 `messages` 当前正式只允许 `user / assistant`；规则、Skill、Agent system prompt 都属于独立装配层，不进入消息历史。
 - assistant 规则层当前正式口径：`/api/v1/assistant/rules/me` 管理用户长期规则，`/api/v1/assistant/rules/projects/{project_id}` 管理项目规则；运行时按 `系统提示 -> 用户规则 -> 项目规则` 顺序叠加；规则真值文件分别写入 `apps/api/.runtime/assistant-config/users/<user_id>/AGENTS.md` 与 `apps/api/.runtime/assistant-config/projects/<project_id>/AGENTS.md`
 - assistant AI 偏好当前正式口径：`/api/v1/assistant/preferences` 管理个人默认连接/模型，`/api/v1/assistant/preferences/projects/{project_id}` 管理项目级覆盖；真值文件分别写入 `apps/api/.runtime/assistant-config/users/<user_id>/preferences.yaml` 与 `apps/api/.runtime/assistant-config/projects/<project_id>/preferences.yaml`
 - assistant Skills 当前正式口径：`/api/v1/assistant/skills` 管理用户 Skill，`/api/v1/assistant/skills/projects/{project_id}` 管理项目 Skill；真值文件分别写入 `users/<user_id>/skills/<skill_id>/SKILL.md` 与 `projects/<project_id>/skills/<skill_id>/SKILL.md`，运行时按 `项目 -> 用户 -> 系统` 解析同 ID Skill
@@ -108,6 +110,9 @@
 - assistant hook agent 当前也会继承用户偏好与项目规则；不要再假设只有主回复会吃到 `preferences/rules`，否则前后两次 `llm.generate` 会出现口径漂移。
 - assistant 用户 Hook 的最小正式能力当前只支持两类事件：`before_assistant_response` / `after_assistant_response`；动作类型支持 `agent | mcp`。其中 agent 动作在未单独配模型时，运行时直接继承当前聊天已解析好的模型；mcp 动作通过 `server_id + tool_name + arguments + input_mapping` 调用用户或系统 MCP。
 - assistant 前端 Claude 化当前口径：主路径已继续收口为“长期规则 + 当前会话 + 文稿上下文 + 模型连接”；`Skills / Agents / Hooks / MCP` 进入更明确的次级区域，并保留“可视化编辑 / 按文件编辑”双模式。当前项目设置页已补齐项目 Skills / MCP，但这些能力不再代表普通聊天的默认主链。
+- Studio 聊天当前正式口径：默认就是普通对话，不再自动绑定系统内置 Skill；会话头部已支持显式 `Skill` 模式切换，区分“本次使用一次 / 当前会话持续使用”，普通对话仍只走规则 + 文稿上下文 + 当前会话历史。
+- Studio 文稿树当前正式口径：只保留少量固定语义槽位 `设定 / 大纲 / 正文`，其中 DB 真值文稿 `大纲/总大纲.md`、`大纲/开篇设计.md`、`正文/第xxx章.md` 继续只读；默认模板里的 `项目说明`、设定细分文稿、`数据层/*.json`、章节规划、时间轴、附录、校验、导出等项目文稿会在新建项目时直接以空文件写入文件层，之后允许用户增删改。`数据层` JSON 仅用于结构化资料，不替代 `ProjectSetting` 或正文主真值。`正文` 现在允许新增卷目录，并通过章节路径占位文件把 DB 章节挂到对应目录下；这些占位文件不作为第二套正文真值。节点改名/删除时，会同步重映射聊天已选上下文路径；若影响当前打开文稿，还会同步更新 `doc` 路由。
+- 共享 `assistant-skill-select-options` 当前默认不再自动注入系统默认聊天 Skill；只有像 Agent 编辑器这种确实需要系统 Skill 兜底的场景，调用方才显式传 `includeSystemDefault: true`。
 - assistant 配置产品方向当前正式口径：面向小说创作用户时，主路径应优先收口为 `规则文件 + 当前会话 + 文稿上下文 + 模型连接`；`Skill / Agent / MCP` 属于显式增强层，不是普通聊天硬前提。作用域默认只保留 `全局(用户)` 与 `项目` 两层，项目层覆盖全局层；`Agents / Hooks` 保留为高级能力或内部能力，不作为主心智。
 - 前端多用户切换账号时，退出登录必须同步清空 `workspace` 持久化里的 `lastProjectId / lastWorkflowByProject`；`sidebarPreference` 仍保留为设备级偏好。
 - 读取 `request.app.state`、容器字段或内存注入对象的 accessor，如果不做 I/O 就保持同步 `def`；不为"全 async"把纯 accessor 改成 coroutine。

@@ -20,7 +20,7 @@ import { invalidateStoryAssetQueries } from "@/features/studio/components/story-
 
 const OUTLINE_DOCUMENT_PATH = "大纲/总大纲.md";
 const OPENING_PLAN_DOCUMENT_PATH = "大纲/开篇设计.md";
-const CHAPTER_DOCUMENT_PATH = /^正文\/第(\d{3})章\.md$/;
+const CHAPTER_DOCUMENT_PATH = /^正文(?:\/[^/]+)*\/第(\d{3})章\.md$/;
 
 type StudioDocumentTarget =
   | { kind: "file"; path: string }
@@ -206,5 +206,5 @@ export function syncStudioDocumentQueries(
 
 function resolveDocumentTitle(documentPath: string) {
   const parts = documentPath.split("/");
-  return parts.at(-1)?.replace(/\.md$/i, "") ?? "未命名文稿";
+  return parts.at(-1)?.replace(/\.(json|md)$/i, "") ?? "未命名文稿";
 }

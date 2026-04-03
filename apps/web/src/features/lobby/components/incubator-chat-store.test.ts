@@ -41,6 +41,25 @@ ${INCUBATOR_INTERRUPTED_REPLY_MESSAGE}`,
   );
 });
 
+test("incubator chat store drops legacy system messages on restore", () => {
+  const session = createEmptyIncubatorChatSession();
+  const normalized = normalizePersistedIncubatorChatSession({
+    ...session,
+    messages: [
+      ...session.messages,
+      { ...createIncubatorMessage("assistant", "旧隐藏指令"), role: "system" as never, hidden: true },
+      createIncubatorMessage("user", "帮我想一个故事方向"),
+    ] as unknown as typeof session.messages,
+  });
+
+  assert.equal(normalized.messages.length, 2);
+  assert.deepEqual(
+    normalized.messages.map((message) => message.role),
+    ["assistant", "user"],
+  );
+  assert.equal(normalized.messages[1]?.content, "帮我想一个故事方向");
+});
+
 test("incubator chat store supports create, switch and delete conversation history", () => {
   resetStore();
   const store = useIncubatorChatStore.getState();

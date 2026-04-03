@@ -14,14 +14,12 @@ PROJECT_INCUBATOR_MODEL_NAME_MAX_LENGTH = 100
 PROJECT_INCUBATOR_CONVERSATION_TEXT_MAX_LENGTH = 8000
 
 ProjectStatus = Literal["draft", "active", "completed", "archived"]
+ProjectDocumentEntryType = Literal["file", "folder"]
 ProjectDocumentSource = Literal[
     "file",
     "outline",
     "opening_plan",
     "chapter",
-    "setting_summary",
-    "chapter_plan",
-    "empty",
 ]
 SettingImpactAction = Literal["mark_stale"]
 SettingImpactTarget = Literal["outline", "opening_plan", "chapter", "chapter_tasks"]
@@ -208,6 +206,44 @@ class ProjectDocumentDTO(BaseModel):
     updated_at: datetime | None
 
 
+class ProjectDocumentTreeNodeDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    node_type: ProjectDocumentEntryType
+    path: str = Field(min_length=1)
+    children: list["ProjectDocumentTreeNodeDTO"] = Field(default_factory=list)
+
+
+class ProjectDocumentEntryCreateDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: ProjectDocumentEntryType
+    path: str = Field(min_length=1)
+
+
+class ProjectDocumentEntryRenameDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1)
+    next_path: str = Field(min_length=1)
+
+
+class ProjectDocumentEntryDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    node_type: ProjectDocumentEntryType
+    path: str = Field(min_length=1)
+
+
+class ProjectDocumentEntryDeleteResultDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    node_type: ProjectDocumentEntryType
+    path: str = Field(min_length=1)
+
+
 class SettingCompletenessIssueDTO(BaseModel):
     field: str
     level: Literal["warning"]
@@ -277,3 +313,6 @@ class ProjectPreparationStatusDTO(BaseModel):
     can_start_workflow: bool
     next_step: PreparationNextStep
     next_step_detail: str
+
+
+ProjectDocumentTreeNodeDTO.model_rebuild()

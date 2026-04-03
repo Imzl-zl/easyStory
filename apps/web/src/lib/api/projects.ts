@@ -9,7 +9,12 @@ import type {
   ProjectCreatePayload,
   ProjectDetail,
   ProjectDocument,
+  ProjectDocumentEntry,
+  ProjectDocumentEntryCreatePayload,
+  ProjectDocumentEntryDeleteResult,
+  ProjectDocumentEntryRenamePayload,
   ProjectDocumentSavePayload,
+  ProjectDocumentTreeNode,
   ProjectPreparationStatus,
   ProjectSetting,
   ProjectSettingSnapshot,
@@ -74,6 +79,37 @@ export function saveProjectDocument(
   return requestJson<ProjectDocument>(`/api/v1/projects/${projectId}/documents?${search}`, {
     method: "PUT",
     body: payload,
+  });
+}
+
+export function listProjectDocumentTree(projectId: string) {
+  return requestJson<ProjectDocumentTreeNode[]>(`/api/v1/projects/${projectId}/document-files/tree`);
+}
+
+export function createProjectDocumentEntry(
+  projectId: string,
+  payload: ProjectDocumentEntryCreatePayload,
+) {
+  return requestJson<ProjectDocumentEntry>(`/api/v1/projects/${projectId}/document-files`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function renameProjectDocumentEntry(
+  projectId: string,
+  payload: ProjectDocumentEntryRenamePayload,
+) {
+  return requestJson<ProjectDocumentEntry>(`/api/v1/projects/${projectId}/document-files/rename`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export function deleteProjectDocumentEntry(projectId: string, path: string) {
+  const search = new URLSearchParams({ path }).toString();
+  return requestJson<ProjectDocumentEntryDeleteResult>(`/api/v1/projects/${projectId}/document-files?${search}`, {
+    method: "DELETE",
   });
 }
 

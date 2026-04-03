@@ -10,7 +10,7 @@ from app.modules.config_registry.schemas import ModelConfig
 ASSISTANT_MAX_MESSAGES = 20
 ASSISTANT_MESSAGE_MAX_LENGTH = 8000
 
-AssistantMessageRole = Literal["system", "user", "assistant"]
+AssistantMessageRole = Literal["user", "assistant"]
 
 
 class AssistantMessageDTO(BaseModel):

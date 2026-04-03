@@ -17,7 +17,9 @@ import {
 
 export type StudioChatSession = {
   composerText: string;
+  conversationSkillId: string | null;
   messages: StudioChatMessage[];
+  nextTurnSkillId: string | null;
   selectedContextPaths: string[];
   settings: StudioChatSettings;
 };
@@ -48,7 +50,9 @@ export function buildStudioChatScopeId(userId: string, projectId: string) {
 export function createEmptyStudioChatSession(): StudioChatSession {
   return {
     composerText: "",
+    conversationSkillId: null,
     messages: [],
+    nextTurnSkillId: null,
     selectedContextPaths: [],
     settings: { ...INITIAL_STUDIO_CHAT_SETTINGS },
   };
@@ -100,6 +104,9 @@ export function ensureStudioChatProjectState(projectState: StudioChatProjectStat
 
 export function isStudioChatSessionEmpty(session: StudioChatSession): boolean {
   if (session.composerText.trim()) {
+    return false;
+  }
+  if (session.conversationSkillId || session.nextTurnSkillId) {
     return false;
   }
   if (session.messages.length > 0 || session.selectedContextPaths.length > 0) {
@@ -202,6 +209,40 @@ export function upsertProjectState(
   };
 }
 
+export function remapDocumentPathReferencesInProjectState(
+  projectState: StudioChatProjectState | undefined,
+  previousPath: string,
+  nextPath: string | null,
+): StudioChatProjectState {
+  const currentProjectState = ensureStudioChatProjectState(projectState);
+  let didChange = false;
+  const conversations = currentProjectState.conversations.map((conversation) => {
+    const selectedContextPaths = remapDocumentPathReferences(
+      conversation.session.selectedContextPaths,
+      previousPath,
+      nextPath,
+    );
+    if (areStringArraysEqual(selectedContextPaths, conversation.session.selectedContextPaths)) {
+      return conversation;
+    }
+    didChange = true;
+    return {
+      ...conversation,
+      session: {
+        ...conversation.session,
+        selectedContextPaths,
+      },
+    };
+  });
+  if (!didChange) {
+    return projectState ?? currentProjectState;
+  }
+  return {
+    ...currentProjectState,
+    conversations,
+  };
+}
+
 function buildConversationRecord(
   session: StudioChatSession,
   id = generateStudioConversationId(),
@@ -229,4 +270,31 @@ function resolveTargetConversationId(projectState: StudioChatProjectState, conve
     return projectState.activeConversationId;
   }
   return projectState.conversations.some((item) => item.id === conversationId) ? conversationId : null;
+}
+
+function remapDocumentPathReferences(
+  paths: string[],
+  previousPath: string,
+  nextPath: string | null,
+) {
+  return Array.from(
+    new Set(
+      paths.flatMap((path) => {
+        if (path !== previousPath && !path.startsWith(`${previousPath}/`)) {
+          return [path];
+        }
+        if (nextPath === null) {
+          return [];
+        }
+        if (path === previousPath) {
+          return [nextPath];
+        }
+        return [`${nextPath}${path.slice(previousPath.length)}`];
+      }),
+    ),
+  );
+}
+
+function areStringArraysEqual(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }

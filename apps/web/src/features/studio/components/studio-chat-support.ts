@@ -16,6 +16,7 @@ import {
   type StudioChatAttachment,
   type StudioChatAttachmentMeta,
 } from "./studio-chat-attachment-support";
+import { normalizeStudioSkillId } from "./studio-chat-skill-support";
 
 const STUDIO_CONTEXT_PREVIEW_MAX_LENGTH = 6000;
 const STUDIO_CONTEXT_SELECTION_MAX_COUNT = 8;
@@ -105,11 +106,14 @@ export function buildStudioAssistantTurnPayload(options: {
   messages: StudioChatMessage[];
   projectId: string;
   settings: StudioChatSettings;
+  skillId?: string | null;
 }): AssistantTurnPayload {
+  const skillId = normalizeStudioSkillId(options.skillId);
   return {
     messages: buildStudioPayloadMessages(options.messages),
     model: buildAssistantModelOverride(options.settings),
     project_id: options.projectId,
+    ...(skillId ? { skill_id: skillId } : {}),
   };
 }
 

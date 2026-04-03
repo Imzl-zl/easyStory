@@ -8,15 +8,11 @@ import type {
 import {
   resolveAssistantMaxOutputTokens,
 } from "@/features/shared/assistant/assistant-output-token-support";
-import {
-  ASSISTANT_DEFAULT_CHAT_SKILL_ID,
-  ASSISTANT_DEFAULT_CHAT_SKILL_LABEL,
-} from "@/features/shared/assistant/assistant-defaults";
 
 export const INCUBATOR_DEFAULT_PROVIDER = "";
 export const INCUBATOR_DEFAULT_MODEL_NAME = "";
-export const INCUBATOR_CHAT_SKILL_ID = ASSISTANT_DEFAULT_CHAT_SKILL_ID;
-export const INCUBATOR_DEFAULT_CHAT_SKILL_LABEL = ASSISTANT_DEFAULT_CHAT_SKILL_LABEL;
+export const INCUBATOR_NO_SKILL_ID = "";
+export const INCUBATOR_NO_SKILL_LABEL = "不额外套用 Skill";
 export const INCUBATOR_NO_AGENT_ID = "";
 export const INCUBATOR_NO_AGENT_LABEL = "直接聊天";
 export const INCUBATOR_UNAVAILABLE_SKILL_LABEL_PREFIX = "当前 Skill 不可用";
@@ -59,19 +55,9 @@ export const INITIAL_INCUBATOR_CHAT_SETTINGS: IncubatorChatSettings = {
   maxOutputTokens: "",
   modelName: INCUBATOR_DEFAULT_MODEL_NAME,
   provider: INCUBATOR_DEFAULT_PROVIDER,
-  skillId: INCUBATOR_CHAT_SKILL_ID,
+  skillId: INCUBATOR_NO_SKILL_ID,
   streamOutput: true,
 };
-
-const INCUBATOR_SYSTEM_MESSAGE = [
-  "你是 easyStory 的小说创作启动助手。",
-  "用户是纯新手时，不要要求他先给出完整设定。",
-  "优先做三件事：帮助找方向、给出可选方案、一次只追问一个关键问题。",
-  "如果用户说不知道写什么，先给 2 到 3 个具体故事方向，每个方向都要有题材、主角钩子、核心冲突。",
-  "回答保持中文、直接、有人味，避免术语堆砌。",
-  "不要把回复写成表单或大纲问卷。",
-  "当信息已经足够整理项目草稿时，可以提醒用户已经可以整理草稿并创建项目。",
-].join("\n");
 
 const INCUBATOR_WELCOME_MESSAGE = [
   "你现在想到的一点点画面、角色念头，或者一句模糊感觉，都可以先发给我。",
@@ -79,10 +65,7 @@ const INCUBATOR_WELCOME_MESSAGE = [
 ].join("\n");
 
 export function createIncubatorInitialMessages(): IncubatorChatMessage[] {
-  return [
-    createIncubatorMessage("system", INCUBATOR_SYSTEM_MESSAGE, { hidden: true }),
-    createIncubatorMessage("assistant", INCUBATOR_WELCOME_MESSAGE),
-  ];
+  return [createIncubatorMessage("assistant", INCUBATOR_WELCOME_MESSAGE)];
 }
 
 export function createIncubatorMessage(
@@ -133,10 +116,20 @@ export function resolveIncubatorAssistantReply(content: string) {
   };
 }
 
+export function isIncubatorConversationRole(role: string): role is AssistantMessage["role"] {
+  return role === "assistant" || role === "user";
+}
+
+export function sanitizeIncubatorConversationMessages(
+  messages: IncubatorChatMessage[],
+): IncubatorChatMessage[] {
+  return messages.filter((message) => isIncubatorConversationRole(message.role));
+}
+
 export function buildAssistantTurnMessages(
   messages: IncubatorChatMessage[],
 ): AssistantMessage[] {
-  return messages
+  return sanitizeIncubatorConversationMessages(messages)
     .filter((message) => message.status !== "pending" && message.status !== "error")
     .map(({ content, role }) => ({ content, role }));
 }
@@ -144,13 +137,14 @@ export function buildAssistantTurnMessages(
 export function buildIncubatorConversationText(
   messages: IncubatorChatMessage[],
 ): string {
-  const firstUserIndex = messages.findIndex((message) => message.role === "user");
+  const visibleMessages = sanitizeIncubatorConversationMessages(messages)
+    .filter((message) => message.status !== "pending" && message.status !== "error");
+  const firstUserIndex = visibleMessages.findIndex((message) => message.role === "user");
   if (firstUserIndex === -1) {
     return "";
   }
-  return messages
+  return visibleMessages
     .slice(firstUserIndex)
-    .filter((message) => message.status !== "pending" && message.status !== "error")
     .map((message) => `${resolveMessageRoleLabel(message.role)}：${message.content}`)
     .join("\n\n");
 }
@@ -256,9 +250,6 @@ function resolveMessageRoleLabel(role: AssistantMessage["role"]) {
   if (role === "assistant") {
     return "助手";
   }
-  if (role === "system") {
-    return "系统";
-  }
   return "用户";
 }
 
@@ -271,8 +262,7 @@ export function resolveIncubatorModelName(modelName: string | null | undefined) 
 }
 
 export function resolveIncubatorSkillId(skillId: string | null | undefined) {
-  const normalized = typeof skillId === "string" ? skillId.trim() : "";
-  return normalized || INCUBATOR_CHAT_SKILL_ID;
+  return typeof skillId === "string" ? skillId.trim() : "";
 }
 
 export function resolveIncubatorSkillLabel(
@@ -284,8 +274,8 @@ export function resolveIncubatorSkillLabel(
   if (matchedOption) {
     return matchedOption.label;
   }
-  return resolvedSkillId === INCUBATOR_CHAT_SKILL_ID
-    ? INCUBATOR_DEFAULT_CHAT_SKILL_LABEL
+  return resolvedSkillId === INCUBATOR_NO_SKILL_ID
+    ? INCUBATOR_NO_SKILL_LABEL
     : `${INCUBATOR_UNAVAILABLE_SKILL_LABEL_PREFIX}：${resolvedSkillId}`;
 }
 

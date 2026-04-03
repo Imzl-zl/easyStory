@@ -22,9 +22,10 @@ import {
   updateIncubatorChatSetting,
 } from "./incubator-chat-settings-support";
 import {
-  INCUBATOR_CHAT_SKILL_ID,
   INCUBATOR_NO_AGENT_ID,
   INCUBATOR_NO_AGENT_LABEL,
+  INCUBATOR_NO_SKILL_ID,
+  INCUBATOR_NO_SKILL_LABEL,
   resolveIncubatorAgentId,
   resolveIncubatorAgentLabel,
   resolveIncubatorHookIds,
@@ -57,13 +58,15 @@ export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
   const skillOptions = useMemo(
     () =>
       buildAssistantSkillSelectOptions(skillQuery.data ?? [], {
-        defaultDescription: "系统内置",
+        leadingOptions: [{ label: INCUBATOR_NO_SKILL_LABEL, value: INCUBATOR_NO_SKILL_ID }],
       }),
     [skillQuery.data],
   );
   const selectedTargetLabel = resolveIncubatorAgentId(model.settings.agentId)
     ? resolveIncubatorAgentLabel(agentOptions, model.settings.agentId)
-    : resolveIncubatorSkillLabel(skillOptions, model.settings.skillId);
+    : resolveIncubatorSkillId(model.settings.skillId)
+      ? resolveIncubatorSkillLabel(skillOptions, model.settings.skillId)
+      : null;
   const summaryItems = buildChatSettingsSummaryItemsWithSkill(model, selectedTargetLabel);
   const hookOptions = useMemo(
     () =>
@@ -93,14 +96,14 @@ export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
     if (resolveIncubatorAgentId(model.settings.agentId)) {
       return;
     }
-    if (!skillQuery.data || model.settings.skillId === INCUBATOR_CHAT_SKILL_ID) {
+    if (!skillQuery.data || model.settings.skillId === INCUBATOR_NO_SKILL_ID) {
       return;
     }
     const hasCurrentSkill = skillQuery.data.some(
       (item) => item.enabled && item.id === model.settings.skillId,
     );
     if (!hasCurrentSkill) {
-      updateIncubatorChatSetting(model, "skillId", INCUBATOR_CHAT_SKILL_ID);
+      updateIncubatorChatSetting(model, "skillId", INCUBATOR_NO_SKILL_ID);
     }
   }, [model, model.settings.skillId, skillQuery.data]);
 

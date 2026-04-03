@@ -24,6 +24,7 @@
 - 多用户 assistant 体验第二轮收口：全局设置已整理为“AI 助手 / 模型连接”双入口，AI 偏好正式露出并与个人长期规则形成同一用户心智；孵化聊天默认会优先使用个人 AI 偏好，退出登录时会清空工作台项目上下文，避免账号串用；AI 偏好真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/preferences.yaml`
 - assistant 项目层配置闭环：项目设置页现已支持“项目长期规则 / 项目 AI 偏好 / 项目 Skills / 项目 MCP”；真值文件写入 `projects/<project_id>/AGENTS.md`、`preferences.yaml`、`skills/<skill_id>/SKILL.md`、`mcp_servers/<server_id>/MCP.yaml`；运行时按 `项目 -> 用户 -> 系统` 解析，其中 AI 偏好做字段级覆盖，Skills / MCP 做同 ID 命中覆盖
 - assistant 配置方向已进一步收口：后续继续靠拢 Claude 的“文件放到约定位置即可生效”模式，但只保留适合小说创作场景的两层作用域（全局 / 项目）；普通用户主路径改为 `规则文件 / 当前会话 / 文稿上下文 / 模型连接`，`Skill / Agent / MCP` 变成显式增强能力，`Agents / Hooks` 保留为高级能力
+- Studio 聊天显式 Skill 模式已落地：默认是“普通对话”，不再自动绑定系统内置 Skill；当前会话现支持“本次使用一次 / 当前会话持续使用”两种 Skill 语义，并按会话持久化。
 - assistant 前端 Claude 化第二阶段收口：全局设置与聊天页现已统一主路径，默认先引导“个人长期规则 + 当前会话 + 模型连接”；`Skills / Agents / Hooks / MCP` 收进更明确的次级区域，并继续支持“可视化编辑 / 按文件编辑”双模式；用户仍可直接按 `SKILL.md / AGENT.md / HOOK.yaml / MCP.yaml` 约定编辑，但这些文件不再等同于普通聊天默认主链
 - 用户自定义 Skills 最小闭环：大厅设置现已新增独立 `Skills` 页签，用户可创建、编辑、启用/停用、删除自己的 Skill，并在聊天页“模型与连接”里直接切换；Skill 真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/skills/<skill_id>/SKILL.md`
 - 用户自定义 Agents 最小闭环：大厅设置现已新增独立 `Agents` 页签，用户可创建、编辑、启用/停用、删除自己的 Agent，并在聊天页“模型与连接”里直接切换；Agent 真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/agents/<agent_id>/AGENT.md`
@@ -43,7 +44,8 @@
 - Workspace Shell 折叠侧栏闭环：全局工作台侧栏现支持桌面端展开/收起、偏好持久化与小屏自动收口，相关导航纯函数已补单测
 - Workspace UI 壳层优化闭环：`WorkspaceShell` 现已改为更克制的导航面板 + 主内容舞台结构，侧栏激活态、折叠态、导航语义和共用卡片层级已统一；同时补齐 `skip link`、`aria-live`、触控细节和输入提示，移动端不再显示无效的展开/收起切换按钮
 - Studio 顶部 Tab 布局闭环：`Studio` 现已改为页头操作区 + 顶部 Tab + 右侧辅助卡片，章节目录只在章节面板内部展示，章节列表已显式区分 loading / error / empty
-- Studio 文稿文件保存闭环：当前创作页已支持项目文稿文件 `GET/PUT`，默认保存到 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；其中 `设定/*`、`附录/*` 和 `大纲/章节规划.md` 走文件层，首次无文件时会按 `ProjectSetting` 摘要或章节列表回填；正式 `大纲 / 开篇设计 / 正文章节` 继续走 DB 内容真值
+- Studio 文稿文件保存闭环：当前创作页已支持项目文稿文件 `GET/PUT`，默认保存到 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；文件层现在支持 `.md + .json`，并会在新建项目时直接创建一套空模板（项目说明、设定细分、`数据层/*.json`、章节规划、时间轴、附录、校验、导出），后续允许用户自行删改；正式 `大纲 / 开篇设计 / 正文章节` 继续走 DB 内容真值。`正文` 目录下允许新增卷目录和章节路径占位文件，但章节正文仍只通过 content 保存链更新。
+- Studio 文稿树 CRUD 闭环：当前创作页左侧文稿树已从“固定骨架 + 自定义节点”改成“少量固定槽位 + 可编辑默认模板”；固定只保留 `设定 / 大纲 / 正文` 语义槽位和 DB 真值节点，其余模板节点都支持重命名、删除、新增与扩展。正文现在支持新增卷目录和章节创建；删除当前文稿时会优先回退到邻近文稿，不再直接跳到全局第一份。重命名/删除若影响当前打开文稿，会同步更新 `doc` 路由；聊天里已选的上下文路径也会随之重映射或移除
 - Engine 控制区压缩闭环：`Engine` 现已改为页头控制区 + 顶部状态区 + 全宽详情区，workflow 输入、控制按钮、摘要与调试入口已从左侧控制栏收口
 - 数据库演进闭环：Alembic baseline，startup 与文件型 SQLite helper 优先走 Alembic
 - Web 工作台主子视图已基本路由化：Lobby / Incubator / Config Registry / Template Library / Recycle Bin / Global Settings / Project Settings / Studio / Engine / Lab
@@ -58,14 +60,17 @@
 
 - `provider` 负责渠道 / 凭证解析，协议由 `api_dialect` 决定，模型缺省由 `default_model` 决定
 - 正文真值只在 `contents + content_versions`；`artifacts`、运行时摘要或预览结果都不是正文主真值
-- `Studio` 项目文稿文件当前只是工作台文件层，不替代 `contents + content_versions`；它更适合设定、附录、章节规划和自由整理文稿，正式大纲 / 开篇设计 / 正文章节仍走内容主链
+- `Studio` 项目文稿文件当前只是工作台文件层，不替代 `contents + content_versions`；它更适合项目说明、设定细化、章节规划、时间轴、附录、校验和自由整理文稿，正式大纲 / 开篇设计 / 正文章节仍走内容主链。正文目录下的卷目录和章节路径占位文件只负责树结构与导航，不保存正文真值。
+- `Studio` 数据层 JSON 当前正式定位为结构化资料层：适合人物 / 势力 / 关系 / 事件等机器可读资料，但不替代 `ProjectSetting` 或 `contents + content_versions` 主真值。
+- `Studio` 文稿编辑器当前已按文件类型分流：`.md` 继续走 Markdown 编辑 / 预览，`.json` 走 JSON 编辑 / 预览；其中 `数据层/人物.json`、`势力.json`、`人物关系.json`、`势力关系.json`、`隶属关系.json` 会组合成只读关系图预览，`结构定义.json`、`事件.json` 和其它 JSON 保持格式化预览，不提供手工连线编辑。
+- `Studio` 文稿树当前正式语义是“少量固定槽位 + 一次性默认模板”：固定槽位只保留 `设定 / 大纲 / 正文`，默认模板在新建项目时直接以空文件写入文件层，后续不再因列表/读取而把已删除模板文稿偷偷补回来；正文新增章节时走 DB 章节创建链，并把路径挂到当前卷目录或正文根目录下。
 - 投影视图（`character_profile` / `world_setting`）统一由 `project` 边界提供，不在 context / content 各自维护
 - `ProjectSetting` 当前正式降级为“结构化摘要真值”：用于快速浏览、机器投影和默认值，不再因为字段缺口阻塞大纲/开篇/正文；但摘要一旦实质变更，已确认的大纲、开篇设计、章节任务和正文仍会按 impact 标记为 stale
 - stale chapter task 必须先重建章节计划，不可直接编辑；前后端同步强制
 - endpoint 安全策略必须同时落在写入入口和运行时出口
 - 程序化 Alembic 优先复用现有 `connection` / `engine`，不要退回字符串化 URL
 - config_registry 对外暴露语义化 DTO，写回前必须 staged full-config 校验，未知字段直接失败
-- `assistant runtime` 当前正式口径：默认可直接走“规则 + 当前会话消息历史”的纯聊天；`skill_id` / `agent_id` 现在是可选增强而非硬前提，且 Studio 聊天已移除默认内置 Skill 绑定；`mcp` 继续通过 hook/plugin 路径执行，agent 通用 tool-calling 仍是下一阶段
+- `assistant runtime` 当前正式口径：默认可直接走“规则 + 当前会话消息历史”的纯聊天；`skill_id` / `agent_id` 现在是可选增强而非硬前提，且 Studio 聊天已移除默认内置 Skill 绑定；Skill 模式已收口为“规则 + Skill + 当前会话历史 + 当前消息”，runtime 会自动补齐 Skill 未显式声明的 `conversation_history / user_input`；assistant turn 的 `messages` 只允许 `user / assistant`，规则和 Skill 不进入历史；`mcp` 继续通过 hook/plugin 路径执行，agent 通用 tool-calling 仍是下一阶段
 - 用户 Hook 当前正式支持 `agent | mcp` 两类动作；MCP 会先解析用户自己的 `mcp_servers/<server_id>/MCP.yaml`，找不到再回退系统 MCP
 - 多用户 assistant 配置当前正式口径：平台可保留系统内置 `skill/agent/hook/mcp/workflow` 作为可选能力；普通用户当前正式拥有个人偏好、个人长期规则、个人 Skills、个人 Agents、个人 Hooks、个人 MCP、项目长期规则和项目 AI 偏好；这些能力当前均以文件为主真值；用户自定义 `Workflows` 仍待补齐
 - runtime hardening 当前已补齐：assistant hook-agent 会按 agent 类型传 `response_format`；MCP provider 会显式拒绝 disabled server / `is_error=true`；workflow staged config 会拒绝 assistant-only hook 事件和 before/after stage 错绑

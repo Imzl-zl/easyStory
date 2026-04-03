@@ -6,7 +6,7 @@ import {
 } from "./incubator-assistant-request-support";
 import {
   createIncubatorInitialMessages,
-  INCUBATOR_CHAT_SKILL_ID,
+  createIncubatorMessage,
   type IncubatorChatSettings,
 } from "./incubator-chat-support";
 
@@ -17,7 +17,7 @@ const SETTINGS: IncubatorChatSettings = {
   maxOutputTokens: "8192",
   modelName: "gpt-4.1",
   provider: "openai",
-  skillId: INCUBATOR_CHAT_SKILL_ID,
+  skillId: "",
   streamOutput: true,
 };
 
@@ -29,7 +29,9 @@ test("incubator assistant request support builds payload with explicit max token
     provider: "openai",
   });
   assert.deepEqual(payload.hook_ids, ["hook.user.after-polish", "hook.user.story-summary"]);
-  assert.equal(payload.skill_id, INCUBATOR_CHAT_SKILL_ID);
+  assert.equal(payload.messages.length, 1);
+  assert.equal(payload.messages[0]?.role, "assistant");
+  assert.equal("skill_id" in payload, false);
 });
 
 test("incubator assistant request support prefers agent id when selected", () => {
@@ -39,4 +41,20 @@ test("incubator assistant request support prefers agent id when selected", () =>
   );
   assert.equal(payload.agent_id, "agent.user.story-coach-a1b2c3");
   assert.equal("skill_id" in payload, false);
+});
+
+test("incubator assistant request support drops legacy system messages from payload", () => {
+  const payload = buildIncubatorAssistantTurnPayload(
+    SETTINGS,
+    [
+      ...createIncubatorInitialMessages(),
+      { ...createIncubatorMessage("assistant", "旧隐藏指令"), role: "system" as never, hidden: true },
+      createIncubatorMessage("user", "帮我想一个开头"),
+    ] as unknown as ReturnType<typeof createIncubatorInitialMessages>,
+  );
+
+  assert.deepEqual(
+    payload.messages.map((message) => message.role),
+    ["assistant", "user"],
+  );
 });

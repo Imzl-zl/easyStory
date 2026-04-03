@@ -68,10 +68,7 @@ export type ProjectDocumentSource =
   | "file"
   | "outline"
   | "opening_plan"
-  | "chapter"
-  | "setting_summary"
-  | "chapter_plan"
-  | "empty";
+  | "chapter";
 
 export type ProjectDocument = {
   project_id: string;
@@ -83,6 +80,36 @@ export type ProjectDocument = {
 
 export type ProjectDocumentSavePayload = {
   content: string;
+};
+
+export type ProjectDocumentEntryType = "file" | "folder";
+
+export type ProjectDocumentTreeNode = {
+  label: string;
+  node_type: ProjectDocumentEntryType;
+  path: string;
+  children: ProjectDocumentTreeNode[];
+};
+
+export type ProjectDocumentEntry = {
+  label: string;
+  node_type: ProjectDocumentEntryType;
+  path: string;
+};
+
+export type ProjectDocumentEntryCreatePayload = {
+  kind: ProjectDocumentEntryType;
+  path: string;
+};
+
+export type ProjectDocumentEntryRenamePayload = {
+  path: string;
+  next_path: string;
+};
+
+export type ProjectDocumentEntryDeleteResult = {
+  node_type: ProjectDocumentEntryType;
+  path: string;
 };
 
 export type ProjectTrashCleanupFailure = {

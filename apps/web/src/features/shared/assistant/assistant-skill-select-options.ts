@@ -19,6 +19,8 @@ type BuildAssistantSkillSelectOptionsOptions = {
   defaultDescription?: string;
   disabledDescription?: string;
   includeDisabled?: boolean;
+  includeSystemDefault?: boolean;
+  leadingOptions?: AssistantSkillSelectOption[];
 };
 
 export function buildAssistantSkillSelectOptions(
@@ -26,15 +28,22 @@ export function buildAssistantSkillSelectOptions(
   options: Readonly<BuildAssistantSkillSelectOptionsOptions> = {},
 ): AssistantSkillSelectOption[] {
   const includeDisabled = options.includeDisabled ?? false;
+  const includeSystemDefault = options.includeSystemDefault ?? false;
   const visibleSkills = skills.filter((skill) => includeDisabled || skill.enabled !== false);
-  const hasDefaultNameCollision = visibleSkills.some((skill) => isDefaultChatSkillLabel(skill.name));
-
-  return [
-    {
+  const hasDefaultNameCollision = includeSystemDefault
+    && visibleSkills.some((skill) => isDefaultChatSkillLabel(skill.name));
+  const leadingOptions = options.leadingOptions ?? [];
+  const systemDefaultOptions = includeSystemDefault
+    ? [{
       description: options.defaultDescription,
       label: buildTaggedLabel(ASSISTANT_DEFAULT_CHAT_SKILL_LABEL, hasDefaultNameCollision ? ["系统"] : []),
       value: ASSISTANT_DEFAULT_CHAT_SKILL_ID,
-    },
+    }]
+    : [];
+
+  return [
+    ...leadingOptions,
+    ...systemDefaultOptions,
     ...visibleSkills.map((skill) => ({
       description: buildCustomSkillDescription(skill, options.disabledDescription),
       label: buildCustomSkillLabel(skill, hasDefaultNameCollision),

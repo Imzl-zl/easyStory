@@ -17,6 +17,11 @@ test("resolveStudioDocumentTarget keeps canonical content paths on database-back
     kind: "chapter",
     path: "正文/第007章.md",
   });
+  assert.deepEqual(resolveStudioDocumentTarget("正文/第一卷/第008章.md"), {
+    chapterNumber: 8,
+    kind: "chapter",
+    path: "正文/第一卷/第008章.md",
+  });
 });
 
 test("resolveStudioDocumentTarget keeps non-canonical markdown paths on file-backed targets", () => {
@@ -27,5 +32,9 @@ test("resolveStudioDocumentTarget keeps non-canonical markdown paths on file-bac
   assert.deepEqual(resolveStudioDocumentTarget("附录/灵感碎片.md"), {
     kind: "file",
     path: "附录/灵感碎片.md",
+  });
+  assert.deepEqual(resolveStudioDocumentTarget("数据层/人物关系.json"), {
+    kind: "file",
+    path: "数据层/人物关系.json",
   });
 });

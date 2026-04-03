@@ -11,6 +11,7 @@ import {
   createEmptyStudioChatSession,
   normalizePersistedStudioChatProjectState,
   readStudioChatProjectState,
+  remapDocumentPathReferencesInProjectState,
   serializeStudioChatProjectState,
   type StudioChatSession,
   type StudioConversationSummary,
@@ -20,18 +21,23 @@ import { useStudioChatStore } from "./studio-chat-store";
 export type StudioChatState = {
   activeConversationId: string;
   composerText: string;
+  conversationSkillId: string | null;
   conversationSummaries: StudioConversationSummary[];
   createConversation: () => string | null;
   deleteConversation: (conversationId: string) => void;
   messages: StudioChatSession["messages"];
+  nextTurnSkillId: string | null;
   patchConversationSession: (
     conversationId: string,
     updater: (current: StudioChatSession) => StudioChatSession,
   ) => void;
+  remapDocumentPathReferences: (previousPath: string, nextPath: string | null) => void;
   selectConversation: (conversationId: string) => void;
   selectedContextPaths: string[];
   setComposerText: Dispatch<SetStateAction<string>>;
+  setConversationSkillId: Dispatch<SetStateAction<string | null>>;
   setMessages: Dispatch<SetStateAction<StudioChatSession["messages"]>>;
+  setNextTurnSkillId: Dispatch<SetStateAction<string | null>>;
   setSelectedContextPaths: Dispatch<SetStateAction<string[]>>;
   settings: StudioChatSession["settings"];
   setSettings: Dispatch<SetStateAction<StudioChatSession["settings"]>>;
@@ -68,8 +74,16 @@ export function useStudioChatState(projectId: string): StudioChatState {
     () => createSessionSetter(scopeId, patchStoredActiveConversation, "composerText"),
     [patchStoredActiveConversation, scopeId],
   );
+  const setConversationSkillId = useMemo(
+    () => createSessionSetter(scopeId, patchStoredActiveConversation, "conversationSkillId"),
+    [patchStoredActiveConversation, scopeId],
+  );
   const setMessages = useMemo(
     () => createSessionSetter(scopeId, patchStoredActiveConversation, "messages"),
+    [patchStoredActiveConversation, scopeId],
+  );
+  const setNextTurnSkillId = useMemo(
+    () => createSessionSetter(scopeId, patchStoredActiveConversation, "nextTurnSkillId"),
     [patchStoredActiveConversation, scopeId],
   );
   const setSelectedContextPaths = useMemo(
@@ -96,6 +110,20 @@ export function useStudioChatState(projectId: string): StudioChatState {
     }
     patchStoredConversation(scopeId, conversationId, updater);
   }, [patchStoredConversation, scopeId]);
+  const remapDocumentPathReferences = useCallback((previousPath: string, nextPath: string | null) => {
+    if (!scopeId || !storedProjectState) {
+      return;
+    }
+    const nextProjectState = remapDocumentPathReferencesInProjectState(
+      storedProjectState,
+      previousPath,
+      nextPath,
+    );
+    if (nextProjectState === storedProjectState) {
+      return;
+    }
+    replaceStoredProjectState(scopeId, nextProjectState);
+  }, [replaceStoredProjectState, scopeId, storedProjectState]);
   const selectConversation = useCallback((conversationId: string) => {
     if (!scopeId) {
       return;
@@ -133,15 +161,20 @@ export function useStudioChatState(projectId: string): StudioChatState {
   return {
     activeConversationId,
     composerText: session.composerText,
+    conversationSkillId: session.conversationSkillId,
     conversationSummaries,
     createConversation,
     deleteConversation,
     messages: session.messages,
+    nextTurnSkillId: session.nextTurnSkillId,
     patchConversationSession,
+    remapDocumentPathReferences,
     selectConversation,
     selectedContextPaths: session.selectedContextPaths,
     setComposerText,
+    setConversationSkillId,
     setMessages,
+    setNextTurnSkillId,
     setSelectedContextPaths,
     settings: session.settings,
     setSettings,

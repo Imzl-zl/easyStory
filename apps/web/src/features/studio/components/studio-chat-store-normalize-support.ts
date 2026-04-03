@@ -48,7 +48,9 @@ export function normalizeStudioChatSession(
   const record = isRecord(value) ? value : {};
   return {
     composerText: readStringValue(record.composerText) ?? "",
+    conversationSkillId: readOptionalSkillId(record.conversationSkillId),
     messages: normalizeMessages(record.messages, mode),
+    nextTurnSkillId: readOptionalSkillId(record.nextTurnSkillId),
     selectedContextPaths: readStringArray(record.selectedContextPaths),
     settings: { ...INITIAL_STUDIO_CHAT_SETTINGS, ...(isRecord(record.settings) ? record.settings : {}) },
   };
@@ -102,7 +104,9 @@ function createFallbackProjectState(): StudioChatProjectState {
 function buildFallbackConversationRecord(): StudioConversationRecord {
   const session = {
     composerText: "",
+    conversationSkillId: null,
     messages: [],
+    nextTurnSkillId: null,
     selectedContextPaths: [],
     settings: { ...INITIAL_STUDIO_CHAT_SETTINGS },
   };
@@ -182,6 +186,11 @@ function buildInterruptedMessageContent(content: string) {
 
 function readStringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+function readOptionalSkillId(value: unknown) {
+  const normalized = readStringValue(value)?.trim();
+  return normalized || null;
 }
 
 function readStringValue(value: unknown) {

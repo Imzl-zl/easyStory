@@ -45,6 +45,7 @@ class ProjectManagementService:
         await self.story_asset_service.scaffold_preparation_assets(db, project.id)
         await db.commit()
         await db.refresh(project)
+        await self.project_service.ensure_project_document_template(db, project.id, owner_id=owner_id)
         return self._to_detail(project)
 
     async def list_projects(

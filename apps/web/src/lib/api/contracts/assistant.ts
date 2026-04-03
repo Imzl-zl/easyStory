@@ -1,4 +1,4 @@
-export type AssistantMessageRole = "system" | "user" | "assistant";
+export type AssistantMessageRole = "user" | "assistant";
 
 export type AssistantMessage = {
   role: AssistantMessageRole;

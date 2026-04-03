@@ -38,6 +38,7 @@
 如果你要看“当前 assistant / 创作聊天主路径”，先读：
 
 - [Assistant 运行时与聊天主路径](./design/20-assistant-runtime-chat-mode.md)
+- [Assistant 项目文稿工具设计](./design/21-assistant-project-document-tools.md)
 - [系统架构设计](./specs/architecture.md)
 - [配置格式规范](./specs/config-format.md)
 

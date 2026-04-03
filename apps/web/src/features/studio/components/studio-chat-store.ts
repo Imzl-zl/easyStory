@@ -16,7 +16,7 @@ import {
 } from "./studio-chat-store-support";
 
 const STORAGE_KEY = "easystory-studio-chat";
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 
 type StudioChatStoreState = {
   createConversation: (scopeId: string) => string;
