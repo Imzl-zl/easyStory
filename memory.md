@@ -6,8 +6,8 @@
 ## 当前基线
 
 - 后端测试：最近一次已知全量 `cd apps/api && ruff check app tests && pytest -q` 通过（记录日期：2026-03-23）
-- 前端检查：最近一次已知 `pnpm --dir apps/web exec tsc --noEmit` + `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-03-30）
-- 最后更新：2026-04-03
+- 前端检查：最近一次已知 `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-04-04）
+- 最后更新：2026-04-04
 
 ## 已完成能力
 
@@ -40,6 +40,7 @@
 - Credential Center 前端闭环：`/workspace/lobby/settings?tab=credentials` 已支持全局/项目作用域切换、项目入口、凭证编辑更新、审计子视图和未保存离开保护
 - Credential Center 删除确认闭环：删除前现有显式确认弹窗，影响文案对齐后端作用域优先级与 usage 历史限制
 - Credential Center 覆盖提示闭环：带项目上下文查看全局凭证时，可显式看到哪些 provider 已被项目级启用凭证接管
+- Credential Center 保存后 dirty 基线已修复：编辑态保存成功后会立即以最新返回结果重建表单，`apiKey` 这类不会回显明文的字段不再让“返回项目大厅”误判为仍有未保存更改
 - Lab 前端 MVP 闭环：`/workspace/project/:projectId/lab` 已支持 `analysis_type / content_id / generated_skill_key` 过滤、详情删除确认、创建结果反馈与组件拆分
 - Workspace Shell 折叠侧栏闭环：全局工作台侧栏现支持桌面端展开/收起、偏好持久化与小屏自动收口，相关导航纯函数已补单测
 - Workspace UI 壳层优化闭环：`WorkspaceShell` 现已改为更克制的导航面板 + 主内容舞台结构，侧栏激活态、折叠态、导航语义和共用卡片层级已统一；同时补齐 `skip link`、`aria-live`、触控细节和输入提示，移动端不再显示无效的展开/收起切换按钮
@@ -96,3 +97,4 @@
 - 2026-03-29：完成用户自定义 MCP + Hook(mcp) 闭环，真值文件落到 `users/<user_id>/mcp_servers/<server_id>/MCP.yaml`；Hook 可直接绑定用户 MCP。
 - 2026-03-30：继续按 Claude 风格收口前端主路径，保留“长期规则 + Skills + 模型连接”为默认心智，`Agents / Hooks / MCP` 进入更明确的次级区域。
 - 2026-03-30：补齐项目级 Skills / MCP，文件真值落到 `projects/<project_id>/skills/<skill_id>/SKILL.md` 与 `projects/<project_id>/mcp_servers/<server_id>/MCP.yaml`，运行时按 `项目 -> 用户 -> 系统` 解析；浏览器已实测 `Skills -> MCP` 无输入切换不再弹未保存提示。
+- 2026-04-04：修复模型连接编辑页保存后 dirty 误报；根因是编辑表单未在保存成功后立即重建基线，尤其 `apiKey` 不回显时会长期判脏。前端 `lint` 与 `test:unit` 已通过，并已在浏览器真实验证“编辑 -> 保存 -> 返回项目大厅”不再弹未保存提示。

@@ -1,4 +1,8 @@
 import type { CredentialView } from "@/lib/api/types";
+import {
+  createCredentialFormFromView,
+  createInitialCredentialForm,
+} from "@/features/settings/components/credential-center-form-support";
 
 export {
   AUTH_STRATEGY_OPTIONS,
@@ -23,6 +27,40 @@ export {
 } from "@/features/settings/components/credential-center-form-support";
 
 export type CredentialCenterMode = "list" | "audit";
+
+type ResolveCredentialEditorStateOptions = {
+  createFormVersion: number;
+  editFormVersion: number;
+  editableCredential: CredentialView | null;
+  savedEditableCredential: CredentialView | null;
+  scope: "user" | "project";
+  scopedProjectId: string | null;
+};
+
+export function resolveCredentialEditorState({
+  createFormVersion,
+  editFormVersion,
+  editableCredential,
+  savedEditableCredential,
+  scope,
+  scopedProjectId,
+}: Readonly<ResolveCredentialEditorStateOptions>) {
+  if (editableCredential) {
+    const baselineCredential = (
+      savedEditableCredential && savedEditableCredential.id === editableCredential.id
+    )
+      ? savedEditableCredential
+      : editableCredential;
+    return {
+      activeFormKey: `edit:${editableCredential.id}:${editFormVersion}`,
+      activeInitialState: createCredentialFormFromView(baselineCredential),
+    };
+  }
+  return {
+    activeFormKey: `create:${scope}:${scopedProjectId ?? "global"}:${createFormVersion}`,
+    activeInitialState: createInitialCredentialForm(),
+  };
+}
 
 export function resolveActiveCredentialId(
   credentials: CredentialView[] | undefined,

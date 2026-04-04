@@ -21,9 +21,8 @@ import {
 import {
   buildCredentialCreatePayload,
   buildCredentialUpdatePayload,
-  createCredentialFormFromView,
-  createInitialCredentialForm,
   getCredentialUpdatePayloadSize,
+  resolveCredentialEditorState,
   resolveEditableCredential,
   resolveActiveCredentialId,
   type CredentialCenterMode,
@@ -78,6 +77,8 @@ export function CredentialCenter({
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<CredentialCenterFeedback>(null);
   const [createFormVersion, setCreateFormVersion] = useState(0);
+  const [editFormVersion, setEditFormVersion] = useState(0);
+  const [savedEditableCredential, setSavedEditableCredential] = useState<CredentialView | null>(null);
   const scopedProjectId = scope === "project" ? projectId ?? null : null;
   const shouldLoadOverrideHints = scope === "user" && projectId !== null && projectId !== undefined;
   const query = useQuery({
@@ -173,7 +174,7 @@ export function CredentialCenter({
       }
       return updateCredential(credential.id, payload);
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       const message = "模型连接已更新。";
       setFeedback({
         message,
@@ -184,6 +185,8 @@ export function CredentialCenter({
         title: "模型连接",
         tone: "success",
       });
+      setSavedEditableCredential(result);
+      setEditFormVersion((current) => current + 1);
       await refresh();
     },
     onError: (error) => {
@@ -249,16 +252,23 @@ export function CredentialCenter({
   const isInteractionPending = isNavigationPending || isFormPending || actionMutation.isPending;
   const pendingAction = resolvePendingCredentialAction(actionMutation.isPending, actionMutation.variables);
   const canUseProjectScope = projectId !== null && projectId !== undefined;
-  const createFormKey = `create:${scope}:${scopedProjectId ?? "global"}:${createFormVersion}`;
-  const activeFormKey = isEditing && editableCredential ? `edit:${editableCredential.id}` : createFormKey;
-  const activeInitialState = editableCredential ? createCredentialFormFromView(editableCredential) : createInitialCredentialForm();
+  const { activeFormKey, activeInitialState } = resolveCredentialEditorState({
+    createFormVersion,
+    editFormVersion,
+    editableCredential,
+    savedEditableCredential,
+    scope,
+    scopedProjectId,
+  });
   const shouldShowEditLoadingState = mode === "list" && selectedCredentialId !== null && query.isLoading;
   const handleModeChange = (nextMode: CredentialCenterMode) => {
     setFeedback(null);
+    setSavedEditableCredential(null);
     onModeChange?.(nextMode);
   };
   const handleScopeChange = (nextScope: CredentialCenterScope) => {
     setFeedback(null);
+    setSavedEditableCredential(null);
     onScopeChange?.(nextScope);
   };
   const handleAuditSelect = (nextCredentialId: string | null) => {
@@ -267,10 +277,12 @@ export function CredentialCenter({
   };
   const handleEditSelect = (nextCredentialId: string | null) => {
     setFeedback(null);
+    setSavedEditableCredential(null);
     onSelectCredentialForEdit?.(nextCredentialId);
   };
   const handleResetEditor = () => {
     setFeedback(null);
+    setSavedEditableCredential(null);
     onResetEditor?.();
   };
 

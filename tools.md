@@ -93,6 +93,7 @@
 - `workflow events` SSE 端点需要 `Authorization: Bearer`；前端不要用原生 `EventSource`，统一走 `fetch + ReadableStream`，并区分正常 EOF 静默重连与错误重连提示。
 - `apps/web` 当前 support 纯逻辑单测走 Node 原生 `--test` + 自定义 `scripts/ts-path-alias-loader.mjs`，这样可直接执行带 `@/` 路径别名的 TypeScript 文件而不引入额外测试框架。
 - 对 query-param 驱动且带本地表单态的页面（如 Lobby Settings / Project Settings / Config Registry），统一复用 `useUnsavedChangesGuard + GuardedLink + UnsavedChangesDialog`；不要只拦本地 tab 按钮，跨页 Link 和浏览器返回也要一起拦。
+- 对编辑态表单里存在“后端不会回显明文”的字段（如 credential `apiKey`）时，保存成功后不要只等 query 刷新推新 `initialState`；应立即用保存返回值重建本地 baseline 或 remount 表单，否则 dirty 会因明文字段残留长期为真。
 - 对 `workflow` 维度的本地 UI 状态（如当前输入框值、已选 node execution、SSE 本地信号），优先用 `{ workflowId, value }` 绑定态再在 render 时按当前 `workflowId` 取值；不要依赖 effect 在切换后“补清空”，否则 A -> B -> A 容易复活旧状态。
 - 导出口径当前已收口：`ChapterTask.status` 为 `completed | stale` 且正文状态为 `approved | stale` 时允许导出；`pending / generating / interrupted / failed` 阻断，`skipped` 直接省略，前端导出对话框必须先跑章节任务预检再发请求。
 - 对"公开 async 入口 + 内部纯规则聚合"的服务（如 review/billing），最佳拆分边界：真实 I/O（并发调度、timeout、DB flush）保留 async；纯规则 helper（归一化、状态聚合、配置校验）保持 sync。

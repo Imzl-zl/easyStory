@@ -8,6 +8,7 @@ import {
   createCredentialFormFromView,
   isCredentialFormDirty,
   normalizeOptionalQueryValue,
+  resolveCredentialEditorState,
 } from "./credential-center-support";
 
 test("createCredentialFormFromView rehydrates default base url when credential uses official default", () => {
@@ -315,6 +316,39 @@ test("isCredentialFormDirty ignores edit changes that normalize back to the same
     isCredentialFormDirty({ ...initialState, displayName: "lucky 2" }, initialState, credential),
     true,
   );
+});
+
+test("resolveCredentialEditorState prefers saved snapshot for edit baseline and bumps form key", () => {
+  const staleCredential = createCredential({ display_name: "旧名称" });
+  const savedCredential = createCredential({ display_name: "新名称" });
+
+  const result = resolveCredentialEditorState({
+    createFormVersion: 0,
+    editFormVersion: 3,
+    editableCredential: staleCredential,
+    savedEditableCredential: savedCredential,
+    scope: "user",
+    scopedProjectId: null,
+  });
+
+  assert.equal(result.activeFormKey, "edit:credential-1:3");
+  assert.equal(result.activeInitialState.displayName, "新名称");
+  assert.equal(result.activeInitialState.apiKey, "");
+});
+
+test("resolveCredentialEditorState builds create baseline when nothing is being edited", () => {
+  const result = resolveCredentialEditorState({
+    createFormVersion: 2,
+    editFormVersion: 0,
+    editableCredential: null,
+    savedEditableCredential: createCredential(),
+    scope: "project",
+    scopedProjectId: "project-1",
+  });
+
+  assert.equal(result.activeFormKey, "create:project:project-1:2");
+  assert.equal(result.activeInitialState.displayName, "");
+  assert.equal(result.activeInitialState.apiKey, "");
 });
 
 test("buildCredentialUpdatePayload can clear client identity fields", () => {
