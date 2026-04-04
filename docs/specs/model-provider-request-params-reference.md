@@ -5,7 +5,7 @@
 | 文档类型 | 技术规范 / 接口参考 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-04-02 |
-| 更新时间 | 2026-04-02 |
+| 更新时间 | 2026-04-04 |
 | 关联文档 | [技术栈确定](./tech-stack.md)、[系统架构设计](./architecture.md)、[数据库设计](./database-design.md)、[主流模型厂商请求头与客户端标识参考](./model-provider-client-identity-and-headers-reference.md)、[主流模型厂商响应结构与流式事件参考](./model-provider-response-contract-reference.md) |
 
 ---
@@ -171,6 +171,8 @@
 - `max_output_tokens` 太小会直接把预算耗在 reasoning 上，最后返回 `status=incomplete`。
 - 官方建议刚开始给 reasoning 模型预留足够预算；文档示例建议先按至少 `25,000` token 量级试验。
 - 响应解析不要沿用 `choices[]` 老逻辑；`Responses` 与 `Chat Completions` 的响应结构和 SSE 结束信号不同，见 [主流模型厂商响应结构与流式事件参考](./model-provider-response-contract-reference.md)。
+- `stream: true` 只表示切到 SSE；工程实现上应把“读流稳定性”和“事件协议解析”分开处理，不要用短超时去取消底层流 reader。
+- `Responses` 流式的最终文本与 `usage` 应优先从 `response.completed` / 最终 `response` 对象收束，而不是假设一定先收到 `response.output_text.delta`。
 
 ---
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,6 +14,7 @@ from .llm_protocol import (
     DEFAULT_REQUEST_TIMEOUT_SECONDS,
     NormalizedLLMResponse,
     PreparedLLMHttpRequest,
+    parse_generation_response,
 )
 
 STREAM_DONE_MARKER = "[DONE]"
@@ -33,6 +35,7 @@ class ParsedStreamEvent:
     payload: dict[str, Any]
     delta: str
     stop_reason: str | None = None
+    terminal_response: NormalizedLLMResponse | None = None
 
 
 class StreamInterruptedError(ConfigurationError):
@@ -72,6 +75,7 @@ async def execute_stream_probe_request(
 ) -> NormalizedLLMResponse:
     text_parts: list[str] = []
     raw_events: list[dict[str, Any]] = []
+    terminal_response: NormalizedLLMResponse | None = None
     async for event in iterate_stream_request(
         request,
         api_dialect=api_dialect,
@@ -79,25 +83,25 @@ async def execute_stream_probe_request(
         timeout_seconds=timeout_seconds,
     ):
         raw_events.append({"event": event.event_name, "data": event.payload})
+        if event.terminal_response is not None:
+            terminal_response = event.terminal_response
         if event.delta:
             text_parts.append(event.delta)
-    content = "".join(text_parts).strip()
+    normalized = build_stream_completion(text_parts, terminal_response)
     if print_response:
         print(
             json.dumps(
-                {"events": raw_events, "content": content},
+                {
+                    "events": raw_events,
+                    "content": normalized.content if normalized is not None else "",
+                },
                 ensure_ascii=False,
                 indent=2,
             )
         )
-    if not content:
+    if normalized is None:
         raise ConfigurationError("Streaming probe returned no text content")
-    return NormalizedLLMResponse(
-        content=content,
-        input_tokens=None,
-        output_tokens=None,
-        total_tokens=None,
-    )
+    return normalized
 
 
 async def iterate_stream_request(
@@ -127,26 +131,43 @@ async def iterate_stream_request(
                     )
                 )
             line_iterator = response.aiter_lines().__aiter__()
-            while True:
-                if await _should_interrupt_stream(should_stop):
-                    raise StreamInterruptedError("Client disconnected during streaming")
-                try:
-                    line = await asyncio.wait_for(
-                        anext(line_iterator),
-                        timeout=STREAM_STOP_CHECK_INTERVAL_SECONDS,
-                    )
-                except asyncio.TimeoutError:
-                    continue
-                except StopAsyncIteration:
-                    break
-                for event in _consume_stream_line(
-                    line,
-                    buffer=buffer,
-                    api_dialect=api_dialect,
-                ):
-                    yield event
+            pending_line_task: asyncio.Task[str] | None = None
+            try:
+                while True:
+                    if pending_line_task is None:
+                        pending_line_task = asyncio.create_task(anext(line_iterator))
+                    if await _should_interrupt_stream(should_stop):
+                        await _cancel_pending_line_task(pending_line_task)
+                        raise StreamInterruptedError("Client disconnected during streaming")
+                    try:
+                        line = await asyncio.wait_for(
+                            asyncio.shield(pending_line_task),
+                            timeout=STREAM_STOP_CHECK_INTERVAL_SECONDS,
+                        )
+                    except asyncio.TimeoutError:
+                        continue
+                    except StopAsyncIteration:
+                        pending_line_task = None
+                        break
+                    pending_line_task = None
+                    for event in _consume_stream_line(
+                        line,
+                        buffer=buffer,
+                        api_dialect=api_dialect,
+                    ):
+                        yield event
+            finally:
+                if pending_line_task is not None:
+                    await _cancel_pending_line_task(pending_line_task)
     for event in _flush_stream_event(buffer, api_dialect=api_dialect):
         yield event
+
+
+async def _cancel_pending_line_task(task: asyncio.Task[str]) -> None:
+    if not task.done():
+        task.cancel()
+    with suppress(asyncio.CancelledError, StopAsyncIteration):
+        await task
 
 
 def _consume_stream_line(
@@ -189,9 +210,31 @@ def _flush_stream_event(
         payload=payload,
         delta=delta,
         stop_reason=_extract_stream_stop_reason(api_dialect, buffer.event_name, payload),
+        terminal_response=_extract_stream_terminal_response(
+            api_dialect,
+            buffer.event_name,
+            payload,
+        ),
     )
     buffer.event_name = None
     return [event]
+
+
+def build_stream_completion(
+    text_parts: list[str],
+    terminal_response: NormalizedLLMResponse | None,
+) -> NormalizedLLMResponse | None:
+    content = "".join(text_parts).strip()
+    if not content and terminal_response is not None:
+        content = terminal_response.content.strip()
+    if not content:
+        return None
+    return NormalizedLLMResponse(
+        content=content,
+        input_tokens=terminal_response.input_tokens if terminal_response is not None else None,
+        output_tokens=terminal_response.output_tokens if terminal_response is not None else None,
+        total_tokens=terminal_response.total_tokens if terminal_response is not None else None,
+    )
 
 
 def _extract_stream_delta(
@@ -241,6 +284,19 @@ def _extract_stream_stop_reason(
     if api_dialect == "anthropic_messages":
         return _extract_anthropic_stop_reason(payload)
     return _extract_gemini_stop_reason(payload)
+
+
+def _extract_stream_terminal_response(
+    api_dialect: str,
+    event_name: str | None,
+    payload: dict[str, Any],
+) -> NormalizedLLMResponse | None:
+    if api_dialect != "openai_responses":
+        return None
+    terminal_payload = _extract_openai_responses_terminal_payload(event_name, payload)
+    if terminal_payload is None:
+        return None
+    return parse_generation_response(api_dialect, terminal_payload)
 
 
 def _extract_openai_chat_delta(payload: dict[str, Any]) -> str:
@@ -300,6 +356,22 @@ def _extract_openai_responses_stop_reason(
             reason = incomplete_details.get("reason")
             if isinstance(reason, str):
                 return reason
+    return None
+
+
+def _extract_openai_responses_terminal_payload(
+    event_name: str | None,
+    payload: dict[str, Any],
+) -> dict[str, Any] | None:
+    if event_name != "response.completed":
+        return None
+    response = payload.get("response")
+    if isinstance(response, dict):
+        return response
+    if isinstance(payload.get("output"), list):
+        return payload
+    if isinstance(payload.get("output_text"), str):
+        return payload
     return None
 
 

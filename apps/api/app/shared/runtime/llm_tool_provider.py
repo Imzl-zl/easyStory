@@ -95,6 +95,7 @@ class LLMToolProvider(ToolProvider):
         parts: list[str] = []
         truncation_reason: str | None = None
         saw_terminal_event = False
+        terminal_response = None
         async for event in stream_support.iterate_stream_request(
             prepared_request,
             api_dialect=api_dialect,
@@ -107,12 +108,14 @@ class LLMToolProvider(ToolProvider):
                     api_dialect=api_dialect,
                     event=event,
                 )
+            if event.terminal_response is not None:
+                terminal_response = event.terminal_response
             if not event.delta:
                 continue
             parts.append(event.delta)
             yield LLMStreamEvent(delta=event.delta)
-        content = "".join(parts)
-        if not content:
+        normalized = stream_support.build_stream_completion(parts, terminal_response)
+        if normalized is None:
             raise ConfigurationError("模型没有返回可展示的内容，请稍后重试。")
         if truncation_reason is not None:
             raise ConfigurationError(
@@ -122,12 +125,12 @@ class LLMToolProvider(ToolProvider):
             raise ConfigurationError(INCOMPLETE_STREAM_MESSAGE)
         yield LLMStreamEvent(
             response={
-                "content": content,
+                "content": normalized.content,
                 "model_name": request.model_name,
                 "provider": request.provider,
-                "input_tokens": None,
-                "output_tokens": None,
-                "total_tokens": None,
+                "input_tokens": normalized.input_tokens,
+                "output_tokens": normalized.output_tokens,
+                "total_tokens": normalized.total_tokens,
             }
         )
 

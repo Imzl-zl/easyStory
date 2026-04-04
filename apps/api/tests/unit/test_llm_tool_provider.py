@@ -6,7 +6,7 @@ import pytest
 
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm_protocol import HttpJsonResponse
-from app.shared.runtime.llm_tool_provider import LLMToolProvider
+from app.shared.runtime.llm_tool_provider import LLMStreamEvent, LLMToolProvider
 
 
 def test_execute_builds_openai_chat_request_with_default_model_fallback() -> None:
@@ -551,6 +551,80 @@ def test_execute_stream_yields_chunks_and_completed_result(monkeypatch) -> None:
         "output_tokens": None,
         "total_tokens": None,
     }
+
+
+def test_execute_stream_uses_openai_completed_payload_when_no_deltas(monkeypatch) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.completed"
+            yield (
+                'data: {"type":"response.completed","response":{"output":[{"type":"message",'
+                '"content":[{"type":"output_text","text":"今天有新方向"}]}],'
+                '"usage":{"input_tokens":8,"output_tokens":10,"total_tokens":18}}}'
+            )
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    provider = LLMToolProvider()
+
+    async def collect_events():
+        return [
+            event
+            async for event in provider.execute_stream(
+                "llm.generate",
+                {
+                    "prompt": "给个方向",
+                    "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_responses",
+                    },
+                },
+            )
+        ]
+
+    events = asyncio.run(collect_events())
+
+    assert events == [
+        LLMStreamEvent(
+            response={
+                "content": "今天有新方向",
+                "model_name": "gpt-4.1-mini",
+                "provider": "openai",
+                "input_tokens": 8,
+                "output_tokens": 10,
+                "total_tokens": 18,
+            }
+        )
+    ]
 
 
 def test_execute_stream_raises_when_upstream_reports_truncation(monkeypatch) -> None:

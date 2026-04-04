@@ -155,6 +155,129 @@ def test_execute_stream_probe_request_ignores_openai_completed_payload(monkeypat
     )
 
     assert normalized.content == "今天"
+    assert normalized.input_tokens is None
+    assert normalized.output_tokens is None
+    assert normalized.total_tokens is None
+
+
+def test_execute_stream_probe_request_reads_openai_completed_response_payload(monkeypatch) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://proxy.example.com/v1/responses",
+        headers={"Accept": "text/event-stream"},
+        json_body={"model": "gpt-5.2-codex", "stream": True},
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.completed"
+            yield (
+                'data: {"type":"response.completed","response":{"output":[{"type":"message",'
+                '"content":[{"type":"output_text","text":"今天有新闻"}]}],'
+                '"usage":{"input_tokens":8,"output_tokens":10,"total_tokens":18}}}'
+            )
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+
+    normalized = asyncio.run(
+        stream_support.execute_stream_probe_request(
+            request,
+            api_dialect="openai_responses",
+            print_response=False,
+        )
+    )
+
+    assert normalized.content == "今天有新闻"
+    assert normalized.input_tokens == 8
+    assert normalized.output_tokens == 10
+    assert normalized.total_tokens == 18
+
+
+def test_execute_stream_probe_request_keeps_slow_openai_stream_alive(monkeypatch) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://proxy.example.com/v1/responses",
+        headers={"Accept": "text/event-stream"},
+        json_body={"model": "gpt-5.2-codex", "stream": True},
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.created"
+            yield 'data: {"type":"response.created"}'
+            yield ""
+            await asyncio.sleep(stream_support.STREAM_STOP_CHECK_INTERVAL_SECONDS + 0.05)
+            yield "event: response.output_text.delta"
+            yield 'data: {"delta":"今天"}'
+            yield ""
+            yield "event: response.completed"
+            yield 'data: {"type":"response.completed"}'
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+
+    normalized = asyncio.run(
+        stream_support.execute_stream_probe_request(
+            request,
+            api_dialect="openai_responses",
+            print_response=False,
+        )
+    )
+
+    assert normalized.content == "今天"
 
 
 def test_flush_stream_event_extracts_openai_chat_truncation_reason() -> None:

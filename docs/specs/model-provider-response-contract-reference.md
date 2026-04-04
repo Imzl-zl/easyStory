@@ -5,7 +5,7 @@
 | 文档类型 | 技术规范 / 响应契约参考 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-04-02 |
-| 更新时间 | 2026-04-02 |
+| 更新时间 | 2026-04-04 |
 | 关联文档 | [主流模型厂商请求参数参考](./model-provider-request-params-reference.md)、[主流模型厂商请求头与客户端标识参考](./model-provider-client-identity-and-headers-reference.md)、[技术栈确定](./tech-stack.md) |
 
 ---
@@ -99,6 +99,14 @@
 - `choices[0].delta.tool_calls`
 - `data: [DONE]`
 
+工程补充口径：
+
+- 流式实现要把“传输层 SSE reader”和“协议层事件状态机”分开处理；前者负责稳定读完整条流，后者负责解析 `delta / completed / usage`。
+- `Responses` 的渐进文本默认从 `response.output_text.delta` 累计；最终完成态以 `response.completed` 携带的 `response` 对象为准。
+- 即使本次流式没有任何 `delta`，只要 `response.completed.response.output[]` 里有可提取文本，也应判定为成功，不应误报“无文本”。
+- `usage` 优先从 `response.completed.response.usage` 或最终响应对象提取，不要把“有无 delta”当成 `usage` 是否可用的前提。
+- 对 `Responses` 而言，`[DONE]` 最多是传输层收尾标记，不是业务上的“完成真值”；完成真值仍应看 `response.completed`。
+
 ### 4.3 解析层该怎么建模
 
 - `openai_responses`：按事件名驱动状态机，最终从 `response.completed` 或最终响应对象收束。
@@ -114,6 +122,8 @@
 - 新项目推荐 `Responses API`，但兼容层仍要保留 `Chat Completions` 支持。
 - `Responses API` 的 `output_text` 适合作为高层快捷提取；底层仍建议保留 `output[]` 原始块，避免丢失工具调用或多模态信息。
 - `Responses` 流式不能再用“等 `[DONE]`”的旧逻辑。
+- `Responses` 流式 reader 不应使用“短超时 + 取消底层读流”的实现；轮询超时只应用于断连检查，不应导致 `aiter_lines()` 一类底层 reader 被取消。
+- 若代理或兼容层把完整文本和 `usage` 只放在 `response.completed.response` 中，解析器仍要从终态 payload 收束最终文本与统计值。
 
 ### 5.2 Anthropic Claude
 
@@ -210,8 +220,10 @@
 
 1. 参数适配层和响应解析层分开测，不要混成一个 integration blob。
 2. 流式解析必须按厂商事件名或 chunk 结构建状态机，不要只做字符串拼接。
-3. `reasoning_content` 一律和用户可见 `content` 分轨保存，避免误渲染到终端。
-4. 厂商返回头只进日志 / 观测，不要拿它驱动业务分支。
+3. SSE reader 必须保持长寿命读取，不要因为轮询超时或心跳检查而取消底层流读取任务。
+4. `Responses` 一类语义化 SSE 协议要同时维护“渐进文本”和“终态完整响应”两条线；前者服务 UI 增量渲染，后者服务最终文本、`usage` 和完成判定。
+5. `reasoning_content` 一律和用户可见 `content` 分轨保存，避免误渲染到终端。
+6. 厂商返回头只进日志 / 观测，不要拿它驱动业务分支。
 
 ---
 
