@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 import uuid
 
@@ -24,6 +25,10 @@ from .assistant_agent_service import AssistantAgentService
 from .assistant_hook_service import AssistantHookService
 from .assistant_mcp_service import AssistantMcpService
 from .assistant_skill_service import AssistantSkillService
+from .assistant_tool_executor import AssistantToolExecutor
+from .assistant_tool_exposure_policy import AssistantToolExposurePolicy
+from .assistant_tool_loop import AssistantToolLoop
+from .assistant_tool_registry import AssistantToolDescriptorRegistry
 from .assistant_hook_providers import build_assistant_plugin_registry
 from .assistant_hook_support import (
     AssistantHookExecutionContext,
@@ -34,13 +39,8 @@ from .assistant_hook_support import (
 )
 from .assistant_execution_support import (
     AssistantExecutionSpec,
-    build_after_assistant_payload,
-    build_before_assistant_payload,
     build_hook_agent_variables,
-    build_turn_response,
-    dump_turn_messages,
     hook_agent_response_format,
-    PreparedAssistantTurn,
     render_prompt,
     require_agent_skill,
     require_text_output,
@@ -48,6 +48,13 @@ from .assistant_execution_support import (
     resolve_hook_agent_output,
     resolve_hook_agent_model,
     validate_retry_policy,
+)
+from .assistant_turn_runtime_support import (
+    PreparedAssistantTurn,
+    build_after_assistant_payload,
+    build_before_assistant_payload,
+    build_turn_context,
+    build_turn_response,
 )
 from .dto import AssistantHookResultDTO, AssistantTurnRequestDTO, AssistantTurnResponseDTO
 from .preferences_service import AssistantPreferencesService
@@ -75,6 +82,10 @@ class AssistantService:
         tool_provider: ToolProvider,
         template_renderer: SkillTemplateRenderer,
         plugin_registry: PluginRegistry | None = None,
+        assistant_tool_descriptor_registry: AssistantToolDescriptorRegistry | None = None,
+        assistant_tool_exposure_policy: AssistantToolExposurePolicy | None = None,
+        assistant_tool_executor: AssistantToolExecutor | None = None,
+        assistant_tool_loop: AssistantToolLoop | None = None,
     ) -> None:
         self.assistant_rule_service = assistant_rule_service
         self.config_loader = config_loader
@@ -102,6 +113,10 @@ class AssistantService:
         self.credential_service_factory = credential_service_factory
         self.tool_provider = tool_provider
         self.template_renderer = template_renderer
+        self.assistant_tool_descriptor_registry = assistant_tool_descriptor_registry
+        self.assistant_tool_exposure_policy = assistant_tool_exposure_policy
+        self.assistant_tool_executor = assistant_tool_executor
+        self.assistant_tool_loop = assistant_tool_loop
         self.plugin_registry = plugin_registry or build_assistant_plugin_registry(
             self,
             mcp_server_resolver=lambda context, server_id: self.assistant_mcp_service.resolve_mcp_server(
@@ -130,6 +145,7 @@ class AssistantService:
             project_id=prepared.project_id,
             spec=prepared.spec,
             system_prompt=prepared.system_prompt,
+            turn_context=prepared.turn_context,
         )
         return await self._finalize_turn(
             db,
@@ -151,21 +167,64 @@ class AssistantService:
         prepared = await self._prepare_turn(db, payload, owner_id=owner_id)
         before_results = await self._run_before_turn_hooks(db, prepared, owner_id=owner_id)
         raw_output: dict[str, Any] | None = None
-        async for event in self._call_turn_llm_stream(
-            db,
-            prepared.hooks,
-            prompt=prepared.prompt,
-            before_payload=prepared.before_payload,
-            owner_id=owner_id,
-            project_id=prepared.project_id,
-            spec=prepared.spec,
-            system_prompt=prepared.system_prompt,
-            should_stop=should_stop,
-        ):
-            if event.delta:
-                yield AssistantStreamEvent("chunk", {"delta": event.delta})
-                continue
-            raw_output = event.response
+        event_seq = 1
+        yield AssistantStreamEvent(
+            "run_started",
+            self._build_stream_event_data(
+                prepared,
+                event_seq=event_seq,
+                state_version=1,
+                extra={
+                    "requested_write_scope": prepared.turn_context.requested_write_scope,
+                    "requested_write_targets": prepared.turn_context.requested_write_targets,
+                },
+            ),
+        )
+        if self._should_use_tool_loop_stream(prepared):
+            async for event_name, event_data in self._stream_turn_with_tool_loop(
+                db,
+                prepared,
+                owner_id=owner_id,
+                should_stop=should_stop,
+            ):
+                if event_name == "final_output":
+                    raw_output = event_data
+                    continue
+                event_seq += 1
+                yield AssistantStreamEvent(
+                    event_name,
+                    self._build_stream_event_data(
+                        prepared,
+                        event_seq=event_seq,
+                        state_version=1,
+                        extra=event_data,
+                    ),
+                )
+        else:
+            async for event in self._call_turn_llm_stream(
+                db,
+                prepared.hooks,
+                prompt=prepared.prompt,
+                before_payload=prepared.before_payload,
+                owner_id=owner_id,
+                project_id=prepared.project_id,
+                spec=prepared.spec,
+                system_prompt=prepared.system_prompt,
+                should_stop=should_stop,
+            ):
+                if event.delta:
+                    event_seq += 1
+                    yield AssistantStreamEvent(
+                        "chunk",
+                        self._build_stream_event_data(
+                            prepared,
+                            event_seq=event_seq,
+                            state_version=1,
+                            extra={"delta": event.delta},
+                        ),
+                    )
+                    continue
+                raw_output = event.response
         if raw_output is None:
             raise ConfigurationError("Streaming response completed without final output")
         response = await self._finalize_turn(
@@ -176,9 +235,18 @@ class AssistantService:
             before_results=before_results,
             owner_id=owner_id,
         )
+        event_seq += 1
+        completed_payload = response.model_dump(mode="json")
+        completed_payload.update(
+            self._build_stream_event_data(
+                prepared,
+                event_seq=event_seq,
+                state_version=2,
+            )
+        )
         yield AssistantStreamEvent(
             "completed",
-            response.model_dump(mode="json"),
+            completed_payload,
         )
 
     async def run_agent_hook(
@@ -269,14 +337,20 @@ class AssistantService:
             owner_id=owner_id,
             project_id=project_id,
         )
-        messages = dump_turn_messages(payload)
+        turn_context = build_turn_context(
+            spec,
+            payload,
+            owner_id=owner_id,
+            project_id=project_id,
+            user_rule_content=rule_bundle.user_content,
+            project_rule_content=rule_bundle.project_content,
+        )
         return PreparedAssistantTurn(
-            before_payload=build_before_assistant_payload(spec, payload, project_id, messages),
+            before_payload=build_before_assistant_payload(spec, payload, project_id, turn_context),
             hooks=[
                 self.assistant_hook_service.resolve_hook(hook_id, owner_id=owner_id)
                 for hook_id in payload.hook_ids
             ],
-            messages=messages,
             project_id=project_id,
             prompt=render_prompt(
                 template_renderer=self.template_renderer,
@@ -289,6 +363,7 @@ class AssistantService:
                 user_content=rule_bundle.user_content,
                 project_content=rule_bundle.project_content,
             ),
+            turn_context=turn_context,
         )
 
     async def _run_before_turn_hooks(
@@ -325,7 +400,7 @@ class AssistantService:
             prepared.spec,
             payload,
             prepared.project_id,
-            prepared.messages,
+            prepared.turn_context,
             content,
         )
         after_results = await self._run_hook_event(
@@ -344,6 +419,7 @@ class AssistantService:
             raw_output,
             content,
             before_results + after_results,
+            prepared.turn_context,
         )
 
     async def _resolve_project_scope(
@@ -356,6 +432,26 @@ class AssistantService:
         if project_id is None:
             return None
         return (await self.project_service.require_project(db, project_id, owner_id=owner_id)).id
+
+    def _build_stream_event_data(
+        self,
+        prepared: PreparedAssistantTurn,
+        *,
+        event_seq: int,
+        state_version: int,
+        extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "run_id": str(prepared.turn_context.run_id),
+            "conversation_id": prepared.turn_context.conversation_id,
+            "client_turn_id": prepared.turn_context.client_turn_id,
+            "event_seq": event_seq,
+            "state_version": state_version,
+            "ts": datetime.now(timezone.utc).isoformat(),
+        }
+        if extra:
+            payload.update(extra)
+        return payload
 
     async def _run_hook_event(
         self,
@@ -458,8 +554,28 @@ class AssistantService:
         project_id: uuid.UUID | None,
         spec: AssistantExecutionSpec,
         system_prompt: str | None,
+        turn_context,
     ) -> dict[str, Any]:
         try:
+            if self.assistant_tool_loop is not None:
+                loop_result = await self.assistant_tool_loop.execute(
+                    db,
+                    turn_context=turn_context,
+                    owner_id=owner_id,
+                    project_id=project_id,
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    model_caller=lambda *, prompt, system_prompt, tools: self._call_llm(
+                        db,
+                        prompt=prompt,
+                        system_prompt=system_prompt,
+                        model=spec.model,
+                        owner_id=owner_id,
+                        project_id=project_id,
+                        tools=tools,
+                    ),
+                )
+                return loop_result.raw_output
             return await self._call_llm(
                 db,
                 prompt=prompt,
@@ -493,6 +609,7 @@ class AssistantService:
         project_id: uuid.UUID | None,
         spec: AssistantExecutionSpec,
         system_prompt: str | None,
+        tools: list[dict[str, Any]] | None = None,
         should_stop: Callable[[], Awaitable[bool]] | None = None,
     ) -> AsyncIterator[LLMStreamEvent]:
         try:
@@ -503,6 +620,7 @@ class AssistantService:
                 model=spec.model,
                 owner_id=owner_id,
                 project_id=project_id,
+                tools=tools,
                 should_stop=should_stop,
             ):
                 yield event
@@ -522,6 +640,110 @@ class AssistantService:
             )
             raise
 
+    async def _stream_turn_with_tool_loop(
+        self,
+        db: AsyncSession,
+        prepared: PreparedAssistantTurn,
+        *,
+        owner_id: uuid.UUID,
+        should_stop: Callable[[], Awaitable[bool]] | None = None,
+    ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
+        if self.assistant_tool_loop is None:
+            raise ConfigurationError("Assistant tool loop is not configured")
+        tool_schemas = self.assistant_tool_loop.resolve_tool_schemas(
+            turn_context=prepared.turn_context,
+            project_id=prepared.project_id,
+        )
+        if not tool_schemas:
+            raise ConfigurationError("Assistant tool loop streaming requires visible tools")
+        try:
+            raw_output: dict[str, Any] | None = None
+            async for event in self._call_llm_stream(
+                db,
+                prompt=prepared.prompt,
+                system_prompt=prepared.system_prompt,
+                model=prepared.spec.model,
+                owner_id=owner_id,
+                project_id=prepared.project_id,
+                tools=tool_schemas,
+                should_stop=should_stop,
+            ):
+                if event.delta:
+                    yield "chunk", {"delta": event.delta}
+                    continue
+                raw_output = event.response
+            if raw_output is None:
+                raise ConfigurationError("Streaming response completed without initial output")
+            if not self._has_tool_calls(raw_output):
+                yield "final_output", raw_output
+                return
+            async for item in self.assistant_tool_loop.iterate(
+                db,
+                turn_context=prepared.turn_context,
+                owner_id=owner_id,
+                project_id=prepared.project_id,
+                prompt=prepared.prompt,
+                system_prompt=prepared.system_prompt,
+                model_caller=lambda *, prompt, system_prompt, tools: self._call_llm(
+                    db,
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    model=prepared.spec.model,
+                    owner_id=owner_id,
+                    project_id=prepared.project_id,
+                    tools=tools,
+                ),
+                initial_raw_output=raw_output,
+                should_stop=should_stop,
+            ):
+                if item.event_name is not None and item.event_payload is not None:
+                    yield item.event_name, item.event_payload
+                    continue
+                if item.raw_output is None:
+                    continue
+                buffered_chunk = self._build_buffered_final_chunk_payload(item.raw_output)
+                if buffered_chunk is not None:
+                    yield "chunk", buffered_chunk
+                yield "final_output", item.raw_output
+        except StreamInterruptedError:
+            raise
+        except Exception as exc:
+            await self._run_on_error_hooks(
+                db,
+                prepared.hooks,
+                prepared.before_payload,
+                exc,
+                owner_id=owner_id,
+                project_id=prepared.project_id,
+                agent_id=prepared.spec.agent_id,
+                skill_id=prepared.spec.skill_id,
+                assistant_model=prepared.spec.model,
+            )
+            raise
+
+    def _should_use_tool_loop_stream(self, prepared: PreparedAssistantTurn) -> bool:
+        if self.assistant_tool_loop is None:
+            return False
+        return bool(
+            self.assistant_tool_loop.resolve_tool_schemas(
+                turn_context=prepared.turn_context,
+                project_id=prepared.project_id,
+            )
+        )
+
+    def _has_tool_calls(self, raw_output: dict[str, Any]) -> bool:
+        tool_calls = raw_output.get("tool_calls")
+        return isinstance(tool_calls, list) and bool(tool_calls)
+
+    def _build_buffered_final_chunk_payload(
+        self,
+        raw_output: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        content = raw_output.get("content")
+        if not isinstance(content, str) or not content:
+            return None
+        return {"delta": content, "chunk_kind": "buffered_final"}
+
     async def _call_llm(
         self,
         db: AsyncSession,
@@ -532,6 +754,7 @@ class AssistantService:
         owner_id: uuid.UUID,
         project_id: uuid.UUID | None,
         response_format: str = "text",
+        tools: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         credential_service = self._resolve_credential_service()
         credential = await credential_service.resolve_active_credential(
@@ -551,6 +774,7 @@ class AssistantService:
                     decrypt_api_key=credential_service.crypto.decrypt,
                 ),
                 "response_format": response_format,
+                "tools": list(tools or []),
             },
         )
 
@@ -563,6 +787,7 @@ class AssistantService:
         model: ModelConfig,
         owner_id: uuid.UUID,
         project_id: uuid.UUID | None,
+        tools: list[dict[str, Any]] | None = None,
         should_stop: Callable[[], Awaitable[bool]] | None = None,
     ) -> AsyncIterator[LLMStreamEvent]:
         credential_service = self._resolve_credential_service()
@@ -586,6 +811,7 @@ class AssistantService:
                     decrypt_api_key=credential_service.crypto.decrypt,
                 ),
                 "response_format": "text",
+                "tools": list(tools or []),
             },
             should_stop=should_stop,
         ):

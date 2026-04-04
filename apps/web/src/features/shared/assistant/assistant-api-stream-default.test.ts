@@ -29,7 +29,10 @@ test("assistant api sends explicit buffered flag for non-stream turn requests", 
 
   try {
     await runAssistantTurn({
+      conversation_id: "conversation-api-test",
+      client_turn_id: "turn-api-test-1",
       messages: [{ content: "测试", role: "user" }],
+      requested_write_scope: "disabled",
       skill_id: "skill.assistant.general_chat",
     });
   } finally {

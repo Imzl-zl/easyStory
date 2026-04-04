@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from .errors import ConfigurationError
-from .llm_protocol_types import NormalizedLLMResponse, normalize_api_dialect
+from .llm_protocol_types import NormalizedLLMResponse, NormalizedLLMToolCall, normalize_api_dialect
 
 TRUNCATED_STOP_REASONS = frozenset({"length", "max_tokens", "max_output_tokens", "MAX_TOKENS"})
 
@@ -28,8 +29,17 @@ def _parse_openai_chat_response(payload: dict[str, Any]) -> NormalizedLLMRespons
     first_choice = _require_dict(choices[0], "choices[0]")
     message = _require_dict(first_choice.get("message"), "choices[0].message")
     content = _stringify_openai_content(message.get("content"))
+    tool_calls = _extract_openai_chat_tool_calls(message)
     usage = _require_dict(payload.get("usage"), "usage", allow_none=True) or {}
-    return _build_normalized_response(content, usage, "prompt_tokens", "completion_tokens", "total_tokens")
+    return _build_normalized_response(
+        content,
+        usage,
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+        finish_reason=_extract_openai_chat_stop_reason(payload),
+        tool_calls=tool_calls,
+    )
 
 
 def _parse_openai_responses_response(payload: dict[str, Any]) -> NormalizedLLMResponse:
@@ -38,8 +48,18 @@ def _parse_openai_responses_response(payload: dict[str, Any]) -> NormalizedLLMRe
         content = output_text
     else:
         content = _extract_responses_text(payload)
+    tool_calls = _extract_openai_responses_tool_calls(payload)
     usage = _require_dict(payload.get("usage"), "usage", allow_none=True) or {}
-    return _build_normalized_response(content, usage, "input_tokens", "output_tokens", "total_tokens")
+    return _build_normalized_response(
+        content,
+        usage,
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        finish_reason=_extract_openai_responses_stop_reason(payload),
+        tool_calls=tool_calls,
+        provider_response_id=_optional_string(payload.get("id")),
+    )
 
 
 def _parse_anthropic_messages_response(payload: dict[str, Any]) -> NormalizedLLMResponse:
@@ -49,8 +69,18 @@ def _parse_anthropic_messages_response(payload: dict[str, Any]) -> NormalizedLLM
         for block in blocks
         if isinstance(block, dict) and isinstance(block.get("text"), str)
     )
+    tool_calls = _extract_anthropic_tool_calls(blocks)
     usage = _require_dict(payload.get("usage"), "usage", allow_none=True) or {}
-    return _build_normalized_response(content, usage, "input_tokens", "output_tokens", None)
+    return _build_normalized_response(
+        content,
+        usage,
+        "input_tokens",
+        "output_tokens",
+        None,
+        finish_reason=_extract_anthropic_stop_reason(payload),
+        tool_calls=tool_calls,
+        provider_response_id=_optional_string(payload.get("id")),
+    )
 
 
 def _parse_gemini_generate_content_response(payload: dict[str, Any]) -> NormalizedLLMResponse:
@@ -65,6 +95,7 @@ def _parse_gemini_generate_content_response(payload: dict[str, Any]) -> Normaliz
         for part in parts
         if isinstance(part, dict) and isinstance(part.get("text"), str)
     )
+    tool_calls = _extract_gemini_tool_calls(parts)
     usage = _require_dict(payload.get("usageMetadata"), "usageMetadata", allow_none=True) or {}
     return _build_normalized_response(
         text,
@@ -72,6 +103,8 @@ def _parse_gemini_generate_content_response(payload: dict[str, Any]) -> Normaliz
         "promptTokenCount",
         "candidatesTokenCount",
         "totalTokenCount",
+        finish_reason=_extract_gemini_stop_reason(payload),
+        tool_calls=tool_calls,
     )
 
 
@@ -159,6 +192,10 @@ def _build_normalized_response(
     input_key: str,
     output_key: str,
     total_key: str | None,
+    *,
+    finish_reason: str | None,
+    tool_calls: list[NormalizedLLMToolCall] | None = None,
+    provider_response_id: str | None = None,
 ) -> NormalizedLLMResponse:
     input_tokens = _optional_int(usage.get(input_key))
     output_tokens = _optional_int(usage.get(output_key))
@@ -167,13 +204,18 @@ def _build_normalized_response(
         total_tokens = input_tokens + output_tokens
     return NormalizedLLMResponse(
         content=content,
+        finish_reason=finish_reason,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_tokens=total_tokens,
+        tool_calls=list(tool_calls or []),
+        provider_response_id=provider_response_id,
     )
 
 
 def _stringify_openai_content(content: Any) -> str:
+    if content is None:
+        return ""
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -207,3 +249,117 @@ def _optional_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigurationError("Expected integer value")
     return value
+
+
+def _optional_string(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def _extract_openai_chat_tool_calls(message: dict[str, Any]) -> list[NormalizedLLMToolCall]:
+    tool_calls = _require_list(message.get("tool_calls"), "message.tool_calls", allow_none=True) or []
+    items: list[NormalizedLLMToolCall] = []
+    for item in tool_calls:
+        if not isinstance(item, dict):
+            continue
+        function = _require_dict(item.get("function"), "message.tool_calls.function", allow_none=True) or {}
+        items.append(
+            _build_tool_call(
+                tool_call_id=_optional_string(item.get("id")),
+                tool_name=_optional_string(function.get("name")),
+                arguments=_parse_tool_arguments(function.get("arguments")),
+            )
+        )
+    return items
+
+
+def _extract_openai_responses_tool_calls(payload: dict[str, Any]) -> list[NormalizedLLMToolCall]:
+    output = _require_list(payload.get("output"), "output")
+    items: list[NormalizedLLMToolCall] = []
+    for item in output:
+        if not isinstance(item, dict) or item.get("type") != "function_call":
+            continue
+        items.append(
+            _build_tool_call(
+                tool_call_id=_optional_string(item.get("call_id")) or _optional_string(item.get("id")),
+                tool_name=_optional_string(item.get("name")),
+                arguments=_parse_tool_arguments(item.get("arguments")),
+                provider_ref=_optional_string(item.get("id")),
+            )
+        )
+    return items
+
+
+def _extract_anthropic_tool_calls(blocks: list[Any]) -> list[NormalizedLLMToolCall]:
+    items: list[NormalizedLLMToolCall] = []
+    for block in blocks:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        items.append(
+            _build_tool_call(
+                tool_call_id=_optional_string(block.get("id")),
+                tool_name=_optional_string(block.get("name")),
+                arguments=_parse_tool_arguments(block.get("input")),
+            )
+        )
+    return items
+
+
+def _extract_gemini_tool_calls(parts: list[Any]) -> list[NormalizedLLMToolCall]:
+    items: list[NormalizedLLMToolCall] = []
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        function_call = _require_dict(part.get("functionCall"), "part.functionCall", allow_none=True)
+        if function_call is None:
+            continue
+        items.append(
+            _build_tool_call(
+                tool_call_id=_optional_string(function_call.get("id")),
+                tool_name=_optional_string(function_call.get("name")),
+                arguments=_parse_tool_arguments(function_call.get("args")),
+            )
+        )
+    return items
+
+
+def _build_tool_call(
+    *,
+    tool_call_id: str | None,
+    tool_name: str | None,
+    arguments: tuple[dict[str, Any] | None, str | None],
+    provider_ref: str | None = None,
+) -> NormalizedLLMToolCall:
+    if tool_call_id is None:
+        raise ConfigurationError("Tool call is missing id")
+    if tool_name is None:
+        raise ConfigurationError("Tool call is missing name")
+    parsed_arguments, arguments_text = arguments
+    return NormalizedLLMToolCall(
+        tool_call_id=tool_call_id,
+        tool_name=tool_name,
+        arguments=parsed_arguments,
+        arguments_text=arguments_text,
+        provider_ref=provider_ref,
+    )
+
+
+def _parse_tool_arguments(value: Any) -> tuple[dict[str, Any] | None, str | None]:
+    if isinstance(value, dict):
+        return value, json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    if value is None:
+        return None, None
+    if not isinstance(value, str):
+        raise ConfigurationError("Tool call arguments must be an object or JSON string")
+    text = value.strip()
+    if not text:
+        return None, None
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ConfigurationError("Tool call arguments JSON is invalid") from exc
+    if not isinstance(parsed, dict):
+        raise ConfigurationError("Tool call arguments JSON must decode to an object")
+    return parsed, text

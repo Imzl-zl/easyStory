@@ -1,3 +1,7 @@
+from .project_document_identity_store import (
+    ProjectDocumentIdentityRecord,
+    ProjectDocumentIdentityStore,
+)
 from .studio_document_file_store import (
     ProjectDocumentEntryRecord,
     ProjectDocumentFileRecord,
@@ -6,6 +10,8 @@ from .studio_document_file_store import (
 )
 
 __all__ = [
+    "ProjectDocumentIdentityRecord",
+    "ProjectDocumentIdentityStore",
     "ProjectDocumentEntryRecord",
     "ProjectDocumentFileRecord",
     "ProjectDocumentFileStore",

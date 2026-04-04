@@ -91,7 +91,10 @@ async def test_assistant_service_runs_user_skill(tmp_path) -> None:
             response = await service.turn(
                 session,
                 AssistantTurnRequestDTO(
+                    conversation_id="conversation-skill-service",
+                    client_turn_id="turn-skill-service-1",
                     skill_id=created.id,
+                    requested_write_scope="disabled",
                     messages=[AssistantMessageDTO(role="user", content="我想写校园成长故事")],
                 ),
                 owner_id=owner.id,

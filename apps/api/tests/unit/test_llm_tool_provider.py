@@ -501,7 +501,10 @@ def test_execute_stream_yields_chunks_and_completed_result(monkeypatch) -> None:
             yield 'data: {"delta":"有新方向"}'
             yield ""
             yield "event: response.completed"
-            yield 'data: {"output_text":"今天有新方向"}'
+            yield (
+                'data: {"type":"response.completed","response":{"output":[{"type":"message",'
+                '"content":[{"type":"output_text","text":"今天有新方向"}]}]}}'
+            )
             yield ""
             yield "data: [DONE]"
             yield ""
@@ -545,11 +548,14 @@ def test_execute_stream_yields_chunks_and_completed_result(monkeypatch) -> None:
     assert [event.delta for event in events[:-1]] == ["今天", "有新方向"]
     assert events[-1].response == {
         "content": "今天有新方向",
+        "finish_reason": None,
         "model_name": "gpt-4.1-mini",
         "provider": "openai",
         "input_tokens": None,
         "output_tokens": None,
         "total_tokens": None,
+        "tool_calls": [],
+        "provider_response_id": None,
     }
 
 
@@ -617,11 +623,99 @@ def test_execute_stream_uses_openai_completed_payload_when_no_deltas(monkeypatch
         LLMStreamEvent(
             response={
                 "content": "今天有新方向",
+                "finish_reason": None,
                 "model_name": "gpt-4.1-mini",
                 "provider": "openai",
                 "input_tokens": 8,
                 "output_tokens": 10,
                 "total_tokens": 18,
+                "tool_calls": [],
+                "provider_response_id": None,
+            }
+        )
+    ]
+
+
+def test_execute_stream_accepts_openai_completed_payload_with_tool_calls_and_no_text(monkeypatch) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.completed"
+            yield (
+                'data: {"type":"response.completed","response":{"id":"resp_tool_1","output":[{"type":"function_call",'
+                '"call_id":"call_123","name":"project.read_documents","arguments":"{\\"paths\\":[\\"设定/人物.md\\"]}"}],'
+                '"usage":{"input_tokens":8,"output_tokens":10,"total_tokens":18}}}'
+            )
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    provider = LLMToolProvider()
+
+    async def collect_events():
+        return [
+            event
+            async for event in provider.execute_stream(
+                "llm.generate",
+                {
+                    "prompt": "读一下人物设定",
+                    "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_responses",
+                    },
+                },
+            )
+        ]
+
+    events = asyncio.run(collect_events())
+
+    assert events == [
+        LLMStreamEvent(
+            response={
+                "content": "",
+                "finish_reason": None,
+                "model_name": "gpt-4.1-mini",
+                "provider": "openai",
+                "input_tokens": 8,
+                "output_tokens": 10,
+                "total_tokens": 18,
+                "tool_calls": [
+                    {
+                        "tool_call_id": "call_123",
+                        "tool_name": "project.read_documents",
+                        "arguments": {"paths": ["设定/人物.md"]},
+                        "arguments_text": '{"paths":["设定/人物.md"]}',
+                        "provider_ref": None,
+                    }
+                ],
+                "provider_response_id": "resp_tool_1",
             }
         )
     ]

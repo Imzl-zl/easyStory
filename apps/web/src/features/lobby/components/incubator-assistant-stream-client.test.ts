@@ -29,12 +29,15 @@ test("assistant stream client rejects partial content when stream ends without c
     await assert.rejects(
       runAssistantTurnStream(
         {
+          conversation_id: "conversation-stream-test",
+          client_turn_id: "turn-stream-test-1",
           messages: [{ content: "测试", role: "user" }],
           model: {
             max_tokens: 8192,
             name: "gemini-2.5-flash",
             provider: "薄荷",
           },
+          requested_write_scope: "disabled",
           skill_id: "skill.assistant.general_chat",
         },
         {

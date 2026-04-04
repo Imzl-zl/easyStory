@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 from typing import Any, Literal
 
@@ -85,6 +85,7 @@ class LLMGenerateRequest:
     max_tokens: int | None
     top_p: float | None
     stop: list[str] | None = None
+    tools: list["LLMFunctionToolDefinition"] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -103,11 +104,30 @@ class HttpJsonResponse:
 
 
 @dataclass(frozen=True)
+class LLMFunctionToolDefinition:
+    name: str
+    description: str
+    parameters: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class NormalizedLLMToolCall:
+    tool_call_id: str
+    tool_name: str
+    arguments: dict[str, Any] | None
+    arguments_text: str | None = None
+    provider_ref: str | None = None
+
+
+@dataclass(frozen=True)
 class NormalizedLLMResponse:
     content: str
+    finish_reason: str | None
     input_tokens: int | None
     output_tokens: int | None
     total_tokens: int | None
+    tool_calls: list[NormalizedLLMToolCall] = field(default_factory=list)
+    provider_response_id: str | None = None
 
 
 def normalize_api_dialect(api_dialect: str | None) -> LlmApiDialect:

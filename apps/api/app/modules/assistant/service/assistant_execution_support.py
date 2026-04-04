@@ -3,16 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from typing import Any, Callable
-import uuid
 
 from jinja2.exceptions import SecurityError, UndefinedError
 
 from app.modules.config_registry import ConfigLoader
-from app.modules.config_registry.schemas import AgentConfig, HookConfig, ModelConfig, SkillConfig
+from app.modules.config_registry.schemas import AgentConfig, ModelConfig, SkillConfig
 from app.shared.runtime import SkillTemplateRenderer
 from app.shared.runtime.errors import ConfigurationError
 
-from .assistant_hook_support import AssistantHookExecutionContext, build_assistant_hook_payload
+from .assistant_hook_support import AssistantHookExecutionContext
 from .assistant_prompt_support import (
     build_skill_variables,
     format_conversation_history,
@@ -20,7 +19,7 @@ from .assistant_prompt_support import (
     resolve_model,
     validate_skill_input,
 )
-from .dto import AssistantHookResultDTO, AssistantTurnRequestDTO, AssistantTurnResponseDTO
+from .dto import AssistantTurnRequestDTO
 from .preferences_dto import AssistantPreferencesDTO
 from .preferences_support import apply_preferred_model
 
@@ -33,17 +32,6 @@ class AssistantExecutionSpec:
     system_prompt: str | None
     model: ModelConfig
     mcp_servers: list[str]
-
-
-@dataclass(frozen=True)
-class PreparedAssistantTurn:
-    before_payload: dict[str, Any]
-    hooks: list[HookConfig]
-    messages: list[dict[str, str]]
-    project_id: uuid.UUID | None
-    prompt: str
-    spec: AssistantExecutionSpec
-    system_prompt: str | None
 
 
 def resolve_execution_spec(
@@ -183,66 +171,6 @@ def resolve_hook_agent_model(
         return assistant_model.model_copy(deep=True)
     preferred_model = apply_preferred_model(hook_base_model, preferences)
     return resolve_model(preferred_model, None, context_label=f"Hook agent {agent.id}")
-
-
-def dump_turn_messages(payload: AssistantTurnRequestDTO) -> list[dict[str, str]]:
-    return [item.model_dump(mode="json") for item in payload.messages]
-
-
-def build_before_assistant_payload(
-    spec: AssistantExecutionSpec,
-    payload: AssistantTurnRequestDTO,
-    project_id: uuid.UUID | None,
-    messages: list[dict[str, str]],
-) -> dict[str, Any]:
-    return build_assistant_hook_payload(
-        event="before_assistant_response",
-        agent_id=spec.agent_id,
-        skill_id=spec.skill_id,
-        project_id=project_id,
-        messages=messages,
-        input_data=payload.input_data,
-        mcp_servers=spec.mcp_servers,
-    )
-
-
-def build_after_assistant_payload(
-    spec: AssistantExecutionSpec,
-    payload: AssistantTurnRequestDTO,
-    project_id: uuid.UUID | None,
-    messages: list[dict[str, str]],
-    content: str,
-) -> dict[str, Any]:
-    return build_assistant_hook_payload(
-        event="after_assistant_response",
-        agent_id=spec.agent_id,
-        skill_id=spec.skill_id,
-        project_id=project_id,
-        messages=messages,
-        input_data=payload.input_data,
-        mcp_servers=spec.mcp_servers,
-        extra={"response": {"content": content}},
-    )
-
-
-def build_turn_response(
-    spec: AssistantExecutionSpec,
-    raw_output: dict[str, Any],
-    content: str,
-    hook_results: list[AssistantHookResultDTO],
-) -> AssistantTurnResponseDTO:
-    return AssistantTurnResponseDTO(
-        agent_id=spec.agent_id,
-        skill_id=spec.skill_id,
-        provider=spec.model.provider or "",
-        model_name=raw_output.get("model_name") or spec.model.name or "",
-        content=content,
-        hook_results=hook_results,
-        mcp_servers=spec.mcp_servers,
-        input_tokens=raw_output.get("input_tokens"),
-        output_tokens=raw_output.get("output_tokens"),
-        total_tokens=raw_output.get("total_tokens"),
-    )
 
 
 def hook_agent_response_format(agent: AgentConfig) -> str:

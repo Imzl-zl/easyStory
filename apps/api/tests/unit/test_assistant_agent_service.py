@@ -105,7 +105,10 @@ async def test_assistant_service_runs_user_agent_with_disabled_user_skill(tmp_pa
             response = await service.turn(
                 session,
                 AssistantTurnRequestDTO(
+                    conversation_id="conversation-agent-service",
+                    client_turn_id="turn-agent-service-1",
                     agent_id=created_agent.id,
+                    requested_write_scope="disabled",
                     messages=[AssistantMessageDTO(role="user", content="我想写一个轻松成长故事")],
                 ),
                 owner_id=owner.id,

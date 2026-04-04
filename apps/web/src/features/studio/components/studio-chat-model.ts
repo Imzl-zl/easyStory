@@ -136,6 +136,7 @@ export function useStudioChatModel({
     const consumedNextTurnSkillId = state.nextTurnSkillId;
     const activeSkillId = consumedNextTurnSkillId ?? state.conversationSkillId;
     const payload = buildStudioAssistantTurnPayload({
+      conversationId,
       messages: nextMessages,
       projectId,
       settings: state.settings,

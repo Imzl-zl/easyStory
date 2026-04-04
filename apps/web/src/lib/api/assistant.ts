@@ -20,6 +20,17 @@ export * from "./assistant-mcp";
 export * from "./assistant-skills";
 
 type AssistantTurnStreamEvent =
+  | {
+    event: "run_started";
+    data: {
+      run_id: string;
+      conversation_id: string;
+      client_turn_id: string;
+      event_seq: number;
+      state_version: number;
+      ts: string;
+    };
+  }
   | { event: "chunk"; data: { delta: string } }
   | { event: "completed"; data: AssistantTurnResult }
   | { event: "error"; data: { message?: string } };
@@ -90,6 +101,9 @@ export async function runAssistantTurnStream(
           streamedContent += event.data.delta;
           options.onChunk(event.data.delta);
         }
+        continue;
+      }
+      if (event.event === "run_started") {
         continue;
       }
       if (event.event === "error") {
@@ -240,6 +254,19 @@ function parseAssistantTurnStreamEvent(chunk: string): AssistantTurnStreamEvent 
   const payload = JSON.parse(dataLines.join("\n")) as unknown;
   if (eventName === "chunk") {
     return { event: "chunk", data: payload as { delta: string } };
+  }
+  if (eventName === "run_started") {
+    return {
+      event: "run_started",
+      data: payload as {
+        run_id: string;
+        conversation_id: string;
+        client_turn_id: string;
+        event_seq: number;
+        state_version: number;
+        ts: string;
+      },
+    };
   }
   if (eventName === "completed") {
     return { event: "completed", data: payload as AssistantTurnResult };

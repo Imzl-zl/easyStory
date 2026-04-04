@@ -37,13 +37,21 @@ from .dto import (
     SettingCompletenessIssueDTO,
     SettingCompletenessResultDTO,
 )
+from .project_document_capability_dto import (
+    ProjectDocumentCatalogEntryDTO,
+    ProjectDocumentReadErrorDTO,
+    ProjectDocumentReadItemDTO,
+    ProjectDocumentReadResultDTO,
+)
 from .factory import (
     create_project_deletion_service,
+    create_project_document_capability_service,
     create_project_incubator_service,
     create_project_management_service,
     create_project_service,
 )
 from .project_deletion_service import ProjectDeletionService
+from .project_document_capability_service import ProjectDocumentCapabilityService
 from .project_incubator_service import ProjectIncubatorService
 from .project_management_service import ProjectManagementService
 from .project_service import ProjectService
@@ -62,11 +70,16 @@ __all__ = [
     "ProjectIncubatorTemplateDTO",
     "ProjectIncubatorUnmappedAnswerDTO",
     "ProjectCreateDTO",
+    "ProjectDocumentCapabilityService",
+    "ProjectDocumentCatalogEntryDTO",
     "ProjectDocumentEntryCreateDTO",
     "ProjectDocumentEntryDTO",
     "ProjectDocumentEntryDeleteResultDTO",
     "ProjectDocumentEntryRenameDTO",
     "ProjectDocumentDTO",
+    "ProjectDocumentReadErrorDTO",
+    "ProjectDocumentReadItemDTO",
+    "ProjectDocumentReadResultDTO",
     "ProjectDocumentSaveDTO",
     "ProjectDocumentTreeNodeDTO",
     "ProjectDeletionService",
@@ -91,6 +104,7 @@ __all__ = [
     "SettingCompletenessIssueDTO",
     "SettingCompletenessResultDTO",
     "create_project_deletion_service",
+    "create_project_document_capability_service",
     "create_project_incubator_service",
     "create_project_management_service",
     "create_project_service",

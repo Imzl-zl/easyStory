@@ -4,7 +4,12 @@ from pathlib import Path
 
 from app.modules.config_registry import ConfigLoader
 from app.modules.credential.service import create_credential_service
-from app.modules.project.service import ProjectService, create_project_service
+from app.modules.project.service import (
+    ProjectDocumentCapabilityService,
+    ProjectService,
+    create_project_document_capability_service,
+    create_project_service,
+)
 from app.shared.runtime import LLMToolProvider, SkillTemplateRenderer
 
 from .assistant_config_file_store import AssistantConfigFileStore
@@ -14,6 +19,10 @@ from .assistant_hook_file_store import AssistantHookFileStore
 from .assistant_hook_service import AssistantHookService
 from .assistant_mcp_file_store import AssistantMcpFileStore
 from .assistant_mcp_service import AssistantMcpService
+from .assistant_tool_executor import AssistantToolExecutor
+from .assistant_tool_exposure_policy import AssistantToolExposurePolicy
+from .assistant_tool_loop import AssistantToolLoop
+from .assistant_tool_registry import AssistantToolDescriptorRegistry
 from .assistant_skill_file_store import AssistantSkillFileStore
 from .assistant_rule_service import AssistantRuleService
 from .assistant_skill_service import AssistantSkillService
@@ -59,6 +68,16 @@ def create_assistant_service(
         project_service=resolved_project_service,
         mcp_store=mcp_store,
     )
+    resolved_tool_registry = create_assistant_tool_descriptor_registry()
+    resolved_tool_exposure_policy = create_assistant_tool_exposure_policy(
+        registry=resolved_tool_registry,
+    )
+    resolved_project_document_capability_service = create_project_document_capability_service(
+        project_service=resolved_project_service,
+    )
+    resolved_tool_executor = create_assistant_tool_executor(
+        project_document_capability_service=resolved_project_document_capability_service,
+    )
     return AssistantService(
         assistant_agent_service=resolved_agent_service,
         assistant_hook_service=create_assistant_hook_service(
@@ -82,6 +101,13 @@ def create_assistant_service(
         project_service=resolved_project_service,
         tool_provider=tool_provider or LLMToolProvider(),
         template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=resolved_tool_registry,
+        assistant_tool_exposure_policy=resolved_tool_exposure_policy,
+        assistant_tool_executor=resolved_tool_executor,
+        assistant_tool_loop=create_assistant_tool_loop(
+            exposure_policy=resolved_tool_exposure_policy,
+            executor=resolved_tool_executor,
+        ),
     )
 
 
@@ -169,4 +195,40 @@ def create_assistant_mcp_service(
         config_loader=config_loader or ConfigLoader(DEFAULT_CONFIG_ROOT),
         project_service=project_service or create_project_service(),
         mcp_store=mcp_store or build_default_assistant_mcp_store(),
+    )
+
+
+def create_assistant_tool_descriptor_registry() -> AssistantToolDescriptorRegistry:
+    return AssistantToolDescriptorRegistry()
+
+
+def create_assistant_tool_exposure_policy(
+    *,
+    registry: AssistantToolDescriptorRegistry | None = None,
+) -> AssistantToolExposurePolicy:
+    return AssistantToolExposurePolicy(
+        registry=registry or create_assistant_tool_descriptor_registry(),
+    )
+
+
+def create_assistant_tool_executor(
+    *,
+    project_document_capability_service: ProjectDocumentCapabilityService | None = None,
+) -> AssistantToolExecutor:
+    return AssistantToolExecutor(
+        project_document_capability_service=project_document_capability_service
+        or create_project_document_capability_service(),
+    )
+
+
+def create_assistant_tool_loop(
+    *,
+    exposure_policy: AssistantToolExposurePolicy | None = None,
+    executor: AssistantToolExecutor | None = None,
+) -> AssistantToolLoop:
+    resolved_exposure_policy = exposure_policy or create_assistant_tool_exposure_policy()
+    resolved_executor = executor or create_assistant_tool_executor()
+    return AssistantToolLoop(
+        exposure_policy=resolved_exposure_policy,
+        executor=resolved_executor,
     )

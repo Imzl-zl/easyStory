@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from app.modules.config_registry import ConfigLoader
-from app.modules.project.infrastructure import ProjectDocumentFileStore
+from app.modules.project.infrastructure import ProjectDocumentFileStore, ProjectDocumentIdentityStore
 from app.modules.observability.service import AuditLogService, create_audit_log_service
 from app.shared.runtime import (
     EXPORT_ROOT_DIR,
@@ -17,6 +17,7 @@ from app.shared.runtime import (
 
 from .project_incubator_service import ProjectIncubatorService
 from .project_deletion_service import ProjectDeletionService
+from .project_document_capability_service import ProjectDocumentCapabilityService
 from .project_management_service import ProjectManagementService
 from .project_service import ProjectService
 
@@ -28,7 +29,23 @@ DEFAULT_CONFIG_ROOT = Path(__file__).resolve().parents[6] / "config"
 
 
 def create_project_service() -> ProjectService:
-    return ProjectService(document_file_store=ProjectDocumentFileStore(_default_project_document_root()))
+    root = _default_project_document_root()
+    return ProjectService(
+        document_file_store=ProjectDocumentFileStore(root),
+        document_identity_store=ProjectDocumentIdentityStore(root),
+    )
+
+
+def create_project_document_capability_service(
+    *,
+    project_service: ProjectService | None = None,
+) -> ProjectDocumentCapabilityService:
+    resolved_project_service = project_service or create_project_service()
+    return ProjectDocumentCapabilityService(
+        project_service=resolved_project_service,
+        document_file_store=resolved_project_service.document_file_store,
+        document_identity_store=resolved_project_service.document_identity_store,
+    )
 
 
 def _default_export_root() -> Path:

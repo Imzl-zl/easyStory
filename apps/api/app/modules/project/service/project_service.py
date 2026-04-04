@@ -64,13 +64,20 @@ if TYPE_CHECKING:
     from app.modules.project.infrastructure import (
         ProjectDocumentEntryRecord,
         ProjectDocumentFileStore,
+        ProjectDocumentIdentityStore,
         ProjectDocumentTreeNodeRecord,
     )
 
 
 class ProjectService:
-    def __init__(self, *, document_file_store: "ProjectDocumentFileStore | None" = None) -> None:
+    def __init__(
+        self,
+        *,
+        document_file_store: "ProjectDocumentFileStore | None" = None,
+        document_identity_store: "ProjectDocumentIdentityStore | None" = None,
+    ) -> None:
         self.document_file_store = document_file_store
+        self.document_identity_store = document_identity_store
 
     async def require_project(
         self,
@@ -169,6 +176,7 @@ class ProjectService:
         if is_canonical_project_document_path(document_path):
             raise BusinessRuleError("该文稿属于正式内容真值，请通过大纲或正文保存链路更新")
         record = self.document_file_store.save_project_document(project.id, document_path, payload.content)
+        self._resolve_document_ref(project.id, document_path)
         return ProjectDocumentDTO(
             project_id=project.id,
             path=document_path,
@@ -218,6 +226,7 @@ class ProjectService:
                 )
                 return self._to_project_document_entry_dto(record)
             record = file_store.create_project_document_file(project.id, payload.path)
+            self._resolve_document_ref(project.id, payload.path)
             return self._to_project_document_entry_dto(record)
         if not is_mutable_project_document_folder_path(payload.path):
             raise BusinessRuleError("固定目录不支持新增子目录")
@@ -249,6 +258,7 @@ class ProjectService:
             source_entry.node_type,
             payload.next_path,
         )
+        self._rename_document_ref(project.id, source_path=payload.path, target_path=payload.next_path)
         return self._to_project_document_entry_dto(record)
 
     async def delete_project_document_entry(
@@ -270,6 +280,7 @@ class ProjectService:
         if source_entry.node_type == "folder":
             self._validate_project_document_folder_delete(project.id, source_entry.path)
         deleted_entry = file_store.delete_project_document_entry(project.id, document_path)
+        self._delete_document_ref(project.id, document_path)
         return ProjectDocumentEntryDeleteResultDTO(
             node_type=deleted_entry.node_type,
             path=deleted_entry.path,
@@ -279,6 +290,31 @@ class ProjectService:
         if self.document_file_store is None:
             raise RuntimeError("Project document file store is not configured")
         return self.document_file_store
+
+    def _resolve_document_ref(self, project_id: uuid.UUID, document_path: str) -> str | None:
+        if self.document_identity_store is None or is_canonical_project_document_path(document_path):
+            return None
+        return self.document_identity_store.resolve_document_ref(project_id, path=document_path)
+
+    def _rename_document_ref(
+        self,
+        project_id: uuid.UUID,
+        *,
+        source_path: str,
+        target_path: str,
+    ) -> None:
+        if self.document_identity_store is None:
+            return
+        self.document_identity_store.rename_document_ref(
+            project_id,
+            source_path=source_path,
+            target_path=target_path,
+        )
+
+    def _delete_document_ref(self, project_id: uuid.UUID, document_path: str) -> None:
+        if self.document_identity_store is None or is_canonical_project_document_path(document_path):
+            return
+        self.document_identity_store.delete_document_ref(project_id, path=document_path)
 
     def _should_include_tree_node(self, node: "ProjectDocumentTreeNodeRecord") -> bool:
         if not is_supported_file_project_document_path(node.path):

@@ -103,16 +103,24 @@ export function replaceStudioChatMessage(
 }
 
 export function buildStudioAssistantTurnPayload(options: {
+  conversationId: string;
   messages: StudioChatMessage[];
   projectId: string;
   settings: StudioChatSettings;
   skillId?: string | null;
 }): AssistantTurnPayload {
   const skillId = normalizeStudioSkillId(options.skillId);
+  const currentUserMessage = options.messages[options.messages.length - 1];
+  if (!currentUserMessage || currentUserMessage.role !== "user") {
+    throw new Error("Studio assistant turn payload requires the latest user message.");
+  }
   return {
+    conversation_id: options.conversationId,
+    client_turn_id: currentUserMessage.id,
     messages: buildStudioPayloadMessages(options.messages),
     model: buildAssistantModelOverride(options.settings),
     project_id: options.projectId,
+    requested_write_scope: "disabled",
     ...(skillId ? { skill_id: skillId } : {}),
   };
 }

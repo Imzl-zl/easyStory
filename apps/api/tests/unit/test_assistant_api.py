@@ -52,19 +52,25 @@ async def test_assistant_api_requires_auth_and_returns_content(monkeypatch, tmp_
             unauthorized = await client.post(
                 "/api/v1/assistant/turn",
                 json={
+                    "conversation_id": "conversation-api-unauthorized",
+                    "client_turn_id": "turn-api-unauthorized-1",
                     "skill_id": "skill.assistant.general_chat",
                     "model": {"provider": "openai", "name": "gpt-4o-mini"},
                     "messages": [{"role": "user", "content": "今天有什么新闻？"}],
+                    "requested_write_scope": "disabled",
                 },
             )
             authorized = await client.post(
                 "/api/v1/assistant/turn",
                 headers=auth_headers(owner_id),
                 json={
+                    "conversation_id": "conversation-api-authorized",
+                    "client_turn_id": "turn-api-authorized-1",
                     "agent_id": "agent.general_assistant",
                     "hook_ids": ["hook.before_news_lookup"],
                     "stream": False,
                     "messages": [{"role": "user", "content": "今天有什么新闻？"}],
+                    "requested_write_scope": "disabled",
                 },
             )
 
@@ -113,14 +119,18 @@ async def test_assistant_api_stream_turn_returns_sse_events(monkeypatch, tmp_pat
                 "/api/v1/assistant/turn",
                 headers=auth_headers(owner_id),
                 json={
+                    "conversation_id": "conversation-api-stream",
+                    "client_turn_id": "turn-api-stream-1",
                     "skill_id": "skill.assistant.general_chat",
                     "stream": True,
                     "messages": [{"role": "user", "content": "给我一个故事方向。"}],
+                    "requested_write_scope": "disabled",
                 },
             ) as response:
                 assert response.status_code == 200
                 body = "".join([chunk async for chunk in response.aiter_text()])
 
+        assert "event: run_started" in body
         assert "event: chunk" in body
         assert "event: completed" in body
         assert "主回复：" in body

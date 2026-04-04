@@ -225,15 +225,20 @@ def build_stream_completion(
     terminal_response: NormalizedLLMResponse | None,
 ) -> NormalizedLLMResponse | None:
     content = "".join(text_parts).strip()
-    if not content and terminal_response is not None:
+    if terminal_response is not None and not content:
         content = terminal_response.content.strip()
-    if not content:
+    if terminal_response is None and not content:
+        return None
+    if terminal_response is not None and not content and not terminal_response.tool_calls:
         return None
     return NormalizedLLMResponse(
         content=content,
+        finish_reason=terminal_response.finish_reason if terminal_response is not None else None,
         input_tokens=terminal_response.input_tokens if terminal_response is not None else None,
         output_tokens=terminal_response.output_tokens if terminal_response is not None else None,
         total_tokens=terminal_response.total_tokens if terminal_response is not None else None,
+        tool_calls=list(terminal_response.tool_calls) if terminal_response is not None else [],
+        provider_response_id=terminal_response.provider_response_id if terminal_response is not None else None,
     )
 
 

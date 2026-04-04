@@ -144,7 +144,11 @@ export function useIncubatorAssistantMutation(
 ) {
   return useMutation({
     mutationFn: async (submission: PromptSubmission) => {
-      const payload = buildIncubatorAssistantTurnPayload(settings, submission.submittedMessages);
+      const payload = buildIncubatorAssistantTurnPayload(
+        submission.conversationId,
+        settings,
+        submission.submittedMessages,
+      );
       if (!settings.streamOutput) {
         return runAssistantTurn(payload);
       }

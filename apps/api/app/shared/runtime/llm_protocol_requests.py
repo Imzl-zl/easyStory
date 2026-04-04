@@ -69,6 +69,19 @@ def _build_openai_chat_request(request: LLMGenerateRequest) -> PreparedLLMHttpRe
         "model": request.model_name,
         "messages": _build_openai_messages(request.prompt, request.system_prompt),
     }
+    if request.tools:
+        body["tools"] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.parameters,
+                },
+            }
+            for tool in request.tools
+        ]
+        body["parallel_tool_calls"] = False
     _merge_generation_params(body, request)
     if request.response_format == JSON_OBJECT_RESPONSE_FORMAT:
         body["response_format"] = {"type": "json_object"}
@@ -90,6 +103,17 @@ def _build_openai_responses_request(request: LLMGenerateRequest) -> PreparedLLMH
             }
         ],
     }
+    if request.tools:
+        body["tools"] = [
+            {
+                "type": "function",
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters,
+            }
+            for tool in request.tools
+        ]
+        body["parallel_tool_calls"] = False
     if request.system_prompt:
         body["instructions"] = request.system_prompt
     _merge_generation_params(body, request, max_tokens_field="max_output_tokens")
@@ -109,6 +133,15 @@ def _build_anthropic_messages_request(request: LLMGenerateRequest) -> PreparedLL
         "max_tokens": request.max_tokens or 1024,
         "messages": [{"role": "user", "content": request.prompt}],
     }
+    if request.tools:
+        body["tools"] = [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.parameters,
+            }
+            for tool in request.tools
+        ]
     if request.system_prompt:
         body["system"] = [{"type": "text", "text": request.system_prompt}]
     if request.temperature is not None:
@@ -135,6 +168,19 @@ def _build_gemini_generate_content_request(request: LLMGenerateRequest) -> Prepa
     generation_config = _build_gemini_generation_config(request)
     if generation_config:
         body["generationConfig"] = generation_config
+    if request.tools:
+        body["tools"] = [
+            {
+                "functionDeclarations": [
+                    {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.parameters,
+                    }
+                    for tool in request.tools
+                ]
+            }
+        ]
     if request.system_prompt:
         body["system_instruction"] = {"parts": [{"text": request.system_prompt}]}
     return PreparedLLMHttpRequest(

@@ -9,6 +9,7 @@ from .errors import ConfigurationError
 from .llm_protocol import (
     HttpJsonResponse,
     LLMConnection,
+    LLMFunctionToolDefinition,
     LLMGenerateRequest,
     PreparedLLMHttpRequest,
     normalize_api_dialect,
@@ -43,6 +44,7 @@ class LLMRequest:
     max_tokens: int | None
     top_p: float | None
     stop: list[str] | None
+    tools: list[LLMFunctionToolDefinition]
     connection: LLMConnection
 
 
@@ -70,11 +72,14 @@ class LLMToolProvider(ToolProvider):
         normalized = parse_generation_response(request.connection.api_dialect, response.json_body or {})
         return {
             "content": normalized.content,
+            "finish_reason": normalized.finish_reason,
             "model_name": request.model_name,
             "provider": request.provider,
             "input_tokens": normalized.input_tokens,
             "output_tokens": normalized.output_tokens,
             "total_tokens": normalized.total_tokens,
+            "tool_calls": [tool_call.__dict__ for tool_call in normalized.tool_calls],
+            "provider_response_id": normalized.provider_response_id,
         }
 
     async def execute_stream(
@@ -126,11 +131,14 @@ class LLMToolProvider(ToolProvider):
         yield LLMStreamEvent(
             response={
                 "content": normalized.content,
+                "finish_reason": normalized.finish_reason,
                 "model_name": request.model_name,
                 "provider": request.provider,
                 "input_tokens": normalized.input_tokens,
                 "output_tokens": normalized.output_tokens,
                 "total_tokens": normalized.total_tokens,
+                "tool_calls": [tool_call.__dict__ for tool_call in normalized.tool_calls],
+                "provider_response_id": normalized.provider_response_id,
             }
         )
 
@@ -161,6 +169,7 @@ def _build_request(params: dict[str, Any]) -> LLMRequest:
         ),
         top_p=_optional_float(model.get("top_p")),
         stop=_optional_string_list(model.get("stop")),
+        tools=_optional_function_tool_list(params.get("tools")),
         connection=_build_connection(credential),
     )
 
@@ -176,6 +185,7 @@ def _to_generate_request(request: LLMRequest) -> LLMGenerateRequest:
         max_tokens=request.max_tokens,
         top_p=request.top_p,
         stop=request.stop,
+        tools=request.tools,
     )
 
 
@@ -257,6 +267,24 @@ def _optional_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigurationError("Expected integer value")
     return value
+
+
+def _optional_function_tool_list(value: Any) -> list[LLMFunctionToolDefinition]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ConfigurationError("tools must be an array")
+    tools: list[LLMFunctionToolDefinition] = []
+    for item in value:
+        tool = _require_dict(item, "tools[]")
+        tools.append(
+            LLMFunctionToolDefinition(
+                name=_require_non_empty_string(tool.get("name"), "tools[].name"),
+                description=_require_non_empty_string(tool.get("description"), "tools[].description"),
+                parameters=_require_dict(tool.get("parameters"), "tools[].parameters"),
+            )
+        )
+    return tools
 
 
 def _resolve_max_tokens(*, requested_value: Any, default_value: Any) -> int | None:

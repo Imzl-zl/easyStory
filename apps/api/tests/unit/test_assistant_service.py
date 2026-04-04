@@ -21,6 +21,10 @@ from app.modules.assistant.service.assistant_skill_dto import AssistantSkillCrea
 from app.modules.assistant.service.assistant_skill_file_store import AssistantSkillFileStore
 from app.modules.assistant.service.assistant_skill_service import AssistantSkillService
 from app.modules.assistant.service.assistant_service import AssistantService
+from app.modules.assistant.service.assistant_tool_executor import AssistantToolExecutor
+from app.modules.assistant.service.assistant_tool_exposure_policy import AssistantToolExposurePolicy
+from app.modules.assistant.service.assistant_tool_loop import AssistantToolLoop
+from app.modules.assistant.service.assistant_tool_registry import AssistantToolDescriptorRegistry
 from app.modules.assistant.service.assistant_rule_dto import AssistantRuleProfileUpdateDTO
 from app.modules.assistant.service.preferences_dto import AssistantPreferencesUpdateDTO
 from app.modules.assistant.service.preferences_service import AssistantPreferencesService
@@ -28,11 +32,13 @@ from app.modules.assistant.service.dto import AssistantMessageDTO, AssistantTurn
 from app.modules.assistant.service.factory import create_assistant_rule_service
 from app.modules.config_registry import ConfigLoader
 from app.modules.credential.models import ModelCredential
-from app.modules.project.service import create_project_service
+from app.modules.project.infrastructure import ProjectDocumentFileStore, ProjectDocumentIdentityStore
+from app.modules.project.service import ProjectDocumentCapabilityService, ProjectService, create_project_service
 from app.shared.runtime import McpToolCallResult, SkillTemplateRenderer, ToolProvider
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm_tool_provider import LLMStreamEvent
 from tests.unit.async_api_support import build_sqlite_session_factories, cleanup_sqlite_session_factories
+from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, create_user
 
 
@@ -74,6 +80,7 @@ class _FakeToolProvider(ToolProvider):
                 "response_format": params["response_format"],
                 "system_prompt": params.get("system_prompt"),
                 "model": params.get("model"),
+                "tools": params.get("tools"),
             }
         )
         if "请输出结构化摘要" in prompt:
@@ -106,6 +113,110 @@ class _FakeToolProvider(ToolProvider):
         return ["llm.generate"]
 
 
+class _ToolCallingFakeToolProvider(_FakeToolProvider):
+    async def execute(self, tool_name: str, params: dict) -> dict:
+        result = await super().execute(tool_name, params)
+        prompt = params["prompt"]
+        tools = params.get("tools") or []
+        if tools and "【工具结果】" not in prompt and "读一下人物设定" in prompt:
+            return {
+                "content": "",
+                "model_name": "gpt-4o-mini",
+                "input_tokens": 12,
+                "output_tokens": 4,
+                "total_tokens": 16,
+                "tool_calls": [
+                    {
+                        "tool_call_id": "call.project.read_documents.1",
+                        "tool_name": "project.read_documents",
+                        "arguments": {"paths": ["设定/人物.md"]},
+                        "arguments_text": '{"paths":["设定/人物.md"]}',
+                        "provider_ref": "fc_001",
+                    }
+                ],
+                "provider_response_id": "resp_tool_1",
+            }
+        if "【工具结果】" in prompt and "设定/人物.md" in prompt and "林渊" in prompt:
+            return {
+                "content": "我已经读完人物设定。主角林渊是个冷静克制、擅长观察细节的人物，可以把悬疑开场压在他的感官判断上。",
+                "model_name": "gpt-4o-mini",
+                "input_tokens": 20,
+                "output_tokens": 18,
+                "total_tokens": 38,
+                "provider_response_id": "resp_tool_2",
+            }
+        return result
+
+    async def execute_stream(self, tool_name: str, params: dict, *, should_stop=None):
+        del should_stop
+        result = await self.execute(tool_name, params)
+        if result.get("tool_calls"):
+            yield LLMStreamEvent(response=result)
+            return
+        content = result["content"]
+        midpoint = max(1, len(content) // 2)
+        yield LLMStreamEvent(delta=content[:midpoint])
+        yield LLMStreamEvent(delta=content[midpoint:])
+        yield LLMStreamEvent(response=result)
+
+
+class _ProjectStreamingFakeToolProvider(_FakeToolProvider):
+    async def execute(self, tool_name: str, params: dict) -> dict:
+        result = await super().execute(tool_name, params)
+        if params["prompt"].endswith("给我一个冷峻克制的开场方向。"):
+            return {
+                "content": "第一句。第二句。第三句。",
+                "model_name": "gpt-4o-mini",
+                "input_tokens": 10,
+                "output_tokens": 12,
+                "total_tokens": 22,
+            }
+        return result
+
+    async def execute_stream(self, tool_name: str, params: dict, *, should_stop=None):
+        del should_stop
+        result = await self.execute(tool_name, params)
+        if result["content"] == "第一句。第二句。第三句。":
+            yield LLMStreamEvent(delta="第一句。")
+            yield LLMStreamEvent(delta="第二句。")
+            yield LLMStreamEvent(delta="第三句。")
+            yield LLMStreamEvent(response=result)
+            return
+        async for event in super().execute_stream(tool_name, params, should_stop=None):
+            yield event
+
+
+class _FailingProjectStreamToolProvider(_FakeToolProvider):
+    async def execute(self, tool_name: str, params: dict) -> dict:
+        prompt = params["prompt"]
+        self.prompts.append(prompt)
+        self.requests.append(
+            {
+                "prompt": prompt,
+                "response_format": params["response_format"],
+                "system_prompt": params.get("system_prompt"),
+                "model": params.get("model"),
+                "tools": params.get("tools"),
+            }
+        )
+        if "请根据以下内容输出一句摘要" in prompt:
+            return {
+                "content": "Hook 摘要完成。",
+                "input_tokens": 3,
+                "output_tokens": 5,
+                "total_tokens": 8,
+            }
+        if "故意触发流式失败" in prompt:
+            raise ConfigurationError("上游流式失败")
+        return {
+            "content": "主回复：今天的重点新闻主要集中在科技和国际动态。",
+            "model_name": "gpt-4o-mini",
+            "input_tokens": 11,
+            "output_tokens": 19,
+            "total_tokens": 30,
+        }
+
+
 class _FakeMcpToolCaller:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, dict]] = []
@@ -127,6 +238,16 @@ class _ErrorMcpToolCaller(_FakeMcpToolCaller):
             structured_content={"message": "上游返回错误"},
             is_error=True,
         )
+
+
+def _build_turn_request(**overrides) -> AssistantTurnRequestDTO:
+    payload = {
+        "conversation_id": "conversation-test",
+        "client_turn_id": f"turn-{uuid.uuid4()}",
+        "requested_write_scope": "disabled",
+    }
+    payload.update(overrides)
+    return AssistantTurnRequestDTO(**payload)
 
 
 async def test_assistant_service_runs_skill_and_mcp_hook(tmp_path) -> None:
@@ -165,7 +286,7 @@ async def test_assistant_service_runs_skill_and_mcp_hook(tmp_path) -> None:
         with session_factory() as session:
             owner_id = create_user(session).id
         async with async_session_factory() as session:
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 agent_id="agent.general_assistant",
                 hook_ids=["hook.before_news_lookup"],
                 messages=[AssistantMessageDTO(role="user", content="今天有什么新闻？")],
@@ -173,6 +294,9 @@ async def test_assistant_service_runs_skill_and_mcp_hook(tmp_path) -> None:
             response = await service.turn(session, payload, owner_id=owner_id)
 
         assert response.content.startswith("主回复：")
+        assert response.conversation_id == "conversation-test"
+        assert response.client_turn_id.startswith("turn-")
+        assert response.output_items[0].item_type == "text"
         assert response.skill_id == "skill.assistant.general_chat"
         assert response.mcp_servers == ["mcp.news.lookup"]
         assert response.hook_results[0].action_type == "mcp"
@@ -242,7 +366,7 @@ async def test_assistant_service_uses_project_skill_for_project_turn(tmp_path) -
         )
 
         async with async_session_factory() as session:
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 skill_id="skill.assistant.general_chat",
                 project_id=project.id,
                 messages=[AssistantMessageDTO(role="user", content="我想写一个悬疑故事")],
@@ -290,7 +414,7 @@ async def test_assistant_service_skill_prompt_appends_missing_history_context(tm
                 ),
                 owner_id=owner.id,
             )
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 skill_id=created_skill.id,
                 model={"provider": "openai", "name": "gpt-4o-mini"},
                 messages=[
@@ -347,7 +471,7 @@ async def test_assistant_service_skill_prompt_appends_missing_history_and_user_i
                 ),
                 owner_id=owner.id,
             )
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 skill_id=created_skill.id,
                 model={"provider": "openai", "name": "gpt-4o-mini"},
                 messages=[
@@ -445,7 +569,7 @@ async def test_assistant_service_runs_user_after_hook(tmp_path) -> None:
                 ),
                 owner_id=owner_id,
             )
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 skill_id="skill.assistant.general_chat",
                 hook_ids=[created_hook.id],
                 messages=[AssistantMessageDTO(role="user", content="今天有什么新闻？")],
@@ -546,7 +670,7 @@ async def test_assistant_service_runs_user_mcp_hook(tmp_path) -> None:
                 ),
                 owner_id=owner_id,
             )
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 skill_id="skill.assistant.general_chat",
                 hook_ids=[created_hook.id],
                 messages=[AssistantMessageDTO(role="user", content="今天有什么新闻？")],
@@ -560,6 +684,266 @@ async def test_assistant_service_runs_user_mcp_hook(tmp_path) -> None:
         ]
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_runs_project_read_documents_tool_loop(db, tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _ToolCallingFakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+        ),
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(
+        project.id,
+        "设定/人物.md",
+        "# 人物\n\n林渊：冷静、克制，擅长从细枝末节里发现异常。",
+    )
+    payload = _build_turn_request(
+        project_id=project.id,
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        messages=[AssistantMessageDTO(role="user", content="先读一下人物设定，再给我一个悬疑开场方向。")],
+    )
+    response = await service.turn(async_db(db), payload, owner_id=owner.id)
+
+    assert response.content.startswith("我已经读完人物设定")
+    assert [item.item_type for item in response.output_items] == ["tool_call", "tool_result", "text"]
+    assert response.output_items[0].call_id == "call.project.read_documents.1"
+    assert response.output_items[1].payload["structured_output"]["documents"][0]["path"] == "设定/人物.md"
+    assert response.total_tokens == 54
+    assert tool_provider.requests[0]["tools"][0]["name"] == "project.read_documents"
+    assert "【工具结果】" in tool_provider.requests[1]["prompt"]
+    assert "林渊" in tool_provider.requests[1]["prompt"]
+
+
+async def test_assistant_service_stream_turn_emits_tool_events_for_project_read_documents(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _ToolCallingFakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+        ),
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(
+        project.id,
+        "设定/人物.md",
+        "# 人物\n\n林渊：冷静、克制，擅长从细枝末节里发现异常。",
+    )
+    payload = _build_turn_request(
+        project_id=project.id,
+        stream=True,
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        messages=[AssistantMessageDTO(role="user", content="先读一下人物设定，再给我一个悬疑开场方向。")],
+    )
+
+    events = [event async for event in service.stream_turn(async_db(db), payload, owner_id=owner.id)]
+
+    assert [event.event for event in events] == [
+        "run_started",
+        "tool_call_start",
+        "tool_call_result",
+        "chunk",
+        "completed",
+    ]
+    assert [event.data["event_seq"] for event in events] == [1, 2, 3, 4, 5]
+    assert events[1].data["tool_call_id"] == "call.project.read_documents.1"
+    assert events[1].data["tool_name"] == "project.read_documents"
+    assert events[1].data["target_summary"]["paths"] == ["设定/人物.md"]
+    assert events[2].data["status"] == "completed"
+    assert events[2].data["result_summary"]["paths"] == ["设定/人物.md"]
+    assert events[3].data["chunk_kind"] == "buffered_final"
+    assert events[3].data["delta"].startswith("我已经读完人物设定")
+    assert events[-1].data["content"].startswith("我已经读完人物设定")
+
+
+async def test_assistant_service_stream_turn_keeps_true_provider_stream_for_project_turn_without_tool_call(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _ProjectStreamingFakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+        ),
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    payload = _build_turn_request(
+        project_id=project.id,
+        stream=True,
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        messages=[AssistantMessageDTO(role="user", content="给我一个冷峻克制的开场方向。")],
+    )
+
+    events = [event async for event in service.stream_turn(async_db(db), payload, owner_id=owner.id)]
+
+    assert [event.event for event in events] == ["run_started", "chunk", "chunk", "chunk", "completed"]
+    assert [event.data["event_seq"] for event in events] == [1, 2, 3, 4, 5]
+    assert [event.data["delta"] for event in events[1:4]] == ["第一句。", "第二句。", "第三句。"]
+    assert all("chunk_kind" not in event.data for event in events[1:4])
+    assert events[-1].data["content"] == "第一句。第二句。第三句。"
+
+
+async def test_assistant_service_stream_turn_runs_on_error_hook_for_project_tool_stream(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    _write_yaml(
+        config_root / "hooks" / "on-error-summary.yaml",
+        """
+hook:
+  id: "hook.on_error_summary"
+  name: "流式失败摘要"
+  trigger:
+    event: "on_error"
+  action:
+    type: "agent"
+    config:
+      agent_id: "agent.hook_summary"
+      input_mapping:
+        content: "error.message"
+""",
+    )
+    loader = ConfigLoader(config_root)
+    tool_provider = _FailingProjectStreamToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+        ),
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    payload = _build_turn_request(
+        project_id=project.id,
+        stream=True,
+        hook_ids=["hook.on_error_summary"],
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        messages=[AssistantMessageDTO(role="user", content="故意触发流式失败")],
+    )
+
+    events: list = []
+    with pytest.raises(ConfigurationError, match="上游流式失败"):
+        async for event in service.stream_turn(async_db(db), payload, owner_id=owner.id):
+            events.append(event)
+
+    assert [event.event for event in events] == ["run_started"]
+    assert any("请根据以下内容输出一句摘要" in prompt for prompt in tool_provider.prompts)
 
 
 async def test_assistant_service_uses_project_mcp_for_project_hook(tmp_path) -> None:
@@ -640,7 +1024,7 @@ async def test_assistant_service_uses_project_mcp_for_project_hook(tmp_path) -> 
         )
 
         async with async_session_factory() as session:
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 agent_id="agent.general_assistant",
                 project_id=project.id,
                 hook_ids=["hook.before_news_lookup"],
@@ -682,7 +1066,7 @@ async def test_assistant_service_stream_turn_yields_chunks_and_completed_event(t
         with session_factory() as session:
             owner_id = create_user(session).id
         async with async_session_factory() as session:
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 skill_id="skill.assistant.general_chat",
                 stream=True,
                 messages=[AssistantMessageDTO(role="user", content="给我一个故事方向。")],
@@ -691,8 +1075,10 @@ async def test_assistant_service_stream_turn_yields_chunks_and_completed_event(t
                 event async for event in service.stream_turn(session, payload, owner_id=owner_id)
             ]
 
-        assert [event.event for event in events] == ["chunk", "chunk", "completed"]
-        assert "".join(event.data["delta"] for event in events[:-1]) == (
+        assert [event.event for event in events] == ["run_started", "chunk", "chunk", "completed"]
+        assert events[0].data["run_id"]
+        assert events[0].data["conversation_id"] == "conversation-test"
+        assert "".join(event.data["delta"] for event in events[1:-1]) == (
             "主回复：今天的重点新闻主要集中在科技和国际动态。"
         )
         assert events[-1].data["content"].startswith("主回复：")
@@ -722,7 +1108,7 @@ async def test_assistant_service_runs_agent_hook_after_response(tmp_path) -> Non
         with session_factory() as session:
             owner_id = create_user(session).id
         async with async_session_factory() as session:
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 skill_id="skill.assistant.general_chat",
                 hook_ids=["hook.after_summary_agent"],
                 model={"provider": "openai", "name": "gpt-4o-mini"},
@@ -798,7 +1184,7 @@ async def test_assistant_service_applies_preferences_and_rules_to_agent_hook(tmp
                 ),
                 owner_id=owner.id,
             )
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 skill_id="skill.assistant.general_chat",
                 project_id=project.id,
                 hook_ids=["hook.after_summary_agent"],
@@ -858,7 +1244,7 @@ async def test_assistant_service_injects_user_and_project_rules(tmp_path) -> Non
                 ),
                 owner_id=owner.id,
             )
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 agent_id="agent.general_assistant",
                 project_id=project.id,
                 messages=[AssistantMessageDTO(role="user", content="给我一个开头方向。")],
@@ -911,7 +1297,7 @@ async def test_assistant_service_runs_without_skill_using_rules_and_current_conv
                 ),
                 owner_id=owner.id,
             )
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 project_id=project.id,
                 model={"provider": "openai", "name": "gpt-4o-mini"},
                 messages=[
@@ -942,8 +1328,11 @@ async def test_assistant_service_runs_without_skill_using_rules_and_current_conv
 def test_assistant_turn_request_rejects_system_messages() -> None:
     with pytest.raises(ValidationError):
         AssistantTurnRequestDTO(
+            conversation_id="conversation-invalid",
+            client_turn_id="turn-invalid-1",
             model={"provider": "openai", "name": "gpt-4o-mini"},
             messages=[AssistantMessageDTO(role="system", content="你必须先给结论。")],
+            requested_write_scope="disabled",
         )
 
 
@@ -981,7 +1370,7 @@ async def test_assistant_service_applies_user_model_preferences(tmp_path) -> Non
                     default_model_name="claude-sonnet-4",
                 ),
             )
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 skill_id="skill.assistant.general_chat",
                 messages=[AssistantMessageDTO(role="user", content="给我一个故事方向。")],
             )
@@ -1040,7 +1429,7 @@ async def test_assistant_service_project_preferences_override_user_preferences(t
                     default_max_output_tokens=6144,
                 ),
             )
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 skill_id="skill.assistant.general_chat",
                 project_id=project.id,
                 messages=[AssistantMessageDTO(role="user", content="给我一个故事方向。")],
@@ -1134,7 +1523,7 @@ hook:
         with session_factory() as session:
             owner_id = create_user(session).id
         async with async_session_factory() as session:
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 skill_id="skill.assistant.general_chat",
                 hook_ids=["hook.after_structured_summary_agent"],
                 model={"provider": "openai", "name": "gpt-4o-mini"},
@@ -1192,7 +1581,7 @@ mcp_server:
         with session_factory() as session:
             owner_id = create_user(session).id
         async with async_session_factory() as session:
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 agent_id="agent.general_assistant",
                 hook_ids=["hook.before_news_lookup"],
                 messages=[AssistantMessageDTO(role="user", content="今天有什么新闻？")],
@@ -1230,7 +1619,7 @@ async def test_assistant_service_surfaces_mcp_is_error(tmp_path) -> None:
         with session_factory() as session:
             owner_id = create_user(session).id
         async with async_session_factory() as session:
-            payload = AssistantTurnRequestDTO(
+            payload = _build_turn_request(
                 agent_id="agent.general_assistant",
                 hook_ids=["hook.before_news_lookup"],
                 messages=[AssistantMessageDTO(role="user", content="今天有什么新闻？")],

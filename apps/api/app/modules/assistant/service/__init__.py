@@ -28,6 +28,10 @@ from .assistant_skill_dto import (
     AssistantSkillUpdateDTO,
 )
 from .assistant_skill_service import AssistantSkillService
+from .assistant_tool_executor import AssistantToolExecutor
+from .assistant_tool_exposure_policy import AssistantToolExposurePolicy
+from .assistant_tool_loop import AssistantToolLoop
+from .assistant_tool_registry import AssistantToolDescriptorRegistry
 from .assistant_service import AssistantService
 from .dto import AssistantHookResultDTO, AssistantMessageDTO, AssistantTurnRequestDTO, AssistantTurnResponseDTO
 from .factory import (
@@ -38,6 +42,10 @@ from .factory import (
     create_assistant_rule_service,
     create_assistant_skill_service,
     create_assistant_service,
+    create_assistant_tool_descriptor_registry,
+    create_assistant_tool_executor,
+    create_assistant_tool_exposure_policy,
+    create_assistant_tool_loop,
 )
 from .preferences_dto import AssistantPreferencesDTO, AssistantPreferencesUpdateDTO
 from .preferences_service import AssistantPreferencesService
@@ -72,6 +80,10 @@ __all__ = [
     "AssistantSkillSummaryDTO",
     "AssistantSkillUpdateDTO",
     "AssistantService",
+    "AssistantToolDescriptorRegistry",
+    "AssistantToolExecutor",
+    "AssistantToolExposurePolicy",
+    "AssistantToolLoop",
     "AssistantTurnRequestDTO",
     "AssistantTurnResponseDTO",
     "create_assistant_agent_service",
@@ -81,4 +93,8 @@ __all__ = [
     "create_assistant_rule_service",
     "create_assistant_skill_service",
     "create_assistant_service",
+    "create_assistant_tool_descriptor_registry",
+    "create_assistant_tool_executor",
+    "create_assistant_tool_exposure_policy",
+    "create_assistant_tool_loop",
 ]
