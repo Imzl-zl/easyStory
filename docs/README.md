@@ -5,7 +5,7 @@
 | 文档类型 | 索引 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-04-02 |
-| 更新时间 | 2026-04-03 |
+| 更新时间 | 2026-04-04 |
 
 ---
 
@@ -38,6 +38,7 @@
 如果你要看“当前 assistant / 创作聊天主路径”，先读：
 
 - [Assistant 运行时与聊天主路径](./design/20-assistant-runtime-chat-mode.md)
+- [Assistant 原生 Tool-Calling Runtime 设计](./design/22-assistant-tool-calling-runtime.md)
 - [Assistant 项目文稿工具设计](./design/21-assistant-project-document-tools.md)
 - [系统架构设计](./specs/architecture.md)
 - [配置格式规范](./specs/config-format.md)

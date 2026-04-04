@@ -12,6 +12,19 @@
 
 MCP (Model Context Protocol) 是 AI 生态基础设施协议。当前已落地 **MCP Client 的最小可用闭环**：`streamable_http` client、`mcp_server` 配置、`mcp` hook provider、assistant/workflow runtime 统一通过 `PluginRegistry` 调用。MCP Server 暴露与通用 agent tool-calling 仍保留为后续阶段。
 
+本文档的定位是：
+
+- 记录 MCP client / plugin / server 三方向的总体预留
+- 记录当前已落地的 MCP client 与 PluginRegistry 基线
+
+本文档不再作为 ordinary chat native tool-calling runtime 的未来真值。
+
+ordinary chat 的正式未来口径统一以下列文档为准：
+
+- [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)
+- [21-assistant-project-document-tools](./21-assistant-project-document-tools.md)
+- [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)
+
 ---
 
 ## 2. 三方向总览
@@ -41,7 +54,15 @@ MCP (Model Context Protocol) 是 AI 生态基础设施协议。当前已落地 *
 
 ### 3.2 当前实现：PluginRegistry + MCP Client
 
-Agent 通过 ToolProvider 抽象层调用 LLM；Hook / Assistant runtime 通过 PluginRegistry 调用 MCP，不直接依赖具体 MCP SDK 细节。
+这一节只描述当前已落地基线，不代表 ordinary chat 的长期目标架构。
+
+当前现状是：
+
+- Agent 通过 ToolProvider 抽象层调用 LLM
+- Hook / Assistant runtime 通过 PluginRegistry 调用 MCP
+- 这条路径当前主要服务 hook/plugin 场景
+
+后续 ordinary chat native tool-calling 的正式目标，不再以“通过 PluginRegistry 旁路执行 MCP”作为主骨架，而以 [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md) 为准。
 
 | 实现 | 阶段 | 说明 |
 |------|------|------|
