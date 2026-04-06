@@ -3,6 +3,9 @@ import uuid
 
 from app.modules.context.models import StoryFact
 from app.modules.content.service import ChapterSaveDTO, create_chapter_content_service
+from app.modules.project.service.project_document_version_support import (
+    build_project_canonical_document_version,
+)
 from app.shared.runtime.errors import BusinessRuleError
 from tests.unit.async_service_support import async_db
 
@@ -40,6 +43,11 @@ def test_save_chapter_draft_creates_versioned_chapter(db):
     assert result.current_version_number == 1
     assert result.status == "draft"
     assert result.content_text.startswith("林渊连夜")
+    assert result.document_version == build_project_canonical_document_version(
+        "canonical:chapter:001",
+        content_id=result.content_id,
+        version_number=result.current_version_number,
+    )
     assert [item.chapter_number for item in chapters] == [1]
 
 

@@ -16,6 +16,7 @@ LlmApiDialect = Literal[
 ]
 LlmAuthStrategy = Literal["bearer", "x_api_key", "x_goog_api_key", "custom_header"]
 LlmRuntimeKind = Literal["server-python", "server-node", "browser"]
+LlmContinuationMode = Literal["provider_continuation", "runtime_replay", "hybrid"]
 
 DEFAULT_API_DIALECT: LlmApiDialect = "openai_chat_completions"
 DEFAULT_AUTH_STRATEGY_BY_DIALECT: dict[LlmApiDialect, LlmAuthStrategy] = {
@@ -60,6 +61,13 @@ HTTP_HEADER_TOKEN_PATTERN = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
 
 
 @dataclass(frozen=True)
+class LLMContinuationSupport:
+    continuation_mode: LlmContinuationMode
+    tolerates_interleaved_tool_results: bool
+    requires_full_replay_after_local_tools: bool
+
+
+@dataclass(frozen=True)
 class LLMConnection:
     api_dialect: LlmApiDialect
     api_key: str
@@ -86,6 +94,8 @@ class LLMGenerateRequest:
     top_p: float | None
     stop: list[str] | None = None
     tools: list["LLMFunctionToolDefinition"] = field(default_factory=list)
+    continuation_items: list[dict[str, Any]] = field(default_factory=list)
+    provider_continuation_state: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -108,6 +118,7 @@ class LLMFunctionToolDefinition:
     name: str
     description: str
     parameters: dict[str, Any]
+    strict: bool = True
 
 
 @dataclass(frozen=True)
@@ -128,6 +139,7 @@ class NormalizedLLMResponse:
     total_tokens: int | None
     tool_calls: list[NormalizedLLMToolCall] = field(default_factory=list)
     provider_response_id: str | None = None
+    provider_output_items: list[dict[str, Any]] = field(default_factory=list)
 
 
 def normalize_api_dialect(api_dialect: str | None) -> LlmApiDialect:
@@ -137,6 +149,25 @@ def normalize_api_dialect(api_dialect: str | None) -> LlmApiDialect:
     if normalized not in SUPPORTED_API_DIALECTS:
         raise ConfigurationError(f"Unsupported api_dialect: {api_dialect}")
     return normalized  # type: ignore[return-value]
+
+
+def resolve_continuation_support(api_dialect: str | None) -> LLMContinuationSupport:
+    dialect = normalize_api_dialect(api_dialect)
+    if dialect == "openai_responses":
+        return LLMContinuationSupport(
+            continuation_mode="hybrid",
+            tolerates_interleaved_tool_results=True,
+            requires_full_replay_after_local_tools=False,
+        )
+    return LLMContinuationSupport(
+        continuation_mode="runtime_replay",
+        tolerates_interleaved_tool_results=False,
+        requires_full_replay_after_local_tools=True,
+    )
+
+
+def allows_provider_continuation_state(continuation_support: LLMContinuationSupport) -> bool:
+    return continuation_support.continuation_mode != "runtime_replay"
 
 
 def normalize_auth_strategy(auth_strategy: str | None) -> LlmAuthStrategy | None:

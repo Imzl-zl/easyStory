@@ -22,6 +22,7 @@ export type IncubatorChatSession = {
   draft: ProjectIncubatorConversationDraft | null;
   draftFingerprint: string | null;
   hasCustomProjectName: boolean;
+  latestCompletedRunId: string | null;
   messages: IncubatorChatMessage[];
   projectName: string;
   settings: IncubatorChatSettings;
@@ -53,6 +54,7 @@ export function createEmptyIncubatorChatSession(): IncubatorChatSession {
     draft: null,
     draftFingerprint: null,
     hasCustomProjectName: false,
+    latestCompletedRunId: null,
     messages: createIncubatorInitialMessages(),
     projectName: "",
     settings: { ...INITIAL_INCUBATOR_CHAT_SETTINGS },
@@ -117,6 +119,7 @@ function normalizeIncubatorChatSession(
     draft: session.draft ?? null,
     draftFingerprint: session.draftFingerprint ?? null,
     hasCustomProjectName: session.hasCustomProjectName ?? false,
+    latestCompletedRunId: session.latestCompletedRunId ?? null,
     messages: normalizeIncubatorMessages(session.messages ?? [], mode),
     projectName: session.projectName ?? "",
     settings: { ...INITIAL_INCUBATOR_CHAT_SETTINGS, ...session.settings },
@@ -155,7 +158,7 @@ export function isIncubatorChatSessionEmpty(session: IncubatorChatSession): bool
   if (session.composerText.trim() || session.projectName.trim() || session.draft || session.draftFingerprint) {
     return false;
   }
-  if (session.hasCustomProjectName) {
+  if (session.hasCustomProjectName || session.latestCompletedRunId) {
     return false;
   }
   if (!areIncubatorSettingsEqual(session.settings, INITIAL_INCUBATOR_CHAT_SETTINGS)) {

@@ -35,6 +35,7 @@ export type StudioLoadedDocument = {
   storageKind: "database" | "file";
   target: StudioDocumentTarget;
   title: string;
+  version: string;
 };
 
 type StudioSavedDocument = StudioLoadedDocument & {
@@ -79,6 +80,7 @@ export async function loadStudioDocument(
       storageKind: "database",
       target,
       title: outline.title,
+      version: outline.document_version,
     };
   }
   if (target.kind === "opening_plan") {
@@ -90,6 +92,7 @@ export async function loadStudioDocument(
       storageKind: "database",
       target,
       title: openingPlan.title,
+      version: openingPlan.document_version,
     };
   }
   if (target.kind === "chapter") {
@@ -101,6 +104,7 @@ export async function loadStudioDocument(
       storageKind: "database",
       target,
       title: chapter.title,
+      version: chapter.document_version,
     };
   }
   const document = await getProjectDocument(projectId, target.path);
@@ -111,6 +115,7 @@ export async function loadStudioDocument(
     storageKind: "file",
     target,
     title: resolveDocumentTitle(target.path),
+    version: document.version,
   };
 }
 
@@ -135,6 +140,7 @@ export async function saveStudioDocument(
       storageKind: "database",
       target,
       title: saved.title,
+      version: saved.document_version,
     };
   }
   if (target.kind === "opening_plan") {
@@ -152,6 +158,7 @@ export async function saveStudioDocument(
       storageKind: "database",
       target,
       title: saved.title,
+      version: saved.document_version,
     };
   }
   if (target.kind === "chapter") {
@@ -169,9 +176,13 @@ export async function saveStudioDocument(
       storageKind: "database",
       target,
       title: saved.title,
+      version: saved.document_version,
     };
   }
-  const saved = await saveProjectDocument(projectId, target.path, { content });
+  const saved = await saveProjectDocument(projectId, target.path, {
+    base_version: document.version,
+    content,
+  });
   return {
     content: saved.content,
     path: target.path,
@@ -179,6 +190,7 @@ export async function saveStudioDocument(
     storageKind: "file",
     target,
     title: resolveDocumentTitle(target.path),
+    version: saved.version,
   };
 }
 

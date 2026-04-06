@@ -4,6 +4,7 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 
 from app.modules import model_registry as _model_registry  # noqa: F401
@@ -61,7 +62,7 @@ def test_alembic_upgrade_head_tolerates_preexisting_credential_token_columns(tmp
         assert MODEL_CREDENTIALS_REQUIRED_COLUMNS <= columns
         with engine.connect() as connection:
             assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-                "5a1c9e8d4b72"
+                _resolve_alembic_head_revision(config)
             )
     finally:
         engine.dispose()
@@ -72,3 +73,7 @@ def _build_alembic_config(database_url: str) -> Config:
     config.set_main_option("script_location", str(ALEMBIC_DIR))
     config.set_main_option("sqlalchemy.url", database_url)
     return config
+
+
+def _resolve_alembic_head_revision(config: Config) -> str:
+    return str(ScriptDirectory.from_config(config).get_current_head())

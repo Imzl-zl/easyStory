@@ -42,6 +42,10 @@ from .project_document_capability_dto import (
     ProjectDocumentReadErrorDTO,
     ProjectDocumentReadItemDTO,
     ProjectDocumentReadResultDTO,
+    ProjectDocumentSearchHitDTO,
+    ProjectDocumentSearchResultDTO,
+    ProjectDocumentWriteDiffSummaryDTO,
+    ProjectDocumentWriteResultDTO,
 )
 from .factory import (
     create_project_deletion_service,
@@ -80,6 +84,10 @@ __all__ = [
     "ProjectDocumentReadErrorDTO",
     "ProjectDocumentReadItemDTO",
     "ProjectDocumentReadResultDTO",
+    "ProjectDocumentSearchHitDTO",
+    "ProjectDocumentSearchResultDTO",
+    "ProjectDocumentWriteDiffSummaryDTO",
+    "ProjectDocumentWriteResultDTO",
     "ProjectDocumentSaveDTO",
     "ProjectDocumentTreeNodeDTO",
     "ProjectDeletionService",

@@ -18,6 +18,7 @@ import {
 export type StudioChatSession = {
   composerText: string;
   conversationSkillId: string | null;
+  latestCompletedRunId: string | null;
   messages: StudioChatMessage[];
   nextTurnSkillId: string | null;
   selectedContextPaths: string[];
@@ -51,6 +52,7 @@ export function createEmptyStudioChatSession(): StudioChatSession {
   return {
     composerText: "",
     conversationSkillId: null,
+    latestCompletedRunId: null,
     messages: [],
     nextTurnSkillId: null,
     selectedContextPaths: [],
@@ -106,7 +108,7 @@ export function isStudioChatSessionEmpty(session: StudioChatSession): boolean {
   if (session.composerText.trim()) {
     return false;
   }
-  if (session.conversationSkillId || session.nextTurnSkillId) {
+  if (session.conversationSkillId || session.nextTurnSkillId || session.latestCompletedRunId) {
     return false;
   }
   if (session.messages.length > 0 || session.selectedContextPaths.length > 0) {

@@ -1,12 +1,43 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 import pytest
 
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm_protocol import HttpJsonResponse
 from app.shared.runtime.llm_tool_provider import LLMStreamEvent, LLMToolProvider
+
+
+def _build_runtime_replay_continuation_items() -> list[dict[str, object]]:
+    return [
+        {
+            "item_type": "tool_call",
+            "call_id": "call_123",
+            "payload": {
+                "tool_name": "project.read_documents",
+                "arguments": {"paths": ["设定/人物.md"]},
+                "arguments_text": '{"paths":["设定/人物.md"]}',
+                "tool_call_id": "call_123",
+            },
+        },
+        {
+            "item_type": "tool_result",
+            "call_id": "call_123",
+            "status": "completed",
+            "tool_name": "project.read_documents",
+            "payload": {
+                "tool_name": "project.read_documents",
+                "structured_output": {
+                    "documents": [{"path": "设定/人物.md"}],
+                    "errors": [],
+                    "catalog_version": "catalog-v1",
+                },
+                "content_items": [{"type": "text", "text": "设定/人物.md\n\n林渊"}],
+            },
+        },
+    ]
 
 
 def test_execute_builds_openai_chat_request_with_default_model_fallback() -> None:
@@ -140,6 +171,193 @@ def test_execute_builds_openai_responses_request() -> None:
     assert result["content"] == "responses 结果"
 
 
+def test_execute_builds_openai_responses_continuation_request() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "output_text": "继续推理后的结果",
+                "usage": {"input_tokens": 6, "output_tokens": 8, "total_tokens": 14},
+            },
+            text="",
+        )
+
+    continuation_items = [
+        {
+            "item_type": "tool_result",
+            "call_id": "call_123",
+            "payload": {
+                "structured_output": {
+                    "documents": [{"path": "设定/人物.md"}],
+                    "errors": [],
+                    "catalog_version": "catalog-v1",
+                }
+            },
+        }
+    ]
+    provider = LLMToolProvider(request_sender=request_sender)
+    asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "先读一下人物设定。",
+                "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                "credential": {
+                    "api_key": "test-key",
+                    "api_dialect": "openai_responses",
+                },
+                "tools": [
+                    {
+                        "name": "project.read_documents",
+                        "description": "读取项目文稿。",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"paths": {"type": "array"}},
+                            "required": ["paths"],
+                        },
+                    }
+                ],
+                "continuation_items": continuation_items,
+                "provider_continuation_state": {
+                    "previous_response_id": "resp_prev_123",
+                    "latest_items": continuation_items,
+                },
+            },
+        )
+    )
+
+    request = captured["request"]
+    assert request.json_body["previous_response_id"] == "resp_prev_123"
+    assert request.json_body["input"][0]["type"] == "function_call_output"
+    assert request.json_body["tools"][0]["strict"] is True
+
+
+def test_execute_discards_provider_continuation_state_for_runtime_replay_dialect() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "content": [{"type": "text", "text": "anthropic 续接结果"}],
+                "usage": {"input_tokens": 10, "output_tokens": 6},
+            },
+            text="",
+        )
+
+    continuation_items = _build_runtime_replay_continuation_items()
+    provider = LLMToolProvider(request_sender=request_sender)
+    result = asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "先读一下人物设定。",
+                "model": {"provider": "anthropic", "name": "claude-sonnet-4-20250514"},
+                "credential": {
+                    "api_key": "anthropic-key",
+                    "api_dialect": "anthropic_messages",
+                },
+                "continuation_items": continuation_items,
+                "provider_continuation_state": {
+                    "previous_response_id": "resp_prev_123",
+                    "latest_items": continuation_items,
+                },
+            },
+        )
+    )
+
+    request = captured["request"]
+    assert "previous_response_id" not in request.json_body
+    assert request.json_body["messages"][0]["content"][0]["text"] == "先读一下人物设定。"
+    assert request.json_body["messages"][1]["content"][0]["type"] == "tool_use"
+    assert request.json_body["messages"][2]["content"][0]["type"] == "tool_result"
+    assert "设定/人物.md" in request.json_body["messages"][2]["content"][0]["content"]
+    assert result["content"] == "anthropic 续接结果"
+
+
+@pytest.mark.parametrize(
+    ("api_dialect", "provider_name", "model_name", "expected_content"),
+    [
+        ("openai_chat_completions", "openai", "gpt-4o-mini", "openai chat 续接结果"),
+        ("gemini_generate_content", "gemini", "gemini-2.5-pro", "gemini 续接结果"),
+    ],
+)
+def test_execute_discards_provider_continuation_state_for_other_runtime_replay_dialects(
+    api_dialect: str,
+    provider_name: str,
+    model_name: str,
+    expected_content: str,
+) -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        if api_dialect == "openai_chat_completions":
+            return HttpJsonResponse(
+                status_code=200,
+                json_body={
+                    "choices": [{"message": {"content": expected_content}}],
+                    "usage": {
+                        "prompt_tokens": 10,
+                        "completion_tokens": 6,
+                        "total_tokens": 16,
+                    },
+                },
+                text="",
+            )
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "candidates": [{"content": {"parts": [{"text": expected_content}]}}],
+                "usageMetadata": {
+                    "promptTokenCount": 10,
+                    "candidatesTokenCount": 6,
+                    "totalTokenCount": 16,
+                },
+            },
+            text="",
+        )
+
+    continuation_items = _build_runtime_replay_continuation_items()
+    provider = LLMToolProvider(request_sender=request_sender)
+    result = asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "先读一下人物设定。",
+                "model": {"provider": provider_name, "name": model_name},
+                "credential": {
+                    "api_key": f"{provider_name}-key",
+                    "api_dialect": api_dialect,
+                },
+                "continuation_items": continuation_items,
+                "provider_continuation_state": {
+                    "previous_response_id": "resp_prev_123",
+                    "latest_items": continuation_items,
+                },
+            },
+        )
+    )
+
+    request = captured["request"]
+    assert "previous_response_id" not in request.json_body
+    if api_dialect == "openai_chat_completions":
+        assert request.json_body["messages"][0] == {"role": "user", "content": "先读一下人物设定。"}
+        request_text = request.json_body["messages"][2]["content"]
+    else:
+        assert request.json_body["contents"][0]["parts"][0]["text"] == "先读一下人物设定。"
+        request_text = json.dumps(
+            request.json_body["contents"][2]["parts"][0]["functionResponse"]["response"],
+            ensure_ascii=False,
+        )
+    assert "设定/人物.md" in request_text
+    assert result["content"] == expected_content
+
+
 def test_execute_builds_anthropic_messages_request() -> None:
     captured = {}
 
@@ -180,7 +398,12 @@ def test_execute_builds_anthropic_messages_request() -> None:
     assert request.headers["x-api-key"] == "anthropic-key"
     assert request.headers["anthropic-version"] == "2023-06-01"
     assert request.json_body["system"] == [{"type": "text", "text": "保持古风"}]
-    assert request.json_body["messages"] == [{"role": "user", "content": "续写一段"}]
+    assert request.json_body["messages"] == [
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": "续写一段"}],
+        }
+    ]
     assert request.json_body["stop_sequences"] == ["END"]
     assert result["content"] == "anthropic 结果"
     assert result["total_tokens"] == 50
@@ -556,6 +779,15 @@ def test_execute_stream_yields_chunks_and_completed_result(monkeypatch) -> None:
         "total_tokens": None,
         "tool_calls": [],
         "provider_response_id": None,
+        "output_items": [
+            {
+                "item_type": "text",
+                "item_id": "provider:openai_responses:text:1",
+                "status": "completed",
+                "provider_ref": None,
+                "payload": {"content": "今天有新方向", "phase": "final"},
+            }
+        ],
     }
 
 
@@ -631,6 +863,15 @@ def test_execute_stream_uses_openai_completed_payload_when_no_deltas(monkeypatch
                 "total_tokens": 18,
                 "tool_calls": [],
                 "provider_response_id": None,
+                "output_items": [
+                    {
+                        "item_type": "text",
+                        "item_id": "provider:openai_responses:text:1",
+                        "status": "completed",
+                        "provider_ref": None,
+                        "payload": {"content": "今天有新方向", "phase": "final"},
+                    }
+                ],
             }
         )
     ]
@@ -716,6 +957,21 @@ def test_execute_stream_accepts_openai_completed_payload_with_tool_calls_and_no_
                     }
                 ],
                 "provider_response_id": "resp_tool_1",
+                "output_items": [
+                    {
+                        "item_type": "tool_call",
+                        "item_id": "provider:openai_responses:tool_call:1",
+                        "status": "completed",
+                        "provider_ref": None,
+                        "call_id": "call_123",
+                        "payload": {
+                            "tool_name": "project.read_documents",
+                            "arguments": {"paths": ["设定/人物.md"]},
+                            "arguments_text": '{"paths":["设定/人物.md"]}',
+                            "tool_call_id": "call_123",
+                        },
+                    }
+                ],
             }
         )
     ]

@@ -3,7 +3,7 @@ import asyncio
 from app.modules.content.models import Content, ContentVersion
 import pytest
 
-from app.modules.project.infrastructure import ProjectDocumentFileStore
+from app.modules.project.infrastructure import ProjectDocumentFileStore, ProjectDocumentIdentityStore
 from app.modules.project.service import (
     ProjectDocumentEntryCreateDTO,
     ProjectDocumentEntryRenameDTO,
@@ -12,6 +12,10 @@ from app.modules.project.service import (
     ProjectManagementService,
     ProjectService,
     ProjectSettingUpdateDTO,
+)
+from app.modules.project.service.project_document_version_support import (
+    build_project_canonical_document_version,
+    build_project_file_document_version,
 )
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 from tests.unit.async_service_support import AsyncSessionAdapter, async_db
@@ -25,6 +29,16 @@ from tests.unit.models.helpers import (
     create_workflow,
     ready_project_setting,
 )
+
+
+class _FailOnRenameDocumentIdentityStore(ProjectDocumentIdentityStore):
+    def rename_document_ref(self, *args, **kwargs) -> None:
+        raise RuntimeError("rename identity failed")
+
+
+class _FailOnDeleteDocumentIdentityStore(ProjectDocumentIdentityStore):
+    def delete_document_ref(self, *args, **kwargs) -> None:
+        raise RuntimeError("delete identity failed")
 
 
 def test_update_project_setting_marks_derived_assets_stale_when_summary_changes(db):
@@ -230,7 +244,7 @@ def test_get_preparation_status_flags_stale_tasks_under_active_workflow(db):
 
 def test_get_project_document_uses_outline_seed_when_file_missing(db, tmp_path):
     project = create_project(db, project_setting=ready_project_setting())
-    _create_story_asset(db, project.id, "outline", "approved", "这是从数据库回填的大纲内容")
+    outline = _create_story_asset(db, project.id, "outline", "approved", "这是从数据库回填的大纲内容")
 
     result = asyncio.run(
         ProjectService(
@@ -244,7 +258,12 @@ def test_get_project_document_uses_outline_seed_when_file_missing(db, tmp_path):
 
     assert result.source == "outline"
     assert result.content == "这是从数据库回填的大纲内容"
-    assert result.updated_at is None
+    assert result.version == build_project_canonical_document_version(
+        "canonical:outline",
+        content_id=outline.id,
+        version_number=1,
+    )
+    assert result.updated_at is not None
 
 
 def test_get_project_document_ignores_shadow_file_for_canonical_outline_path(db, tmp_path):
@@ -263,6 +282,7 @@ def test_get_project_document_ignores_shadow_file_for_canonical_outline_path(db,
 
     assert result.source == "outline"
     assert result.content == "这是数据库中的正式大纲"
+    assert result.version.startswith("canonical:outline:version:")
 
 
 def test_save_project_document_persists_markdown_file(db, tmp_path):
@@ -274,7 +294,10 @@ def test_save_project_document_persists_markdown_file(db, tmp_path):
             async_db(db),
             project.id,
             "设定/世界观.md",
-            ProjectDocumentSaveDTO(content="# 世界观\n\n这里是文件保存后的内容。"),
+            ProjectDocumentSaveDTO(
+                base_version=build_project_file_document_version(""),
+                content="# 世界观\n\n这里是文件保存后的内容。",
+            ),
         )
     )
     loaded = asyncio.run(
@@ -286,8 +309,10 @@ def test_save_project_document_persists_markdown_file(db, tmp_path):
     )
 
     assert saved.source == "file"
+    assert saved.version == build_project_file_document_version("# 世界观\n\n这里是文件保存后的内容。")
     assert loaded.source == "file"
     assert loaded.content == "# 世界观\n\n这里是文件保存后的内容。"
+    assert loaded.version == build_project_file_document_version("# 世界观\n\n这里是文件保存后的内容。")
     assert (tmp_path / "projects" / str(project.id) / "documents" / "设定" / "世界观.md").exists()
 
 
@@ -300,7 +325,10 @@ def test_save_project_document_persists_json_file(db, tmp_path):
             async_db(db),
             project.id,
             "数据层/人物关系.json",
-            ProjectDocumentSaveDTO(content='{\n  "character_relations": []\n}'),
+            ProjectDocumentSaveDTO(
+                base_version=build_project_file_document_version(""),
+                content='{\n  "character_relations": []\n}',
+            ),
         )
     )
     loaded = asyncio.run(
@@ -312,9 +340,35 @@ def test_save_project_document_persists_json_file(db, tmp_path):
     )
 
     assert saved.source == "file"
+    assert saved.version == build_project_file_document_version('{\n  "character_relations": []\n}')
     assert loaded.source == "file"
     assert loaded.content == '{\n  "character_relations": []\n}'
+    assert loaded.version == build_project_file_document_version('{\n  "character_relations": []\n}')
     assert (tmp_path / "projects" / str(project.id) / "documents" / "数据层" / "人物关系.json").exists()
+
+
+def test_save_project_document_rejects_stale_base_version(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    file_store = ProjectDocumentFileStore(tmp_path)
+    file_store.save_project_document(project.id, "设定/世界观.md", "# 世界观\n\n旧内容")
+    service = ProjectService(document_file_store=file_store)
+
+    with pytest.raises(BusinessRuleError, match="版本已变化"):
+        asyncio.run(
+            service.save_project_document(
+                async_db(db),
+                project.id,
+                "设定/世界观.md",
+                ProjectDocumentSaveDTO(
+                    base_version=build_project_file_document_version(""),
+                    content="# 世界观\n\n新内容",
+                ),
+            )
+        )
+
+    persisted = file_store.find_project_document(project.id, "设定/世界观.md")
+    assert persisted is not None
+    assert persisted.content == "# 世界观\n\n旧内容"
 
 
 def test_get_project_document_reads_existing_template_file_from_file_layer(db, tmp_path):
@@ -332,6 +386,7 @@ def test_get_project_document_reads_existing_template_file_from_file_layer(db, t
 
     assert loaded.source == "file"
     assert loaded.content == ""
+    assert loaded.version == build_project_file_document_version("")
 
 
 def test_get_project_document_reads_existing_template_json_file_from_file_layer(db, tmp_path):
@@ -354,6 +409,7 @@ def test_get_project_document_reads_existing_template_json_file_from_file_layer(
 
     assert loaded.source == "file"
     assert loaded.content == ""
+    assert loaded.version == build_project_file_document_version("")
 
 
 def test_get_project_document_raises_for_missing_file_layer_document(db, tmp_path):
@@ -380,7 +436,10 @@ def test_save_project_document_rejects_canonical_content_paths(db, tmp_path):
                 async_db(db),
                 project.id,
                 "正文/第001章.md",
-                ProjectDocumentSaveDTO(content="# 正文\n\n不应该写到文件层"),
+                ProjectDocumentSaveDTO(
+                    base_version=build_project_file_document_version(""),
+                    content="# 正文\n\n不应该写到文件层",
+                ),
             )
         )
 
@@ -395,7 +454,47 @@ def test_save_project_document_rejects_parent_path_escape(db, tmp_path):
                 async_db(db),
                 project.id,
                 "../逃逸.md",
-                ProjectDocumentSaveDTO(content="不应该写出项目目录"),
+                ProjectDocumentSaveDTO(
+                    base_version=build_project_file_document_version(""),
+                    content="不应该写出项目目录",
+                ),
+            )
+        )
+
+
+def test_save_project_document_rejects_non_mutable_project_file_path(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    service = ProjectService(document_file_store=ProjectDocumentFileStore(tmp_path))
+
+    with pytest.raises(BusinessRuleError, match="可写项目文件文稿"):
+        asyncio.run(
+            service.save_project_document(
+                async_db(db),
+                project.id,
+                "正文/灵感备注.md",
+                ProjectDocumentSaveDTO(
+                    base_version=build_project_file_document_version(""),
+                    content="# 备注",
+                ),
+            )
+        )
+
+
+def test_save_project_document_rejects_directory_path(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    service = ProjectService(document_file_store=ProjectDocumentFileStore(tmp_path))
+    asyncio.run(service.ensure_project_document_template(async_db(db), project.id))
+
+    with pytest.raises(BusinessRuleError, match="可写项目文件文稿"):
+        asyncio.run(
+            service.save_project_document(
+                async_db(db),
+                project.id,
+                "设定",
+                ProjectDocumentSaveDTO(
+                    base_version=build_project_file_document_version(""),
+                    content="# 不应写入目录",
+                ),
             )
         )
 
@@ -687,6 +786,37 @@ def test_rename_project_document_entry_rejects_missing_target_parent(db, tmp_pat
         )
 
 
+def test_rename_project_document_entry_rolls_back_file_when_identity_update_fails(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    file_store = ProjectDocumentFileStore(tmp_path)
+    identity_store = _FailOnRenameDocumentIdentityStore(tmp_path)
+    file_store.save_project_document(project.id, "附录/旧灵感.md", "旧内容")
+    identity_store.resolve_document_ref(project.id, path="附录/旧灵感.md")
+    service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+
+    with pytest.raises(RuntimeError, match="rename identity failed"):
+        asyncio.run(
+            service.rename_project_document_entry(
+                async_db(db),
+                project.id,
+                ProjectDocumentEntryRenameDTO(
+                    path="附录/旧灵感.md",
+                    next_path="附录/新灵感.md",
+                ),
+            )
+        )
+
+    assert (tmp_path / "projects" / str(project.id) / "documents" / "附录" / "旧灵感.md").exists()
+    assert not (tmp_path / "projects" / str(project.id) / "documents" / "附录" / "新灵感.md").exists()
+    identities = identity_store.list_document_identities(project.id)
+    assert [(item.document_ref, item.path) for item in identities] == [
+        (identities[0].document_ref, "附录/旧灵感.md")
+    ]
+
+
 def test_delete_project_document_entry_removes_custom_folder(db, tmp_path):
     project = create_project(db, project_setting=ready_project_setting())
     file_store = ProjectDocumentFileStore(tmp_path)
@@ -705,6 +835,34 @@ def test_delete_project_document_entry_removes_custom_folder(db, tmp_path):
     assert deleted.node_type == "folder"
     assert deleted.path == "设定/补充"
     assert not (tmp_path / "projects" / str(project.id) / "documents" / "设定" / "补充").exists()
+
+
+def test_delete_project_document_entry_restores_file_when_identity_delete_fails(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    file_store = ProjectDocumentFileStore(tmp_path)
+    identity_store = _FailOnDeleteDocumentIdentityStore(tmp_path)
+    file_store.save_project_document(project.id, "附录/灵感.md", "旧内容")
+    document_ref = identity_store.resolve_document_ref(project.id, path="附录/灵感.md")
+    service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+
+    with pytest.raises(RuntimeError, match="delete identity failed"):
+        asyncio.run(
+            service.delete_project_document_entry(
+                async_db(db),
+                project.id,
+                "附录/灵感.md",
+            )
+        )
+
+    assert (tmp_path / "projects" / str(project.id) / "documents" / "附录" / "灵感.md").exists()
+    identities = identity_store.list_document_identities(project.id)
+    assert [(item.document_ref, item.path) for item in identities] == [
+        (document_ref, "附录/灵感.md")
+    ]
+    assert not (tmp_path / "projects" / str(project.id) / ".delete-staging").exists()
 
 
 def test_delete_project_document_entry_rejects_fixed_slot_root(db, tmp_path):
@@ -747,7 +905,7 @@ def _create_story_asset(
     content_type: str,
     status: str,
     content_text: str,
-) -> None:
+) -> Content:
     content = Content(
         project_id=project_id,
         content_type=content_type,
@@ -766,3 +924,4 @@ def _create_story_asset(
         )
     )
     db.commit()
+    return content

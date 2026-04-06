@@ -21,12 +21,15 @@ test("studio chat model clears one-time skill only after a successful turn", () 
     consumedNextTurnSkillId: session.nextTurnSkillId,
     content: "这次先把冲突压到更近的场景里。",
     messageId: pendingAssistantMessage.id,
+    runId: "run-1",
   });
 
+  assert.equal(nextSession.latestCompletedRunId, "run-1");
   assert.equal(nextSession.nextTurnSkillId, null);
   assert.equal(nextSession.conversationSkillId, "skill.user.long-form");
   assert.equal(nextSession.messages.at(-1)?.status, undefined);
   assert.equal(nextSession.messages.at(-1)?.content, "这次先把冲突压到更近的场景里。");
+  assert.equal(nextSession.messages.at(-1)?.requestContent, "这次先把冲突压到更近的场景里。");
 });
 
 test("studio chat model keeps next-turn skill untouched when this turn did not consume one", () => {
@@ -43,7 +46,9 @@ test("studio chat model keeps next-turn skill untouched when this turn did not c
     consumedNextTurnSkillId: null,
     content: "保持当前对话模式。",
     messageId: pendingAssistantMessage.id,
+    runId: "run-2",
   });
 
+  assert.equal(nextSession.latestCompletedRunId, "run-2");
   assert.equal(nextSession.nextTurnSkillId, "skill.user.one-shot");
 });

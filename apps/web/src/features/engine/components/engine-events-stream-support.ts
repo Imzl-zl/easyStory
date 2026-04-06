@@ -1,6 +1,6 @@
 "use client";
 
-import { ApiError, getApiBaseUrl } from "@/lib/api/client";
+import { ApiError, createApiErrorFromPayload, getApiBaseUrl } from "@/lib/api/client";
 import type { ExecutionLogView } from "@/lib/api/types";
 
 const STREAM_TIMEOUT_SECONDS = 300;
@@ -171,13 +171,5 @@ async function toStreamError(response: Response): Promise<Error> {
   const payload = contentType.includes("application/json")
     ? await response.json()
     : await response.text();
-  const detail =
-    typeof payload === "object" && payload !== null && "detail" in payload
-      ? payload.detail
-      : payload;
-  const message =
-    typeof detail === "string" && detail.trim()
-      ? detail
-      : `Workflow events stream failed with status ${response.status}`;
-  return new ApiError(message, response.status, detail);
+  return createApiErrorFromPayload(payload, response.status);
 }

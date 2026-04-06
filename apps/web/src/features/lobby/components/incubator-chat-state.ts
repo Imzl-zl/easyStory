@@ -25,6 +25,7 @@ export type IncubatorChatState = {
   draft: IncubatorChatSession["draft"];
   draftFingerprint: string | null;
   hasCustomProjectName: boolean;
+  latestCompletedRunId: string | null;
   messages: IncubatorChatSession["messages"];
   patchConversationSession: (
     conversationId: string,
@@ -108,6 +109,7 @@ export function useChatState(): IncubatorChatState {
     draft: session.draft,
     draftFingerprint: session.draftFingerprint,
     hasCustomProjectName: session.hasCustomProjectName,
+    latestCompletedRunId: session.latestCompletedRunId,
     messages: session.messages,
     patchConversationSession: (conversationId, updater) => {
       if (!currentUserId) {

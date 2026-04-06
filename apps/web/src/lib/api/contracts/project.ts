@@ -74,11 +74,34 @@ export type ProjectDocument = {
   project_id: string;
   path: string;
   content: string;
+  version: string;
   source: ProjectDocumentSource;
   updated_at: string | null;
+  document_revision_id: string | null;
+  run_audit_id: string | null;
+};
+
+export type ProjectDocumentContentState = "ready" | "empty" | "placeholder";
+
+export type ProjectDocumentCatalogEntry = {
+  path: string;
+  document_ref: string;
+  binding_version: string;
+  resource_uri: string;
+  title: string;
+  source: ProjectDocumentSource;
+  document_kind: string;
+  mime_type: string;
+  schema_id: string | null;
+  content_state: ProjectDocumentContentState;
+  writable: boolean;
+  version: string;
+  updated_at: string | null;
+  catalog_version: string;
 };
 
 export type ProjectDocumentSavePayload = {
+  base_version: string;
   content: string;
 };
 
@@ -323,6 +346,7 @@ export type StoryAsset = {
   title: string;
   status: "draft" | "approved" | "stale" | "archived";
   version_number: number;
+  document_version: string;
   content_text: string;
 };
 
@@ -353,6 +377,7 @@ export type ChapterSummary = {
   title: string;
   status: "draft" | "approved" | "stale" | "archived";
   current_version_number: number;
+  document_version: string;
   best_version_number: number | null;
   word_count: number | null;
   last_edited_at: string | null;

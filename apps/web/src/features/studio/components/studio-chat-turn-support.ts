@@ -10,16 +10,19 @@ export function buildSucceededStudioConversationSession(
     consumedNextTurnSkillId: string | null;
     content: string;
     messageId: string;
+    runId: string;
   },
 ): StudioChatSession {
   const normalized = normalizeStudioAssistantReply(options.content);
   return {
     ...current,
     ...(options.consumedNextTurnSkillId ? { nextTurnSkillId: null } : {}),
+    latestCompletedRunId: options.runId,
     messages: replaceStudioChatMessage(current.messages, options.messageId, {
       content: normalized.content,
       id: options.messageId,
       rawMarkdown: options.content,
+      requestContent: options.content,
       role: "assistant",
       status: normalized.status,
     }),

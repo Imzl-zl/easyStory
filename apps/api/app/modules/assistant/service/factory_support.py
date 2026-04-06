@@ -7,6 +7,8 @@ from .assistant_agent_file_store import AssistantAgentFileStore
 from .assistant_hook_file_store import AssistantHookFileStore
 from .assistant_mcp_file_store import AssistantMcpFileStore
 from .assistant_skill_file_store import AssistantSkillFileStore
+from .assistant_tool_step_store import AssistantToolStepStore
+from .assistant_turn_run_store import AssistantTurnRunStore
 
 
 def build_default_assistant_config_store() -> AssistantConfigFileStore:
@@ -27,3 +29,11 @@ def build_default_assistant_hook_store() -> AssistantHookFileStore:
 
 def build_default_assistant_mcp_store() -> AssistantMcpFileStore:
     return AssistantMcpFileStore(get_settings().assistant_config_root)
+
+
+def build_default_assistant_turn_run_store() -> AssistantTurnRunStore:
+    return AssistantTurnRunStore(get_settings().assistant_config_root / "turn-runs")
+
+
+def build_default_assistant_tool_step_store() -> AssistantToolStepStore:
+    return AssistantToolStepStore(get_settings().assistant_config_root / "tool-steps")

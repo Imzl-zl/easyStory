@@ -7,7 +7,7 @@
 
 - 后端测试：最近一次已知全量 `cd apps/api && ruff check app tests && pytest -q` 通过（记录日期：2026-03-23）
 - 前端检查：最近一次已知 `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-04-04）
-- 最后更新：2026-04-04
+- 最后更新：2026-04-06
 
 ## 已完成能力
 
@@ -20,6 +20,14 @@
 - 工作流闭环：control plane、runtime、auto-review / fix、workflow logs / prompt replay / audit
 - workflow hooks runtime 闭环：`script/webhook/agent` 已真实接入 workflow runtime，`PluginRegistry` 支持 execute/timeout，hook agent 依赖已进入 snapshot，builtin `auto_save_content` 可执行
 - assistant runtime 第一阶段闭环：新增 `/api/v1/assistant/turn`，非 workflow 对话已支持 skill prompt、hook 生命周期与 `mcp` 插件调用；workflow snapshot 已可冻结 `resolved_mcp_servers`
+- assistant 原生 tool-calling runtime `v1A` 已闭环：ordinary chat 现已支持本地 `project.read_documents / project.write_document` tool loop、`AssistantTurnRun / AssistantToolStep` 真值、structured continuation replay、recoverable tool error 回填、SSE `run_started / tool_call_start / tool_call_result / completed` 与真实 `state_version`；assistant 主链相关后端回归 `54 passed`，前端 assistant stream 定向测试已通过
+- assistant stale-running-turn 恢复语义已补齐：`AssistantTurnRun` 现会记录本地 runtime claim（`host / pid / instance_id`）；若旧进程已中断导致残留 `running` run，runtime 会把该 run 显式终止为失败态，不再让同一 `client_turn_id` 永久卡在 `run_in_progress`，且不会静默重放整轮 turn
+- assistant SSE 错误事件现已补齐 run 级元数据：stream error 默认会带 `run_id / conversation_id / client_turn_id / event_seq / state_version / ts`；运行中异常优先使用 `AssistantService` 附着的精确 stream meta，准备阶段失败则由 router 基于 request 回填最小元数据
+- 前端 `AssistantTurnStreamTerminalError` 现已保留 run 级元数据：结构化 `error` 事件与 `cancelled tool_result -> EOF` 两条终止路径都会保留 `runId / conversationId / clientTurnId / eventSeq / stateVersion / ts`
+- assistant 前端 continuity 口径进一步对齐：`Studio` 之外，`Incubator` 聊天也已记录 `latestCompletedRunId`，并在后续 turn 通过 `continuation_anchor.previous_run_id` 回传后端
+- assistant 共享 stream client 现已把异常 EOF 收口成结构化终止错误：若已拿到 run/tool/chunk 元数据后流意外断开，会抛 `AssistantTurnStreamTerminalError(code=stream_interrupted)` 并保留最后一次事件元数据
+- `Incubator` 空会话判定现已与 `Studio` 对齐：`latestCompletedRunId` 也会把会话视为非空，避免带 continuity 真值的会话被误复用成“新对话”
+- assistant 共享 stream client 现已把 malformed SSE payload 收口成结构化终止错误：非法 JSON 不再上抛原始 `SyntaxError`，而是统一转成 `AssistantTurnStreamTerminalError(code=stream_payload_invalid, terminalStatus=failed)` 并尽量保留最后一次事件元数据
 - assistant 规则层当前闭环：已支持用户规则 `/api/v1/assistant/rules/me` 与项目规则 `/api/v1/assistant/rules/projects/{project_id}`；运行时自动注入“用户长期规则 + 当前项目规则”，Web 全局设置与项目设置已补入口；规则真值文件分别落在 `apps/api/.runtime/assistant-config/users/<user_id>/AGENTS.md` 与 `apps/api/.runtime/assistant-config/projects/<project_id>/AGENTS.md`
 - 多用户 assistant 体验第二轮收口：全局设置已整理为“AI 助手 / 模型连接”双入口，AI 偏好正式露出并与个人长期规则形成同一用户心智；孵化聊天默认会优先使用个人 AI 偏好，退出登录时会清空工作台项目上下文，避免账号串用；AI 偏好真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/preferences.yaml`
 - assistant 项目层配置闭环：项目设置页现已支持“项目长期规则 / 项目 AI 偏好 / 项目 Skills / 项目 MCP”；真值文件写入 `projects/<project_id>/AGENTS.md`、`preferences.yaml`、`skills/<skill_id>/SKILL.md`、`mcp_servers/<server_id>/MCP.yaml`；运行时按 `项目 -> 用户 -> 系统` 解析，其中 AI 偏好做字段级覆盖，Skills / MCP 做同 ID 命中覆盖
@@ -72,6 +80,9 @@
 - 程序化 Alembic 优先复用现有 `connection` / `engine`，不要退回字符串化 URL
 - config_registry 对外暴露语义化 DTO，写回前必须 staged full-config 校验，未知字段直接失败
 - `assistant runtime` 当前正式口径：默认可直接走“规则 + 当前会话消息历史”的纯聊天；`skill_id` / `agent_id` 现在是可选增强而非硬前提，且 Studio 聊天已移除默认内置 Skill 绑定；Skill 模式已收口为“规则 + Skill + 当前会话历史 + 当前消息”，runtime 会自动补齐 Skill 未显式声明的 `conversation_history / user_input`；assistant turn 的 `messages` 只允许 `user / assistant`，规则和 Skill 不进入历史；`mcp` 继续通过 hook/plugin 路径执行，agent 通用 tool-calling 仍是下一阶段
+- assistant tool-calling 当前正式口径：ordinary chat 已支持本地 `project.*` 工具串行执行；非 `openai_responses` provider 统一走结构化 runtime replay，不再把 continuation 压回自然语言 prompt；共享前端 stream client 目前明确以 `completed / error / cancelled tool_result` 为终止真值优先级
+- assistant tool-calling `v1B` 当前已推进到 continuity-first 文稿工具面：`project.list_documents / search_documents / read_documents / write_document` 已接入 runtime；长历史 compaction、tool-loop continuation budget、metadata-only 文稿搜索已收口；`grant_bound` 写路径现已具备显式 `approval_grant` 骨架，并把 grant snapshot 落到 `AssistantToolStep / AssistantTurnRun`
+- assistant SSE 当前正式口径：除普通 `completed`/tool 事件外，`error` 事件也应尽量携带同一 run 的结构化元数据，前端不再只依赖裸错误消息来推断归属
 - 用户 Hook 当前正式支持 `agent | mcp` 两类动作；MCP 会先解析用户自己的 `mcp_servers/<server_id>/MCP.yaml`，找不到再回退系统 MCP
 - 多用户 assistant 配置当前正式口径：平台可保留系统内置 `skill/agent/hook/mcp/workflow` 作为可选能力；普通用户当前正式拥有个人偏好、个人长期规则、个人 Skills、个人 Agents、个人 Hooks、个人 MCP、项目长期规则和项目 AI 偏好；这些能力当前均以文件为主真值；用户自定义 `Workflows` 仍待补齐
 - runtime hardening 当前已补齐：assistant hook-agent 会按 agent 类型传 `response_format`；MCP provider 会显式拒绝 disabled server / `is_error=true`；workflow staged config 会拒绝 assistant-only hook 事件和 before/after stage 错绑
@@ -98,3 +109,13 @@
 - 2026-03-30：继续按 Claude 风格收口前端主路径，保留“长期规则 + Skills + 模型连接”为默认心智，`Agents / Hooks / MCP` 进入更明确的次级区域。
 - 2026-03-30：补齐项目级 Skills / MCP，文件真值落到 `projects/<project_id>/skills/<skill_id>/SKILL.md` 与 `projects/<project_id>/mcp_servers/<server_id>/MCP.yaml`，运行时按 `项目 -> 用户 -> 系统` 解析；浏览器已实测 `Skills -> MCP` 无输入切换不再弹未保存提示。
 - 2026-04-04：修复模型连接编辑页保存后 dirty 误报；根因是编辑表单未在保存成功后立即重建基线，尤其 `apiKey` 不回显时会长期判脏。前端 `lint` 与 `test:unit` 已通过，并已在浏览器真实验证“编辑 -> 保存 -> 返回项目大厅”不再弹未保存提示。
+- 2026-04-06：assistant 原生 tool-calling runtime `v1A` 继续收口：非 `openai_responses` provider 改为结构化 replay，recoverable tool error 可回填模型继续推理，SSE `state_version` 回到 run 真值；`assistant_service + continuation + assistant_api` 共 `54 passed`，前端共享 stream client 终止优先级测试补齐并通过。
+- 2026-04-06：继续补齐 assistant stale-run 恢复语义：`AssistantTurnRun` 新增本地 runtime claim（`host / pid / instance_id`），旧进程中断留下的 `running` run 现在会被显式收口为 failed，而不是永久 `run_in_progress`；相关 assistant 后端回归已通过。
+- 2026-04-06：继续完善 SSE 错误语义：router/stream runtime 现已为 `error` 事件补齐 run 关联元数据，API 与前端 stream fixture 同步到真实 error 形状；`assistant_api`、相关 `assistant_service` 异常路径和前端 stream 测试已通过。
+- 2026-04-06：继续收口前端 stream 终止真值：`AssistantTurnStreamTerminalError` 现在会保留 `error` 与 `cancelled` 两类终止路径的 run 元数据；过程中修正了一次 camelCase/snake_case 二次转换导致的 `runId` 丢失问题，定向前端测试与 `eslint` 已通过。
+- 2026-04-06：补齐 `Incubator` 聊天 continuity：session/store/request builder/成功提交链已接入 `latestCompletedRunId -> continuation_anchor.previous_run_id`，避免与 `Studio` 在 run continuity 语义上继续漂移；相关前端定向测试 `5 passed`，`eslint` 通过。
+- 2026-04-06：继续完善共享 stream client：异常 EOF 不再抛裸 `Error`，而是统一转成带最后事件元数据的 `stream_interrupted` 结构化终止错误；assistant stream 定向测试与 `eslint` 已通过。
+- 2026-04-06：修正 `Incubator` store 边角语义：空会话判定已把 `latestCompletedRunId` 纳入非空条件，与 `Studio` 保持一致；相关 `Incubator` store/request/submit` 定向测试与 `eslint` 已通过。
+- 2026-04-06：继续强化共享 stream client 的协议异常暴露：malformed SSE payload 不再向上冒原始 `SyntaxError`，而是统一转成 `stream_payload_invalid` 结构化终止错误；中途修正了“误把正常 `error` 事件也包成 payload invalid”的实现错误，相关定向测试与 `eslint` 已通过。
+- 2026-04-06：assistant 文稿工具继续稳步推进到 `v1B`：补齐 `project.search_documents` 契约、continuity-first 搜索排序、长历史 compaction/budget、tool-loop continuation 预算，以及 `project.write_document` 的显式 `approval_grant` 骨架；当前 grant 已进入 policy decision、execution context、tool step snapshot 与 turn run snapshot，定向后端回归已通过。
+- 2026-04-06：继续修正 assistant 文稿工具 runtime 边界：hidden tool 现在会在 runtime 计划阶段被显式拒绝，不再“只是隐藏但仍可执行”；`grant_bound` 只会对 `writable=true` 的 active 文稿签发 grant；`AssistantToolStep.approval_state` 也已改为依赖实际 grant，避免无 grant 写调用被错误记成 `approved`。

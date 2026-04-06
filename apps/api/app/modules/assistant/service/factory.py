@@ -23,6 +23,7 @@ from .assistant_tool_executor import AssistantToolExecutor
 from .assistant_tool_exposure_policy import AssistantToolExposurePolicy
 from .assistant_tool_loop import AssistantToolLoop
 from .assistant_tool_registry import AssistantToolDescriptorRegistry
+from .assistant_tool_step_store import AssistantToolStepStore
 from .assistant_skill_file_store import AssistantSkillFileStore
 from .assistant_rule_service import AssistantRuleService
 from .assistant_skill_service import AssistantSkillService
@@ -33,8 +34,11 @@ from .factory_support import (
     build_default_assistant_hook_store,
     build_default_assistant_mcp_store,
     build_default_assistant_skill_store,
+    build_default_assistant_tool_step_store,
+    build_default_assistant_turn_run_store,
 )
 from .preferences_service import AssistantPreferencesService
+from .assistant_turn_run_store import AssistantTurnRunStore
 
 DEFAULT_CONFIG_ROOT = Path(__file__).resolve().parents[6] / "config"
 
@@ -48,6 +52,8 @@ def create_assistant_service(
     mcp_store: AssistantMcpFileStore | None = None,
     skill_store: AssistantSkillFileStore | None = None,
     tool_provider: LLMToolProvider | None = None,
+    tool_step_store: AssistantToolStepStore | None = None,
+    turn_run_store: AssistantTurnRunStore | None = None,
 ) -> AssistantService:
     resolved_config_store = config_store or build_default_assistant_config_store()
     resolved_config_loader = config_loader or ConfigLoader(DEFAULT_CONFIG_ROOT)
@@ -107,7 +113,10 @@ def create_assistant_service(
         assistant_tool_loop=create_assistant_tool_loop(
             exposure_policy=resolved_tool_exposure_policy,
             executor=resolved_tool_executor,
+            step_store=tool_step_store or build_default_assistant_tool_step_store(),
         ),
+        turn_run_store=turn_run_store or build_default_assistant_turn_run_store(),
+        project_document_capability_service=resolved_project_document_capability_service,
     )
 
 
@@ -225,10 +234,16 @@ def create_assistant_tool_loop(
     *,
     exposure_policy: AssistantToolExposurePolicy | None = None,
     executor: AssistantToolExecutor | None = None,
+    step_store: AssistantToolStepStore | None = None,
 ) -> AssistantToolLoop:
     resolved_exposure_policy = exposure_policy or create_assistant_tool_exposure_policy()
     resolved_executor = executor or create_assistant_tool_executor()
     return AssistantToolLoop(
         exposure_policy=resolved_exposure_policy,
         executor=resolved_executor,
+        step_store=step_store,
     )
+
+
+def create_assistant_tool_step_store() -> AssistantToolStepStore:
+    return build_default_assistant_tool_step_store()

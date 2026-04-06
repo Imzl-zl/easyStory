@@ -9,15 +9,18 @@ from .errors import ConfigurationError
 from .llm_protocol import (
     HttpJsonResponse,
     LLMConnection,
+    LLMContinuationSupport,
     LLMFunctionToolDefinition,
     LLMGenerateRequest,
     PreparedLLMHttpRequest,
+    allows_provider_continuation_state,
     normalize_api_dialect,
     normalize_auth_strategy,
     normalize_runtime_kind,
     parse_generation_response,
     prepare_generation_request,
     resolve_model_name,
+    resolve_continuation_support,
     send_json_http_request,
 )
 from .tool_provider import ToolProvider
@@ -45,6 +48,9 @@ class LLMRequest:
     top_p: float | None
     stop: list[str] | None
     tools: list[LLMFunctionToolDefinition]
+    continuation_items: list[dict[str, Any]]
+    provider_continuation_state: dict[str, Any] | None
+    continuation_support: LLMContinuationSupport
     connection: LLMConnection
 
 
@@ -80,6 +86,7 @@ class LLMToolProvider(ToolProvider):
             "total_tokens": normalized.total_tokens,
             "tool_calls": [tool_call.__dict__ for tool_call in normalized.tool_calls],
             "provider_response_id": normalized.provider_response_id,
+            "output_items": normalized.provider_output_items,
         }
 
     async def execute_stream(
@@ -139,6 +146,7 @@ class LLMToolProvider(ToolProvider):
                 "total_tokens": normalized.total_tokens,
                 "tool_calls": [tool_call.__dict__ for tool_call in normalized.tool_calls],
                 "provider_response_id": normalized.provider_response_id,
+                "output_items": normalized.provider_output_items,
             }
         )
 
@@ -156,6 +164,8 @@ def _build_request(params: dict[str, Any]) -> LLMRequest:
         default_model=_optional_string(credential.get("default_model")),
         provider_label=provider or "credential",
     )
+    connection = _build_connection(credential)
+    continuation_support = resolve_continuation_support(connection.api_dialect)
     return LLMRequest(
         prompt=prompt,
         model_name=model_name,
@@ -170,7 +180,13 @@ def _build_request(params: dict[str, Any]) -> LLMRequest:
         top_p=_optional_float(model.get("top_p")),
         stop=_optional_string_list(model.get("stop")),
         tools=_optional_function_tool_list(params.get("tools")),
-        connection=_build_connection(credential),
+        continuation_items=_optional_record_list(params.get("continuation_items")),
+        provider_continuation_state=_resolve_provider_continuation_state(
+            params.get("provider_continuation_state"),
+            continuation_support=continuation_support,
+        ),
+        continuation_support=continuation_support,
+        connection=connection,
     )
 
 
@@ -186,7 +202,22 @@ def _to_generate_request(request: LLMRequest) -> LLMGenerateRequest:
         top_p=request.top_p,
         stop=request.stop,
         tools=request.tools,
+        continuation_items=request.continuation_items,
+        provider_continuation_state=request.provider_continuation_state,
     )
+
+
+def _resolve_provider_continuation_state(
+    raw_state: object,
+    *,
+    continuation_support: LLMContinuationSupport,
+) -> dict[str, Any] | None:
+    normalized_state = _optional_dict(raw_state)
+    if normalized_state is None:
+        return None
+    if not allows_provider_continuation_state(continuation_support):
+        return None
+    return normalized_state
 
 
 def _build_http_error_message(response: HttpJsonResponse) -> str:
@@ -282,9 +313,39 @@ def _optional_function_tool_list(value: Any) -> list[LLMFunctionToolDefinition]:
                 name=_require_non_empty_string(tool.get("name"), "tools[].name"),
                 description=_require_non_empty_string(tool.get("description"), "tools[].description"),
                 parameters=_require_dict(tool.get("parameters"), "tools[].parameters"),
+                strict=_optional_bool(tool.get("strict"), default=True),
             )
         )
     return tools
+
+
+def _optional_bool(value: Any, *, default: bool | None = None) -> bool:
+    if value is None:
+        if default is None:
+            raise ConfigurationError("Expected bool value")
+        return default
+    if isinstance(value, bool):
+        return value
+    raise ConfigurationError("Expected bool value")
+
+
+def _optional_dict(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ConfigurationError("Expected object value")
+    return value
+
+
+def _optional_record_list(value: Any) -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ConfigurationError("continuation_items must be an array")
+    normalized: list[dict[str, Any]] = []
+    for item in value:
+        normalized.append(_require_dict(item, "continuation_items[]"))
+    return normalized
 
 
 def _resolve_max_tokens(*, requested_value: Any, default_value: Any) -> int | None:

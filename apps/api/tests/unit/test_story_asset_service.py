@@ -6,6 +6,9 @@ from app.modules.content.service import (
     StoryAssetSaveDTO,
     create_story_asset_service,
 )
+from app.modules.project.service.project_document_version_support import (
+    build_project_canonical_document_version,
+)
 from app.shared.runtime.errors import BusinessRuleError
 from tests.unit.async_service_support import async_db
 
@@ -66,6 +69,11 @@ def test_get_asset_returns_current_outline_version(db):
     assert result.title == "主线大纲"
     assert result.status == "draft"
     assert result.content_text == "第一幕：主角入宗。"
+    assert result.document_version == build_project_canonical_document_version(
+        "canonical:outline",
+        content_id=result.content_id,
+        version_number=result.version_number,
+    )
 
 
 def test_scaffold_preparation_assets_create_blank_current_versions(db):

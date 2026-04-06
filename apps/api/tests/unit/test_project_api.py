@@ -74,6 +74,19 @@ async def test_project_api_manages_project_lifecycle(monkeypatch, tmp_path) -> N
             assert opening_plan_response.json()["version_number"] == 1
             assert opening_plan_response.json()["content_text"] == ""
 
+            catalog_response = await client.get(
+                f"/api/v1/projects/{project_id}/document-catalog",
+                headers=_auth_headers(owner_id),
+            )
+            assert catalog_response.status_code == 200
+            catalog = catalog_response.json()
+            outline_entry = next(item for item in catalog if item["path"] == "大纲/总大纲.md")
+            assert outline_entry["document_ref"] == "canonical:outline"
+            assert outline_entry["binding_version"]
+            assert outline_entry["catalog_version"]
+            assert outline_entry["version"].startswith("canonical:outline:version:")
+            assert outline_entry["updated_at"] is not None
+
             list_response = await client.get("/api/v1/projects", headers=_auth_headers(owner_id))
             assert list_response.status_code == 200
             listed = list_response.json()

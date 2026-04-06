@@ -9,17 +9,20 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.modules.config_registry.schemas import ModelConfig
 
-ASSISTANT_MAX_MESSAGES = 20
 ASSISTANT_MESSAGE_MAX_LENGTH = 8000
 
 AssistantMessageRole = Literal["user", "assistant"]
 AssistantRequestedWriteScope = Literal["disabled", "turn"]
 AssistantOutputItemType = Literal["text", "tool_call", "tool_result", "reasoning", "refusal"]
+AssistantCompactionTriggerReason = Literal["max_input_tokens_exceeded"]
 AssistantNormalizedInputItemType = Literal[
     "message",
     "rule",
     "skill_instruction",
+    "hook_selection",
+    "model_selection",
     "document_context",
+    "document_context_binding",
     "tool_call",
     "tool_result",
     "reasoning",
@@ -73,6 +76,19 @@ class AssistantNormalizedInputItemDTO(BaseModel):
     payload: Any = None
 
 
+class AssistantCompactionSnapshotDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    trigger_reason: AssistantCompactionTriggerReason
+    budget_limit_tokens: int = Field(ge=1)
+    estimated_tokens_before: int = Field(ge=1)
+    estimated_tokens_after: int = Field(ge=1)
+    compressed_message_count: int = Field(ge=1)
+    preserved_recent_message_count: int = Field(ge=0)
+    protected_document_paths: list[str] = Field(default_factory=list)
+    summary: str = Field(min_length=1)
+
+
 class AssistantOutputItemDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -104,7 +120,7 @@ class AssistantTurnRequestDTO(BaseModel):
     stream: bool = True
     hook_ids: list[str] = Field(default_factory=list)
     project_id: uuid.UUID | None = None
-    messages: list[AssistantMessageDTO] = Field(min_length=1, max_length=ASSISTANT_MAX_MESSAGES)
+    messages: list[AssistantMessageDTO] = Field(min_length=1)
     document_context: AssistantDocumentContextDTO | None = None
     requested_write_scope: AssistantRequestedWriteScope = "disabled"
     requested_write_targets: list[str] | None = None
@@ -122,6 +138,8 @@ class AssistantTurnRequestDTO(BaseModel):
             if direct_parent_digest != self.continuation_anchor.messages_digest:
                 raise ValueError("conversation_state_mismatch")
         if self.requested_write_targets is not None:
+            if self.requested_write_scope != "turn":
+                raise ValueError("unsupported_write_target_scope")
             active_document_ref = (
                 self.document_context.active_document_ref
                 if self.document_context is not None
@@ -162,8 +180,20 @@ class AssistantTurnResponseDTO(BaseModel):
 
 
 def build_turn_messages_digest(messages: list[AssistantMessageDTO]) -> str:
+    return build_turn_message_records_digest(
+        [item.model_dump(mode="json") for item in messages]
+    )
+
+
+def build_turn_message_records_digest(messages: list[dict[str, str]]) -> str:
     payload = json.dumps(
-        [item.model_dump(mode="json") for item in messages],
+        [
+            {
+                "content": str(item["content"]),
+                "role": str(item["role"]),
+            }
+            for item in messages
+        ],
         ensure_ascii=False,
         separators=(",", ":"),
         sort_keys=True,
@@ -172,10 +202,11 @@ def build_turn_messages_digest(messages: list[AssistantMessageDTO]) -> str:
 
 
 __all__ = [
-    "ASSISTANT_MAX_MESSAGES",
     "ASSISTANT_MESSAGE_MAX_LENGTH",
     "AssistantActiveBufferStateDTO",
     "AssistantContinuationAnchorDTO",
+    "AssistantCompactionSnapshotDTO",
+    "AssistantCompactionTriggerReason",
     "AssistantDocumentContextDTO",
     "AssistantHookResultDTO",
     "AssistantMessageDTO",
@@ -188,5 +219,6 @@ __all__ = [
     "AssistantRequestedWriteScope",
     "AssistantTurnRequestDTO",
     "AssistantTurnResponseDTO",
+    "build_turn_message_records_digest",
     "build_turn_messages_digest",
 ]

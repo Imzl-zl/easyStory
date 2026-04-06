@@ -5,7 +5,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from app.modules.config_registry import ConfigLoader
-from app.modules.project.infrastructure import ProjectDocumentFileStore, ProjectDocumentIdentityStore
+from app.modules.project.infrastructure import (
+    ProjectDocumentFileStore,
+    ProjectDocumentIdentityStore,
+    ProjectDocumentRevisionStore,
+)
 from app.modules.observability.service import AuditLogService, create_audit_log_service
 from app.shared.runtime import (
     EXPORT_ROOT_DIR,
@@ -45,6 +49,11 @@ def create_project_document_capability_service(
         project_service=resolved_project_service,
         document_file_store=resolved_project_service.document_file_store,
         document_identity_store=resolved_project_service.document_identity_store,
+        document_revision_store=(
+            ProjectDocumentRevisionStore(resolved_project_service.document_file_store.root)
+            if resolved_project_service.document_file_store is not None
+            else None
+        ),
     )
 
 

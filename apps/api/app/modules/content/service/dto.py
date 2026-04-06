@@ -40,7 +40,22 @@ class StoryAssetDTO(BaseModel):
     title: str
     status: ContentStatus
     version_number: int
+    document_version: str
     content_text: str
+
+
+class CanonicalProjectDocumentDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: uuid.UUID
+    content_id: uuid.UUID
+    content_type: ContentType
+    title: str = Field(min_length=1)
+    chapter_number: int | None = Field(default=None, ge=1)
+    content_text: str = ""
+    version_number: int | None = Field(default=None, ge=1)
+    word_count: int | None = Field(default=None, ge=0)
+    updated_at: datetime | None = None
 
 
 class StoryAssetImpactItemDTO(BaseModel):
@@ -106,6 +121,7 @@ class ChapterSummaryDTO(BaseModel):
     title: str
     status: ContentStatus
     current_version_number: int
+    document_version: str
     best_version_number: int | None
     word_count: int | None
     last_edited_at: datetime | None

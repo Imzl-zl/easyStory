@@ -9,6 +9,9 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.content.models import Content, ContentVersion
 from app.modules.project.service import ProjectService
+from app.modules.project.service.project_document_version_support import (
+    build_project_canonical_document_version,
+)
 from app.modules.workflow.models import ChapterTask
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 
@@ -281,6 +284,11 @@ class StoryAssetService:
             title=content.title,
             status=content.status,
             version_number=version.version_number,
+            document_version=build_project_canonical_document_version(
+                f"canonical:{content.content_type}",
+                content_id=content.id,
+                version_number=version.version_number,
+            ),
             content_text=version.content_text,
         )
 

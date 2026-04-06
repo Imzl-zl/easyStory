@@ -140,15 +140,17 @@ export function useIncubatorCreateMutation({
 
 export function useIncubatorAssistantMutation(
   settings: IncubatorChatSettings,
+  latestCompletedRunId: string | null,
   patchConversationSession: SubmitPromptParams["patchConversationSession"],
 ) {
   return useMutation({
     mutationFn: async (submission: PromptSubmission) => {
-      const payload = buildIncubatorAssistantTurnPayload(
-        submission.conversationId,
+      const payload = buildIncubatorAssistantTurnPayload({
+        conversationId: submission.conversationId,
+        latestCompletedRunId,
+        messages: submission.submittedMessages,
         settings,
-        submission.submittedMessages,
-      );
+      });
       if (!settings.streamOutput) {
         return runAssistantTurn(payload);
       }

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import {
+  buildStudioActiveBufferState,
+  buildStudioBufferHash,
+} from "./studio-document-buffer-support";
 import { resolveStudioDocumentTarget } from "./studio-document-support";
 
 test("resolveStudioDocumentTarget keeps canonical content paths on database-backed targets", () => {
@@ -37,4 +41,27 @@ test("resolveStudioDocumentTarget keeps non-canonical markdown paths on file-bac
     kind: "file",
     path: "数据层/人物关系.json",
   });
+});
+
+test("buildStudioActiveBufferState produces a stable editor snapshot", () => {
+  const firstHash = buildStudioBufferHash("林渊在雨夜里停下脚步。");
+  const secondHash = buildStudioBufferHash("林渊在雨夜里停下脚步。");
+  const changedHash = buildStudioBufferHash("林渊在雨夜里加快脚步。");
+
+  assert.equal(firstHash, secondHash);
+  assert.notEqual(firstHash, changedHash);
+  assert.match(firstHash, /^fnv1a64:[0-9a-f]{16}$/);
+  assert.deepEqual(
+    buildStudioActiveBufferState({
+      baseVersion: "canonical:chapter:007:version:content-chapter-7:5",
+      content: "林渊在雨夜里停下脚步。",
+      dirty: true,
+    }),
+    {
+      base_version: "canonical:chapter:007:version:content-chapter-7:5",
+      buffer_hash: firstHash,
+      dirty: true,
+      source: "studio_editor",
+    },
+  );
 });

@@ -193,6 +193,7 @@ class ProjectSettingUpdateDTO(BaseModel):
 class ProjectDocumentSaveDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    base_version: str = Field(min_length=1)
     content: str
 
 
@@ -202,8 +203,11 @@ class ProjectDocumentDTO(BaseModel):
     project_id: uuid.UUID
     path: str = Field(min_length=1)
     content: str
+    version: str = Field(min_length=1)
     source: ProjectDocumentSource
     updated_at: datetime | None
+    document_revision_id: str | None = Field(default=None, min_length=1)
+    run_audit_id: str | None = Field(default=None, min_length=1)
 
 
 class ProjectDocumentTreeNodeDTO(BaseModel):

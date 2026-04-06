@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.project.service import (
     ProjectPreparationStatusDTO,
+    ProjectDocumentCatalogEntryDTO,
     ProjectCreateDTO,
     ProjectDeletionService,
     ProjectDetailDTO,
@@ -26,6 +27,7 @@ from app.modules.project.service import (
     ProjectIncubatorService,
     ProjectManagementService,
     ProjectService,
+    ProjectDocumentCapabilityService,
     ProjectTrashCleanupResultDTO,
     ProjectSettingSnapshotDTO,
     ProjectSettingUpdateDTO,
@@ -33,6 +35,7 @@ from app.modules.project.service import (
     ProjectUpdateDTO,
     SettingCompletenessResultDTO,
     create_project_deletion_service,
+    create_project_document_capability_service,
     create_project_incubator_service,
     create_project_management_service,
     create_project_service,
@@ -58,6 +61,10 @@ def get_project_incubator_service() -> ProjectIncubatorService:
 
 def get_project_deletion_service() -> ProjectDeletionService:
     return create_project_deletion_service()
+
+
+def get_project_document_capability_service() -> ProjectDocumentCapabilityService:
+    return create_project_document_capability_service()
 
 
 @router.post("", response_model=ProjectDetailDTO)
@@ -189,21 +196,54 @@ async def get_project_document(
     )
 
 
+@router.get(
+    "/{project_id}/document-catalog",
+    response_model=list[ProjectDocumentCatalogEntryDTO],
+)
+async def list_project_document_catalog(
+    project_id: uuid.UUID,
+    capability_service: ProjectDocumentCapabilityService = Depends(
+        get_project_document_capability_service
+    ),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db_session),
+) -> list[ProjectDocumentCatalogEntryDTO]:
+    return await capability_service.list_document_catalog(
+        db,
+        project_id,
+        owner_id=current_user.id,
+    )
+
+
 @router.put("/{project_id}/documents", response_model=ProjectDocumentDTO)
 async def save_project_document(
     project_id: uuid.UUID,
     payload: ProjectDocumentSaveDTO,
     path: str = Query(min_length=1),
-    project_service: ProjectService = Depends(get_project_service),
+    capability_service: ProjectDocumentCapabilityService = Depends(
+        get_project_document_capability_service
+    ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db_session),
 ) -> ProjectDocumentDTO:
-    return await project_service.save_project_document(
+    result = await capability_service.write_document(
         db,
         project_id,
-        path,
-        payload,
+        path=path,
+        content=payload.content,
+        base_version=payload.base_version,
         owner_id=current_user.id,
+        run_audit_id=f"project_manual_save:{uuid.uuid4()}",
+    )
+    return ProjectDocumentDTO(
+        project_id=project_id,
+        path=result.path,
+        content=payload.content,
+        version=result.version,
+        source=result.source,
+        updated_at=result.updated_at,
+        document_revision_id=result.document_revision_id,
+        run_audit_id=result.run_audit_id,
     )
 
 

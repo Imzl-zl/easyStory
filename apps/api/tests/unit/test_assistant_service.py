@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import dataclasses
+import json
 from pathlib import Path
 import uuid
 
@@ -20,48 +22,96 @@ from app.modules.assistant.service.assistant_mcp_service import AssistantMcpServ
 from app.modules.assistant.service.assistant_skill_dto import AssistantSkillCreateDTO
 from app.modules.assistant.service.assistant_skill_file_store import AssistantSkillFileStore
 from app.modules.assistant.service.assistant_skill_service import AssistantSkillService
-from app.modules.assistant.service.assistant_service import AssistantService
+from app.modules.assistant.service.assistant_service import AssistantService, AssistantStreamEvent
+from app.modules.assistant.service.assistant_turn_run_store import AssistantTurnRunStore
 from app.modules.assistant.service.assistant_tool_executor import AssistantToolExecutor
 from app.modules.assistant.service.assistant_tool_exposure_policy import AssistantToolExposurePolicy
 from app.modules.assistant.service.assistant_tool_loop import AssistantToolLoop
 from app.modules.assistant.service.assistant_tool_registry import AssistantToolDescriptorRegistry
+from app.modules.assistant.service.assistant_tool_step_store import AssistantToolStepStore
+from app.modules.assistant.service.assistant_turn_runtime_support import build_turn_run_id
 from app.modules.assistant.service.assistant_rule_dto import AssistantRuleProfileUpdateDTO
 from app.modules.assistant.service.preferences_dto import AssistantPreferencesUpdateDTO
 from app.modules.assistant.service.preferences_service import AssistantPreferencesService
-from app.modules.assistant.service.dto import AssistantMessageDTO, AssistantTurnRequestDTO
+from app.modules.assistant.service.dto import (
+    AssistantContinuationAnchorDTO,
+    AssistantMessageDTO,
+    AssistantTurnRequestDTO,
+)
 from app.modules.assistant.service.factory import create_assistant_rule_service
 from app.modules.config_registry import ConfigLoader
-from app.modules.credential.models import ModelCredential
-from app.modules.project.infrastructure import ProjectDocumentFileStore, ProjectDocumentIdentityStore
+from app.modules.project.infrastructure import (
+    ProjectDocumentFileStore,
+    ProjectDocumentIdentityStore,
+    ProjectDocumentRevisionStore,
+)
 from app.modules.project.service import ProjectDocumentCapabilityService, ProjectService, create_project_service
 from app.shared.runtime import McpToolCallResult, SkillTemplateRenderer, ToolProvider
-from app.shared.runtime.errors import ConfigurationError
+from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from app.shared.runtime.llm_tool_provider import LLMStreamEvent
+from app.shared.runtime.provider_interop_stream_support import StreamInterruptedError
+from tests.unit.assistant_service_test_support import (
+    _build_config_root,
+    _build_turn_request,
+    _CompactingCredentialService,
+    _FakeCredentialService,
+    _write_yaml,
+)
 from tests.unit.async_api_support import build_sqlite_session_factories, cleanup_sqlite_session_factories
 from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, create_user
 
 
-class _FakeCrypto:
-    def decrypt(self, value: str) -> str:
-        return value
+class _FailOnCommittedStepStore(AssistantToolStepStore):
+    def append_step(self, record) -> None:
+        if record.status == "committed":
+            raise RuntimeError("failed to persist committed snapshot")
+        super().append_step(record)
 
 
-class _FakeCredentialService:
-    def __init__(self) -> None:
-        self.crypto = _FakeCrypto()
+class _FailOnAppendRevisionStore(ProjectDocumentRevisionStore):
+    def append_revision(self, *args, **kwargs):
+        raise RuntimeError("failed to append revision")
 
-    async def resolve_active_credential(self, db, *, provider: str, user_id, project_id=None):
-        del db, user_id, project_id
-        return ModelCredential(
-            owner_type="user",
-            owner_id=uuid.uuid4(),
-            provider=provider,
-            display_name=f"{provider}-test",
-            encrypted_key=f"{provider}-key",
-            api_dialect="openai_responses",
-            default_model="gpt-4o-mini",
-            is_active=True,
+    def append_revision_unlocked(self, *args, **kwargs):
+        raise RuntimeError("failed to append revision")
+
+
+def _write_turn_run_snapshot(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _expected_run_budget(
+    *,
+    max_steps: int,
+    tool_timeout_seconds: int | None,
+    max_tool_calls: int | None = None,
+    max_input_tokens: int | None = None,
+    max_history_tokens: int | None = None,
+) -> dict[str, object]:
+    return {
+        "max_steps": max_steps,
+        "max_tool_calls": max_steps if max_tool_calls is None else max_tool_calls,
+        "max_input_tokens": max_input_tokens,
+        "max_history_tokens": max_history_tokens,
+        "max_tool_schema_tokens": None,
+        "max_tool_result_tokens_per_step": None,
+        "max_read_bytes": None,
+        "max_write_bytes": None,
+        "max_parallel_tool_calls": 1,
+        "tool_timeout_seconds": tool_timeout_seconds,
+    }
+
+
+def test_assistant_turn_request_rejects_write_targets_when_scope_disabled() -> None:
+    with pytest.raises(ValidationError, match="unsupported_write_target_scope"):
+        _build_turn_request(
+            messages=[AssistantMessageDTO(role="user", content="test")],
+            document_context={
+                "active_document_ref": "project_file:test",
+            },
+            requested_write_targets=["project_file:test"],
         )
 
 
@@ -81,6 +131,8 @@ class _FakeToolProvider(ToolProvider):
                 "system_prompt": params.get("system_prompt"),
                 "model": params.get("model"),
                 "tools": params.get("tools"),
+                "continuation_items": params.get("continuation_items"),
+                "provider_continuation_state": params.get("provider_continuation_state"),
             }
         )
         if "请输出结构化摘要" in prompt:
@@ -113,12 +165,20 @@ class _FakeToolProvider(ToolProvider):
         return ["llm.generate"]
 
 
+def _request_contains_continuation_fragment(params: dict, fragment: str) -> bool:
+    continuation_items = params.get("continuation_items")
+    if not isinstance(continuation_items, list):
+        return False
+    serialized = json.dumps(continuation_items, ensure_ascii=False, sort_keys=True)
+    return fragment in serialized
+
+
 class _ToolCallingFakeToolProvider(_FakeToolProvider):
     async def execute(self, tool_name: str, params: dict) -> dict:
         result = await super().execute(tool_name, params)
         prompt = params["prompt"]
         tools = params.get("tools") or []
-        if tools and "【工具结果】" not in prompt and "读一下人物设定" in prompt:
+        if tools and not params.get("continuation_items") and "读一下人物设定" in prompt:
             return {
                 "content": "",
                 "model_name": "gpt-4o-mini",
@@ -136,7 +196,10 @@ class _ToolCallingFakeToolProvider(_FakeToolProvider):
                 ],
                 "provider_response_id": "resp_tool_1",
             }
-        if "【工具结果】" in prompt and "设定/人物.md" in prompt and "林渊" in prompt:
+        if (
+            _request_contains_continuation_fragment(params, "设定/人物.md")
+            and _request_contains_continuation_fragment(params, "林渊")
+        ):
             return {
                 "content": "我已经读完人物设定。主角林渊是个冷静克制、擅长观察细节的人物，可以把悬疑开场压在他的感官判断上。",
                 "model_name": "gpt-4o-mini",
@@ -159,6 +222,178 @@ class _ToolCallingFakeToolProvider(_FakeToolProvider):
         yield LLMStreamEvent(delta=content[midpoint:])
         yield LLMStreamEvent(response=result)
 
+
+class _ToolLoopErrorEchoProvider(_FakeToolProvider):
+    async def execute(self, tool_name: str, params: dict) -> dict:
+        result = await super().execute(tool_name, params)
+        prompt = params["prompt"]
+        tools = params.get("tools") or []
+        if tools and not params.get("continuation_items") and "找一下人物和缺失文稿" in prompt:
+            return {
+                "content": "",
+                "model_name": "gpt-4o-mini",
+                "input_tokens": 10,
+                "output_tokens": 4,
+                "total_tokens": 14,
+                "tool_calls": [
+                    {
+                        "tool_call_id": "call.project.read_documents.mixed",
+                        "tool_name": "project.read_documents",
+                        "arguments": {"paths": ["设定/人物.md", "设定/不存在.md"]},
+                        "arguments_text": '{"paths":["设定/人物.md","设定/不存在.md"]}',
+                        "provider_ref": "fc_mixed",
+                    }
+                ],
+            }
+        if (
+            _request_contains_continuation_fragment(params, "document_not_found")
+            and _request_contains_continuation_fragment(params, "设定/不存在.md")
+        ):
+            return {
+                "content": "我看到人物文稿已读到，但设定/不存在.md 读取失败，请先确认路径。",
+                "model_name": "gpt-4o-mini",
+                "input_tokens": 16,
+                "output_tokens": 10,
+                "total_tokens": 26,
+            }
+        return result
+
+
+class _InfiniteToolCallProvider(_FakeToolProvider):
+    def __init__(self) -> None:
+        super().__init__()
+        self.call_count = 0
+
+    async def execute(self, tool_name: str, params: dict) -> dict:
+        await super().execute(tool_name, params)
+        self.call_count += 1
+        return {
+            "content": "",
+            "model_name": "gpt-4o-mini",
+            "input_tokens": 9,
+            "output_tokens": 3,
+            "total_tokens": 12,
+            "tool_calls": [
+                {
+                    "tool_call_id": f"call.project.read_documents.loop-{self.call_count}",
+                    "tool_name": "project.read_documents",
+                    "arguments": {"paths": ["设定/人物.md"]},
+                    "arguments_text": '{"paths":["设定/人物.md"]}',
+                    "provider_ref": f"fc_loop_{self.call_count}",
+                }
+            ],
+        }
+
+
+class _ParallelToolCallProvider(_FakeToolProvider):
+    async def execute(self, tool_name: str, params: dict) -> dict:
+        await super().execute(tool_name, params)
+        return {
+            "content": "",
+            "model_name": "gpt-4o-mini",
+            "input_tokens": 9,
+            "output_tokens": 3,
+            "total_tokens": 12,
+            "tool_calls": [
+                {
+                    "tool_call_id": "call.project.read_documents.1",
+                    "tool_name": "project.read_documents",
+                    "arguments": {"paths": ["设定/人物.md"]},
+                    "arguments_text": '{"paths":["设定/人物.md"]}',
+                    "provider_ref": "fc_parallel_1",
+                },
+                {
+                    "tool_call_id": "call.project.read_documents.2",
+                    "tool_name": "project.read_documents",
+                    "arguments": {"paths": ["设定/人物.md"]},
+                    "arguments_text": '{"paths":["设定/人物.md"]}',
+                    "provider_ref": "fc_parallel_2",
+                },
+            ],
+        }
+
+
+class _WriteDocumentToolProvider(_FakeToolProvider):
+    def __init__(self, *, base_version: str) -> None:
+        super().__init__()
+        self.base_version = base_version
+
+    async def execute(self, tool_name: str, params: dict) -> dict:
+        result = await super().execute(tool_name, params)
+        prompt = params["prompt"]
+        tools = params.get("tools") or []
+        if tools and not params.get("continuation_items") and "把当前人物设定补一条观察能力" in prompt:
+            return {
+                "content": "",
+                "model_name": "gpt-4o-mini",
+                "input_tokens": 11,
+                "output_tokens": 5,
+                "total_tokens": 16,
+                "tool_calls": [
+                    {
+                        "tool_call_id": "call.project.write_document.1",
+                        "tool_name": "project.write_document",
+                        "arguments": {
+                            "path": "设定/人物.md",
+                            "content": "# 人物\n\n林渊：冷静、克制。\n\n补充：他对雨夜里的细微异常尤其敏感。",
+                            "base_version": self.base_version,
+                        },
+                        "arguments_text": '{"path":"设定/人物.md","content":"# 人物\\n\\n林渊：冷静、克制。\\n\\n补充：他对雨夜里的细微异常尤其敏感。","base_version":"'
+                        + self.base_version
+                        + '"}',
+                        "provider_ref": "fc_write_1",
+                    }
+                ],
+            }
+        if (
+            _request_contains_continuation_fragment(params, "project.write_document")
+            and _request_contains_continuation_fragment(params, "document_revision_id")
+        ):
+            return {
+                "content": "人物设定已经同步到当前文稿，可以继续基于新设定推进开场。",
+                "model_name": "gpt-4o-mini",
+                "input_tokens": 13,
+                "output_tokens": 11,
+                "total_tokens": 24,
+            }
+        return result
+
+
+class _WriteConflictToolProvider(_FakeToolProvider):
+    async def execute(self, tool_name: str, params: dict) -> dict:
+        result = await super().execute(tool_name, params)
+        prompt = params["prompt"]
+        tools = params.get("tools") or []
+        if tools and not params.get("continuation_items") and "尝试覆盖旧版本人物设定" in prompt:
+            return {
+                "content": "",
+                "model_name": "gpt-4o-mini",
+                "input_tokens": 10,
+                "output_tokens": 4,
+                "total_tokens": 14,
+                "tool_calls": [
+                    {
+                        "tool_call_id": "call.project.write_document.conflict",
+                        "tool_name": "project.write_document",
+                        "arguments": {
+                            "path": "设定/人物.md",
+                            "content": "# 人物\n\n错误覆盖内容",
+                            "base_version": "sha256:stale",
+                        },
+                        "arguments_text": '{"path":"设定/人物.md","content":"# 人物\\n\\n错误覆盖内容","base_version":"sha256:stale"}',
+                        "provider_ref": "fc_write_conflict",
+                    }
+                ],
+            }
+        if _request_contains_continuation_fragment(params, "version_conflict"):
+            return {
+                "content": "写回失败，因为人物设定已经有新版本，应该先读取最新内容再决定是否覆盖。",
+                "model_name": "gpt-4o-mini",
+                "input_tokens": 12,
+                "output_tokens": 12,
+                "total_tokens": 24,
+            }
+        return result
 
 class _ProjectStreamingFakeToolProvider(_FakeToolProvider):
     async def execute(self, tool_name: str, params: dict) -> dict:
@@ -217,6 +452,25 @@ class _FailingProjectStreamToolProvider(_FakeToolProvider):
         }
 
 
+class _EmptyContentToolProvider(_FakeToolProvider):
+    async def execute(self, tool_name: str, params: dict) -> dict:
+        result = await super().execute(tool_name, params)
+        if "请根据以下内容输出一句摘要" in params["prompt"]:
+            return result
+        return {
+            "content": None,
+            "model_name": "gpt-4o-mini",
+            "input_tokens": 8,
+            "output_tokens": 0,
+            "total_tokens": 8,
+        }
+
+    async def execute_stream(self, tool_name: str, params: dict, *, should_stop=None):
+        del should_stop
+        result = await self.execute(tool_name, params)
+        yield LLMStreamEvent(response=result)
+
+
 class _FakeMcpToolCaller:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, dict]] = []
@@ -238,17 +492,6 @@ class _ErrorMcpToolCaller(_FakeMcpToolCaller):
             structured_content={"message": "上游返回错误"},
             is_error=True,
         )
-
-
-def _build_turn_request(**overrides) -> AssistantTurnRequestDTO:
-    payload = {
-        "conversation_id": "conversation-test",
-        "client_turn_id": f"turn-{uuid.uuid4()}",
-        "requested_write_scope": "disabled",
-    }
-    payload.update(overrides)
-    return AssistantTurnRequestDTO(**payload)
-
 
 async def test_assistant_service_runs_skill_and_mcp_hook(tmp_path) -> None:
     config_root = _build_config_root(tmp_path)
@@ -706,6 +949,8 @@ async def test_assistant_service_runs_project_read_documents_tool_loop(db, tmp_p
     registry = AssistantToolDescriptorRegistry()
     exposure_policy = AssistantToolExposurePolicy(registry=registry)
     executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    step_store = AssistantToolStepStore(tmp_path / "tool-steps")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
     service = AssistantService(
         assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
         config_loader=loader,
@@ -719,7 +964,9 @@ async def test_assistant_service_runs_project_read_documents_tool_loop(db, tmp_p
         assistant_tool_loop=AssistantToolLoop(
             exposure_policy=exposure_policy,
             executor=executor,
+            step_store=step_store,
         ),
+        turn_run_store=turn_run_store,
     )
     owner = create_user(db)
     project = create_project(db, owner=owner)
@@ -740,9 +987,2201 @@ async def test_assistant_service_runs_project_read_documents_tool_loop(db, tmp_p
     assert response.output_items[0].call_id == "call.project.read_documents.1"
     assert response.output_items[1].payload["structured_output"]["documents"][0]["path"] == "设定/人物.md"
     assert response.total_tokens == 54
-    assert tool_provider.requests[0]["tools"][0]["name"] == "project.read_documents"
-    assert "【工具结果】" in tool_provider.requests[1]["prompt"]
-    assert "林渊" in tool_provider.requests[1]["prompt"]
+    assert [item["name"] for item in tool_provider.requests[0]["tools"]] == [
+        "project.list_documents",
+        "project.search_documents",
+        "project.read_documents",
+    ]
+    assert tool_provider.requests[1]["prompt"] == tool_provider.requests[0]["prompt"]
+    assert _request_contains_continuation_fragment(
+        tool_provider.requests[1],
+        "设定/人物.md",
+    )
+    assert _request_contains_continuation_fragment(
+        tool_provider.requests[1],
+        "林渊",
+    )
+    assert tool_provider.requests[1]["provider_continuation_state"] == {
+        "previous_response_id": "resp_tool_1",
+        "latest_items": tool_provider.requests[1]["continuation_items"],
+    }
+    step_history = step_store.list_step_history(response.run_id, "call.project.read_documents.1")
+    run_record = turn_run_store.get_run(response.run_id)
+    assert [item.status for item in step_history] == ["reading", "completed"]
+    assert step_history[-1].tool_name == "project.read_documents"
+    assert step_history[-1].target_document_refs[0].startswith("project_file:")
+    assert step_history[-1].result_summary == {
+        "content_item_count": 1,
+        "document_count": 1,
+        "paths": ["设定/人物.md"],
+        "resource_count": 1,
+    }
+    assert run_record is not None
+    assert run_record.status == "completed"
+    assert run_record.requested_write_scope == "disabled"
+    assert run_record.requested_write_targets_snapshot == ()
+    assert run_record.exposed_tool_names_snapshot == (
+        "project.list_documents",
+        "project.search_documents",
+        "project.read_documents",
+    )
+    assert [item["name"] for item in run_record.resolved_tool_descriptor_snapshot] == [
+        "project.list_documents",
+        "project.search_documents",
+        "project.read_documents",
+    ]
+    assert run_record.budget_snapshot == _expected_run_budget(max_steps=8, tool_timeout_seconds=15)
+    assert run_record.provider_continuation_state == {
+        "previous_response_id": "resp_tool_1",
+        "latest_items": tool_provider.requests[1]["continuation_items"],
+    }
+    assert run_record.pending_tool_calls_snapshot == ()
+    assert run_record.state_version >= 4
+    assert run_record.started_at <= run_record.updated_at
+    assert run_record.completed_at is not None
+    assert run_record.updated_at <= run_record.completed_at
+    policy_by_name = {
+        item["descriptor"]["name"]: item
+        for item in run_record.tool_policy_decisions_snapshot
+    }
+    assert policy_by_name["project.list_documents"]["visibility"] == "visible"
+    assert policy_by_name["project.search_documents"]["visibility"] == "visible"
+    assert policy_by_name["project.read_documents"]["visibility"] == "visible"
+    assert policy_by_name["project.read_documents"]["effective_approval_mode"] == "none"
+    assert policy_by_name["project.write_document"]["visibility"] == "hidden"
+    assert policy_by_name["project.write_document"]["hidden_reason"] == "write_grant_unavailable"
+    assert run_record.document_context_snapshot is None
+    assert run_record.turn_context_hash
+    assert [item["item_type"] for item in run_record.normalized_input_items_snapshot] == [
+        "message",
+        "model_selection",
+        "tool_call",
+        "tool_result",
+        "message",
+    ]
+
+async def test_assistant_service_persists_and_validates_continuation_anchor(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-continuation")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        async with async_session_factory() as session:
+            first_payload = _build_turn_request(
+                messages=[AssistantMessageDTO(role="user", content="先给我一个方向。")],
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+            first_response = await service.turn(session, first_payload, owner_id=owner_id)
+
+            second_payload = _build_turn_request(
+                continuation_anchor=AssistantContinuationAnchorDTO(
+                    previous_run_id=first_response.run_id,
+                ),
+                messages=[
+                    AssistantMessageDTO(role="user", content="先给我一个方向。"),
+                    AssistantMessageDTO(role="assistant", content=first_response.content),
+                    AssistantMessageDTO(role="user", content="继续往下展开。"),
+                ],
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+            second_response = await service.turn(session, second_payload, owner_id=owner_id)
+
+            mismatched_payload = _build_turn_request(
+                continuation_anchor=AssistantContinuationAnchorDTO(
+                    previous_run_id=first_response.run_id,
+                ),
+                messages=[
+                    AssistantMessageDTO(role="user", content="先给我一个方向。"),
+                    AssistantMessageDTO(role="assistant", content="被篡改的上一轮回复"),
+                    AssistantMessageDTO(role="user", content="继续往下展开。"),
+                ],
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+            with pytest.raises(BusinessRuleError) as exc_info:
+                await service.turn(session, mismatched_payload, owner_id=owner_id)
+
+        first_run = turn_run_store.get_run(first_response.run_id)
+        second_run = turn_run_store.get_run(second_response.run_id)
+
+        assert exc_info.value.code == "conversation_state_mismatch"
+        assert str(exc_info.value) == "当前会话状态已变化，请刷新对话后重试。"
+        assert second_response.content.startswith("主回复：")
+        assert first_run is not None
+        assert second_run is not None
+        assert first_run.terminal_status == "completed"
+        assert second_run.terminal_status == "completed"
+        assert first_run.continuation_anchor_snapshot is None
+        assert second_run.continuation_anchor_snapshot == {
+            "previous_run_id": str(first_response.run_id),
+            "messages_digest": None,
+        }
+        assert second_run.requested_write_scope == "disabled"
+        assert second_run.exposed_tool_names_snapshot == ()
+        assert second_run.tool_policy_decisions_snapshot == ()
+        assert second_run.budget_snapshot is None
+        assert [item["item_type"] for item in second_run.normalized_input_items_snapshot] == [
+            "message",
+            "message",
+            "message",
+            "model_selection",
+        ]
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_replays_completed_turn_for_same_client_turn_id(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-idempotent-completed")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                messages=[AssistantMessageDTO(role="user", content="先给我一个方向。")],
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+            first_response = await service.turn(session, payload, owner_id=owner_id)
+            second_response = await service.turn(session, payload, owner_id=owner_id)
+
+            assert second_response == first_response
+            assert len(tool_provider.requests) == 1
+
+            conflicting_payload = payload.model_copy(
+                update={
+                    "messages": [
+                        AssistantMessageDTO(role="user", content="换一个完全不同的问题。"),
+                    ]
+                }
+            )
+            with pytest.raises(BusinessRuleError) as exc_info:
+                await service.turn(session, conflicting_payload, owner_id=owner_id)
+
+            assert exc_info.value.code == "turn_idempotency_conflict"
+
+            conflicting_model_payload = AssistantTurnRequestDTO.model_validate(
+                {
+                    **payload.model_dump(mode="json"),
+                    "model": {"provider": "openai", "name": "gpt-5"},
+                }
+            )
+            with pytest.raises(BusinessRuleError) as model_exc_info:
+                await service.turn(session, conflicting_model_payload, owner_id=owner_id)
+
+            assert model_exc_info.value.code == "turn_idempotency_conflict"
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_compacts_history_and_preserves_relation_anchors(db, tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_CompactingCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+        project_document_capability_service=capability_service,
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "数据层/人物关系.json", '{"relations":["林渊-顾砚：互相试探"]}')
+    file_store.save_project_document(project.id, "数据层/势力关系.json", '{"relations":["黑潮会-白塔局：长期对抗"]}')
+    file_store.save_project_document(project.id, "设定/伏笔.md", "第一卷要埋下黑潮会真实目标的伏笔。")
+    payload = _build_turn_request(
+        project_id=project.id,
+        skill_id="skill.assistant.general_chat",
+        model={"provider": "openai", "name": "gpt-4o-mini", "max_tokens": 64},
+        document_context={
+            "selected_paths": [
+                "数据层/人物关系.json",
+                "数据层/势力关系.json",
+                "设定/伏笔.md",
+            ]
+        },
+        messages=[
+            AssistantMessageDTO(
+                role="user",
+                content="人物关系里林渊和顾砚的互相试探必须贯穿全文，不能写成前几章提过后面就消失。",
+            ),
+            AssistantMessageDTO(
+                role="assistant",
+                content="我会把这条人物关系保持成持续施压的暗线，让两人的试探不断影响表面合作。",
+            ),
+            AssistantMessageDTO(
+                role="user",
+                content="势力关系也不能丢，黑潮会和白塔局的长期对抗是主线压力源，时间轴必须能对上。",
+            ),
+            AssistantMessageDTO(
+                role="assistant",
+                content="已记录：人物关系、势力关系、伏笔回收和时间轴一致性都要贯穿全文，尤其第一卷不能掉线。",
+            ),
+            AssistantMessageDTO(role="user", content="基于这些约束，给我一个冷峻克制的开篇第一场戏方向。"),
+        ],
+    )
+
+    response = await service.turn(async_db(db), payload, owner_id=owner.id)
+
+    prompt = tool_provider.requests[0]["prompt"]
+    run_record = turn_run_store.get_run(response.run_id)
+
+    assert "【压缩后的早期对话摘要】" in prompt
+    assert response.content.startswith("主回复：")
+    assert run_record is not None
+    assert run_record.compaction_snapshot is not None
+    assert run_record.budget_snapshot is not None
+    assert run_record.budget_snapshot["max_steps"] == 1
+    assert run_record.budget_snapshot["max_tool_calls"] is None
+    assert run_record.budget_snapshot["max_input_tokens"] == 216
+    assert run_record.budget_snapshot["tool_timeout_seconds"] is None
+    assert "数据层/人物关系.json" in run_record.compaction_snapshot["protected_document_paths"]
+    assert "数据层/势力关系.json" in run_record.compaction_snapshot["protected_document_paths"]
+    assert "人物关系" in run_record.compaction_snapshot["summary"]
+    assert "势力关系" in run_record.compaction_snapshot["summary"]
+    assert "贯穿全文" in run_record.compaction_snapshot["summary"]
+    compacted_item = next(
+        item
+        for item in run_record.normalized_input_items_snapshot
+        if item["item_type"] == "compacted_context"
+    )
+    assert compacted_item["content"] == run_record.compaction_snapshot["summary"]
+    assert compacted_item["payload"]["budget_limit_tokens"] == 216
+
+
+async def test_assistant_service_raises_budget_exhausted_when_latest_message_alone_exceeds_budget(
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_CompactingCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-budget-exhausted")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        huge_message = "人物关系、势力关系和贯穿全文的主线都不能丢。 " * 40
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                skill_id="skill.assistant.general_chat",
+                model={"provider": "openai", "name": "gpt-4o-mini", "max_tokens": 64},
+                messages=[AssistantMessageDTO(role="user", content=huge_message)],
+            )
+            with pytest.raises(BusinessRuleError) as exc_info:
+                await service.turn(session, payload, owner_id=owner_id)
+
+        run_id = build_turn_run_id(
+            owner_id=owner_id,
+            project_id=None,
+            conversation_id=payload.conversation_id,
+            client_turn_id=payload.client_turn_id,
+        )
+        assert exc_info.value.code == "budget_exhausted"
+        assert turn_run_store.get_run(run_id) is None
+        assert tool_provider.requests == []
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_uses_context_window_without_implicit_max_tokens(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_CompactingCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-implicit-max-tokens")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                skill_id="skill.assistant.general_chat",
+                messages=[AssistantMessageDTO(role="user", content="用一句话概括当前剧情核心冲突。")],
+            )
+            response = await service.turn(session, payload, owner_id=owner_id)
+
+        run_record = turn_run_store.get_run(response.run_id)
+        assert response.content.startswith("主回复：")
+        assert run_record is not None
+        assert run_record.budget_snapshot is not None
+        assert run_record.budget_snapshot["max_input_tokens"] == 280
+        assert "max_tokens" not in tool_provider.requests[0]["model"]
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_replays_completed_recoverable_tool_turn_for_same_client_turn_id(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _WriteConflictToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    step_store = AssistantToolStepStore(tmp_path / "tool-steps")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            step_store=step_store,
+        ),
+        turn_run_store=turn_run_store,
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊：冷静、克制。")
+    payload = _build_turn_request(
+        project_id=project.id,
+        requested_write_scope="turn",
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        document_context={
+            "active_path": "设定/人物.md",
+            "active_buffer_state": {
+                "dirty": False,
+                "base_version": "sha256:stale",
+            },
+        },
+        messages=[AssistantMessageDTO(role="user", content="尝试覆盖旧版本人物设定。")],
+    )
+
+    first_response = await service.turn(async_db(db), payload, owner_id=owner.id)
+    replay_response = await service.turn(async_db(db), payload, owner_id=owner.id)
+
+    assert replay_response == first_response
+    assert replay_response.content.startswith("写回失败，因为人物设定已经有新版本")
+    assert len(tool_provider.requests) == 2
+
+
+async def test_assistant_service_blocks_reentry_for_running_turn(db, tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-running-turn")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                messages=[AssistantMessageDTO(role="user", content="先给我一个方向。")],
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+            prepared = await service._prepare_turn(session, payload, owner_id=owner_id)  # noqa: SLF001
+            assert turn_run_store.create_run(
+                service._build_running_turn_record(prepared, owner_id=owner_id)  # noqa: SLF001
+            )
+
+            with pytest.raises(BusinessRuleError) as exc_info:
+                await service.turn(session, payload, owner_id=owner_id)
+
+            assert exc_info.value.code == "run_in_progress"
+            assert len(tool_provider.requests) == 0
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_marks_stale_running_turn_failed_without_replay(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        "app.modules.assistant.service.assistant_runtime_claim_support._is_process_alive",
+        lambda pid: False,
+    )
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-stale-running-turn")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                messages=[AssistantMessageDTO(role="user", content="这次继续聊剧情方向。")],
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+            prepared = await service._prepare_turn(session, payload, owner_id=owner_id)  # noqa: SLF001
+            stale_claim = {
+                "host": service.runtime_claim_snapshot["host"],
+                "instance_id": "stale-runtime",
+                "pid": 999999,
+            }
+            assert turn_run_store.create_run(
+                service._build_running_turn_record(  # noqa: SLF001
+                    prepared,
+                    owner_id=owner_id,
+                    runtime_claim_snapshot=stale_claim,
+                )
+            )
+
+            with pytest.raises(BusinessRuleError) as exc_info:
+                await service.turn(session, payload, owner_id=owner_id)
+
+            assert exc_info.value.code == "stale_run_interrupted"
+            assert tool_provider.requests == []
+            run_record = turn_run_store.get_run(prepared.turn_context.run_id)
+            assert run_record is not None
+            assert run_record.status == "failed"
+            assert run_record.terminal_error_code == "stale_run_interrupted"
+            assert run_record.write_effective is False
+            assert run_record.completed_at is not None
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_preserves_existing_running_turn_snapshot_truth_when_stale_run_is_terminated(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        "app.modules.assistant.service.assistant_runtime_claim_support._is_process_alive",
+        lambda pid: False,
+    )
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+        project_document_capability_service=capability_service,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-stale-running-turn-truth")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+        file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                project_id=project.id,
+                messages=[AssistantMessageDTO(role="user", content="这次继续聊剧情方向。")],
+                document_context={
+                    "active_path": "设定/人物.md",
+                    "active_buffer_state": {
+                        "dirty": False,
+                        "base_version": "sha256:base",
+                    },
+                },
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+            prepared = await service._prepare_turn(session, payload, owner_id=owner.id)  # noqa: SLF001
+            assert prepared.turn_context.tool_catalog_version is not None
+            assert prepared.run_snapshot.tool_catalog_version == prepared.turn_context.tool_catalog_version
+            stale_claim = {
+                "host": service.runtime_claim_snapshot["host"],
+                "instance_id": "stale-runtime",
+                "pid": 999999,
+            }
+            stale_run = dataclasses.replace(
+                service._build_running_turn_record(  # noqa: SLF001
+                    prepared,
+                    owner_id=owner.id,
+                    runtime_claim_snapshot=stale_claim,
+                ),
+                tool_catalog_version="catalog:existing-run",
+            )
+            assert turn_run_store.create_run(stale_run)
+            stored_run = turn_run_store.get_run(prepared.turn_context.run_id)
+            assert stored_run is not None
+            assert stored_run.tool_catalog_version == "catalog:existing-run"
+
+            with pytest.raises(BusinessRuleError) as exc_info:
+                await service.turn(session, payload, owner_id=owner.id)
+
+            assert exc_info.value.code == "stale_run_interrupted"
+            assert tool_provider.requests == []
+            run_record = turn_run_store.get_run(prepared.turn_context.run_id)
+            assert run_record is not None
+            assert run_record.status == "failed"
+            assert run_record.terminal_error_code == "stale_run_interrupted"
+            assert run_record.tool_catalog_version == "catalog:existing-run"
+            assert run_record.write_effective is False
+            assert run_record.completed_at is not None
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_marks_stale_written_running_turn_failed_without_replay(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        "app.modules.assistant.service.assistant_runtime_claim_support._is_process_alive",
+        lambda pid: False,
+    )
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-stale-written-running-turn")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                messages=[AssistantMessageDTO(role="user", content="继续给我一个剧情建议。")],
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+            prepared = await service._prepare_turn(session, payload, owner_id=owner_id)  # noqa: SLF001
+            stale_claim = {
+                "host": service.runtime_claim_snapshot["host"],
+                "instance_id": "stale-runtime",
+                "pid": 999999,
+            }
+            assert turn_run_store.create_run(
+                service._build_running_turn_record(  # noqa: SLF001
+                    prepared,
+                    owner_id=owner_id,
+                    write_effective=True,
+                    runtime_claim_snapshot=stale_claim,
+                )
+            )
+
+            with pytest.raises(BusinessRuleError) as exc_info:
+                await service.turn(session, payload, owner_id=owner_id)
+
+            assert exc_info.value.code == "stale_run_write_state_unknown"
+            assert tool_provider.requests == []
+            run_record = turn_run_store.get_run(prepared.turn_context.run_id)
+            assert run_record is not None
+            assert run_record.status == "failed"
+            assert run_record.terminal_error_code == "stale_run_write_state_unknown"
+            assert run_record.write_effective is True
+            assert run_record.completed_at is not None
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+def test_assistant_turn_run_store_rejects_invalid_requested_write_scope(tmp_path) -> None:
+    store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    run_id = uuid.uuid4()
+    snapshot_path = store.root / f"{run_id}.json"
+    _write_turn_run_snapshot(
+        snapshot_path,
+        {
+            "run_id": str(run_id),
+            "owner_id": str(uuid.uuid4()),
+            "project_id": None,
+            "conversation_id": "conversation-invalid-scope",
+            "client_turn_id": "turn-invalid-scope-1",
+            "continuation_anchor_snapshot": None,
+            "request_messages_digest": "digest",
+            "document_context_snapshot": None,
+            "requested_write_scope": "session",
+            "requested_write_targets_snapshot": [],
+            "normalized_input_items_snapshot": [{"item_type": "message", "role": "user", "content": "hi"}],
+            "exposed_tool_names_snapshot": [],
+            "resolved_tool_descriptor_snapshot": [],
+            "turn_context_hash": "0" * 64,
+            "terminal_status": "completed",
+            "completion_messages_digest": "digest+assistant",
+            "terminal_error_code": None,
+            "terminal_error_message": None,
+            "write_effective": False,
+            "completed_at": "2026-04-05T00:00:00+00:00",
+        },
+    )
+
+    with pytest.raises(ConfigurationError, match="requested_write_scope"):
+        store.get_run(run_id)
+
+
+def test_assistant_turn_run_store_rejects_invalid_normalized_input_item_snapshot(tmp_path) -> None:
+    store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    run_id = uuid.uuid4()
+    snapshot_path = store.root / f"{run_id}.json"
+    _write_turn_run_snapshot(
+        snapshot_path,
+        {
+            "run_id": str(run_id),
+            "owner_id": str(uuid.uuid4()),
+            "project_id": None,
+            "conversation_id": "conversation-invalid-input-item",
+            "client_turn_id": "turn-invalid-input-item-1",
+            "continuation_anchor_snapshot": None,
+            "request_messages_digest": "digest",
+            "document_context_snapshot": None,
+            "requested_write_scope": "disabled",
+            "requested_write_targets_snapshot": [],
+            "normalized_input_items_snapshot": [{"role": "user", "content": "hi"}],
+            "exposed_tool_names_snapshot": [],
+            "resolved_tool_descriptor_snapshot": [],
+            "turn_context_hash": "1" * 64,
+            "terminal_status": "completed",
+            "completion_messages_digest": "digest+assistant",
+            "terminal_error_code": None,
+            "terminal_error_message": None,
+            "write_effective": False,
+            "completed_at": "2026-04-05T00:00:00+00:00",
+        },
+    )
+
+    with pytest.raises(ConfigurationError, match="normalized_input_items_snapshot"):
+        store.get_run(run_id)
+
+
+def test_assistant_turn_run_store_rejects_invalid_descriptor_snapshot(tmp_path) -> None:
+    store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    run_id = uuid.uuid4()
+    snapshot_path = store.root / f"{run_id}.json"
+    _write_turn_run_snapshot(
+        snapshot_path,
+        {
+            "run_id": str(run_id),
+            "owner_id": str(uuid.uuid4()),
+            "project_id": None,
+            "conversation_id": "conversation-invalid-descriptor",
+            "client_turn_id": "turn-invalid-descriptor-1",
+            "continuation_anchor_snapshot": None,
+            "request_messages_digest": "digest",
+            "document_context_snapshot": None,
+            "requested_write_scope": "disabled",
+            "requested_write_targets_snapshot": [],
+            "normalized_input_items_snapshot": [{"item_type": "message", "role": "user", "content": "hi"}],
+            "exposed_tool_names_snapshot": ["project.read_documents"],
+            "resolved_tool_descriptor_snapshot": [
+                {
+                    "name": "project.read_documents",
+                    "description": "读取文稿",
+                    "input_schema": {"type": "object"},
+                    "output_schema": {"type": "object"},
+                    "origin": "project_document",
+                    "trust_class": "local_first_party",
+                    "plane": "resource",
+                    "mutability": "read_only",
+                    "execution_locus": "local_runtime",
+                    "approval_mode": "unsafe_mode",
+                    "idempotency_class": "safe_read",
+                    "timeout_seconds": 15,
+                }
+            ],
+            "turn_context_hash": "2" * 64,
+            "terminal_status": "completed",
+            "completion_messages_digest": "digest+assistant",
+            "terminal_error_code": None,
+            "terminal_error_message": None,
+            "write_effective": False,
+            "completed_at": "2026-04-05T00:00:00+00:00",
+        },
+    )
+
+    with pytest.raises(ConfigurationError, match="approval_mode"):
+        store.get_run(run_id)
+
+
+def test_assistant_turn_run_store_rejects_invalid_tool_policy_decision_snapshot(tmp_path) -> None:
+    store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    run_id = uuid.uuid4()
+    snapshot_path = store.root / f"{run_id}.json"
+    _write_turn_run_snapshot(
+        snapshot_path,
+        {
+            "run_id": str(run_id),
+            "owner_id": str(uuid.uuid4()),
+            "project_id": None,
+            "conversation_id": "conversation-invalid-policy-decision",
+            "client_turn_id": "turn-invalid-policy-decision-1",
+            "continuation_anchor_snapshot": None,
+            "request_messages_digest": "digest",
+            "document_context_snapshot": None,
+            "requested_write_scope": "disabled",
+            "requested_write_targets_snapshot": [],
+            "normalized_input_items_snapshot": [{"item_type": "message", "role": "user", "content": "hi"}],
+            "exposed_tool_names_snapshot": [],
+            "resolved_tool_descriptor_snapshot": [],
+            "tool_policy_decisions_snapshot": [
+                {
+                    "descriptor": {
+                        "name": "project.read_documents",
+                        "description": "读取文稿",
+                        "input_schema": {"type": "object"},
+                        "output_schema": {"type": "object"},
+                        "origin": "project_document",
+                        "trust_class": "local_first_party",
+                        "plane": "resource",
+                        "mutability": "read_only",
+                        "execution_locus": "local_runtime",
+                        "approval_mode": "none",
+                        "idempotency_class": "safe_read",
+                        "timeout_seconds": 15,
+                    },
+                    "visibility": "visible",
+                    "effective_approval_mode": "none",
+                    "allowed_target_document_refs": [],
+                    "hidden_reason": "write_grant_unavailable",
+                }
+            ],
+            "turn_context_hash": "3" * 64,
+            "terminal_status": "completed",
+            "completion_messages_digest": "digest+assistant",
+            "terminal_error_code": None,
+            "terminal_error_message": None,
+            "write_effective": False,
+            "completed_at": "2026-04-05T00:00:00+00:00",
+        },
+    )
+
+    with pytest.raises(ConfigurationError, match="hidden_reason"):
+        store.get_run(run_id)
+
+
+def test_assistant_turn_run_store_rejects_invalid_budget_snapshot(tmp_path) -> None:
+    store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    run_id = uuid.uuid4()
+    snapshot_path = store.root / f"{run_id}.json"
+    _write_turn_run_snapshot(
+        snapshot_path,
+        {
+            "run_id": str(run_id),
+            "owner_id": str(uuid.uuid4()),
+            "project_id": None,
+            "conversation_id": "conversation-invalid-budget",
+            "client_turn_id": "turn-invalid-budget-1",
+            "continuation_anchor_snapshot": None,
+            "request_messages_digest": "digest",
+            "document_context_snapshot": None,
+            "requested_write_scope": "disabled",
+            "requested_write_targets_snapshot": [],
+            "normalized_input_items_snapshot": [{"item_type": "message", "role": "user", "content": "hi"}],
+            "exposed_tool_names_snapshot": [],
+            "resolved_tool_descriptor_snapshot": [],
+            "tool_policy_decisions_snapshot": [],
+            "budget_snapshot": {
+                "max_steps": 0,
+                "max_tool_calls": None,
+                "max_input_tokens": None,
+                "max_history_tokens": None,
+                "max_tool_schema_tokens": None,
+                "max_tool_result_tokens_per_step": None,
+                "max_read_bytes": None,
+                "max_write_bytes": None,
+                "max_parallel_tool_calls": 1,
+                "tool_timeout_seconds": None,
+            },
+            "turn_context_hash": "4" * 64,
+            "terminal_status": "completed",
+            "completion_messages_digest": "digest+assistant",
+            "terminal_error_code": None,
+            "terminal_error_message": None,
+            "write_effective": False,
+            "completed_at": "2026-04-05T00:00:00+00:00",
+        },
+    )
+
+    with pytest.raises(ConfigurationError, match="budget_snapshot"):
+        store.get_run(run_id)
+
+
+def test_assistant_turn_run_store_rejects_invalid_compaction_snapshot(tmp_path) -> None:
+    store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    run_id = uuid.uuid4()
+    snapshot_path = store.root / f"{run_id}.json"
+    _write_turn_run_snapshot(
+        snapshot_path,
+        {
+            "run_id": str(run_id),
+            "owner_id": str(uuid.uuid4()),
+            "project_id": None,
+            "conversation_id": "conversation-invalid-compaction",
+            "client_turn_id": "turn-invalid-compaction-1",
+            "continuation_anchor_snapshot": None,
+            "compaction_snapshot": {
+                "trigger_reason": "max_input_tokens_exceeded",
+                "budget_limit_tokens": 216,
+                "estimated_tokens_before": 240,
+                "estimated_tokens_after": 0,
+                "compressed_message_count": 2,
+                "preserved_recent_message_count": 1,
+                "protected_document_paths": ["数据层/人物关系.json"],
+                "summary": "人物关系与势力关系要贯穿全文。",
+            },
+            "request_messages_digest": "digest",
+            "document_context_snapshot": None,
+            "requested_write_scope": "disabled",
+            "requested_write_targets_snapshot": [],
+            "normalized_input_items_snapshot": [{"item_type": "message", "role": "user", "content": "hi"}],
+            "exposed_tool_names_snapshot": [],
+            "resolved_tool_descriptor_snapshot": [],
+            "tool_policy_decisions_snapshot": [],
+            "budget_snapshot": None,
+            "turn_context_hash": "5" * 64,
+            "terminal_status": "completed",
+            "completion_messages_digest": "digest+assistant",
+            "terminal_error_code": None,
+            "terminal_error_message": None,
+            "write_effective": False,
+            "completed_at": "2026-04-05T00:00:00+00:00",
+        },
+    )
+
+    with pytest.raises(ConfigurationError, match="compaction_snapshot"):
+        store.get_run(run_id)
+
+
+async def test_assistant_service_surfaces_partial_project_read_errors_to_followup_prompt(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _ToolLoopErrorEchoProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+        ),
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    payload = _build_turn_request(
+        project_id=project.id,
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        messages=[AssistantMessageDTO(role="user", content="找一下人物和缺失文稿，再告诉我情况。")],
+    )
+
+    response = await service.turn(async_db(db), payload, owner_id=owner.id)
+
+    assert response.content.startswith("我看到人物文稿已读到")
+    assert _request_contains_continuation_fragment(tool_provider.requests[1], "设定/不存在.md")
+    assert _request_contains_continuation_fragment(tool_provider.requests[1], "document_not_found")
+
+
+async def test_assistant_service_fails_when_tool_loop_exhausted(db, tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _InfiniteToolCallProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            max_iterations=2,
+        ),
+        turn_run_store=turn_run_store,
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    payload = _build_turn_request(
+        project_id=project.id,
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        messages=[AssistantMessageDTO(role="user", content="一直循环读人物设定。")],
+    )
+
+    with pytest.raises(BusinessRuleError) as exc_info:
+        await service.turn(async_db(db), payload, owner_id=owner.id)
+
+    failed_run = turn_run_store.get_run(
+        build_turn_run_id(
+            owner_id=owner.id,
+            project_id=project.id,
+            conversation_id=payload.conversation_id,
+            client_turn_id=payload.client_turn_id,
+        )
+    )
+
+    assert exc_info.value.code == "tool_loop_exhausted"
+    assert str(exc_info.value) == "本轮工具调用次数已达上限，已停止继续执行。"
+    assert failed_run is not None
+    assert failed_run.exposed_tool_names_snapshot == (
+        "project.list_documents",
+        "project.search_documents",
+        "project.read_documents",
+    )
+    assert failed_run.resolved_tool_descriptor_snapshot[0]["approval_mode"] == "none"
+    assert failed_run.requested_write_scope == "disabled"
+    assert failed_run.budget_snapshot == _expected_run_budget(max_steps=2, tool_timeout_seconds=15)
+    assert failed_run.turn_context_hash
+    assert failed_run.terminal_status == "failed"
+    assert failed_run.terminal_error_code == "tool_loop_exhausted"
+    assert failed_run.write_effective is False
+
+
+async def test_assistant_service_fails_when_provider_returns_parallel_tool_calls(db, tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _ParallelToolCallProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            max_iterations=4,
+        ),
+        turn_run_store=turn_run_store,
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    payload = _build_turn_request(
+        project_id=project.id,
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        messages=[AssistantMessageDTO(role="user", content="并行读一下人物设定。")],
+    )
+
+    with pytest.raises(BusinessRuleError) as exc_info:
+        await service.turn(async_db(db), payload, owner_id=owner.id)
+
+    failed_run = turn_run_store.get_run(
+        build_turn_run_id(
+            owner_id=owner.id,
+            project_id=project.id,
+            conversation_id=payload.conversation_id,
+            client_turn_id=payload.client_turn_id,
+        )
+    )
+
+    assert exc_info.value.code == "parallel_tool_calls_unsupported"
+    assert str(exc_info.value) == "当前运行时只支持串行工具调用，请逐个执行工具。"
+    assert failed_run is not None
+    assert failed_run.budget_snapshot == _expected_run_budget(max_steps=4, tool_timeout_seconds=15)
+    assert failed_run.budget_snapshot["max_parallel_tool_calls"] == 1
+    assert failed_run.terminal_status == "failed"
+    assert failed_run.terminal_error_code == "parallel_tool_calls_unsupported"
+
+
+async def test_assistant_service_preserves_terminal_payload_when_on_error_hook_also_fails(
+    db,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊：冷静、克制。")
+    target = next(
+        item
+        for item in await capability_service.list_document_catalog(async_db(db), project.id)
+        if item.path == "设定/人物.md"
+    )
+    tool_provider = _WriteDocumentToolProvider(base_version=target.version)
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            step_store=_FailOnCommittedStepStore(tmp_path / "tool-steps"),
+        ),
+        turn_run_store=turn_run_store,
+    )
+
+    original_run_hook_event = service._run_hook_event
+
+    async def _patched_run_hook_event(db, hooks, event, **kwargs):
+        if event == "on_error":
+            raise RuntimeError("on_error hook failed")
+        return await original_run_hook_event(db, hooks, event, **kwargs)
+
+    monkeypatch.setattr(service, "_run_hook_event", _patched_run_hook_event)
+
+    payload = _build_turn_request(
+        project_id=project.id,
+        requested_write_scope="turn",
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        document_context={
+            "active_path": "设定/人物.md",
+            "active_buffer_state": {
+                "dirty": False,
+                "base_version": target.version,
+            },
+        },
+        messages=[AssistantMessageDTO(role="user", content="把当前人物设定补一条观察能力。")],
+    )
+
+    with pytest.raises(ExceptionGroup):
+        await service.turn(async_db(db), payload, owner_id=owner.id)
+
+    failed_run = turn_run_store.get_run(
+        build_turn_run_id(
+            owner_id=owner.id,
+            project_id=project.id,
+            conversation_id=payload.conversation_id,
+            client_turn_id=payload.client_turn_id,
+        )
+    )
+
+    assert failed_run is not None
+    assert failed_run.terminal_status == "failed"
+    assert failed_run.terminal_error_code == "committed_state_persist_failed"
+    assert failed_run.write_effective is True
+    assert failed_run.terminal_error_message is not None
+    assert "文稿写入已生效" in failed_run.terminal_error_message
+
+
+async def test_assistant_service_runs_project_write_document_tool_loop(db, tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊：冷静、克制。")
+    target = next(
+        item
+        for item in await capability_service.list_document_catalog(async_db(db), project.id)
+        if item.path == "设定/人物.md"
+    )
+    tool_provider = _WriteDocumentToolProvider(base_version=target.version)
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    step_store = AssistantToolStepStore(tmp_path / "tool-steps")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            step_store=step_store,
+        ),
+        turn_run_store=turn_run_store,
+    )
+    payload = _build_turn_request(
+        project_id=project.id,
+        requested_write_scope="turn",
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        document_context={
+            "active_path": "设定/人物.md",
+            "active_buffer_state": {
+                "dirty": False,
+                "base_version": target.version,
+            },
+        },
+        messages=[AssistantMessageDTO(role="user", content="把当前人物设定补一条观察能力。")],
+    )
+
+    response = await service.turn(async_db(db), payload, owner_id=owner.id)
+    saved = file_store.find_project_document(project.id, "设定/人物.md")
+
+    assert response.content.startswith("人物设定已经同步")
+    assert [item.item_type for item in response.output_items] == ["tool_call", "tool_result", "text"]
+    assert response.output_items[1].payload["structured_output"]["path"] == "设定/人物.md"
+    assert saved is not None
+    assert "他对雨夜里的细微异常尤其敏感" in saved.content
+    step_history = step_store.list_step_history(response.run_id, "call.project.write_document.1")
+    run_record = turn_run_store.get_run(response.run_id)
+    assert run_record is not None
+    assert [item.status for item in step_history] == ["validating", "writing", "committed"]
+    assert step_history[-1].idempotency_key == f"{response.run_id}:call.project.write_document.1:{target.document_ref}"
+    assert step_history[-1].approval_grant_id is not None
+    assert step_history[-1].approval_grant_snapshot == {
+        "grant_id": step_history[-1].approval_grant_id,
+        "allowed_tool_names": ["project.write_document"],
+        "target_document_refs": [target.document_ref],
+        "binding_version_constraints": {
+            target.document_ref: run_record.document_context_bindings_snapshot[0]["binding_version"]
+        },
+        "base_version_constraints": {
+            target.document_ref: target.version
+        },
+        "approval_mode_snapshot": "grant_bound",
+        "expires_at": None,
+    }
+    assert step_history[-1].result_summary == {
+        "resource_count": 1,
+        "content_item_count": 1,
+        "paths": ["设定/人物.md"],
+        "document_count": 1,
+        "document_revision_id": response.output_items[1].payload["structured_output"]["document_revision_id"],
+        "run_audit_id": response.output_items[1].payload["structured_output"]["run_audit_id"],
+    }
+    assert run_record.requested_write_scope == "turn"
+    assert run_record.requested_write_targets_snapshot == (target.document_ref,)
+    assert len(run_record.approval_grants_snapshot) == 1
+    assert run_record.approval_grants_snapshot[0] == {
+        "grant_id": step_history[-1].approval_grant_id,
+        "allowed_tool_names": ("project.write_document",),
+        "target_document_refs": (target.document_ref,),
+        "binding_version_constraints": {
+            target.document_ref: run_record.document_context_bindings_snapshot[0]["binding_version"]
+        },
+        "base_version_constraints": {
+            target.document_ref: target.version
+        },
+        "approval_mode_snapshot": "grant_bound",
+        "expires_at": None,
+    }
+    assert run_record.document_context_snapshot is not None
+    assert run_record.tool_catalog_version == run_record.document_context_snapshot["catalog_version"]
+    assert run_record.document_context_snapshot["active_path"] == "设定/人物.md"
+    assert run_record.document_context_bindings_snapshot[0]["document_ref"] == target.document_ref
+    assert run_record.document_context_bindings_snapshot[0]["selection_role"] == "active"
+    assert set(run_record.exposed_tool_names_snapshot) == {
+        "project.list_documents",
+        "project.search_documents",
+        "project.read_documents",
+        "project.write_document",
+    }
+    assert run_record.budget_snapshot == _expected_run_budget(max_steps=8, tool_timeout_seconds=None)
+    assert run_record.status == "completed"
+    assert run_record.write_effective is True
+    assert {item["name"] for item in run_record.resolved_tool_descriptor_snapshot} == {
+        "project.list_documents",
+        "project.search_documents",
+        "project.read_documents",
+        "project.write_document",
+    }
+    policy_by_name = {
+        item["descriptor"]["name"]: item
+        for item in run_record.tool_policy_decisions_snapshot
+    }
+    assert policy_by_name["project.list_documents"]["visibility"] == "visible"
+    assert policy_by_name["project.search_documents"]["visibility"] == "visible"
+    assert policy_by_name["project.read_documents"]["visibility"] == "visible"
+    assert policy_by_name["project.write_document"]["visibility"] == "visible"
+    assert policy_by_name["project.write_document"]["allowed_target_document_refs"] == (target.document_ref,)
+    assert policy_by_name["project.write_document"]["approval_grant"] == run_record.approval_grants_snapshot[0]
+    assert (
+        response.output_items[1].payload["structured_output"]["run_audit_id"]
+        == f"{response.run_id}:call.project.write_document.1"
+    )
+    assert response.output_items[1].payload["audit"] == {
+        "run_audit_id": f"{response.run_id}:call.project.write_document.1"
+    }
+    tool_result_item = next(
+        item
+        for item in run_record.normalized_input_items_snapshot
+        if item["item_type"] == "tool_result"
+    )
+    assert tool_result_item["payload"]["audit"] == response.output_items[1].payload["audit"]
+    assert tool_result_item["payload"]["structured_output"]["path"] == "设定/人物.md"
+    assert any(
+        item["item_type"] == "tool_call"
+        for item in run_record.normalized_input_items_snapshot
+    )
+
+
+async def test_assistant_service_surfaces_write_document_conflict_to_followup_prompt(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _WriteConflictToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    step_store = AssistantToolStepStore(tmp_path / "tool-steps")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            step_store=step_store,
+        ),
+        turn_run_store=turn_run_store,
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊：冷静、克制。")
+    payload = _build_turn_request(
+        project_id=project.id,
+        requested_write_scope="turn",
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        document_context={
+            "active_path": "设定/人物.md",
+            "active_buffer_state": {
+                "dirty": False,
+                "base_version": "sha256:stale",
+            },
+        },
+        messages=[AssistantMessageDTO(role="user", content="尝试覆盖旧版本人物设定。")],
+    )
+
+    response = await service.turn(async_db(db), payload, owner_id=owner.id)
+
+    assert response.content.startswith("写回失败，因为人物设定已经有新版本")
+    assert len(tool_provider.requests) == 2
+    assert _request_contains_continuation_fragment(tool_provider.requests[1], "version_conflict")
+    run_id = build_turn_run_id(
+        owner_id=owner.id,
+        project_id=project.id,
+        conversation_id=payload.conversation_id,
+        client_turn_id=payload.client_turn_id,
+    )
+    step_history = step_store.list_step_history(
+        run_id,
+        "call.project.write_document.conflict",
+    )
+    assert [item.status for item in step_history] == ["validating", "failed"]
+    assert step_history[-1].tool_name == "project.write_document"
+    assert step_history[-1].error_code == "version_conflict"
+    assert step_history[-1].result_summary == {
+        "content_item_count": 0,
+        "error_code": "version_conflict",
+        "message": "目标文稿版本已变化，请重新读取最新内容后再写入。",
+        "recovery_kind": "return_error_to_model",
+        "resource_count": 0,
+    }
+    assert response.output_items[1].payload["error"] == {
+        "code": "version_conflict",
+        "message": "目标文稿版本已变化，请重新读取最新内容后再写入。",
+        "retryable": False,
+        "recovery_hint": "请先重新读取目标文稿的最新状态，再决定是否继续写入。",
+        "requires_user_action": True,
+        "recovery_kind": "return_error_to_model",
+    }
+
+
+async def test_assistant_service_stream_turn_surfaces_write_document_conflict_and_continues(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _WriteConflictToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    step_store = AssistantToolStepStore(tmp_path / "tool-steps")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            step_store=step_store,
+        ),
+        turn_run_store=turn_run_store,
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊：冷静、克制。")
+    payload = _build_turn_request(
+        project_id=project.id,
+        stream=True,
+        requested_write_scope="turn",
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        document_context={
+            "active_path": "设定/人物.md",
+            "active_buffer_state": {
+                "dirty": False,
+                "base_version": "sha256:stale",
+            },
+        },
+        messages=[AssistantMessageDTO(role="user", content="尝试覆盖旧版本人物设定。")],
+    )
+
+    events = [event async for event in service.stream_turn(async_db(db), payload, owner_id=owner.id)]
+
+    assert [event.event for event in events] == [
+        "run_started",
+        "tool_call_start",
+        "tool_call_result",
+        "chunk",
+        "chunk",
+        "completed",
+    ]
+    assert [event.data["state_version"] for event in events] == [1, 2, 2, 3, 3, 5]
+    assert events[2].data["status"] == "errored"
+    assert events[2].data["result_summary"] == {
+        "content_item_count": 0,
+        "error_code": "version_conflict",
+        "message": "目标文稿版本已变化，请重新读取最新内容后再写入。",
+        "recovery_kind": "return_error_to_model",
+        "resource_count": 0,
+    }
+    assert events[2].data["error"] == {
+        "code": "version_conflict",
+        "message": "目标文稿版本已变化，请重新读取最新内容后再写入。",
+        "retryable": False,
+        "recovery_hint": "请先重新读取目标文稿的最新状态，再决定是否继续写入。",
+        "requires_user_action": True,
+        "recovery_kind": "return_error_to_model",
+    }
+    assert events[-1].data["content"].startswith("写回失败，因为人物设定已经有新版本")
+
+
+async def test_assistant_service_stream_turn_surfaces_committed_write_when_step_persist_fails(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊：冷静、克制。")
+    target = next(
+        item
+        for item in await capability_service.list_document_catalog(async_db(db), project.id)
+        if item.path == "设定/人物.md"
+    )
+    tool_provider = _WriteDocumentToolProvider(base_version=target.version)
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    step_store = _FailOnCommittedStepStore(tmp_path / "tool-steps")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            step_store=step_store,
+        ),
+    )
+    payload = _build_turn_request(
+        project_id=project.id,
+        stream=True,
+        requested_write_scope="turn",
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        document_context={
+            "active_path": "设定/人物.md",
+            "active_buffer_state": {
+                "dirty": False,
+                "base_version": target.version,
+            },
+        },
+        messages=[AssistantMessageDTO(role="user", content="把当前人物设定补一条观察能力。")],
+    )
+
+    events: list[AssistantStreamEvent] = []
+    with pytest.raises(BusinessRuleError) as exc_info:
+        async for event in service.stream_turn(async_db(db), payload, owner_id=owner.id):
+            events.append(event)
+
+    saved = file_store.find_project_document(project.id, "设定/人物.md")
+    failed_run_id = build_turn_run_id(
+        owner_id=owner.id,
+        project_id=project.id,
+        conversation_id=payload.conversation_id,
+        client_turn_id=payload.client_turn_id,
+    )
+    step_history = step_store.list_step_history(
+        failed_run_id,
+        "call.project.write_document.1",
+    )
+
+    assert exc_info.value.code == "committed_state_persist_failed"
+    assert "文稿写入已生效" in str(exc_info.value)
+    assert saved is not None
+    assert "他对雨夜里的细微异常尤其敏感" in saved.content
+    assert [item.status for item in step_history] == ["validating", "writing"]
+    assert [event.event for event in events] == [
+        "run_started",
+        "tool_call_start",
+        "tool_call_result",
+    ]
+    assert events[-1].data["status"] == "committed"
+    assert events[-1].data["result_summary"]["state_persist_failed"] is True
+    assert events[-1].data["result_summary"]["document_revision_id"]
+    assert events[-1].data["error"]["code"] == "committed_state_persist_failed"
+
+
+async def test_assistant_service_stream_turn_surfaces_effective_write_when_revision_persist_fails(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+        document_revision_store=_FailOnAppendRevisionStore(tmp_path / "revisions"),
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊：冷静、克制。")
+    target = next(
+        item
+        for item in await capability_service.list_document_catalog(async_db(db), project.id)
+        if item.path == "设定/人物.md"
+    )
+    tool_provider = _WriteDocumentToolProvider(base_version=target.version)
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    step_store = AssistantToolStepStore(tmp_path / "tool-steps")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            step_store=step_store,
+        ),
+        turn_run_store=turn_run_store,
+    )
+    payload = _build_turn_request(
+        project_id=project.id,
+        stream=True,
+        requested_write_scope="turn",
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        document_context={
+            "active_path": "设定/人物.md",
+            "active_buffer_state": {
+                "dirty": False,
+                "base_version": target.version,
+            },
+        },
+        messages=[AssistantMessageDTO(role="user", content="把当前人物设定补一条观察能力。")],
+    )
+
+    events: list[AssistantStreamEvent] = []
+    with pytest.raises(BusinessRuleError) as exc_info:
+        async for event in service.stream_turn(async_db(db), payload, owner_id=owner.id):
+            events.append(event)
+
+    saved = file_store.find_project_document(project.id, "设定/人物.md")
+    run_id = build_turn_run_id(
+        owner_id=owner.id,
+        project_id=project.id,
+        conversation_id=payload.conversation_id,
+        client_turn_id=payload.client_turn_id,
+    )
+    run_record = turn_run_store.get_run(run_id)
+    step_history = step_store.list_step_history(run_id, "call.project.write_document.1")
+
+    assert exc_info.value.code == "document_revision_persist_failed"
+    assert saved is not None
+    assert "他对雨夜里的细微异常尤其敏感" in saved.content
+    assert [item.status for item in step_history] == ["validating", "writing", "committed"]
+    assert events[-1].data["status"] == "committed"
+    assert events[-1].data["result_summary"]["write_effective"] is True
+    assert events[-1].data["error"]["code"] == "document_revision_persist_failed"
+    assert run_record is not None
+    assert run_record.write_effective is True
+    assert run_record.terminal_error_code == "document_revision_persist_failed"
+
+
+async def test_assistant_service_stream_turn_preserves_effective_write_when_cancelled_after_commit(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊：冷静、克制。")
+    target = next(
+        item
+        for item in await capability_service.list_document_catalog(async_db(db), project.id)
+        if item.path == "设定/人物.md"
+    )
+    tool_provider = _WriteDocumentToolProvider(base_version=target.version)
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    step_store = AssistantToolStepStore(tmp_path / "tool-steps")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            step_store=step_store,
+        ),
+        turn_run_store=turn_run_store,
+    )
+    payload = _build_turn_request(
+        project_id=project.id,
+        stream=True,
+        requested_write_scope="turn",
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        document_context={
+            "active_path": "设定/人物.md",
+            "active_buffer_state": {
+                "dirty": False,
+                "base_version": target.version,
+            },
+        },
+        messages=[AssistantMessageDTO(role="user", content="把当前人物设定补一条观察能力。")],
+    )
+    should_stop_calls = 0
+
+    async def should_stop() -> bool:
+        nonlocal should_stop_calls
+        should_stop_calls += 1
+        return should_stop_calls >= 4
+
+    events: list[AssistantStreamEvent] = []
+    with pytest.raises(BusinessRuleError) as exc_info:
+        async for event in service.stream_turn(
+            async_db(db),
+            payload,
+            owner_id=owner.id,
+            should_stop=should_stop,
+        ):
+            events.append(event)
+
+    saved = file_store.find_project_document(project.id, "设定/人物.md")
+    run_id = build_turn_run_id(
+        owner_id=owner.id,
+        project_id=project.id,
+        conversation_id=payload.conversation_id,
+        client_turn_id=payload.client_turn_id,
+    )
+    run_record = turn_run_store.get_run(run_id)
+    step_history = step_store.list_step_history(run_id, "call.project.write_document.1")
+
+    assert exc_info.value.code == "cancel_requested"
+    assert str(exc_info.value) == "本轮已停止，但已有写入生效。"
+    assert saved is not None
+    assert "他对雨夜里的细微异常尤其敏感" in saved.content
+    assert [event.event for event in events] == [
+        "run_started",
+        "tool_call_start",
+        "tool_call_result",
+    ]
+    assert events[-1].data["status"] == "committed"
+    assert [item.status for item in step_history] == ["validating", "writing", "committed"]
+    assert run_record is not None
+    assert run_record.terminal_status == "cancelled"
+    assert run_record.write_effective is True
+    assert run_record.terminal_error_code == "cancel_requested"
+    assert run_record.terminal_error_message == "本轮已停止，但已有写入生效。"
+
+
+async def test_assistant_service_stream_turn_records_cancelled_tool_step_before_execution(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _ToolCallingFakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    step_store = AssistantToolStepStore(tmp_path / "tool-steps")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            step_store=step_store,
+        ),
+        turn_run_store=turn_run_store,
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(
+        project.id,
+        "设定/人物.md",
+        "# 人物\n\n林渊：冷静、克制，擅长从细枝末节里发现异常。",
+    )
+    payload = _build_turn_request(
+        project_id=project.id,
+        stream=True,
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        messages=[AssistantMessageDTO(role="user", content="先读一下人物设定，再给我一个悬疑开场方向。")],
+    )
+    should_stop_calls = 0
+
+    async def should_stop() -> bool:
+        nonlocal should_stop_calls
+        should_stop_calls += 1
+        return should_stop_calls >= 3
+
+    events: list[AssistantStreamEvent] = []
+    with pytest.raises(StreamInterruptedError):
+        async for event in service.stream_turn(
+            async_db(db),
+            payload,
+            owner_id=owner.id,
+            should_stop=should_stop,
+        ):
+            events.append(event)
+
+    cancelled_run_id = build_turn_run_id(
+        owner_id=owner.id,
+        project_id=project.id,
+        conversation_id=payload.conversation_id,
+        client_turn_id=payload.client_turn_id,
+    )
+    run_record = turn_run_store.get_run(cancelled_run_id)
+    step_history = step_store.list_step_history(cancelled_run_id, "call.project.read_documents.1")
+
+    assert [event.event for event in events] == [
+        "run_started",
+        "tool_call_start",
+        "tool_call_result",
+    ]
+    assert events[-1].data["status"] == "cancelled"
+    assert events[-1].data["result_summary"] == {
+        "cancelled": True,
+        "terminal": True,
+        "error_code": "cancel_requested",
+        "message": "本轮已停止，当前工具未执行。",
+    }
+    assert [item.status for item in step_history] == ["reading", "cancelled"]
+    assert step_history[-1].error_code == "cancel_requested"
+    assert run_record is not None
+    assert run_record.terminal_status == "cancelled"
+    assert run_record.terminal_error_code == "cancel_requested"
+
+
+async def test_assistant_service_rejects_stale_document_context_catalog_version(db, tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        project_document_capability_service=capability_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊：冷静、克制。")
+    payload = _build_turn_request(
+        project_id=project.id,
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        document_context={
+            "active_path": "设定/人物.md",
+            "catalog_version": "catalog:stale",
+        },
+        messages=[AssistantMessageDTO(role="user", content="继续参考当前人物设定。")],
+    )
+
+    with pytest.raises(BusinessRuleError) as exc_info:
+        await service.turn(async_db(db), payload, owner_id=owner.id)
+
+    assert exc_info.value.code == "catalog_version_mismatch"
+    assert str(exc_info.value) == "当前文稿目录已变化，请刷新文稿上下文后重试。"
+    assert tool_provider.requests == []
+
+
+async def test_assistant_service_accepts_stale_catalog_version_when_active_binding_is_stable(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        project_document_capability_service=capability_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊：冷静、克制。")
+    catalog = await capability_service.list_document_catalog(async_db(db), project.id, owner_id=owner.id)
+    target = next(item for item in catalog if item.path == "设定/人物.md")
+    payload = _build_turn_request(
+        project_id=project.id,
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        document_context={
+            "active_path": "设定/人物.md",
+            "active_document_ref": target.document_ref,
+            "active_binding_version": target.binding_version,
+            "catalog_version": "catalog:stale",
+        },
+        messages=[AssistantMessageDTO(role="user", content="继续参考当前人物设定。")],
+    )
+
+    response = await service.turn(async_db(db), payload, owner_id=owner.id)
+
+    assert response.content.startswith("主回复：")
+    assert len(tool_provider.requests) == 1
+
+
+async def test_assistant_service_rejects_active_document_binding_drift(db, tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        project_document_capability_service=capability_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    content = "# 人物\n\n林渊：冷静、克制。"
+    file_store.save_project_document(project.id, "设定/人物.md", content)
+    stale_entry = next(
+        item
+        for item in await capability_service.list_document_catalog(async_db(db), project.id)
+        if item.path == "设定/人物.md"
+    )
+    file_store.delete_project_document_entry(project.id, "设定/人物.md")
+    identity_store.delete_document_ref(project.id, path="设定/人物.md")
+    file_store.save_project_document(project.id, "设定/人物.md", content)
+    fresh_entry = next(
+        item
+        for item in await capability_service.list_document_catalog(async_db(db), project.id)
+        if item.path == "设定/人物.md"
+    )
+
+    assert stale_entry.document_ref != fresh_entry.document_ref
+    assert stale_entry.version == fresh_entry.version
+
+    payload = _build_turn_request(
+        project_id=project.id,
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        document_context={
+            "active_path": "设定/人物.md",
+            "active_document_ref": stale_entry.document_ref,
+            "active_binding_version": stale_entry.binding_version,
+            "active_buffer_state": {
+                "dirty": False,
+                "base_version": stale_entry.version,
+            },
+            "catalog_version": fresh_entry.catalog_version,
+        },
+        messages=[AssistantMessageDTO(role="user", content="继续参考当前人物设定。")],
+    )
+
+    with pytest.raises(BusinessRuleError) as exc_info:
+        await service.turn(async_db(db), payload, owner_id=owner.id)
+
+    assert exc_info.value.code == "active_document_binding_mismatch"
+    assert str(exc_info.value) == "当前活动文稿绑定已变化，请刷新当前文稿后重试。"
+    assert tool_provider.requests == []
 
 
 async def test_assistant_service_stream_turn_emits_tool_events_for_project_read_documents(
@@ -804,16 +3243,18 @@ async def test_assistant_service_stream_turn_emits_tool_events_for_project_read_
         "tool_call_start",
         "tool_call_result",
         "chunk",
+        "chunk",
         "completed",
     ]
-    assert [event.data["event_seq"] for event in events] == [1, 2, 3, 4, 5]
+    assert [event.data["event_seq"] for event in events] == [1, 2, 3, 4, 5, 6]
+    assert [event.data["state_version"] for event in events] == [1, 2, 3, 4, 5, 6]
     assert events[1].data["tool_call_id"] == "call.project.read_documents.1"
     assert events[1].data["tool_name"] == "project.read_documents"
     assert events[1].data["target_summary"]["paths"] == ["设定/人物.md"]
     assert events[2].data["status"] == "completed"
     assert events[2].data["result_summary"]["paths"] == ["设定/人物.md"]
-    assert events[3].data["chunk_kind"] == "buffered_final"
-    assert events[3].data["delta"].startswith("我已经读完人物设定")
+    assert all("chunk_kind" not in event.data for event in events[3:5])
+    assert "".join(event.data["delta"] for event in events[3:5]).startswith("我已经读完人物设定")
     assert events[-1].data["content"].startswith("我已经读完人物设定")
 
 
@@ -868,6 +3309,7 @@ async def test_assistant_service_stream_turn_keeps_true_provider_stream_for_proj
 
     assert [event.event for event in events] == ["run_started", "chunk", "chunk", "chunk", "completed"]
     assert [event.data["event_seq"] for event in events] == [1, 2, 3, 4, 5]
+    assert [event.data["state_version"] for event in events] == [1, 2, 3, 4, 5]
     assert [event.data["delta"] for event in events[1:4]] == ["第一句。", "第二句。", "第三句。"]
     assert all("chunk_kind" not in event.data for event in events[1:4])
     assert events[-1].data["content"] == "第一句。第二句。第三句。"
@@ -943,7 +3385,131 @@ hook:
             events.append(event)
 
     assert [event.event for event in events] == ["run_started"]
-    assert any("请根据以下内容输出一句摘要" in prompt for prompt in tool_provider.prompts)
+    summary_prompts = [
+        prompt
+        for prompt in tool_provider.prompts
+        if "请根据以下内容输出一句摘要" in prompt
+    ]
+    assert len(summary_prompts) == 1
+
+
+async def test_assistant_service_turn_runs_on_error_hook_for_prepare_failure(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    _write_yaml(
+        config_root / "hooks" / "on-error-summary.yaml",
+        """
+hook:
+  id: "hook.on_error_summary"
+  name: "失败摘要"
+  trigger:
+    event: "on_error"
+  action:
+    type: "agent"
+    config:
+      agent_id: "agent.hook_summary"
+      input_mapping:
+        content: "error.message"
+""",
+    )
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-prepare-on-error")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                hook_ids=["hook.on_error_summary"],
+                continuation_anchor=AssistantContinuationAnchorDTO(previous_run_id=uuid.uuid4()),
+                messages=[AssistantMessageDTO(role="user", content="继续往下展开。")],
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+
+            with pytest.raises(BusinessRuleError, match="当前会话状态已变化"):
+                await service.turn(session, payload, owner_id=owner_id)
+
+        summary_prompts = [
+            prompt
+            for prompt in tool_provider.prompts
+            if "请根据以下内容输出一句摘要" in prompt
+        ]
+        assert len(summary_prompts) == 1
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_stream_turn_runs_on_error_hook_for_finalize_failure(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    _write_yaml(
+        config_root / "hooks" / "on-error-summary.yaml",
+        """
+hook:
+  id: "hook.on_error_summary"
+  name: "失败摘要"
+  trigger:
+    event: "on_error"
+  action:
+    type: "agent"
+    config:
+      agent_id: "agent.hook_summary"
+      input_mapping:
+        content: "error.message"
+""",
+    )
+    loader = ConfigLoader(config_root)
+    tool_provider = _EmptyContentToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-finalize-on-error")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                stream=True,
+                hook_ids=["hook.on_error_summary"],
+                messages=[AssistantMessageDTO(role="user", content="给我一个方向。")],
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+
+            events: list[AssistantStreamEvent] = []
+            with pytest.raises(ConfigurationError, match="Assistant output must be plain text"):
+                async for event in service.stream_turn(session, payload, owner_id=owner_id):
+                    events.append(event)
+
+        assert [event.event for event in events] == ["run_started"]
+        summary_prompts = [
+            prompt
+            for prompt in tool_provider.prompts
+            if "请根据以下内容输出一句摘要" in prompt
+        ]
+        assert len(summary_prompts) == 1
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
 
 async def test_assistant_service_uses_project_mcp_for_project_hook(tmp_path) -> None:
@@ -1631,131 +4197,3 @@ async def test_assistant_service_surfaces_mcp_is_error(tmp_path) -> None:
         ]
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
-
-
-def _build_config_root(tmp_path: Path) -> Path:
-    root = tmp_path / "config"
-    _write_yaml(
-        root / "skills" / "assistant" / "general-chat.yaml",
-        """
-skill:
-  id: "skill.assistant.general_chat"
-  name: "通用对话助手"
-  category: "assistant"
-  prompt: |
-    你是一个通用助手。
-    {% if conversation_history %}
-    历史对话：
-    {{ conversation_history }}
-    {% endif %}
-    用户问题：{{ user_input }}
-  variables:
-    conversation_history:
-      type: "string"
-      required: false
-      default: ""
-    user_input:
-      type: "string"
-      required: true
-  model:
-    provider: "openai"
-    name: "gpt-4o-mini"
-""",
-    )
-    _write_yaml(
-        root / "skills" / "assistant" / "hook-summary.yaml",
-        """
-skill:
-  id: "skill.assistant.hook_summary"
-  name: "Hook 摘要"
-  category: "assistant"
-  prompt: |
-    请根据以下内容输出一句摘要：
-    {{ content }}
-  variables:
-    content:
-      type: "string"
-      required: true
-  model:
-    provider: "openai"
-    name: "gpt-4o-mini"
-""",
-    )
-    _write_yaml(
-        root / "agents" / "writers" / "general-assistant.yaml",
-        """
-agent:
-  id: "agent.general_assistant"
-  name: "通用助手"
-  type: "writer"
-  system_prompt: "你是通用助手。"
-  skills: ["skill.assistant.general_chat"]
-  mcp_servers: ["mcp.news.lookup"]
-  model:
-    provider: "openai"
-    name: "gpt-4o-mini"
-""",
-    )
-    _write_yaml(
-        root / "agents" / "writers" / "hook-summary.yaml",
-        """
-agent:
-  id: "agent.hook_summary"
-  name: "Hook 摘要助手"
-  type: "checker"
-  system_prompt: "你负责给正文做一句摘要。"
-  skills: ["skill.assistant.hook_summary"]
-  model:
-    provider: "openai"
-    name: "gpt-4o-mini"
-""",
-    )
-    _write_yaml(
-        root / "hooks" / "before-news-lookup.yaml",
-        """
-hook:
-  id: "hook.before_news_lookup"
-  name: "新闻检索"
-  trigger:
-    event: "before_assistant_response"
-  action:
-    type: "mcp"
-    config:
-      server_id: "mcp.news.lookup"
-      tool_name: "search_news"
-      input_mapping:
-        query: "request.user_input"
-""",
-    )
-    _write_yaml(
-        root / "hooks" / "after-summary-agent.yaml",
-        """
-hook:
-  id: "hook.after_summary_agent"
-  name: "生成摘要"
-  trigger:
-    event: "after_assistant_response"
-  action:
-    type: "agent"
-    config:
-      agent_id: "agent.hook_summary"
-      input_mapping:
-        content: "response.content"
-""",
-    )
-    _write_yaml(
-        root / "mcp_servers" / "news.yaml",
-        """
-mcp_server:
-  id: "mcp.news.lookup"
-  name: "新闻检索 MCP"
-  transport: "streamable_http"
-  url: "https://example.com/mcp"
-""",
-    )
-    return root
-
-
-def _write_yaml(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content.strip() + "\n", encoding="utf-8")

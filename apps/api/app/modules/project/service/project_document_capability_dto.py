@@ -8,6 +8,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from .dto import ProjectDocumentSource
 
 ProjectDocumentContentState = Literal["ready", "empty", "placeholder"]
+ProjectDocumentSearchField = Literal[
+    "path",
+    "title",
+    "schema_id",
+    "source",
+    "document_kind",
+    "content_state",
+]
 
 
 class ProjectDocumentCatalogEntryDTO(BaseModel):
@@ -15,6 +23,7 @@ class ProjectDocumentCatalogEntryDTO(BaseModel):
 
     path: str = Field(min_length=1)
     document_ref: str = Field(min_length=1)
+    binding_version: str = Field(min_length=1)
     resource_uri: str = Field(min_length=1)
     title: str = Field(min_length=1)
     source: ProjectDocumentSource
@@ -48,3 +57,51 @@ class ProjectDocumentReadResultDTO(BaseModel):
     documents: list[ProjectDocumentReadItemDTO] = Field(default_factory=list)
     errors: list[ProjectDocumentReadErrorDTO] = Field(default_factory=list)
     catalog_version: str = Field(min_length=1)
+
+
+class ProjectDocumentSearchHitDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1)
+    document_ref: str = Field(min_length=1)
+    binding_version: str = Field(min_length=1)
+    resource_uri: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    source: ProjectDocumentSource
+    document_kind: str = Field(min_length=1)
+    schema_id: str | None = None
+    content_state: ProjectDocumentContentState
+    writable: bool
+    version: str = Field(min_length=1)
+    updated_at: datetime | None
+    matched_fields: list[ProjectDocumentSearchField] = Field(default_factory=list)
+    match_score: int = Field(ge=0)
+
+
+class ProjectDocumentSearchResultDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    documents: list[ProjectDocumentSearchHitDTO] = Field(default_factory=list)
+    catalog_version: str = Field(min_length=1)
+
+
+class ProjectDocumentWriteDiffSummaryDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    changed: bool
+    previous_chars: int = Field(ge=0)
+    next_chars: int = Field(ge=0)
+
+
+class ProjectDocumentWriteResultDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1)
+    document_ref: str = Field(min_length=1)
+    resource_uri: str = Field(min_length=1)
+    source: ProjectDocumentSource
+    version: str = Field(min_length=1)
+    document_revision_id: str = Field(min_length=1)
+    updated_at: datetime
+    diff_summary: ProjectDocumentWriteDiffSummaryDTO
+    run_audit_id: str = Field(min_length=1)

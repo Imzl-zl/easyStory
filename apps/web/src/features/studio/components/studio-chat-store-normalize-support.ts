@@ -49,6 +49,7 @@ export function normalizeStudioChatSession(
   return {
     composerText: readStringValue(record.composerText) ?? "",
     conversationSkillId: readOptionalSkillId(record.conversationSkillId),
+    latestCompletedRunId: readOptionalString(record.latestCompletedRunId),
     messages: normalizeMessages(record.messages, mode),
     nextTurnSkillId: readOptionalSkillId(record.nextTurnSkillId),
     selectedContextPaths: readStringArray(record.selectedContextPaths),
@@ -105,6 +106,7 @@ function buildFallbackConversationRecord(): StudioConversationRecord {
   const session = {
     composerText: "",
     conversationSkillId: null,
+    latestCompletedRunId: null,
     messages: [],
     nextTurnSkillId: null,
     selectedContextPaths: [],
@@ -189,6 +191,11 @@ function readStringArray(value: unknown) {
 }
 
 function readOptionalSkillId(value: unknown) {
+  const normalized = readStringValue(value)?.trim();
+  return normalized || null;
+}
+
+function readOptionalString(value: unknown) {
   const normalized = readStringValue(value)?.trim();
   return normalized || null;
 }

@@ -25,6 +25,7 @@ export type StudioChatState = {
   conversationSummaries: StudioConversationSummary[];
   createConversation: () => string | null;
   deleteConversation: (conversationId: string) => void;
+  latestCompletedRunId: string | null;
   messages: StudioChatSession["messages"];
   nextTurnSkillId: string | null;
   patchConversationSession: (
@@ -165,6 +166,7 @@ export function useStudioChatState(projectId: string): StudioChatState {
     conversationSummaries,
     createConversation,
     deleteConversation,
+    latestCompletedRunId: session.latestCompletedRunId,
     messages: session.messages,
     nextTurnSkillId: session.nextTurnSkillId,
     patchConversationSession,

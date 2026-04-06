@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Message } from "@arco-design/web-react";
 
 import { runAssistantTurn, runAssistantTurnStream } from "@/lib/api/assistant";
 import { getErrorMessage } from "@/lib/api/client";
+import { listProjectDocumentCatalog } from "@/lib/api/projects";
+import type { AssistantActiveBufferState } from "@/lib/api/types";
 
 import {
   buildStudioAttachmentOnlyMessage,
@@ -18,6 +21,7 @@ import {
   appendStudioChatMessageDelta,
   buildNextStudioChatSettingsForProvider,
   buildStudioAssistantTurnPayload,
+  buildStudioDocumentCatalogQueryKey,
   buildStudioUserRequestContent,
   createStudioChatMessage,
   INITIAL_STUDIO_CHAT_SETTINGS,
@@ -32,23 +36,32 @@ import { useStudioChatSkillModel } from "./studio-chat-skill-model";
 import { useStudioChatState } from "./studio-chat-state";
 
 type UseStudioChatModelOptions = {
-  currentDocumentContent: string;
+  activeBufferState: AssistantActiveBufferState | null;
   currentDocumentPath: string | null;
   projectId: string;
 };
 
 export function useStudioChatModel({
-  currentDocumentContent,
+  activeBufferState,
   currentDocumentPath,
   projectId,
 }: UseStudioChatModelOptions) {
   const state = useStudioChatState(projectId);
   const [attachments, setAttachments] = useState<StudioChatAttachment[]>([]);
   const [isResponding, setIsResponding] = useState(false);
+  const needsDocumentCatalog = Boolean(currentDocumentPath) || state.selectedContextPaths.length > 0;
   const hasUserMessage = useMemo(
     () => state.messages.some((message) => message.role === "user"),
     [state.messages],
   );
+  const documentCatalogQuery = useQuery({
+    queryKey: buildStudioDocumentCatalogQueryKey(projectId),
+    queryFn: () => listProjectDocumentCatalog(projectId),
+    enabled: needsDocumentCatalog,
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+  });
   const credentialModel = useStudioChatCredentialModel(
     projectId,
     hasUserMessage,
@@ -118,13 +131,20 @@ export function useStudioChatModel({
       Message.warning(credentialModel.credentialNotice ?? "当前没有可用模型连接。");
       return;
     }
+    if (needsDocumentCatalog) {
+      if (documentCatalogQuery.error) {
+        Message.error(getErrorMessage(documentCatalogQuery.error));
+        return;
+      }
+      if (!documentCatalogQuery.data) {
+        Message.warning("当前文稿目录快照仍在加载，请稍后重试。");
+        return;
+      }
+    }
     const conversationId = state.activeConversationId;
     const userMessage = buildStudioUserMessage({
       attachments,
       content,
-      currentDocumentContent,
-      currentDocumentPath,
-      selectedContextPaths: state.selectedContextPaths,
     });
 
     const assistantMessage = createStudioChatMessage(
@@ -136,9 +156,14 @@ export function useStudioChatModel({
     const consumedNextTurnSkillId = state.nextTurnSkillId;
     const activeSkillId = consumedNextTurnSkillId ?? state.conversationSkillId;
     const payload = buildStudioAssistantTurnPayload({
+      activeBufferState,
       conversationId,
+      currentDocumentPath,
+      documentCatalogEntries: documentCatalogQuery.data ?? null,
+      latestCompletedRunId: state.latestCompletedRunId,
       messages: nextMessages,
       projectId,
+      selectedContextPaths: state.selectedContextPaths,
       settings: state.settings,
       skillId: activeSkillId,
     });
@@ -165,6 +190,7 @@ export function useStudioChatModel({
           consumedNextTurnSkillId,
           content: result.content,
           messageId: assistantMessage.id,
+          runId: result.run_id,
         }));
     } catch (error) {
       state.patchConversationSession(conversationId, (current) => ({
@@ -180,11 +206,14 @@ export function useStudioChatModel({
       setIsResponding(false);
     }
   }, [
+    activeBufferState,
     credentialModel.canChat,
     credentialModel.credentialNotice,
-    currentDocumentContent,
     currentDocumentPath,
+    documentCatalogQuery.data,
+    documentCatalogQuery.error,
     isResponding,
+    needsDocumentCatalog,
     projectId,
     state,
     attachments,
@@ -256,18 +285,12 @@ async function runStudioChatStream(
 function buildStudioUserMessage(options: {
   attachments: StudioChatAttachment[];
   content: string;
-  currentDocumentContent: string;
-  currentDocumentPath: string | null;
-  selectedContextPaths: string[];
 }) {
   const trimmedContent = options.content.trim();
   const displayContent = trimmedContent || buildStudioAttachmentOnlyMessage(options.attachments);
   const requestContent = buildStudioUserRequestContent({
     attachments: options.attachments,
-    currentDocumentContent: options.currentDocumentContent,
-    currentDocumentPath: options.currentDocumentPath,
     message: displayContent,
-    selectedContextPaths: options.selectedContextPaths,
   });
   return createStudioChatMessage("user", displayContent, {
     attachments: extractStudioChatAttachmentMeta(options.attachments),

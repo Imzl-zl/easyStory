@@ -4,13 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Message } from "@arco-design/web-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { resolveStudioDocumentSaveErrorMessage } from "@/features/studio/components/studio-document-feedback-support";
 import {
   buildStudioDocumentQueryKey,
+  type StudioLoadedDocument,
   loadStudioDocument,
   resolveStudioDocumentTarget,
   saveStudioDocument,
   syncStudioDocumentQueries,
 } from "@/features/studio/components/studio-document-support";
+import { buildStudioActiveBufferState } from "@/features/studio/components/studio-document-buffer-support";
 
 type UseStudioDocumentModelArgs = {
   projectId: string;
@@ -45,6 +48,11 @@ export function useStudioDocumentModel({
 
   const hasUnsavedChanges = dirtyPath !== null && dirtyPath === target?.path;
   const documentContent = hasUnsavedChanges ? draftContent : (documentQuery.data?.content ?? "");
+  const activeBufferState = resolveActiveBufferState(
+    documentQuery.data,
+    documentContent,
+    hasUnsavedChanges,
+  );
 
   const saveMutation = useMutation({
     mutationFn: (content: string) => {
@@ -65,8 +73,8 @@ export function useStudioDocumentModel({
         savedDocument.storageKind === "file" ? "已保存到项目文稿文件" : "已保存到正式文稿",
       );
     },
-    onError: () => {
-      Message.error("保存失败，请稍后重试。");
+    onError: (error) => {
+      Message.error(resolveStudioDocumentSaveErrorMessage(error));
     },
   });
 
@@ -104,6 +112,7 @@ export function useStudioDocumentModel({
 
   return {
     appendMarkdownToDocument,
+    activeBufferState,
     discardUnsavedChanges,
     documentContent,
     handleContentChange,
@@ -113,4 +122,19 @@ export function useStudioDocumentModel({
     isSaving: saveMutation.isPending,
     saveNoun: documentQuery.data?.saveNoun ?? "文稿",
   };
+}
+
+function resolveActiveBufferState(
+  document: StudioLoadedDocument | undefined,
+  content: string,
+  dirty: boolean,
+) {
+  if (!document) {
+    return null;
+  }
+  return buildStudioActiveBufferState({
+    baseVersion: document.version,
+    content,
+    dirty,
+  });
 }

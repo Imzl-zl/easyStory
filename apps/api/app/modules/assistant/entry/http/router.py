@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 import json
 import uuid
 
@@ -38,6 +39,7 @@ from app.modules.assistant.service import (
     AssistantService,
     AssistantTurnRequestDTO,
     AssistantTurnResponseDTO,
+    resolve_assistant_stream_error_meta,
     create_assistant_preferences_service,
     create_assistant_agent_service,
     create_assistant_hook_service,
@@ -45,12 +47,13 @@ from app.modules.assistant.service import (
     create_assistant_rule_service,
     create_assistant_skill_service,
     create_assistant_service,
+    resolve_assistant_terminal_payload,
 )
+from app.modules.assistant.service.assistant_turn_runtime_support import build_turn_run_id
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
 from app.shared.db import get_async_db_session
-from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.provider_interop_stream_support import StreamInterruptedError
+from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 
 router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
 ASSISTANT_TURN_RESPONSE_SCHEMA = AssistantTurnResponseDTO.model_json_schema()
@@ -141,10 +144,15 @@ async def _iter_assistant_turn_events(
             should_stop=request.is_disconnected,
         ):
             yield _format_sse_event(event.event, event.data)
-    except StreamInterruptedError:
-        return
     except Exception as exc:
-        yield _format_sse_event("error", {"message": _resolve_assistant_stream_error_message(exc)})
+        yield _format_sse_event(
+            "error",
+            _build_assistant_stream_error_payload(
+                exc,
+                request_payload=payload,
+                owner_id=owner_id,
+            ),
+        )
 
 
 def _format_sse_event(event: str, data: object) -> str:
@@ -157,9 +165,75 @@ def _resolve_assistant_stream_error_message(error: Exception) -> str:
         if detail:
             return f"这次回复失败了，请检查模型连接后重试。上游提示：{detail}"
         return "这次回复失败了，请检查模型连接后重试。"
+    if isinstance(error, BusinessRuleError):
+        if detail:
+            return detail
+        return "这次回复失败了，请重试。"
     if detail:
         return f"这次回复中断了，请重试。详细信息：{detail}"
     return "这次回复中断了，请重试。"
+
+
+def _build_assistant_stream_request_meta(
+    *,
+    request_payload: AssistantTurnRequestDTO,
+    owner_id: uuid.UUID,
+) -> dict[str, object]:
+    return {
+        "run_id": str(
+            build_turn_run_id(
+                owner_id=owner_id,
+                project_id=request_payload.project_id,
+                conversation_id=request_payload.conversation_id,
+                client_turn_id=request_payload.client_turn_id,
+            )
+        ),
+        "conversation_id": request_payload.conversation_id,
+        "client_turn_id": request_payload.client_turn_id,
+        "event_seq": 1,
+        "state_version": 1,
+        "ts": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _build_assistant_stream_error_payload(
+    error: Exception,
+    *,
+    request_payload: AssistantTurnRequestDTO | None = None,
+    owner_id: uuid.UUID | None = None,
+) -> dict[str, object]:
+    terminal_payload = resolve_assistant_terminal_payload(error)
+    payload: dict[str, object] = {}
+    stream_meta = resolve_assistant_stream_error_meta(error)
+    if stream_meta is not None:
+        payload.update(stream_meta)
+    elif request_payload is not None and owner_id is not None:
+        payload.update(
+            _build_assistant_stream_request_meta(
+                request_payload=request_payload,
+                owner_id=owner_id,
+            )
+        )
+    payload["message"] = (
+        terminal_payload.message
+        if terminal_payload is not None
+        else _resolve_assistant_stream_error_message(error)
+    )
+    if terminal_payload is not None:
+        payload["code"] = terminal_payload.code
+        payload["terminal_status"] = terminal_payload.terminal_status
+        payload["write_effective"] = terminal_payload.write_effective
+        return payload
+    if isinstance(error, ConfigurationError):
+        payload["code"] = "configuration_error"
+        payload["terminal_status"] = "failed"
+        payload["write_effective"] = False
+        return payload
+    if isinstance(error, BusinessRuleError):
+        payload["code"] = getattr(error, "code", "business_rule_error")
+        payload["terminal_status"] = "failed"
+        payload["write_effective"] = False
+    return payload
 
 
 @router.get("/preferences", response_model=AssistantPreferencesDTO)

@@ -1,4 +1,4 @@
-import { ApiError, getApiBaseUrl, requestJson } from "@/lib/api/client";
+import { ApiError, createApiErrorFromPayload, getApiBaseUrl, requestJson } from "@/lib/api/client";
 import type { ExportCreatePayload, ExportView } from "@/lib/api/types";
 import { getAuthToken } from "@/lib/stores/auth-store";
 
@@ -41,15 +41,7 @@ async function toDownloadError(response: Response): Promise<ApiError> {
   const payload = contentType.includes("application/json")
     ? await response.json()
     : await response.text();
-  const detail =
-    typeof payload === "object" && payload !== null && "detail" in payload
-      ? payload.detail
-      : payload;
-  const message =
-    typeof detail === "string" && detail.trim()
-      ? detail
-      : `导出下载失败，HTTP ${response.status}`;
-  return new ApiError(message, response.status, detail);
+  return createApiErrorFromPayload(payload, response.status);
 }
 
 function triggerBrowserDownload(downloadUrl: string, filename: string) {

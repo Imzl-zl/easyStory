@@ -12,7 +12,7 @@ from app.modules.content.models import Content, ContentVersion
 from app.modules.project.models import Project
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
 from app.modules.workflow.service.snapshot_support import workflow_to_summary_dto
-from app.shared.runtime.errors import BusinessRuleError, NotFoundError
+from app.shared.runtime.errors import BusinessRuleError, ConfigurationError, NotFoundError
 
 from .dto import (
     PreparationAssetStatusDTO,
@@ -45,6 +45,10 @@ from .project_document_support import (
     is_visible_project_document_tree_file_path,
     list_default_project_document_template_folders,
     parse_chapter_number_from_document_path,
+)
+from .project_document_version_support import (
+    build_project_canonical_document_version,
+    build_project_file_document_version,
 )
 from .project_service_support import (
     CHAPTER_TASK_STALE_STATUS,
@@ -149,16 +153,26 @@ class ProjectService:
                 project_id=project.id,
                 path=document_path,
                 content=record.content,
+                version=build_project_file_document_version(record.content),
                 source="file",
                 updated_at=record.updated_at,
+                document_revision_id=None,
+                run_audit_id=None,
             )
-        content, source = await self._load_project_document_seed(db, project, document_path)
+        content, source, version, updated_at = await self._load_project_document_seed(
+            db,
+            project,
+            document_path,
+        )
         return ProjectDocumentDTO(
             project_id=project.id,
             path=document_path,
             content=content,
+            version=version,
             source=source,
-            updated_at=None,
+            updated_at=updated_at,
+            document_revision_id=None,
+            run_audit_id=None,
         )
 
     async def save_project_document(
@@ -175,14 +189,28 @@ class ProjectService:
             raise RuntimeError("Project document file store is not configured")
         if is_canonical_project_document_path(document_path):
             raise BusinessRuleError("该文稿属于正式内容真值，请通过大纲或正文保存链路更新")
-        record = self.document_file_store.save_project_document(project.id, document_path, payload.content)
-        self._resolve_document_ref(project.id, document_path)
+        if not is_supported_file_project_document_path(document_path):
+            self.document_file_store.find_project_document(project.id, document_path)
+            raise BusinessRuleError("当前路径不是可写项目文件文稿")
+        if not is_mutable_project_document_file_path(document_path):
+            raise BusinessRuleError("当前路径不是可写项目文件文稿")
+        with self.document_file_store.project_document_tree_lock(project.id):
+            record = self.document_file_store.save_project_document(
+                project.id,
+                document_path,
+                payload.content,
+                expected_version=payload.base_version,
+            )
+            self._resolve_document_ref(project.id, document_path)
         return ProjectDocumentDTO(
             project_id=project.id,
             path=document_path,
             content=record.content,
+            version=build_project_file_document_version(record.content),
             source="file",
             updated_at=record.updated_at,
+            document_revision_id=None,
+            run_audit_id=None,
         )
 
     async def list_project_document_tree(
@@ -225,12 +253,14 @@ class ProjectService:
                     chapter_number=chapter_number,
                 )
                 return self._to_project_document_entry_dto(record)
-            record = file_store.create_project_document_file(project.id, payload.path)
-            self._resolve_document_ref(project.id, payload.path)
+            with file_store.project_document_tree_lock(project.id):
+                record = file_store.create_project_document_file(project.id, payload.path)
+                self._resolve_document_ref(project.id, payload.path)
             return self._to_project_document_entry_dto(record)
         if not is_mutable_project_document_folder_path(payload.path):
             raise BusinessRuleError("固定目录不支持新增子目录")
-        record = file_store.create_project_document_folder(project.id, payload.path)
+        with file_store.project_document_tree_lock(project.id):
+            record = file_store.create_project_document_folder(project.id, payload.path)
         return self._to_project_document_entry_dto(record)
 
     async def rename_project_document_entry(
@@ -245,20 +275,35 @@ class ProjectService:
         project = await self.require_project(db, project_id, owner_id=owner_id)
         if is_fixed_project_document_folder_path(payload.path):
             raise BusinessRuleError("固定目录不支持重命名")
-        source_entry = file_store.find_project_document_entry(project.id, payload.path)
-        if source_entry is None:
-            raise BusinessRuleError("目标文稿不存在")
-        if payload.path == payload.next_path:
-            raise BusinessRuleError("新路径不能和原路径相同")
-        self._validate_mutable_project_document_entry(source_entry)
-        self._validate_target_project_document_path(payload.next_path, source_entry.node_type)
-        record = file_store.rename_project_document_entry(
-            project.id,
-            payload.path,
-            source_entry.node_type,
-            payload.next_path,
-        )
-        self._rename_document_ref(project.id, source_path=payload.path, target_path=payload.next_path)
+        with file_store.project_document_tree_lock(project.id):
+            source_entry = file_store.find_project_document_entry(project.id, payload.path)
+            if source_entry is None:
+                raise BusinessRuleError("目标文稿不存在")
+            if payload.path == payload.next_path:
+                raise BusinessRuleError("新路径不能和原路径相同")
+            self._validate_mutable_project_document_entry(source_entry)
+            self._validate_target_project_document_path(payload.next_path, source_entry.node_type)
+            record = file_store.rename_project_document_entry(
+                project.id,
+                payload.path,
+                source_entry.node_type,
+                payload.next_path,
+            )
+            try:
+                self._rename_document_ref(project.id, source_path=payload.path, target_path=payload.next_path)
+            except Exception:
+                try:
+                    file_store.rename_project_document_entry(
+                        project.id,
+                        payload.next_path,
+                        source_entry.node_type,
+                        payload.path,
+                    )
+                except Exception as rollback_exc:
+                    raise ConfigurationError(
+                        "Project document rename metadata update failed and rollback could not restore source path"
+                    ) from rollback_exc
+                raise
         return self._to_project_document_entry_dto(record)
 
     async def delete_project_document_entry(
@@ -273,17 +318,41 @@ class ProjectService:
         project = await self.require_project(db, project_id, owner_id=owner_id)
         if is_fixed_project_document_folder_path(document_path):
             raise BusinessRuleError("固定目录不支持删除")
-        source_entry = file_store.find_project_document_entry(project.id, document_path)
-        if source_entry is None:
-            raise BusinessRuleError("目标文稿不存在")
-        self._validate_mutable_project_document_entry(source_entry)
-        if source_entry.node_type == "folder":
-            self._validate_project_document_folder_delete(project.id, source_entry.path)
-        deleted_entry = file_store.delete_project_document_entry(project.id, document_path)
-        self._delete_document_ref(project.id, document_path)
+        with file_store.project_document_tree_lock(project.id):
+            source_entry = file_store.find_project_document_entry(project.id, document_path)
+            if source_entry is None:
+                raise BusinessRuleError("目标文稿不存在")
+            self._validate_mutable_project_document_entry(source_entry)
+            if source_entry.node_type == "folder":
+                self._validate_project_document_folder_delete(project.id, source_entry.path)
+            deleted_identity_records = self._list_document_identity_records_for_path_prefix(
+                project.id,
+                source_entry.path,
+            )
+            staged_entry = file_store.stage_project_document_entry_delete(project.id, document_path)
+            try:
+                self._delete_document_ref(project.id, document_path)
+                file_store.finalize_staged_project_document_entry_delete(project.id, staged_entry)
+            except Exception as exc:
+                rollback_failures: list[str] = []
+                try:
+                    file_store.restore_staged_project_document_entry(project.id, staged_entry)
+                except Exception as restore_exc:
+                    rollback_failures.append(f"restore_document:{restore_exc}")
+                if deleted_identity_records:
+                    try:
+                        self._restore_document_identity_records(project.id, deleted_identity_records)
+                    except Exception as restore_exc:
+                        rollback_failures.append(f"restore_document_ref:{restore_exc}")
+                if rollback_failures:
+                    detail = "; ".join(rollback_failures)
+                    raise ConfigurationError(
+                        f"Project document delete failed and rollback did not fully recover state: {detail}"
+                    ) from exc
+                raise
         return ProjectDocumentEntryDeleteResultDTO(
-            node_type=deleted_entry.node_type,
-            path=deleted_entry.path,
+            node_type=source_entry.node_type,
+            path=source_entry.path,
         )
 
     def _require_document_file_store(self) -> "ProjectDocumentFileStore":
@@ -315,6 +384,30 @@ class ProjectService:
         if self.document_identity_store is None or is_canonical_project_document_path(document_path):
             return
         self.document_identity_store.delete_document_ref(project_id, path=document_path)
+
+    def _list_document_identity_records_for_path_prefix(
+        self,
+        project_id: uuid.UUID,
+        document_path: str,
+    ):
+        if self.document_identity_store is None or is_canonical_project_document_path(document_path):
+            return ()
+        return self.document_identity_store.list_document_identities_for_path_prefix(
+            project_id,
+            path=document_path,
+        )
+
+    def _restore_document_identity_records(
+        self,
+        project_id: uuid.UUID,
+        records,
+    ) -> None:
+        if self.document_identity_store is None or not records:
+            return
+        self.document_identity_store.restore_document_identities(
+            project_id,
+            records=tuple(records),
+        )
 
     def _should_include_tree_node(self, node: "ProjectDocumentTreeNodeRecord") -> bool:
         if not is_supported_file_project_document_path(node.path):
@@ -675,14 +768,29 @@ class ProjectService:
         db: AsyncSession,
         project: Project,
         document_path: str,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, str, datetime | None]:
         if document_path == OUTLINE_DOCUMENT_PATH:
-            return await self._load_story_asset_seed(db, project.id, "outline"), "outline"
+            content, version, updated_at = await self._load_story_asset_seed(
+                db,
+                project.id,
+                "outline",
+            )
+            return content, "outline", version, updated_at
         if document_path == OPENING_PLAN_DOCUMENT_PATH:
-            return await self._load_story_asset_seed(db, project.id, "opening_plan"), "opening_plan"
+            content, version, updated_at = await self._load_story_asset_seed(
+                db,
+                project.id,
+                "opening_plan",
+            )
+            return content, "opening_plan", version, updated_at
         chapter_number = parse_chapter_number_from_document_path(document_path)
         if chapter_number is not None:
-            return await self._load_chapter_seed(db, project.id, chapter_number), "chapter"
+            content, version, updated_at = await self._load_chapter_seed(
+                db,
+                project.id,
+                chapter_number,
+            )
+            return content, "chapter", version, updated_at
         raise NotFoundError("目标文稿不存在")
 
     async def _load_story_asset_seed(
@@ -690,21 +798,32 @@ class ProjectService:
         db: AsyncSession,
         project_id: uuid.UUID,
         content_type: str,
-    ) -> str:
+    ) -> tuple[str, str, datetime | None]:
         content = await db.scalar(
             select(Content)
             .options(selectinload(Content.versions))
             .where(Content.project_id == project_id, Content.content_type == content_type)
         )
         version = current_version(content) if content is not None else None
-        return version.content_text if version is not None else ""
+        updated_at = content.last_edited_at if content is not None else None
+        if updated_at is None and version is not None:
+            updated_at = version.created_at
+        return (
+            version.content_text if version is not None else "",
+            build_project_canonical_document_version(
+                f"canonical:{content_type}",
+                content_id=content.id if content is not None else None,
+                version_number=version.version_number if version is not None else None,
+            ),
+            updated_at,
+        )
 
     async def _load_chapter_seed(
         self,
         db: AsyncSession,
         project_id: uuid.UUID,
         chapter_number: int,
-    ) -> str:
+    ) -> tuple[str, str, datetime | None]:
         content = await db.scalar(
             select(Content)
             .options(selectinload(Content.versions))
@@ -715,7 +834,18 @@ class ProjectService:
             )
         )
         version = current_version(content) if content is not None else None
-        return version.content_text if version is not None else ""
+        updated_at = content.last_edited_at if content is not None else None
+        if updated_at is None and version is not None:
+            updated_at = version.created_at
+        return (
+            version.content_text if version is not None else "",
+            build_project_canonical_document_version(
+                f"canonical:chapter:{chapter_number:03d}",
+                content_id=content.id if content is not None else None,
+                version_number=version.version_number if version is not None else None,
+            ),
+            updated_at,
+        )
 
     def _can_start_workflow(
         self,

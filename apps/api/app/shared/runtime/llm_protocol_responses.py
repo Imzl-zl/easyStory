@@ -39,6 +39,7 @@ def _parse_openai_chat_response(payload: dict[str, Any]) -> NormalizedLLMRespons
         "total_tokens",
         finish_reason=_extract_openai_chat_stop_reason(payload),
         tool_calls=tool_calls,
+        provider_output_items=_build_openai_chat_output_items(message),
     )
 
 
@@ -59,6 +60,7 @@ def _parse_openai_responses_response(payload: dict[str, Any]) -> NormalizedLLMRe
         finish_reason=_extract_openai_responses_stop_reason(payload),
         tool_calls=tool_calls,
         provider_response_id=_optional_string(payload.get("id")),
+        provider_output_items=_build_openai_responses_output_items(payload),
     )
 
 
@@ -196,6 +198,7 @@ def _build_normalized_response(
     finish_reason: str | None,
     tool_calls: list[NormalizedLLMToolCall] | None = None,
     provider_response_id: str | None = None,
+    provider_output_items: list[dict[str, Any]] | None = None,
 ) -> NormalizedLLMResponse:
     input_tokens = _optional_int(usage.get(input_key))
     output_tokens = _optional_int(usage.get(output_key))
@@ -210,6 +213,7 @@ def _build_normalized_response(
         total_tokens=total_tokens,
         tool_calls=list(tool_calls or []),
         provider_response_id=provider_response_id,
+        provider_output_items=list(provider_output_items or []),
     )
 
 
@@ -275,8 +279,39 @@ def _extract_openai_chat_tool_calls(message: dict[str, Any]) -> list[NormalizedL
     return items
 
 
+def _build_openai_chat_output_items(message: dict[str, Any]) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    content = _stringify_openai_content(message.get("content"))
+    if content.strip():
+        items.append(
+            {
+                "item_type": "text",
+                "item_id": "provider:openai_chat:text:0",
+                "status": "completed",
+                "payload": {"content": content, "phase": "final"},
+            }
+        )
+    for index, tool_call in enumerate(_extract_openai_chat_tool_calls(message), start=1):
+        items.append(
+            {
+                "item_type": "tool_call",
+                "item_id": f"provider:openai_chat:tool_call:{index}",
+                "status": "completed",
+                "provider_ref": tool_call.provider_ref,
+                "call_id": tool_call.tool_call_id,
+                "payload": {
+                    "tool_name": tool_call.tool_name,
+                    "arguments": tool_call.arguments,
+                    "arguments_text": tool_call.arguments_text,
+                    "tool_call_id": tool_call.tool_call_id,
+                },
+            }
+        )
+    return items
+
+
 def _extract_openai_responses_tool_calls(payload: dict[str, Any]) -> list[NormalizedLLMToolCall]:
-    output = _require_list(payload.get("output"), "output")
+    output = _require_list(payload.get("output"), "output", allow_none=True) or []
     items: list[NormalizedLLMToolCall] = []
     for item in output:
         if not isinstance(item, dict) or item.get("type") != "function_call":
@@ -289,6 +324,97 @@ def _extract_openai_responses_tool_calls(payload: dict[str, Any]) -> list[Normal
                 provider_ref=_optional_string(item.get("id")),
             )
         )
+    return items
+
+
+def _build_openai_responses_output_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    output = _require_list(payload.get("output"), "output", allow_none=True)
+    items: list[dict[str, Any]] = []
+    text_index = 0
+    tool_call_index = 0
+    reasoning_index = 0
+    refusal_index = 0
+    if output is None:
+        output_text = payload.get("output_text")
+        if isinstance(output_text, str) and output_text.strip():
+            return [
+                {
+                    "item_type": "text",
+                    "item_id": "provider:openai_responses:text:1",
+                    "status": "completed",
+                    "provider_ref": _optional_string(payload.get("id")),
+                    "payload": {"content": output_text, "phase": "final"},
+                }
+            ]
+        return []
+    for item in output:
+        if not isinstance(item, dict):
+            continue
+        item_type = item.get("type")
+        provider_ref = _optional_string(item.get("id"))
+        if item_type == "function_call":
+            tool_call_index += 1
+            arguments, arguments_text = _parse_tool_arguments(item.get("arguments"))
+            call_id = _optional_string(item.get("call_id")) or provider_ref
+            if call_id is None:
+                continue
+            items.append(
+                {
+                    "item_type": "tool_call",
+                    "item_id": f"provider:openai_responses:tool_call:{tool_call_index}",
+                    "status": "completed",
+                    "provider_ref": provider_ref,
+                    "call_id": call_id,
+                    "payload": {
+                        "tool_name": _optional_string(item.get("name")),
+                        "arguments": arguments,
+                        "arguments_text": arguments_text,
+                        "tool_call_id": call_id,
+                    },
+                }
+            )
+            continue
+        if item_type == "reasoning":
+            reasoning_index += 1
+            items.append(
+                {
+                    "item_type": "reasoning",
+                    "item_id": f"provider:openai_responses:reasoning:{reasoning_index}",
+                    "status": _optional_string(item.get("status")) or "completed",
+                    "provider_ref": provider_ref,
+                    "payload": item,
+                }
+            )
+            continue
+        if item_type == "refusal":
+            refusal_index += 1
+            items.append(
+                {
+                    "item_type": "refusal",
+                    "item_id": f"provider:openai_responses:refusal:{refusal_index}",
+                    "status": _optional_string(item.get("status")) or "completed",
+                    "provider_ref": provider_ref,
+                    "payload": item,
+                }
+            )
+            continue
+        content = _require_list(item.get("content"), "output.content", allow_none=True) or []
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            text = block.get("text")
+            if not isinstance(text, str) or not text.strip():
+                continue
+            text_index += 1
+            items.append(
+                {
+                    "item_type": "text",
+                    "item_id": f"provider:openai_responses:text:{text_index}",
+                    "status": "completed",
+                    "provider_ref": provider_ref,
+                    "payload": {"content": text, "phase": "final"},
+                }
+            )
     return items
 
 

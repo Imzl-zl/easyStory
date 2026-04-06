@@ -229,6 +229,14 @@ ordinary chat 的正式装配中间态，不应长期停留在“`system_prompt`
 - 当前代码里的 `system_prompt` 与 `prompt` 只视为迁移期 projection，不再作为主语义真值
 - 规则、Skill、文稿上下文、工具结果摘要应能分别计量预算、单独裁剪与单独回放
 - `PromptSection.content` 不应退化成无边界杂项袋；凡是需要参与恢复、审批或授权判断的系统语义，都必须进入 `NormalizedInputItem[]` 或等价显式对象
+- `v1A` 至少要把以下执行语义显式写入 `NormalizedInputItem[]`：
+  - `message`
+  - 用户 / 项目规则
+  - `skill_instruction`
+  - `hook_selection`
+  - `model_selection`
+  - flat `document_context`
+  - 归一化后的 `DocumentContextBinding[]` 或等价 `document_context_binding`
 
 ### 3.2 规则层
 

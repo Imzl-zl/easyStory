@@ -99,7 +99,11 @@ export function useIncubatorChatModel(
     setFeedback,
     settings: state.settings,
   });
-  const assistantMutation = useIncubatorAssistantMutation(state.settings, state.patchConversationSession);
+  const assistantMutation = useIncubatorAssistantMutation(
+    state.settings,
+    state.latestCompletedRunId,
+    state.patchConversationSession,
+  );
   const baseSubmitPrompt = useIncubatorPromptSubmit({
     activeConversationId: state.activeConversationId,
     assistantMutation,

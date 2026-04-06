@@ -8,6 +8,7 @@ import type {
   ProjectIncubatorDraftPayload,
   ProjectCreatePayload,
   ProjectDetail,
+  ProjectDocumentCatalogEntry,
   ProjectDocument,
   ProjectDocumentEntry,
   ProjectDocumentEntryCreatePayload,
@@ -80,6 +81,10 @@ export function saveProjectDocument(
     method: "PUT",
     body: payload,
   });
+}
+
+export function listProjectDocumentCatalog(projectId: string) {
+  return requestJson<ProjectDocumentCatalogEntry[]>(`/api/v1/projects/${projectId}/document-catalog`);
 }
 
 export function listProjectDocumentTree(projectId: string) {

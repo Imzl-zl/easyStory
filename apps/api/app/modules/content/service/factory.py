@@ -10,6 +10,7 @@ from app.modules.project.service import ProjectService, create_project_service
 from app.shared.runtime import LLMToolProvider, SkillTemplateRenderer, ToolProvider
 
 from .chapter_content_service import ChapterContentService
+from .canonical_project_document_query_service import CanonicalProjectDocumentQueryService
 from .story_asset_generation_service import StoryAssetGenerationService
 from .story_asset_service import StoryAssetService
 
@@ -56,3 +57,10 @@ def create_chapter_content_service(
         project_service or create_project_service(),
         story_bible_service or create_story_bible_service(),
     )
+
+
+def create_canonical_project_document_query_service(
+    *,
+    project_service: ProjectService | None = None,
+) -> CanonicalProjectDocumentQueryService:
+    return CanonicalProjectDocumentQueryService(project_service or create_project_service())

@@ -3,6 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from app.modules.content.models import Content, ContentVersion
+from app.modules.project.service.project_document_version_support import (
+    build_project_canonical_document_version,
+)
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 
 from .dto import (
@@ -104,6 +107,11 @@ def to_summary(content: Content) -> ChapterSummaryDTO:
         title=content.title,
         status=content.status,
         current_version_number=version.version_number,
+        document_version=build_project_canonical_document_version(
+            f"canonical:chapter:{(content.chapter_number or 0):03d}",
+            content_id=content.id,
+            version_number=version.version_number,
+        ),
         best_version_number=best_version_number(content),
         word_count=version.word_count,
         last_edited_at=content.last_edited_at,

@@ -239,6 +239,11 @@ def build_stream_completion(
         total_tokens=terminal_response.total_tokens if terminal_response is not None else None,
         tool_calls=list(terminal_response.tool_calls) if terminal_response is not None else [],
         provider_response_id=terminal_response.provider_response_id if terminal_response is not None else None,
+        provider_output_items=(
+            list(terminal_response.provider_output_items)
+            if terminal_response is not None
+            else []
+        ),
     )
 
 

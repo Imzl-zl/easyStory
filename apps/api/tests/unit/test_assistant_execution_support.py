@@ -10,7 +10,11 @@ from app.modules.assistant.service.dto import (
     AssistantTurnRequestDTO,
     build_turn_messages_digest,
 )
-from app.modules.assistant.service.assistant_execution_support import resolve_hook_agent_output
+from app.modules.assistant.service.assistant_execution_support import (
+    render_message_only_prompt,
+    render_skill_prompt,
+    resolve_hook_agent_output,
+)
 from app.modules.config_registry.schemas import AgentConfig
 from app.shared.runtime.errors import ConfigurationError
 
@@ -72,6 +76,84 @@ def test_assistant_turn_request_rejects_non_active_write_target_scope() -> None:
             requested_write_scope="turn",
             requested_write_targets=["doc.other"],
         )
+
+
+def test_assistant_turn_request_accepts_long_history_snapshot() -> None:
+    messages = [
+        AssistantMessageDTO(
+            role="assistant" if index % 2 else "user",
+            content=f"消息 {index}",
+        )
+        for index in range(1, 28)
+    ]
+    messages.append(AssistantMessageDTO(role="user", content="继续写。"))
+
+    payload = AssistantTurnRequestDTO(
+        conversation_id="conversation-long-history-test",
+        client_turn_id="turn-long-history-test-1",
+        messages=messages,
+        requested_write_scope="disabled",
+    )
+
+    assert len(payload.messages) == len(messages)
+
+
+def test_render_message_only_prompt_includes_project_search_documents_guidance() -> None:
+    prompt = render_message_only_prompt(
+        [AssistantMessageDTO(role="user", content="帮我检查这一卷的人物关系和时间线是否一致。")],
+        has_project_scope=True,
+    )
+
+    assert "project.search_documents" in prompt
+    assert "project.read_documents" in prompt
+    assert "人物关系、势力关系、时间轴、事件或伏笔回收" in prompt
+    assert prompt.endswith("帮我检查这一卷的人物关系和时间线是否一致。")
+
+
+def test_render_skill_prompt_messages_json_path_keeps_project_search_documents_guidance() -> None:
+    prompt = render_skill_prompt(
+        rendered_skill_prompt="请根据 messages_json 总结 continuity 风险。",
+        messages=[AssistantMessageDTO(role="user", content="检查全书连续性。")],
+        referenced_variables={"messages_json"},
+        has_project_scope=True,
+    )
+
+    assert "project.search_documents" in prompt
+    assert "project.read_documents" in prompt
+
+
+def test_render_message_only_prompt_prefers_document_context_over_project_search_guidance() -> None:
+    prompt = render_message_only_prompt(
+        [AssistantMessageDTO(role="user", content="基于当前文稿继续写。")],
+        has_project_scope=True,
+        document_context={
+            "active_path": "正文/第001章.md",
+            "selected_paths": ["设定/人物.md"],
+        },
+    )
+
+    assert "【当前文稿上下文】" in prompt
+    assert "project.read_documents" in prompt
+    assert "project.search_documents" not in prompt
+
+
+def test_render_message_only_prompt_omits_project_search_documents_guidance_without_project_scope() -> None:
+    prompt = render_message_only_prompt(
+        [AssistantMessageDTO(role="user", content="简单聊聊这一章。")]
+    )
+
+    assert "project.search_documents" not in prompt
+    assert "项目范围工具提示" not in prompt
+
+
+def test_render_message_only_prompt_omits_project_search_documents_guidance_for_non_continuity_question() -> None:
+    prompt = render_message_only_prompt(
+        [AssistantMessageDTO(role="user", content="先读一下人物设定，再给我一个悬疑开场方向。")],
+        has_project_scope=True,
+    )
+
+    assert "project.search_documents" not in prompt
+    assert prompt == "【用户当前消息】\n先读一下人物设定，再给我一个悬疑开场方向。"
 
 
 def _build_structured_agent() -> AgentConfig:

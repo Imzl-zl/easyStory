@@ -12,6 +12,7 @@ import { StudioDocumentTreeDialog } from "@/features/studio/components/studio-do
 import { AiChatPanel } from "@/features/studio/components/ai-chat-panel";
 import { useStudioDocumentModel } from "@/features/studio/components/studio-document-model";
 import { useStudioChatModel } from "@/features/studio/components/studio-chat-model";
+import { buildStudioDocumentCatalogQueryKey } from "@/features/studio/components/studio-chat-support";
 import {
   buildStudioDocumentEntryPath,
   buildStudioDocumentTree,
@@ -157,7 +158,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
     router,
   });
   const chatModel = useStudioChatModel({
-    currentDocumentContent: documentModel.documentContent,
+    activeBufferState: documentModel.activeBufferState,
     currentDocumentPath: documentPath,
     projectId,
   });
@@ -181,15 +182,16 @@ export function StudioPage({ projectId }: StudioPageProps) {
     setDocumentTreeDialogValue("");
   }, []);
 
-  const invalidateProjectDocumentTree = useCallback(async () => {
+  const invalidateProjectDocumentQueries = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["project-document-tree", projectId] });
+    await queryClient.invalidateQueries({ queryKey: buildStudioDocumentCatalogQueryKey(projectId) });
   }, [projectId, queryClient]);
 
   const createDocumentEntryMutation = useMutation({
     mutationFn: (payload: { kind: "file" | "folder"; path: string }) =>
       createProjectDocumentEntry(projectId, payload),
     onSuccess: async (entry) => {
-      await invalidateProjectDocumentTree();
+      await invalidateProjectDocumentQueries();
       closeDocumentTreeDialog();
       Message.success(entry.node_type === "file" ? "已新建文稿" : "已新建目录");
       if (entry.node_type !== "file") {
@@ -212,7 +214,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
       const nextDocumentPath = documentPath
         ? remapDocumentTreePath(documentPath, payload.path, entry.path)
         : null;
-      await invalidateProjectDocumentTree();
+      await invalidateProjectDocumentQueries();
       closeDocumentTreeDialog();
       chatModel.remapDocumentPathReferences(payload.path, entry.path);
       if (nextDocumentPath !== documentPath) {
@@ -235,7 +237,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
       const nextDocumentPath = currentDocumentAffected
         ? findClosestRemainingFilePath(documentTree, entry.path, documentPath)
         : documentPath;
-      await invalidateProjectDocumentTree();
+      await invalidateProjectDocumentQueries();
       closeDocumentTreeDialog();
       chatModel.remapDocumentPathReferences(entry.path, null);
       if (currentDocumentAffected) {

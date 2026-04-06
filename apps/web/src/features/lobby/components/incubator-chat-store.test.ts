@@ -117,6 +117,26 @@ test("incubator chat store keeps pending assistant reply while streaming in curr
   assert.equal(pendingMessage.content, "正");
 });
 
+test("incubator chat store does not reuse an active session with latest completed run id as empty conversation", () => {
+  resetStore();
+  const store = useIncubatorChatStore.getState();
+
+  const firstConversationId = store.createConversation("user-1");
+  store.patchActiveConversation("user-1", (current) => ({
+    ...current,
+    latestCompletedRunId: "run-incubator-keep-1",
+  }));
+
+  const nextConversationId = store.createConversation("user-1");
+  const userState = useIncubatorChatStore.getState().userStatesByUserId["user-1"];
+
+  assert.ok(userState);
+  assert.equal(userState.conversations.length, 2);
+  assert.equal(firstConversationId === nextConversationId, false);
+  assert.equal(userState.activeConversationId, nextConversationId);
+  assert.equal(userState.conversations[1]?.session.latestCompletedRunId, "run-incubator-keep-1");
+});
+
 test("incubator chat store does not rewrite active conversation when async result returns to a deleted history", () => {
   resetStore();
   const store = useIncubatorChatStore.getState();

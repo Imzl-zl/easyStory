@@ -5,13 +5,19 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 import shutil
 import uuid
+from contextlib import contextmanager
 from typing import Literal
 
 from app.shared.runtime.errors import BusinessRuleError
 
+from .file_atomic_support import exclusive_file_lock, write_text_atomically
+
 ProjectDocumentEntryType = Literal["file", "folder"]
 PROJECT_DOCUMENT_TEMPLATE_MARKER_PREFIX = ".studio-template-v"
+PROJECT_DOCUMENT_TREE_LOCK_FILE = ".document_tree.lock"
+PROJECT_DOCUMENT_DELETE_STAGING_DIR = ".delete-staging"
 SUPPORTED_PROJECT_DOCUMENT_FILE_SUFFIXES = {".json", ".md"}
+FILE_HASH_CHUNK_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -22,10 +28,24 @@ class ProjectDocumentFileRecord:
 
 
 @dataclass(frozen=True)
+class ProjectDocumentFileMetadataRecord:
+    content_hash: str
+    path: str
+    size_bytes: int
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
 class ProjectDocumentEntryRecord:
     label: str
     node_type: ProjectDocumentEntryType
     path: str
+
+
+@dataclass(frozen=True)
+class ProjectDocumentStagedDeleteRecord:
+    entry: ProjectDocumentEntryRecord
+    staged_path: Path
 
 
 @dataclass(frozen=True)
@@ -39,6 +59,11 @@ class ProjectDocumentTreeNodeRecord:
 class ProjectDocumentFileStore:
     def __init__(self, root: Path) -> None:
         self.root = root
+
+    @contextmanager
+    def project_document_tree_lock(self, project_id: uuid.UUID):
+        with exclusive_file_lock(self._resolve_project_tree_lock_path(project_id)):
+            yield
 
     def bootstrap_project_document_template(
         self,
@@ -88,16 +113,44 @@ class ProjectDocumentFileStore:
             updated_at=datetime.fromtimestamp(stats.st_mtime, tz=UTC),
         )
 
+    def find_project_document_metadata(
+        self,
+        project_id: uuid.UUID,
+        document_path: str,
+    ) -> ProjectDocumentFileMetadataRecord | None:
+        project_root = self._resolve_project_document_root(project_id)
+        resolved = self._resolve_project_document_path(project_id, document_path)
+        if not resolved.exists():
+            return None
+        stats = resolved.stat()
+        return ProjectDocumentFileMetadataRecord(
+            content_hash=_build_file_content_hash(resolved),
+            path=self._read_relative_entry_path(project_root, resolved),
+            size_bytes=stats.st_size,
+            updated_at=datetime.fromtimestamp(stats.st_mtime, tz=UTC),
+        )
+
     def save_project_document(
         self,
         project_id: uuid.UUID,
         document_path: str,
         content: str,
+        *,
+        expected_version: str | None = None,
     ) -> ProjectDocumentFileRecord:
         project_root = self._resolve_project_document_root(project_id)
         resolved = self._resolve_project_document_path(project_id, document_path)
         self._ensure_parent_directory_ready(project_root, resolved.parent)
-        resolved.write_text(content, encoding="utf-8")
+        if expected_version is not None:
+            from app.modules.project.service.project_document_version_support import (
+                build_project_file_document_version,
+            )
+
+            current_content = resolved.read_text(encoding="utf-8") if resolved.exists() else ""
+            current_version = build_project_file_document_version(current_content)
+            if current_version != expected_version:
+                raise BusinessRuleError("目标文稿版本已变化，请重新读取最新内容后再写入。")
+        write_text_atomically(resolved, content)
         stats = resolved.stat()
         return ProjectDocumentFileRecord(
             path=self._read_relative_entry_path(project_root, resolved),
@@ -184,6 +237,45 @@ class ProjectDocumentFileStore:
             resolved.unlink()
         return record
 
+    def stage_project_document_entry_delete(
+        self,
+        project_id: uuid.UUID,
+        entry_path: str,
+    ) -> ProjectDocumentStagedDeleteRecord:
+        project_root = self._resolve_project_document_root(project_id)
+        resolved = self._resolve_existing_project_entry_path(project_id, entry_path)
+        if resolved is None:
+            raise BusinessRuleError("目标文稿不存在")
+        record = self._build_entry_record(project_root, resolved)
+        staging_path = self._resolve_delete_staging_root(project_id) / str(uuid.uuid4()) / resolved.name
+        staging_path.parent.mkdir(parents=True, exist_ok=True)
+        resolved.rename(staging_path)
+        return ProjectDocumentStagedDeleteRecord(entry=record, staged_path=staging_path)
+
+    def restore_staged_project_document_entry(
+        self,
+        project_id: uuid.UUID,
+        staged: ProjectDocumentStagedDeleteRecord,
+    ) -> ProjectDocumentEntryRecord:
+        project_root = self._resolve_project_document_root(project_id)
+        target_path = project_root / Path(*PurePosixPath(staged.entry.path).parts)
+        self._ensure_parent_directory_ready(project_root, target_path.parent)
+        self._ensure_path_is_available(target_path, "恢复路径")
+        staged.staged_path.rename(target_path)
+        self._cleanup_delete_staging_dirs(project_id, staged.staged_path)
+        return self._build_entry_record(project_root, target_path)
+
+    def finalize_staged_project_document_entry_delete(
+        self,
+        project_id: uuid.UUID,
+        staged: ProjectDocumentStagedDeleteRecord,
+    ) -> None:
+        if staged.staged_path.is_dir():
+            shutil.rmtree(staged.staged_path)
+        elif staged.staged_path.exists():
+            staged.staged_path.unlink()
+        self._cleanup_delete_staging_dirs(project_id, staged.staged_path)
+
     def _build_tree_node(
         self,
         project_root: Path,
@@ -241,6 +333,12 @@ class ProjectDocumentFileStore:
 
     def _resolve_project_document_root(self, project_id: uuid.UUID) -> Path:
         return self.root / "projects" / str(project_id) / "documents"
+
+    def _resolve_project_tree_lock_path(self, project_id: uuid.UUID) -> Path:
+        return self.root / "projects" / str(project_id) / PROJECT_DOCUMENT_TREE_LOCK_FILE
+
+    def _resolve_delete_staging_root(self, project_id: uuid.UUID) -> Path:
+        return self.root / "projects" / str(project_id) / PROJECT_DOCUMENT_DELETE_STAGING_DIR
 
     def get_project_document_template_version(self, project_id: uuid.UUID) -> int:
         project_root = self._resolve_project_document_root(project_id)
@@ -350,7 +448,7 @@ class ProjectDocumentFileStore:
     def _write_template_marker(self, project_id: uuid.UUID, template_version: int) -> None:
         marker_path = self._resolve_template_marker_path(project_id, template_version)
         marker_path.parent.mkdir(parents=True, exist_ok=True)
-        marker_path.write_text(marker_path.name, encoding="utf-8")
+        write_text_atomically(marker_path, marker_path.name)
         self._cleanup_stale_template_markers(marker_path.parent, keep_name=marker_path.name)
 
     def _resolve_template_marker_path(self, project_id: uuid.UUID, template_version: int) -> Path:
@@ -363,8 +461,33 @@ class ProjectDocumentFileStore:
             if entry.is_file() and entry.name.startswith(PROJECT_DOCUMENT_TEMPLATE_MARKER_PREFIX) and entry.name != keep_name:
                 entry.unlink()
 
+    def _cleanup_delete_staging_dirs(self, project_id: uuid.UUID, staged_path: Path) -> None:
+        staging_root = self._resolve_delete_staging_root(project_id)
+        current = staged_path.parent
+        while current != staging_root:
+            if current.exists() and any(current.iterdir()):
+                return
+            if current.exists():
+                current.rmdir()
+            current = current.parent
+        if staging_root.exists() and not any(staging_root.iterdir()):
+            staging_root.rmdir()
+
     def _parse_template_marker_version(self, filename: str) -> int | None:
         if not filename.startswith(PROJECT_DOCUMENT_TEMPLATE_MARKER_PREFIX):
             return None
         suffix = filename.removeprefix(PROJECT_DOCUMENT_TEMPLATE_MARKER_PREFIX)
         return int(suffix) if suffix.isdigit() else None
+
+
+def _build_file_content_hash(path: Path) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(FILE_HASH_CHUNK_BYTES)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()

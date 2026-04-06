@@ -3,6 +3,7 @@ import { getAuthToken } from "@/lib/stores/auth-store";
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 
 export class ApiError extends Error {
+  readonly code: string | null;
   readonly detail: unknown;
   readonly status: number;
 
@@ -10,8 +11,10 @@ export class ApiError extends Error {
     message: string,
     status: number,
     detail: unknown,
+    code: string | null = null,
   ) {
     super(message);
+    this.code = code;
     this.status = status;
     this.detail = detail;
   }
@@ -45,14 +48,22 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
     : await response.text();
 
   if (!response.ok) {
-    const detail =
-      typeof payload === "object" && payload !== null && "detail" in payload
-        ? payload.detail
-        : payload;
-    throw new ApiError(resolveApiMessage(detail, response.status), response.status, detail);
+    throw createApiErrorFromPayload(payload, response.status);
   }
 
   return payload as T;
+}
+
+export function createApiErrorFromPayload(payload: unknown, status: number): ApiError {
+  const detail =
+    isRecord(payload) && "detail" in payload
+      ? payload.detail
+      : payload;
+  const code =
+    isRecord(payload) && typeof payload.code === "string" && payload.code.trim()
+      ? payload.code
+      : null;
+  return new ApiError(resolveApiMessage(detail, status), status, detail, code);
 }
 
 function resolveApiMessage(detail: unknown, status: number): string {
@@ -73,4 +84,12 @@ export function getErrorMessage(error: unknown): string {
     return error.message;
   }
   return "出现未知错误。";
+}
+
+export function getErrorCode(error: unknown): string | null {
+  return error instanceof ApiError ? error.code : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

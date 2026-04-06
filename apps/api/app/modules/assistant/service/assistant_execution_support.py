@@ -13,8 +13,10 @@ from app.shared.runtime.errors import ConfigurationError
 
 from .assistant_hook_support import AssistantHookExecutionContext
 from .assistant_prompt_support import (
+    build_conversation_history_projection,
     build_skill_variables,
-    format_conversation_history,
+    format_document_context,
+    format_project_tool_guidance,
     require_latest_user_message,
     resolve_model,
     validate_skill_input,
@@ -87,24 +89,54 @@ def render_prompt(
     template_renderer: SkillTemplateRenderer,
     skill: SkillConfig | None,
     payload: AssistantTurnRequestDTO,
+    document_context: dict[str, Any] | None = None,
+    projected_messages: list[Any] | None = None,
+    compacted_context_summary: str | None = None,
 ) -> str:
+    messages = list(projected_messages or payload.messages)
+    has_project_scope = payload.project_id is not None
     if skill is None:
-        return render_message_only_prompt(payload.messages)
+        return render_message_only_prompt(
+            messages,
+            has_project_scope=has_project_scope,
+            document_context=document_context,
+            compacted_context_summary=compacted_context_summary,
+        )
     referenced_variables = template_renderer.referenced_variables(skill.prompt)
-    variables = build_skill_variables(skill, payload.messages, payload.input_data)
+    variables = build_skill_variables(
+        skill,
+        payload.messages,
+        payload.input_data,
+        conversation_history_messages=messages[:-1],
+        compacted_context_summary=compacted_context_summary,
+    )
     validate_skill_input(skill, variables)
     try:
         return render_skill_prompt(
             rendered_skill_prompt=template_renderer.render(skill.prompt, variables),
-            messages=payload.messages,
+            messages=messages,
             referenced_variables=referenced_variables,
+            has_project_scope=has_project_scope,
+            document_context=document_context,
+            compacted_context_summary=compacted_context_summary,
         )
     except (SecurityError, UndefinedError) as exc:
         raise ConfigurationError(f"Assistant prompt render failed: {exc}") from exc
 
 
-def render_message_only_prompt(messages: list[Any]) -> str:
-    return render_message_context_sections(messages)
+def render_message_only_prompt(
+    messages: list[Any],
+    *,
+    has_project_scope: bool = False,
+    document_context: dict[str, Any] | None = None,
+    compacted_context_summary: str | None = None,
+) -> str:
+    return render_message_context_sections(
+        messages,
+        has_project_scope=has_project_scope,
+        document_context=document_context,
+        compacted_context_summary=compacted_context_summary,
+    )
 
 
 def render_skill_prompt(
@@ -112,26 +144,82 @@ def render_skill_prompt(
     rendered_skill_prompt: str,
     messages: list[Any],
     referenced_variables: set[str],
+    has_project_scope: bool = False,
+    document_context: dict[str, Any] | None = None,
+    compacted_context_summary: str | None = None,
 ) -> str:
     sections = [f"【当前 Skill 指令】\n{rendered_skill_prompt.strip()}"]
-    if "messages_json" in referenced_variables:
-        return "\n\n".join(section for section in sections if section.strip())
     latest_user_message = require_latest_user_message(messages)
-    history = format_conversation_history(messages[:-1])
+    if "messages_json" in referenced_variables:
+        sections.extend(
+            _build_project_context_sections(
+                has_project_scope=has_project_scope,
+                latest_user_message=latest_user_message,
+                document_context=document_context,
+            )
+        )
+        return "\n\n".join(section for section in sections if section.strip())
+    history = build_conversation_history_projection(
+        messages[:-1],
+        compacted_context_summary=compacted_context_summary,
+    )
     if history and "conversation_history" not in referenced_variables:
         sections.append(f"【当前会话历史】\n{history}")
+    sections.extend(
+        _build_project_context_sections(
+            has_project_scope=has_project_scope,
+            latest_user_message=latest_user_message,
+            document_context=document_context,
+        )
+    )
     if "user_input" not in referenced_variables:
         sections.append(f"【用户当前消息】\n{latest_user_message}")
     return "\n\n".join(section for section in sections if section.strip())
 
 
-def render_message_context_sections(messages: list[Any]) -> str:
+def render_message_context_sections(
+    messages: list[Any],
+    *,
+    has_project_scope: bool = False,
+    document_context: dict[str, Any] | None = None,
+    compacted_context_summary: str | None = None,
+) -> str:
     latest_user_message = require_latest_user_message(messages)
     sections = [f"【用户当前消息】\n{latest_user_message}"]
-    history = format_conversation_history(messages[:-1])
+    history = build_conversation_history_projection(
+        messages[:-1],
+        compacted_context_summary=compacted_context_summary,
+    )
     if history:
         sections.insert(0, f"【当前会话历史】\n{history}")
+    project_sections = _build_project_context_sections(
+        has_project_scope=has_project_scope,
+        latest_user_message=latest_user_message,
+        document_context=document_context,
+    )
+    if project_sections:
+        sections = [*sections[:-1], *project_sections, sections[-1]]
     return "\n\n".join(sections)
+
+
+def _build_project_context_sections(
+    *,
+    has_project_scope: bool,
+    latest_user_message: str,
+    document_context: dict[str, Any] | None,
+) -> list[str]:
+    sections: list[str] = []
+    document_context_section = format_document_context(document_context)
+    if document_context_section:
+        sections.append(document_context_section)
+    project_tool_guidance = format_project_tool_guidance(
+        has_project_scope=has_project_scope,
+        latest_user_message=latest_user_message,
+        document_context=document_context,
+    )
+    if project_tool_guidance:
+        sections.append(project_tool_guidance)
+    return sections
 
 
 def require_agent_skill(skill_loader: Callable[[str], SkillConfig], agent: AgentConfig) -> SkillConfig:
