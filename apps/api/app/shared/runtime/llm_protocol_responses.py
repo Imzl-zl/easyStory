@@ -435,7 +435,7 @@ def _extract_anthropic_tool_calls(blocks: list[Any]) -> list[NormalizedLLMToolCa
 
 def _extract_gemini_tool_calls(parts: list[Any]) -> list[NormalizedLLMToolCall]:
     items: list[NormalizedLLMToolCall] = []
-    for part in parts:
+    for index, part in enumerate(parts, start=1):
         if not isinstance(part, dict):
             continue
         function_call = _require_dict(part.get("functionCall"), "part.functionCall", allow_none=True)
@@ -443,7 +443,10 @@ def _extract_gemini_tool_calls(parts: list[Any]) -> list[NormalizedLLMToolCall]:
             continue
         items.append(
             _build_tool_call(
-                tool_call_id=_optional_string(function_call.get("id")),
+                tool_call_id=(
+                    _optional_string(function_call.get("id"))
+                    or f"provider:gemini_generate_content:tool_call:{index}"
+                ),
                 tool_name=_optional_string(function_call.get("name")),
                 arguments=_parse_tool_arguments(function_call.get("args")),
             )

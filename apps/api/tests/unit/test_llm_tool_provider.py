@@ -467,6 +467,82 @@ def test_execute_builds_gemini_generate_content_request() -> None:
     assert result["content"] == "gemini 结果"
 
 
+def test_execute_sanitizes_gemini_tool_schema_before_sending() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "candidates": [{"content": {"parts": [{"text": "gemini 工具结果"}]}}],
+                "usageMetadata": {"promptTokenCount": 2, "candidatesTokenCount": 3, "totalTokenCount": 5},
+            },
+            text="",
+        )
+
+    provider = LLMToolProvider(request_sender=request_sender)
+    asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "读取当前文稿",
+                "model": {
+                    "provider": "gemini",
+                    "name": "gemini-2.5-pro",
+                },
+                "credential": {
+                    "api_key": "gemini-key",
+                    "api_dialect": "gemini_generate_content",
+                },
+                "tools": [
+                    {
+                        "name": "project.read_documents",
+                        "description": "读取项目文稿。",
+                        "parameters": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "paths": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                                "options": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "properties": {"mode": {"type": "string"}},
+                                },
+                            },
+                            "anyOf": [
+                                {"required": ["paths"]},
+                                {"required": ["options"]},
+                            ],
+                            "required": ["paths"],
+                        },
+                    }
+                ],
+            },
+        )
+    )
+
+    params = captured["request"].json_body["tools"][0]["functionDeclarations"][0]["parameters"]
+    assert params == {
+        "type": "object",
+        "properties": {
+            "paths": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "options": {
+                "type": "object",
+                "properties": {"mode": {"type": "string"}},
+            },
+        },
+        "description": "Provide at least one of: options, paths.",
+        "required": ["paths"],
+    }
+
+
 def test_execute_allows_bearer_override_for_anthropic_messages() -> None:
     captured = {}
 
@@ -972,6 +1048,92 @@ def test_execute_stream_accepts_openai_completed_payload_with_tool_calls_and_no_
                         },
                     }
                 ],
+            }
+        )
+    ]
+
+
+def test_execute_stream_accepts_gemini_terminal_payload_with_tool_calls_and_no_text(
+    monkeypatch,
+) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield (
+                'data: {"candidates":[{"content":{"parts":[{"functionCall":{'
+                '"name":"project.read_documents","args":{"paths":["设定/人物.md"]}}}],"role":"model"},'
+                '"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":8,'
+                '"candidatesTokenCount":10,"totalTokenCount":18}}'
+            )
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    provider = LLMToolProvider()
+
+    async def collect_events():
+        return [
+            event
+            async for event in provider.execute_stream(
+                "llm.generate",
+                {
+                    "prompt": "读一下人物设定",
+                    "model": {"provider": "gemini", "name": "gemini-2.5-pro"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "gemini_generate_content",
+                    },
+                },
+            )
+        ]
+
+    events = asyncio.run(collect_events())
+
+    assert events == [
+        LLMStreamEvent(
+            response={
+                "content": "",
+                "finish_reason": "STOP",
+                "model_name": "gemini-2.5-pro",
+                "provider": "gemini",
+                "input_tokens": 8,
+                "output_tokens": 10,
+                "total_tokens": 18,
+                "tool_calls": [
+                    {
+                        "tool_call_id": "provider:gemini_generate_content:tool_call:1",
+                        "tool_name": "project.read_documents",
+                        "arguments": {"paths": ["设定/人物.md"]},
+                        "arguments_text": '{"paths":["设定/人物.md"]}',
+                        "provider_ref": None,
+                    }
+                ],
+                "provider_response_id": None,
+                "output_items": [],
             }
         )
     ]

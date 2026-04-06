@@ -24,6 +24,8 @@ from .llm_protocol_types import (
 )
 
 USER_AGENT_HEADER_NAME = "User-Agent"
+GEMINI_UNSUPPORTED_SCHEMA_KEYS = frozenset({"additionalProperties"})
+GEMINI_ANY_OF_NOTE_PREFIX = "Provide at least one of:"
 RUNTIME_KIND_LABELS = {
     "server-python": "server; python",
     "server-node": "server; node",
@@ -170,18 +172,7 @@ def _build_gemini_generate_content_request(request: LLMGenerateRequest) -> Prepa
     if generation_config:
         body["generationConfig"] = generation_config
     if request.tools:
-        body["tools"] = [
-            {
-                "functionDeclarations": [
-                    {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.parameters,
-                    }
-                    for tool in request.tools
-                ]
-            }
-        ]
+        body["tools"] = [{"functionDeclarations": _build_gemini_function_declarations(request)}]
     if request.system_prompt:
         body["system_instruction"] = {"parts": [{"text": request.system_prompt}]}
     return PreparedLLMHttpRequest(
@@ -190,6 +181,70 @@ def _build_gemini_generate_content_request(request: LLMGenerateRequest) -> Prepa
         headers=_build_request_headers(request.connection),
         json_body=body,
     )
+
+
+def _build_gemini_function_declarations(
+    request: LLMGenerateRequest,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": _sanitize_gemini_tool_schema(tool.parameters),
+        }
+        for tool in request.tools
+    ]
+
+
+def _sanitize_gemini_tool_schema(value: Any) -> Any:
+    if isinstance(value, dict):
+        cleaned = {
+            key: _sanitize_gemini_tool_schema(item)
+            for key, item in value.items()
+            if key not in GEMINI_UNSUPPORTED_SCHEMA_KEYS
+        }
+        return _simplify_gemini_required_only_any_of(cleaned)
+    if isinstance(value, list):
+        return [_sanitize_gemini_tool_schema(item) for item in value]
+    return value
+
+
+def _simplify_gemini_required_only_any_of(
+    schema: dict[str, Any],
+) -> dict[str, Any]:
+    any_of = schema.get("anyOf")
+    if not _is_required_only_any_of(any_of):
+        return schema
+    fields = sorted({field for entry in any_of for field in entry["required"]})
+    simplified = {key: value for key, value in schema.items() if key != "anyOf"}
+    simplified["description"] = _merge_schema_description(
+        simplified.get("description"),
+        f"{GEMINI_ANY_OF_NOTE_PREFIX} {', '.join(fields)}.",
+    )
+    return simplified
+
+
+def _is_required_only_any_of(value: Any) -> bool:
+    if not isinstance(value, list) or not value:
+        return False
+    for entry in value:
+        if not isinstance(entry, dict):
+            return False
+        keys = set(entry.keys())
+        required = entry.get("required")
+        if keys != {"required"} or not isinstance(required, list) or not required:
+            return False
+        if any(not isinstance(field, str) or not field.strip() for field in required):
+            return False
+    return True
+
+
+def _merge_schema_description(existing: Any, note: str) -> str:
+    if not isinstance(existing, str) or not existing.strip():
+        return note
+    if note in existing:
+        return existing
+    return f"{existing.strip()} {note}"
 
 
 def _build_openai_chat_messages(request: LLMGenerateRequest) -> list[dict[str, Any]]:

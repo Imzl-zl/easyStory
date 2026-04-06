@@ -246,6 +246,117 @@ def test_prepare_generation_request_falls_back_to_runtime_replay_for_gemini() ->
     )
 
 
+def test_prepare_generation_request_strips_unsupported_gemini_tool_schema_keys() -> None:
+    tool_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "paths": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1},
+            },
+            "options": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "mode": {"type": "string", "enum": ["full"]},
+                },
+                "required": ["mode"],
+            },
+        },
+        "required": ["paths"],
+    }
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="gemini_generate_content",
+                api_key="test-key",
+                base_url="https://generativelanguage.googleapis.com",
+            ),
+            model_name="gemini-2.5-pro",
+            prompt="读一下设定。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            tools=[
+                LLMFunctionToolDefinition(
+                    name="project.read_documents",
+                    description="读取项目文稿。",
+                    parameters=tool_schema,
+                )
+            ],
+        )
+    )
+
+    params = request.json_body["tools"][0]["functionDeclarations"][0]["parameters"]
+    assert params == {
+        "type": "object",
+        "properties": {
+            "paths": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1},
+            },
+            "options": {
+                "type": "object",
+                "properties": {
+                    "mode": {"type": "string", "enum": ["full"]},
+                },
+                "required": ["mode"],
+            },
+        },
+        "required": ["paths"],
+    }
+    assert tool_schema["additionalProperties"] is False
+    assert tool_schema["properties"]["options"]["additionalProperties"] is False
+
+
+def test_prepare_generation_request_simplifies_required_only_anyof_for_gemini() -> None:
+    tool_schema = {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "minLength": 1},
+            "path_prefix": {"type": "string", "minLength": 1},
+        },
+        "anyOf": [
+            {"required": ["query"]},
+            {"required": ["path_prefix"]},
+        ],
+    }
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="gemini_generate_content",
+                api_key="test-key",
+                base_url="https://generativelanguage.googleapis.com",
+            ),
+            model_name="gemini-2.5-pro",
+            prompt="检索文稿。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            tools=[
+                LLMFunctionToolDefinition(
+                    name="project.search_documents",
+                    description="检索项目文稿。",
+                    parameters=tool_schema,
+                )
+            ],
+        )
+    )
+
+    params = request.json_body["tools"][0]["functionDeclarations"][0]["parameters"]
+    assert "anyOf" not in params
+    assert params["description"] == "Provide at least one of: path_prefix, query."
+    assert tool_schema["anyOf"] == [
+        {"required": ["query"]},
+        {"required": ["path_prefix"]},
+    ]
+
+
 def test_prepare_generation_request_rejects_mixed_openai_responses_continuation() -> None:
     with pytest.raises(
         ConfigurationError,
@@ -318,6 +429,39 @@ def test_parse_openai_responses_response_extracts_function_call() -> None:
     assert normalized.tool_calls[0].tool_name == "project.read_documents"
     assert normalized.tool_calls[0].arguments == {"paths": ["设定/人物.md"]}
     assert normalized.provider_output_items[0]["item_type"] == "tool_call"
+
+
+def test_parse_gemini_response_generates_tool_call_id_when_missing() -> None:
+    normalized = parse_generation_response(
+        "gemini_generate_content",
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "functionCall": {
+                                    "name": "project.read_documents",
+                                    "args": {"paths": ["设定/人物.md"]},
+                                }
+                            }
+                        ]
+                    },
+                    "finishReason": "STOP",
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 12,
+                "candidatesTokenCount": 4,
+                "totalTokenCount": 16,
+            },
+        },
+    )
+
+    assert normalized.content == ""
+    assert normalized.tool_calls[0].tool_call_id == "provider:gemini_generate_content:tool_call:1"
+    assert normalized.tool_calls[0].tool_name == "project.read_documents"
+    assert normalized.tool_calls[0].arguments == {"paths": ["设定/人物.md"]}
 
 
 def test_parse_openai_responses_response_rejects_invalid_tool_arguments_json() -> None:

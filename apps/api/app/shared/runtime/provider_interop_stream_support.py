@@ -301,12 +301,22 @@ def _extract_stream_terminal_response(
     event_name: str | None,
     payload: dict[str, Any],
 ) -> NormalizedLLMResponse | None:
-    if api_dialect != "openai_responses":
-        return None
-    terminal_payload = _extract_openai_responses_terminal_payload(event_name, payload)
+    terminal_payload = _extract_terminal_payload(api_dialect, event_name, payload)
     if terminal_payload is None:
         return None
     return parse_generation_response(api_dialect, terminal_payload)
+
+
+def _extract_terminal_payload(
+    api_dialect: str,
+    event_name: str | None,
+    payload: dict[str, Any],
+) -> dict[str, Any] | None:
+    if api_dialect == "openai_responses":
+        return _extract_openai_responses_terminal_payload(event_name, payload)
+    if api_dialect == "gemini_generate_content":
+        return _extract_gemini_terminal_payload(payload)
+    return None
 
 
 def _extract_openai_chat_delta(payload: dict[str, Any]) -> str:
@@ -429,6 +439,22 @@ def _extract_gemini_stop_reason(payload: dict[str, Any]) -> str | None:
         return None
     finish_reason = candidate.get("finishReason")
     return finish_reason if isinstance(finish_reason, str) else None
+
+
+def _extract_gemini_terminal_payload(payload: dict[str, Any]) -> dict[str, Any] | None:
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        return None
+    candidate = candidates[0]
+    if not isinstance(candidate, dict):
+        return None
+    content = candidate.get("content")
+    if not isinstance(content, dict):
+        return None
+    parts = content.get("parts")
+    if not isinstance(parts, list) or not parts:
+        return None
+    return payload
 
 
 def _build_gemini_stream_url(url: str) -> str:
