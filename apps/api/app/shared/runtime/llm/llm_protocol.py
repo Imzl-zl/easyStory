@@ -1,4 +1,5 @@
 from .llm_endpoint_policy import normalize_custom_base_url
+from .llm_interop_profiles import LLMInteropCapabilities, normalize_interop_profile, resolve_interop_capabilities
 from .llm_protocol_requests import build_verification_request, prepare_generation_request
 from .llm_protocol_responses import parse_generation_response
 from .llm_protocol_types import (
@@ -42,6 +43,7 @@ __all__ = [
     "LLMContinuationSupport",
     "LLMFunctionToolDefinition",
     "JSON_OBJECT_RESPONSE_FORMAT",
+    "LLMInteropCapabilities",
     "LLMConnection",
     "LLMGenerateRequest",
     "LlmApiDialect",
@@ -58,6 +60,7 @@ __all__ = [
     "normalize_api_dialect",
     "normalize_auth_strategy",
     "normalize_http_header_name",
+    "normalize_interop_profile",
     "normalize_runtime_kind",
     "normalize_custom_base_url",
     "parse_generation_response",
@@ -65,6 +68,7 @@ __all__ = [
     "resolve_api_key_header_name",
     "resolve_auth_strategy",
     "resolve_continuation_support",
+    "resolve_interop_capabilities",
     "resolve_model_name",
     "send_json_http_request",
 ]

@@ -12,7 +12,7 @@
 
 > 本文档当前仍是 assistant runtime 中“项目文稿工具域”的正式设计真值。
 >
-> 若你在跟踪本轮文档重构路线、待迁移章节或阶段状态，请看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。未明确回写到本文的目标语义，不视为正式真值。
+> 若你需要查看 2026-04-07 这轮 assistant runtime 收口的历史实施过程，请看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。当前正式语义以本文、相关 design 文档与代码为准。
 
 ## 1. 目的
 

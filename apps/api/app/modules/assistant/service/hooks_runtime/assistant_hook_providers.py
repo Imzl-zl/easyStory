@@ -4,7 +4,7 @@ from typing import Any, Callable, Protocol
 
 from app.modules.config_registry import ConfigLoader
 from app.shared.runtime import McpToolCaller, PluginRegistry, StreamableHttpMcpToolCaller
-from app.shared.runtime.plugin_providers import (
+from app.shared.runtime.plugins.plugin_providers import (
     AgentPluginProvider,
     AsyncWebhookRequestSender,
     McpPluginProvider,

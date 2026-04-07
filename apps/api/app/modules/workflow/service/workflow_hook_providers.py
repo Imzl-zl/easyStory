@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from app.shared.runtime import McpToolCaller, PluginRegistry, StreamableHttpMcpToolCaller
-from app.shared.runtime.plugin_providers import (
+from app.shared.runtime.plugins.plugin_providers import (
     AgentPluginProvider,
     AsyncWebhookRequestSender,
     McpPluginProvider,

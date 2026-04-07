@@ -23,6 +23,13 @@ from app.modules.assistant.service import (
     AssistantToolStepStore,
 )
 from app.modules.assistant.service.assistant_runtime_terminal import AssistantRuntimeTerminalError
+from app.modules.assistant.service.dto import build_structured_items_digest
+from app.modules.assistant.service.tooling.assistant_tool_loop_output_support import (
+    _build_tool_cycle_continuation_items,
+)
+from app.modules.assistant.service.tooling.assistant_tool_loop_budget_support import (
+    apply_tool_loop_request_budget,
+)
 from app.modules.assistant.service.tooling.assistant_tool_loop_result_support import _build_tool_call_start_payload
 from app.modules.assistant.service.tooling.assistant_tool_catalog_support import build_tool_catalog_version
 from app.modules.assistant.service.tooling.assistant_tool_runtime_dto import (
@@ -39,7 +46,7 @@ from app.modules.project.service.project_document_buffer_state_support import (
     TRUSTED_ACTIVE_BUFFER_SOURCE,
     build_project_document_buffer_hash,
 )
-from app.shared.runtime.llm_protocol import resolve_continuation_support
+from app.shared.runtime.llm.llm_protocol import resolve_continuation_support
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, ready_project_setting
@@ -1245,6 +1252,17 @@ def test_assistant_tool_loop_keeps_provider_continuation_state_for_hybrid_suppor
 
 def test_assistant_tool_loop_compacts_runtime_replay_continuation_to_fit_input_budget():
     long_content = "林渊与顾砚的互相试探必须贯穿全文。 " * 120
+    initial_raw_output = {
+        "content": "",
+        "tool_calls": [
+            {
+                "tool_call_id": "tool-call-1",
+                "tool_name": "project.read_documents",
+                "arguments": {"paths": ["设定/人物.md"]},
+                "arguments_text": '{"paths":["设定/人物.md"]}',
+            }
+        ],
+    }
 
     class _StaticReadExecutor:
         async def execute(self, db, context, *, on_lifecycle_update=None):
@@ -1342,17 +1360,7 @@ def test_assistant_tool_loop_compacts_runtime_replay_continuation_to_fit_input_b
                 system_prompt="你是小说助手。",
                 continuation_support=resolve_continuation_support("anthropic_messages"),
                 model_caller=model_caller,
-                initial_raw_output={
-                    "content": "",
-                    "tool_calls": [
-                        {
-                            "tool_call_id": "tool-call-1",
-                            "tool_name": "project.read_documents",
-                            "arguments": {"paths": ["设定/人物.md"]},
-                            "arguments_text": '{"paths":["设定/人物.md"]}',
-                        }
-                    ],
-                },
+                initial_raw_output=initial_raw_output,
                 run_budget=AssistantRunBudget(
                     max_steps=8,
                     max_tool_calls=8,
@@ -1385,9 +1393,60 @@ def test_assistant_tool_loop_compacts_runtime_replay_continuation_to_fit_input_b
     snapshot = recorded_states[-1].continuation_compaction_snapshot
     assert snapshot is not None
     assert snapshot["phase"] == "tool_loop_continuation"
+    assert snapshot["level"] == "soft"
     assert snapshot["estimated_tokens_before"] > snapshot["estimated_tokens_after"]
     assert snapshot["compacted_item_count"] >= 1
     assert snapshot["compacted_tool_names"] == ["project.read_documents"]
+    assert snapshot["compacted_document_refs"] == ["project_file:1"]
+    assert snapshot["compacted_document_versions"] == {"project_file:1": "sha256:read-1"}
+    assert snapshot["compacted_catalog_versions"] == ["catalog-v1"]
+    original_tool_result_item = _build_tool_cycle_continuation_items(
+        raw_output=initial_raw_output,
+        tool_calls=initial_raw_output["tool_calls"],
+        tool_results=[
+            AssistantToolResultEnvelope(
+                tool_call_id="tool-call-1",
+                status="completed",
+                structured_output={
+                    "documents": [
+                        {
+                            "path": "设定/人物.md",
+                            "document_ref": "project_file:1",
+                            "version": "sha256:read-1",
+                            "truncated": True,
+                            "next_cursor": "offset:4096",
+                            "schema_id": "story.character_sheet",
+                            "content": long_content,
+                            "resource_uri": "resource://project/1/%E8%AE%BE%E5%AE%9A/%E4%BA%BA%E7%89%A9.md",
+                            "binding_version": "binding-1",
+                            "title": "人物",
+                            "source": "project_file",
+                            "document_kind": "story_note",
+                            "mime_type": "text/markdown",
+                            "content_state": "ready",
+                            "writable": True,
+                        }
+                    ],
+                    "errors": [],
+                    "catalog_version": "catalog-v1",
+                },
+                content_items=[
+                    {
+                        "type": "text",
+                        "text": "设定/人物.md\ndocument_ref=project_file:1\nversion=sha256:read-1\n"
+                        "truncated=true\nnext_cursor=offset:4096\n\n" + long_content,
+                    }
+                ],
+            )
+        ],
+    )[1]
+    assert snapshot["compressed_items_digest"] == build_structured_items_digest(
+        [original_tool_result_item]
+    )
+    assert snapshot["projected_items_digest"] == build_structured_items_digest(
+        continuation_items
+    )
+    assert snapshot["compressed_items_digest"] != snapshot["projected_items_digest"]
     assert snapshot["trimmed_text_slot_count"] >= 1
     assert items[-1].raw_output is not None
     assert items[-1].raw_output["content"] == "后续回复"
@@ -1510,6 +1569,54 @@ def test_assistant_tool_loop_preserves_provider_final_output_items():
         item["item_id"] == f"{turn_context.run_id}:text:2"
         for item in items[-1].raw_output["output_items"]
     )
+
+
+def test_apply_tool_loop_request_budget_raises_shared_budget_exhausted_when_prompt_alone_exceeds_budget():
+    huge_prompt = "人物关系、势力关系和贯穿全文的主线都不能丢。 " * 80
+    continuation_items = (
+        {
+            "item_type": "message",
+            "role": "assistant",
+            "content": "我先读取人物设定。",
+        },
+        {
+            "item_type": "tool_result",
+            "status": "completed",
+            "call_id": "tool-call-1",
+            "tool_name": "project.read_documents",
+            "payload": {
+                "tool_name": "project.read_documents",
+                "structured_output": {
+                    "documents": [],
+                    "errors": [],
+                    "catalog_version": "catalog-v1",
+                },
+                "content_items": [{"type": "text", "text": "设定/人物.md"}],
+                "resource_links": [],
+                "error": None,
+            },
+        },
+    )
+
+    with pytest.raises(AssistantRuntimeTerminalError) as exc_info:
+        apply_tool_loop_request_budget(
+            prompt=huge_prompt,
+            system_prompt="你是小说助手。",
+            tool_schemas=[{"type": "function", "function": {"name": "project.read_documents"}}],
+            continuation_items=continuation_items,
+            provider_continuation_state=None,
+            continuation_support=resolve_continuation_support("anthropic_messages"),
+            run_budget=AssistantRunBudget(
+                max_steps=8,
+                max_tool_calls=8,
+                max_input_tokens=32,
+                max_parallel_tool_calls=1,
+                tool_timeout_seconds=15,
+            ),
+        )
+
+    assert exc_info.value.code == "budget_exhausted"
+    assert str(exc_info.value) == "本轮上下文预算已耗尽，压缩后仍无法继续执行。"
 
 
 def test_assistant_tool_loop_emits_streamed_continuation_chunks():

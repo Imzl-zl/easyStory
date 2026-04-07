@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from pathlib import Path
+import textwrap
 import uuid
 
 import pytest
@@ -35,7 +36,16 @@ from app.modules.assistant.service.tooling.assistant_tool_exposure_policy import
 from app.modules.assistant.service.tooling.assistant_tool_loop import AssistantToolLoop
 from app.modules.assistant.service.tooling.assistant_tool_registry import AssistantToolDescriptorRegistry
 from app.modules.assistant.service.tooling.assistant_tool_step_store import AssistantToolStepStore
-from app.modules.assistant.service.turn.assistant_turn_runtime_support import build_turn_run_id
+from app.modules.assistant.service.turn.assistant_turn_runtime_support import (
+    build_after_assistant_payload,
+    build_turn_run_id,
+)
+from app.modules.assistant.service.turn.assistant_turn_error_support import (
+    build_request_error_hook_payload,
+)
+from app.modules.assistant.service.context.assistant_prompt_support import (
+    build_document_context_injection_snapshot,
+)
 from app.modules.assistant.service.rules.assistant_rule_dto import AssistantRuleProfileUpdateDTO
 from app.modules.assistant.service.preferences.preferences_dto import (
     AssistantPreferencesUpdateDTO,
@@ -47,6 +57,7 @@ from app.modules.assistant.service.dto import (
     AssistantContinuationAnchorDTO,
     AssistantMessageDTO,
     AssistantTurnRequestDTO,
+    build_structured_items_digest,
     build_turn_messages_digest,
 )
 from app.modules.assistant.service.factory import create_assistant_rule_service
@@ -64,8 +75,8 @@ from app.modules.project.service.project_document_buffer_state_support import (
 )
 from app.shared.runtime import McpToolCallResult, SkillTemplateRenderer, ToolProvider
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
-from app.shared.runtime.llm_tool_provider import LLMStreamEvent
-from app.shared.runtime.provider_interop_stream_support import StreamInterruptedError
+from app.shared.runtime.llm.llm_tool_provider import LLMStreamEvent
+from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
 from tests.unit.assistant_service_test_support import (
     _build_config_root,
     _build_turn_request,
@@ -96,6 +107,11 @@ class _FailOnAppendRevisionStore(ProjectDocumentRevisionStore):
 def _write_turn_run_snapshot(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _write_rule_markdown(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(textwrap.dedent(content).strip() + "\n", encoding="utf-8")
 
 
 def _expected_run_budget(
@@ -1116,6 +1132,7 @@ async def test_assistant_service_runs_project_read_documents_tool_loop(db, tmp_p
     assert policy_by_name["project.write_document"]["visibility"] == "hidden"
     assert policy_by_name["project.write_document"]["hidden_reason"] == "write_grant_unavailable"
     assert run_record.document_context_snapshot is None
+    assert run_record.document_context_recovery_snapshot is None
     assert run_record.turn_context_hash
     assert [item["item_type"] for item in run_record.normalized_input_items_snapshot] == [
         "message",
@@ -1193,12 +1210,41 @@ async def test_assistant_service_persists_continuation_compaction_snapshot_for_t
     )
     assert run_record.continuation_compaction_snapshot is not None
     assert run_record.continuation_compaction_snapshot["phase"] == "tool_loop_continuation"
+    assert run_record.continuation_compaction_snapshot["level"] == "soft"
     assert run_record.continuation_compaction_snapshot["estimated_tokens_before"] > (
         run_record.continuation_compaction_snapshot["estimated_tokens_after"]
     )
     assert run_record.continuation_compaction_snapshot["compacted_tool_names"] == [
         "project.read_documents"
     ]
+    continuation_document_ref = tool_provider.requests[1]["continuation_items"][1]["payload"][
+        "structured_output"
+    ]["documents"][0]["document_ref"]
+    continuation_document_version = tool_provider.requests[1]["continuation_items"][1]["payload"][
+        "structured_output"
+    ]["documents"][0]["version"]
+    continuation_catalog_version = tool_provider.requests[1]["continuation_items"][1]["payload"][
+        "structured_output"
+    ]["catalog_version"]
+    assert run_record.continuation_compaction_snapshot["compacted_document_refs"] == [
+        continuation_document_ref
+    ]
+    assert run_record.continuation_compaction_snapshot["compacted_document_versions"] == {
+        continuation_document_ref: continuation_document_version
+    }
+    assert run_record.continuation_compaction_snapshot["compacted_catalog_versions"] == [
+        continuation_catalog_version
+    ]
+    assert run_record.continuation_compaction_snapshot["compressed_items_digest"]
+    assert run_record.continuation_compaction_snapshot["projected_items_digest"] == (
+        build_structured_items_digest(
+            run_record.continuation_request_snapshot["continuation_items"]
+        )
+    )
+    assert (
+        run_record.continuation_compaction_snapshot["compressed_items_digest"]
+        != run_record.continuation_compaction_snapshot["projected_items_digest"]
+    )
     assert run_record.continuation_compaction_snapshot["trimmed_text_slot_count"] >= 1
     assert run_record.continuation_request_snapshot == {
         "continuation_items": tool_provider.requests[1]["continuation_items"],
@@ -1464,8 +1510,66 @@ async def test_assistant_service_compacts_history_and_preserves_relation_anchors
     assert run_record.budget_snapshot["tool_timeout_seconds"] is None
     assert run_record.compaction_snapshot["phase"] == "initial_prompt"
     assert run_record.compaction_snapshot["level"] == "soft"
+    history_messages = payload.messages[:-1]
+    preserved_recent_count = run_record.compaction_snapshot["preserved_recent_message_count"]
+    compacted_messages = (
+        history_messages[:-preserved_recent_count]
+        if preserved_recent_count > 0
+        else history_messages
+    )
+    projected_messages = (
+        [*history_messages[-preserved_recent_count:], payload.messages[-1]]
+        if preserved_recent_count > 0
+        else [payload.messages[-1]]
+    )
+    assert run_record.compaction_snapshot["compressed_messages_digest"] == build_turn_messages_digest(
+        compacted_messages
+    )
+    assert run_record.compaction_snapshot["projected_messages_digest"] == build_turn_messages_digest(
+        projected_messages
+    )
     assert "数据层/人物关系.json" in run_record.compaction_snapshot["protected_document_paths"]
     assert "数据层/势力关系.json" in run_record.compaction_snapshot["protected_document_paths"]
+    assert set(run_record.compaction_snapshot["protected_document_refs"]) == {
+        binding["document_ref"]
+        for binding in run_record.document_context_bindings_snapshot
+        if binding["path"] in run_record.compaction_snapshot["protected_document_paths"]
+    }
+    assert set(run_record.compaction_snapshot["protected_document_reasons"]["数据层/人物关系.json"]) >= {
+        "selected_path",
+        "binding",
+        "data_layer_path",
+    }
+    assert set(run_record.compaction_snapshot["protected_document_reasons"]["数据层/势力关系.json"]) >= {
+        "selected_path",
+        "binding",
+        "data_layer_path",
+    }
+    assert run_record.compaction_snapshot["protected_document_binding_versions"] == {
+        binding["document_ref"]: binding["binding_version"]
+        for binding in run_record.document_context_bindings_snapshot
+        if (
+            binding["path"] in run_record.compaction_snapshot["protected_document_paths"]
+            and binding.get("binding_version")
+        )
+    }
+    assert run_record.compaction_snapshot["document_context_collapsed"] is False
+    assert run_record.compaction_snapshot["document_context_projection_mode"] == "selected_only"
+    assert run_record.document_context_snapshot is not None
+    assert run_record.document_context_injection_snapshot is not None
+    assert (
+        run_record.compaction_snapshot["projected_document_context_snapshot"]
+        == run_record.document_context_injection_snapshot
+    )
+    assert (
+        run_record.compaction_snapshot["document_context_recovery_snapshot"]
+        == run_record.document_context_recovery_snapshot
+    )
+    assert set(run_record.compaction_snapshot["summary_anchor_keywords"]) >= {
+        "人物关系",
+        "势力关系",
+        "贯穿全文",
+    }
     assert "人物关系" in run_record.compaction_snapshot["summary"]
     assert "势力关系" in run_record.compaction_snapshot["summary"]
     assert "贯穿全文" in run_record.compaction_snapshot["summary"]
@@ -1475,12 +1579,45 @@ async def test_assistant_service_compacts_history_and_preserves_relation_anchors
         if item["item_type"] == "compacted_context"
     )
     assert compacted_item["content"] == run_record.compaction_snapshot["summary"]
+    assert compacted_item["payload"] == run_record.compaction_snapshot
     assert compacted_item["payload"]["phase"] == "initial_prompt"
     assert compacted_item["payload"]["level"] == "soft"
     assert compacted_item["payload"]["budget_limit_tokens"] == 216
+    assert (
+        compacted_item["payload"]["compressed_messages_digest"]
+        == run_record.compaction_snapshot["compressed_messages_digest"]
+    )
+    assert (
+        compacted_item["payload"]["projected_messages_digest"]
+        == run_record.compaction_snapshot["projected_messages_digest"]
+    )
+    assert (
+        compacted_item["payload"]["summary_anchor_keywords"]
+        == run_record.compaction_snapshot["summary_anchor_keywords"]
+    )
+    assert (
+        compacted_item["payload"]["protected_document_reasons"]
+        == run_record.compaction_snapshot["protected_document_reasons"]
+    )
+    assert (
+        compacted_item["payload"]["protected_document_binding_versions"]
+        == run_record.compaction_snapshot["protected_document_binding_versions"]
+    )
+    assert (
+        compacted_item["payload"]["document_context_recovery_snapshot"]
+        == run_record.document_context_recovery_snapshot
+    )
+    assert (
+        compacted_item["payload"]["projected_document_context_snapshot"]
+        == run_record.compaction_snapshot["projected_document_context_snapshot"]
+    )
+    assert (
+        compacted_item["payload"]["document_context_projection_mode"]
+        == run_record.compaction_snapshot["document_context_projection_mode"]
+    )
 
 
-async def test_assistant_prepare_turn_records_project_tool_guidance_as_explicit_snapshot(
+async def test_assistant_prepare_turn_exposes_compaction_snapshot_in_hook_payload(
     tmp_path,
 ) -> None:
     config_root = _build_config_root(tmp_path)
@@ -1490,11 +1627,345 @@ async def test_assistant_prepare_turn_records_project_tool_guidance_as_explicit_
     service = AssistantService(
         assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
         config_loader=loader,
-        credential_service_factory=_FakeCredentialService,
+        credential_service_factory=_CompactingCredentialService,
         project_service=create_project_service(),
         tool_provider=tool_provider,
         template_renderer=SkillTemplateRenderer(),
-        turn_run_store=AssistantTurnRunStore(tmp_path / "turn-runs"),
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-hook-context-snapshots")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                project_id=project.id,
+                skill_id="skill.assistant.general_chat",
+                model={"provider": "openai", "name": "gpt-4o-mini", "max_tokens": 32},
+                messages=[
+                    AssistantMessageDTO(
+                        role="user",
+                        content="人物关系里林渊和顾砚的互相试探必须贯穿全文，时间轴也不能乱。 " * 3,
+                    ),
+                    AssistantMessageDTO(
+                        role="assistant",
+                        content="我会把人物关系和时间轴都维持成贯穿全文的连续性压力。 " * 3,
+                    ),
+                    AssistantMessageDTO(
+                        role="user",
+                        content="黑潮会和白塔局的长期对抗也要保留，不能只在前期出现。 " * 3,
+                    ),
+                    AssistantMessageDTO(
+                        role="assistant",
+                        content="已记录：人物关系、势力关系与时间轴一致性都不能掉线。 " * 3,
+                    ),
+                    AssistantMessageDTO(
+                        role="user",
+                        content="基于这些约束，给我一个冷峻克制的开篇方向。人物关系、势力关系和时间轴都要继续有效。 " * 2,
+                    ),
+                ],
+            )
+
+            prepared = await service._prepare_turn(session, payload, owner_id=owner.id)  # noqa: SLF001
+            assert prepared.turn_context.compaction_snapshot is not None
+            assert (
+                prepared.before_payload["request"]["compaction_snapshot"]
+                == prepared.turn_context.compaction_snapshot
+            )
+            assert prepared.before_payload["request"]["tool_guidance_snapshot"] is None
+            assert (
+                prepared.before_payload["request"]["tool_catalog_version"]
+                == prepared.turn_context.tool_catalog_version
+            )
+            assert prepared.before_payload["request"]["exposed_tool_names_snapshot"] == []
+
+            after_payload = build_after_assistant_payload(
+                prepared.spec,
+                payload,
+                prepared.project_id,
+                prepared.turn_context,
+                "主回复：给出方向。",
+                visible_tool_descriptors=prepared.visible_tool_descriptors,
+            )
+            assert (
+                after_payload["request"]["compaction_snapshot"]
+                == prepared.turn_context.compaction_snapshot
+            )
+            assert after_payload["request"]["tool_guidance_snapshot"] is None
+            assert (
+                after_payload["request"]["tool_catalog_version"]
+                == prepared.turn_context.tool_catalog_version
+            )
+            assert after_payload["request"]["exposed_tool_names_snapshot"] == []
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_prepare_turn_exposes_tool_guidance_snapshot_in_hook_payload_when_visible_tools_match(
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+        ),
+        project_document_capability_service=capability_service,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-hook-tool-guidance-snapshot")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                project_id=project.id,
+                skill_id="skill.assistant.general_chat",
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+                messages=[
+                    AssistantMessageDTO(
+                        role="user",
+                        content="人物关系和时间轴的一致性要贯穿全文，先告诉我应该查哪些资料。",
+                    )
+                ],
+            )
+
+            prepared = await service._prepare_turn(session, payload, owner_id=owner.id)  # noqa: SLF001
+
+            assert prepared.turn_context.tool_guidance_snapshot is not None
+            assert (
+                prepared.before_payload["request"]["tool_guidance_snapshot"]
+                == prepared.turn_context.tool_guidance_snapshot
+            )
+            assert (
+                prepared.before_payload["request"]["tool_catalog_version"]
+                == prepared.turn_context.tool_catalog_version
+            )
+            assert prepared.before_payload["request"]["exposed_tool_names_snapshot"] == [
+                item.name for item in prepared.visible_tool_descriptors
+            ]
+
+            after_payload = build_after_assistant_payload(
+                prepared.spec,
+                payload,
+                prepared.project_id,
+                prepared.turn_context,
+                "主回复：先查人物关系和时间轴相关文稿。",
+                visible_tool_descriptors=prepared.visible_tool_descriptors,
+            )
+            assert (
+                after_payload["request"]["tool_guidance_snapshot"]
+                == prepared.turn_context.tool_guidance_snapshot
+            )
+            assert (
+                after_payload["request"]["tool_catalog_version"]
+                == prepared.turn_context.tool_catalog_version
+            )
+            assert after_payload["request"]["exposed_tool_names_snapshot"] == [
+                item.name for item in prepared.visible_tool_descriptors
+            ]
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_prepare_turn_exposes_document_context_recovery_snapshot_in_hook_payload(
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        project_document_capability_service=capability_service,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-hook-document-context-recovery")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+            file_store.save_project_document(project.id, "设定/人物.md", "林渊：冷静克制，擅长观察。")
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                project_id=project.id,
+                skill_id="skill.assistant.general_chat",
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+                document_context={
+                    "active_path": "设定/人物.md",
+                    "selected_paths": ["设定/人物.md"],
+                    "active_buffer_state": {
+                        "dirty": True,
+                        "base_version": "version:v1",
+                        "buffer_hash": "buffer:abc",
+                        "source": TRUSTED_ACTIVE_BUFFER_SOURCE,
+                    },
+                },
+                messages=[AssistantMessageDTO(role="user", content="继续沿人物设定往下写。")],
+            )
+
+            prepared = await service._prepare_turn(session, payload, owner_id=owner.id)  # noqa: SLF001
+            assert prepared.turn_context.document_context_recovery_snapshot is not None
+            assert prepared.turn_context.document_context_injection_snapshot is not None
+            assert (
+                prepared.run_snapshot.document_context_injection_snapshot
+                == prepared.turn_context.document_context_injection_snapshot
+            )
+            assert (
+                prepared.before_payload["request"]["document_context_bindings_snapshot"]
+                == prepared.turn_context.document_context_bindings
+            )
+            assert (
+                prepared.before_payload["request"]["document_context_recovery_snapshot"]
+                == prepared.turn_context.document_context_recovery_snapshot
+            )
+            assert (
+                prepared.before_payload["request"]["document_context_injection_snapshot"]
+                == prepared.turn_context.document_context_injection_snapshot
+            )
+
+            after_payload = build_after_assistant_payload(
+                prepared.spec,
+                payload,
+                prepared.project_id,
+                prepared.turn_context,
+                "主回复：继续写。",
+                visible_tool_descriptors=prepared.visible_tool_descriptors,
+            )
+            assert (
+                after_payload["request"]["document_context_bindings_snapshot"]
+                == prepared.turn_context.document_context_bindings
+            )
+            assert (
+                after_payload["request"]["document_context_recovery_snapshot"]
+                == prepared.turn_context.document_context_recovery_snapshot
+            )
+            assert (
+                after_payload["request"]["document_context_injection_snapshot"]
+                == prepared.turn_context.document_context_injection_snapshot
+            )
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+def test_build_request_error_hook_payload_keeps_bindings_snapshot_shape_stable() -> None:
+    owner_id = uuid.uuid4()
+    payload = AssistantTurnRequestDTO(
+        conversation_id="conversation-on-error-bindings",
+        client_turn_id="turn-on-error-bindings",
+        messages=[AssistantMessageDTO(role="user", content="继续往下写。")],
+        document_context={
+            "active_path": "设定/人物.md",
+            "selected_paths": ["设定/人物.md"],
+        },
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+    )
+
+    hook_payload = build_request_error_hook_payload(payload=payload, owner_id=owner_id)
+
+    assert hook_payload["request"]["document_context"] == payload.document_context.model_dump(mode="json")
+    assert hook_payload["request"]["document_context_bindings_snapshot"] is None
+    assert hook_payload["request"]["document_context_recovery_snapshot"] is None
+    assert hook_payload["request"]["document_context_injection_snapshot"] == (
+        build_document_context_injection_snapshot(
+            payload.document_context.model_dump(mode="json")
+        )
+    )
+    assert hook_payload["request"]["tool_catalog_version"] is None
+    assert hook_payload["request"]["exposed_tool_names_snapshot"] == []
+
+
+async def test_assistant_prepare_turn_records_project_tool_guidance_as_explicit_snapshot(
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+        ),
+        turn_run_store=turn_run_store,
+        project_document_capability_service=capability_service,
     )
     session_factory, async_session_factory, engine, async_engine, database_path = (
         build_sqlite_session_factories(tmp_path, name="assistant-project-tool-guidance")
@@ -1529,10 +2000,87 @@ async def test_assistant_prepare_turn_records_project_tool_guidance_as_explicit_
                 "project.search_documents",
                 "project.read_documents",
             ]
+            assert tool_guidance["payload"]["discovery_source"] == "continuity_keywords"
             assert "人物关系" in tool_guidance["payload"]["trigger_keywords"]
             assert "时间轴" in tool_guidance["payload"]["trigger_keywords"]
+            assert prepared.turn_context.tool_guidance_snapshot is not None
             assert tool_guidance["payload"]["content"].startswith("【项目范围工具提示】")
-            assert tool_guidance["payload"]["content"] in prepared.prompt
+            assert prepared.turn_context.tool_guidance_snapshot["content"] in prepared.prompt
+            assert prepared.turn_context.tool_guidance_snapshot == tool_guidance["payload"]
+            assert prepared.run_snapshot.tool_guidance_snapshot == tool_guidance["payload"]
+
+            response = await service.turn(session, payload, owner_id=owner.id)
+
+            run_record = turn_run_store.get_run(response.run_id)
+            assert run_record is not None
+            assert run_record.tool_guidance_snapshot == tool_guidance["payload"]
+            stored_tool_guidance = next(
+                item
+                for item in run_record.normalized_input_items_snapshot
+                if item["item_type"] == "tool_guidance"
+            )
+            assert stored_tool_guidance["payload"] == run_record.tool_guidance_snapshot
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_prepare_turn_omits_project_tool_guidance_without_visible_project_tools(
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-project-tool-guidance-without-visible-tools")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                project_id=project.id,
+                messages=[
+                    AssistantMessageDTO(
+                        role="user",
+                        content="这段人物关系和时间轴的一致性要贯穿全文，你先帮我判断应该查哪些资料。",
+                    )
+                ],
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+
+            prepared = await service._prepare_turn(session, payload, owner_id=owner.id)  # noqa: SLF001
+
+            assert "【项目范围工具提示】" not in prepared.prompt
+            assert prepared.turn_context.tool_guidance_snapshot is None
+            assert prepared.run_snapshot.tool_guidance_snapshot is None
+            assert prepared.visible_tool_descriptors == ()
+            assert all(
+                item["item_type"] != "tool_guidance"
+                for item in prepared.turn_context.normalized_input_items
+            )
+
+            response = await service.turn(session, payload, owner_id=owner.id)
+
+            run_record = turn_run_store.get_run(response.run_id)
+            assert run_record is not None
+            assert run_record.tool_guidance_snapshot is None
+            assert all(
+                item["item_type"] != "tool_guidance"
+                for item in run_record.normalized_input_items_snapshot
+            )
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
@@ -2194,10 +2742,24 @@ def test_assistant_turn_run_store_rejects_invalid_compaction_snapshot(tmp_path) 
                 "level": "soft",
                 "budget_limit_tokens": 216,
                 "estimated_tokens_before": 240,
-                "estimated_tokens_after": 0,
+                "estimated_tokens_after": 120,
                 "compressed_message_count": 2,
                 "preserved_recent_message_count": 1,
                 "protected_document_paths": ["数据层/人物关系.json"],
+                "protected_document_refs": ["doc.characters"],
+                "protected_document_reasons": {
+                    "数据层/人物关系.json": ["selected_path", 1]
+                },
+                "protected_document_binding_versions": {"doc.characters": "binding-v1"},
+                "document_context_recovery_snapshot": {
+                    "active_path": "设定/人物.md",
+                    "active_document_ref": "doc.characters",
+                    "active_binding_version": "binding:v1",
+                    "selected_paths": ["设定/人物.md"],
+                    "selected_document_refs": ["doc.characters"],
+                    "active_buffer_state": {"dirty": True, "unexpected": "invalid"},
+                    "catalog_version": "catalog:v1",
+                },
                 "summary": "人物关系与势力关系要贯穿全文。",
             },
             "request_messages_digest": "digest",
@@ -2311,6 +2873,140 @@ def test_assistant_turn_run_store_rejects_invalid_continuation_request_snapshot(
     )
 
     with pytest.raises(ConfigurationError, match="continuation_request_snapshot"):
+        store.get_run(run_id)
+
+
+def test_assistant_turn_run_store_rejects_invalid_document_context_recovery_snapshot(tmp_path) -> None:
+    store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    run_id = uuid.uuid4()
+    snapshot_path = store.root / f"{run_id}.json"
+    _write_turn_run_snapshot(
+        snapshot_path,
+        {
+            "run_id": str(run_id),
+            "owner_id": str(uuid.uuid4()),
+            "project_id": None,
+            "conversation_id": "conversation-invalid-document-context-recovery",
+            "client_turn_id": "turn-invalid-document-context-recovery-1",
+            "continuation_anchor_snapshot": None,
+            "compaction_snapshot": None,
+            "request_messages_digest": "digest",
+            "document_context_snapshot": None,
+            "document_context_recovery_snapshot": {
+                "active_path": "设定/人物.md",
+                "active_document_ref": "doc.characters",
+                "active_binding_version": "binding:v1",
+                "selected_paths": ["设定/人物.md"],
+                "selected_document_refs": ["doc.characters"],
+                "active_buffer_state": {"dirty": True, "unexpected": "invalid"},
+                "catalog_version": None,
+            },
+            "requested_write_scope": "disabled",
+            "requested_write_targets_snapshot": [],
+            "normalized_input_items_snapshot": [{"item_type": "message", "role": "user", "content": "hi"}],
+            "exposed_tool_names_snapshot": [],
+            "resolved_tool_descriptor_snapshot": [],
+            "tool_policy_decisions_snapshot": [],
+            "budget_snapshot": None,
+            "turn_context_hash": "6" * 64,
+            "terminal_status": "completed",
+            "completion_messages_digest": "digest+assistant",
+            "terminal_error_code": None,
+            "terminal_error_message": None,
+            "write_effective": False,
+            "completed_at": "2026-04-05T00:00:00+00:00",
+        },
+    )
+
+    with pytest.raises(ConfigurationError, match="document_context_recovery_snapshot"):
+        store.get_run(run_id)
+
+
+def test_assistant_turn_run_store_rejects_invalid_document_context_injection_snapshot(tmp_path) -> None:
+    store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    run_id = uuid.uuid4()
+    snapshot_path = store.root / f"{run_id}.json"
+    _write_turn_run_snapshot(
+        snapshot_path,
+        {
+            "run_id": str(run_id),
+            "owner_id": str(uuid.uuid4()),
+            "project_id": None,
+            "conversation_id": "conversation-invalid-document-context-injection",
+            "client_turn_id": "turn-invalid-document-context-injection-1",
+            "continuation_anchor_snapshot": None,
+            "compaction_snapshot": None,
+            "request_messages_digest": "digest",
+            "document_context_snapshot": None,
+            "document_context_recovery_snapshot": None,
+            "document_context_injection_snapshot": {
+                "active_path": "设定/人物.md",
+                "selected_paths": ["设定/人物.md"],
+                "selected_document_refs": ["doc.characters"],
+                "active_buffer_state": {"dirty": True, "unexpected": "invalid"},
+            },
+            "requested_write_scope": "disabled",
+            "requested_write_targets_snapshot": [],
+            "normalized_input_items_snapshot": [{"item_type": "message", "role": "user", "content": "hi"}],
+            "exposed_tool_names_snapshot": [],
+            "resolved_tool_descriptor_snapshot": [],
+            "tool_policy_decisions_snapshot": [],
+            "budget_snapshot": None,
+            "turn_context_hash": "6" * 64,
+            "terminal_status": "completed",
+            "completion_messages_digest": "digest+assistant",
+            "terminal_error_code": None,
+            "terminal_error_message": None,
+            "write_effective": False,
+            "completed_at": "2026-04-05T00:00:00+00:00",
+        },
+    )
+
+    with pytest.raises(ConfigurationError, match="document_context_injection_snapshot"):
+        store.get_run(run_id)
+
+
+def test_assistant_turn_run_store_rejects_invalid_tool_guidance_snapshot(tmp_path) -> None:
+    store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    run_id = uuid.uuid4()
+    snapshot_path = store.root / f"{run_id}.json"
+    _write_turn_run_snapshot(
+        snapshot_path,
+        {
+            "run_id": str(run_id),
+            "owner_id": str(uuid.uuid4()),
+            "project_id": None,
+            "conversation_id": "conversation-invalid-tool-guidance",
+            "client_turn_id": "turn-invalid-tool-guidance-1",
+            "continuation_anchor_snapshot": None,
+            "compaction_snapshot": None,
+            "request_messages_digest": "digest",
+            "document_context_snapshot": None,
+            "document_context_recovery_snapshot": None,
+            "tool_guidance_snapshot": {
+                "guidance_type": "project_search_then_read",
+                "tool_names": ["project.search_documents", "project.read_documents"],
+                "trigger_keywords": "人物关系",
+                "content": "【项目范围工具提示】\n- 当前对话已绑定项目。",
+            },
+            "requested_write_scope": "disabled",
+            "requested_write_targets_snapshot": [],
+            "normalized_input_items_snapshot": [{"item_type": "message", "role": "user", "content": "hi"}],
+            "exposed_tool_names_snapshot": [],
+            "resolved_tool_descriptor_snapshot": [],
+            "tool_policy_decisions_snapshot": [],
+            "budget_snapshot": None,
+            "turn_context_hash": "6" * 64,
+            "terminal_status": "completed",
+            "completion_messages_digest": "digest+assistant",
+            "terminal_error_code": None,
+            "terminal_error_message": None,
+            "write_effective": False,
+            "completed_at": "2026-04-05T00:00:00+00:00",
+        },
+    )
+
+    with pytest.raises(ConfigurationError, match="tool_guidance_snapshot"):
         store.get_run(run_id)
 
 
@@ -2773,10 +3469,36 @@ async def test_assistant_service_runs_project_write_document_tool_loop(db, tmp_p
         "expires_at": None,
     }
     assert run_record.document_context_snapshot is not None
+    assert run_record.document_context_recovery_snapshot is not None
+    assert run_record.document_context_injection_snapshot is not None
     assert run_record.tool_catalog_version is not None
     assert run_record.tool_catalog_version.startswith("tool_catalog:")
     assert run_record.tool_catalog_version != run_record.document_context_snapshot["catalog_version"]
     assert run_record.document_context_snapshot["active_path"] == "设定/人物.md"
+    assert run_record.document_context_recovery_snapshot["active_path"] == "设定/人物.md"
+    assert run_record.document_context_recovery_snapshot["active_document_ref"] == target.document_ref
+    assert (
+        run_record.document_context_recovery_snapshot["active_binding_version"]
+        == run_record.document_context_bindings_snapshot[0]["binding_version"]
+    )
+    assert run_record.document_context_recovery_snapshot["selected_paths"] == ["设定/人物.md"]
+    assert run_record.document_context_recovery_snapshot["selected_document_refs"] == [target.document_ref]
+    assert (
+        run_record.document_context_recovery_snapshot["active_buffer_state"]["source"]
+        == TRUSTED_ACTIVE_BUFFER_SOURCE
+    )
+    document_context_recovery_item = next(
+        item
+        for item in run_record.normalized_input_items_snapshot
+        if item["item_type"] == "document_context_recovery"
+    )
+    assert document_context_recovery_item["payload"] == run_record.document_context_recovery_snapshot
+    assert run_record.document_context_injection_snapshot == (
+        build_document_context_injection_snapshot(
+            run_record.document_context_snapshot,
+            document_context_recovery_snapshot=run_record.document_context_recovery_snapshot,
+        )
+    )
     assert run_record.document_context_bindings_snapshot[0]["document_ref"] == target.document_ref
     assert run_record.document_context_bindings_snapshot[0]["selection_role"] == "active"
     assert run_record.document_context_bindings_snapshot[0]["buffer_source"] == TRUSTED_ACTIVE_BUFFER_SOURCE
@@ -4291,6 +5013,187 @@ async def test_assistant_service_runs_without_skill_using_rules_and_current_conv
         assert "回答时先给一句方向判断。" in system_prompt
         assert "【当前项目规则】" in system_prompt
         assert "这个项目统一保持冷峻克制的语气。" in system_prompt
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_resolves_recursive_rule_includes_in_stable_order(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    service.plugin_registry = build_assistant_plugin_registry(service, config_loader=loader)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-rule-include-order")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        user_rule_root = tmp_path / "assistant-config" / "users" / str(owner_id)
+        _write_rule_markdown(
+            user_rule_root / "AGENTS.md",
+            """
+            ---
+            enabled: true
+            scope: user
+            include:
+              - fragments/style.md
+              - fragments/format.md
+            ---
+
+            先给结论。
+            """,
+        )
+        _write_rule_markdown(
+            user_rule_root / "fragments" / "style.md",
+            """
+            ---
+            scope: user
+            include:
+              - nested/tone.md
+            ---
+
+            统一保持简洁。
+            """,
+        )
+        _write_rule_markdown(
+            user_rule_root / "fragments" / "nested" / "tone.md",
+            "若给建议，先给一句判断。",
+        )
+        _write_rule_markdown(user_rule_root / "fragments" / "format.md", "避免使用表格。")
+
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+                messages=[AssistantMessageDTO(role="user", content="帮我改一下开头方向。")],
+            )
+            await service.turn(session, payload, owner_id=owner_id)
+
+        system_prompt = tool_provider.requests[0]["system_prompt"] or ""
+        first = system_prompt.index("先给结论。")
+        second = system_prompt.index("统一保持简洁。")
+        third = system_prompt.index("若给建议，先给一句判断。")
+        fourth = system_prompt.index("避免使用表格。")
+        assert first < second < third < fourth
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+@pytest.mark.parametrize(
+    ("scope_name", "writer", "message"),
+    [
+        (
+            "missing",
+            lambda root, owner_id: _write_rule_markdown(
+                root / "AGENTS.md",
+                """
+                ---
+                enabled: true
+                scope: user
+                include:
+                  - fragments/missing.md
+                ---
+
+                先给结论。
+                """,
+            ),
+            "does not exist",
+        ),
+        (
+            "cycle",
+            lambda root, owner_id: (
+                _write_rule_markdown(
+                    root / "AGENTS.md",
+                    """
+                    ---
+                    enabled: true
+                    scope: user
+                    include:
+                      - fragments/style.md
+                    ---
+
+                    先给结论。
+                    """,
+                ),
+                _write_rule_markdown(
+                    root / "fragments" / "style.md",
+                    """
+                    ---
+                    scope: user
+                    include:
+                      - ../AGENTS.md
+                    ---
+
+                    统一保持简洁。
+                    """,
+                ),
+            ),
+            "cycle detected",
+        ),
+        (
+            "illegal-scope",
+            lambda root, owner_id: _write_rule_markdown(
+                root / "AGENTS.md",
+                f"""
+                ---
+                enabled: true
+                scope: user
+                include:
+                  - ../../projects/{uuid.uuid4()}/AGENTS.md
+                ---
+
+                先给结论。
+                """,
+            ),
+            "must stay within user scope root",
+        ),
+    ],
+)
+async def test_assistant_service_rejects_invalid_rule_includes(
+    tmp_path,
+    scope_name,
+    writer,
+    message,
+) -> None:
+    del scope_name
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=_FakeToolProvider(),
+        template_renderer=SkillTemplateRenderer(),
+    )
+    service.plugin_registry = build_assistant_plugin_registry(service, config_loader=loader)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-rule-include-errors")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        user_rule_root = tmp_path / "assistant-config" / "users" / str(owner_id)
+        writer(user_rule_root, owner_id)
+
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+                messages=[AssistantMessageDTO(role="user", content="帮我改一下开头方向。")],
+            )
+            with pytest.raises(ConfigurationError, match=message):
+                await service.turn(session, payload, owner_id=owner_id)
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 

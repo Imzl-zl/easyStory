@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
-from app.shared.runtime.provider_interop_stream_support import StreamInterruptedError
+from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
 
 AssistantRunTerminalStatus = Literal["completed", "failed", "cancelled"]
 CANCEL_REQUESTED_ERROR_CODE = "cancel_requested"

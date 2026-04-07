@@ -24,7 +24,7 @@ from app.modules.assistant.service.turn.assistant_turn_run_store import Assistan
 from app.modules.config_registry import ConfigLoader
 from app.modules.project.service import create_project_service
 from app.shared.runtime import SkillTemplateRenderer
-from app.shared.runtime.provider_interop_stream_support import StreamInterruptedError
+from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
 
 
 async def test_assistant_api_requires_auth_and_returns_content(monkeypatch, tmp_path) -> None:

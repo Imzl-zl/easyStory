@@ -14,8 +14,10 @@ from ..dto import (
     AssistantContinuationAnchorDTO,
     AssistantCompactionSnapshotDTO,
     AssistantContinuationCompactionSnapshotDTO,
+    AssistantDocumentContextRecoverySnapshotDTO,
     AssistantContinuationRequestSnapshotDTO,
     AssistantNormalizedInputItemDTO,
+    AssistantProjectToolGuidanceDTO,
 )
 AssistantTurnRunStatus = Literal["running", "completed", "failed", "cancelled"]
 AssistantTurnTerminalStatus = Literal["completed", "failed", "cancelled"]
@@ -58,7 +60,10 @@ class AssistantTurnRunRecord:
     compaction_snapshot: dict[str, Any] | None
     request_messages_digest: str
     document_context_snapshot: dict[str, Any] | None
+    document_context_recovery_snapshot: dict[str, Any] | None
+    document_context_injection_snapshot: dict[str, Any] | None
     document_context_bindings_snapshot: tuple[dict[str, Any], ...]
+    tool_guidance_snapshot: dict[str, Any] | None
     requested_write_scope: str
     requested_write_targets_snapshot: tuple[str, ...]
     normalized_input_items_snapshot: tuple[dict[str, Any], ...]
@@ -149,9 +154,24 @@ def read_turn_run_record(path: Path) -> AssistantTurnRunRecord:
         compaction_snapshot=_read_optional_compaction_snapshot(payload, "compaction_snapshot", reader),
         request_messages_digest=reader.read_required_string(payload, "request_messages_digest"),
         document_context_snapshot=reader.read_optional_object(payload, "document_context_snapshot"),
+        document_context_recovery_snapshot=_read_optional_document_context_recovery_snapshot(
+            payload,
+            "document_context_recovery_snapshot",
+            reader,
+        ),
+        document_context_injection_snapshot=_read_optional_document_context_recovery_snapshot(
+            payload,
+            "document_context_injection_snapshot",
+            reader,
+        ),
         document_context_bindings_snapshot=reader.read_optional_object_tuple(
             payload,
             "document_context_bindings_snapshot",
+        ),
+        tool_guidance_snapshot=_read_optional_tool_guidance_snapshot(
+            payload,
+            "tool_guidance_snapshot",
+            reader,
         ),
         requested_write_scope=reader.read_optional_literal_string(
             payload,
@@ -327,6 +347,23 @@ def _read_optional_continuation_compaction_snapshot(
     return dto.model_dump(mode="json")
 
 
+def _read_optional_document_context_recovery_snapshot(
+    payload: dict[str, object],
+    field_name: str,
+    reader: SnapshotReader,
+) -> dict[str, Any] | None:
+    value = reader.read_optional_object(payload, field_name)
+    if value is None:
+        return None
+    try:
+        dto = AssistantDocumentContextRecoverySnapshotDTO.model_validate(value)
+    except Exception as exc:
+        raise ConfigurationError(
+            f"{reader._field_ref(field_name)} contains invalid document context recovery snapshot: {reader.path}"
+        ) from exc
+    return dto.model_dump(mode="json")
+
+
 def _read_optional_continuation_request_snapshot(
     payload: dict[str, object],
     field_name: str,
@@ -340,6 +377,23 @@ def _read_optional_continuation_request_snapshot(
     except Exception as exc:
         raise ConfigurationError(
             f"{reader._field_ref(field_name)} contains invalid continuation request snapshot: {reader.path}"
+        ) from exc
+    return dto.model_dump(mode="json")
+
+
+def _read_optional_tool_guidance_snapshot(
+    payload: dict[str, object],
+    field_name: str,
+    reader: SnapshotReader,
+) -> dict[str, Any] | None:
+    value = reader.read_optional_object(payload, field_name)
+    if value is None:
+        return None
+    try:
+        dto = AssistantProjectToolGuidanceDTO.model_validate(value)
+    except Exception as exc:
+        raise ConfigurationError(
+            f"{reader._field_ref(field_name)} contains invalid tool guidance snapshot: {reader.path}"
         ) from exc
     return dto.model_dump(mode="json")
 

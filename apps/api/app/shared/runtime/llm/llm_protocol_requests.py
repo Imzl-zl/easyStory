@@ -4,8 +4,8 @@ import json
 from typing import Any
 from urllib.parse import quote, urlsplit
 
-from .errors import ConfigurationError
-from .gemini_probe_support import apply_gemini_probe_thinking_config
+from ..errors import ConfigurationError
+from .interop.gemini_probe_support import apply_gemini_probe_thinking_config
 from .llm_endpoint_policy import normalize_custom_base_url
 from .llm_protocol_types import (
     ANTHROPIC_VERSION,
@@ -94,6 +94,7 @@ def _build_openai_chat_request(request: LLMGenerateRequest) -> PreparedLLMHttpRe
         url=_join_endpoint(request.connection, "/v1/chat/completions"),
         headers=_build_request_headers(request.connection),
         json_body=body,
+        interop_profile=request.connection.interop_profile,
     )
 
 
@@ -127,6 +128,7 @@ def _build_openai_responses_request(request: LLMGenerateRequest) -> PreparedLLMH
         url=_join_endpoint(request.connection, "/v1/responses"),
         headers=_build_request_headers(request.connection),
         json_body=body,
+        interop_profile=request.connection.interop_profile,
     )
 
 
@@ -161,6 +163,7 @@ def _build_anthropic_messages_request(request: LLMGenerateRequest) -> PreparedLL
             extra_headers={"anthropic-version": ANTHROPIC_VERSION},
         ),
         json_body=body,
+        interop_profile=request.connection.interop_profile,
     )
 
 
@@ -180,6 +183,7 @@ def _build_gemini_generate_content_request(request: LLMGenerateRequest) -> Prepa
         url=_build_gemini_endpoint(request.connection, request.model_name),
         headers=_build_request_headers(request.connection),
         json_body=body,
+        interop_profile=request.connection.interop_profile,
     )
 
 

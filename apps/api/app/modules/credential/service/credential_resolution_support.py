@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.credential.models import ModelCredential
 from app.modules.project.service import ProjectService
-from app.shared.runtime.llm_protocol import resolve_model_name
+from app.shared.runtime.llm.llm_protocol import resolve_model_name
 
 from .credential_query_support import (
     OWNER_TYPE_PROJECT,

@@ -17,8 +17,10 @@ AssistantOutputItemType = Literal["text", "tool_call", "tool_result", "reasoning
 AssistantCompactionTriggerReason = Literal["max_input_tokens_exceeded"]
 AssistantCompactionPhase = Literal["initial_prompt"]
 AssistantCompactionLevel = Literal["soft", "hard"]
+AssistantDocumentContextProjectionMode = Literal["full", "active_only", "selected_only", "omitted"]
 AssistantContinuationCompactionPhase = Literal["tool_loop_continuation"]
 AssistantProjectToolGuidanceType = Literal["project_search_then_read"]
+AssistantProjectToolDiscoverySource = Literal["continuity_keywords"]
 AssistantNormalizedInputItemType = Literal[
     "message",
     "rule",
@@ -28,6 +30,7 @@ AssistantNormalizedInputItemType = Literal[
     "model_selection",
     "document_context",
     "document_context_binding",
+    "document_context_recovery",
     "tool_call",
     "tool_result",
     "reasoning",
@@ -71,6 +74,18 @@ class AssistantDocumentContextDTO(BaseModel):
     catalog_version: str | None = Field(default=None, min_length=1)
 
 
+class AssistantDocumentContextRecoverySnapshotDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    active_path: str | None = Field(default=None, min_length=1)
+    active_document_ref: str | None = Field(default=None, min_length=1)
+    active_binding_version: str | None = Field(default=None, min_length=1)
+    selected_paths: list[str] = Field(default_factory=list)
+    selected_document_refs: list[str] = Field(default_factory=list)
+    active_buffer_state: AssistantActiveBufferStateDTO | None = None
+    catalog_version: str | None = Field(default=None, min_length=1)
+
+
 class AssistantNormalizedInputItemDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -91,8 +106,18 @@ class AssistantCompactionSnapshotDTO(BaseModel):
     estimated_tokens_before: int = Field(ge=1)
     estimated_tokens_after: int = Field(ge=1)
     compressed_message_count: int = Field(ge=1)
+    compressed_messages_digest: str | None = Field(default=None, min_length=1)
+    projected_messages_digest: str | None = Field(default=None, min_length=1)
     preserved_recent_message_count: int = Field(ge=0)
+    summary_anchor_keywords: list[str] = Field(default_factory=list)
     protected_document_paths: list[str] = Field(default_factory=list)
+    protected_document_refs: list[str] = Field(default_factory=list)
+    protected_document_reasons: dict[str, list[str]] = Field(default_factory=dict)
+    protected_document_binding_versions: dict[str, str] = Field(default_factory=dict)
+    document_context_collapsed: bool = False
+    document_context_projection_mode: AssistantDocumentContextProjectionMode = "omitted"
+    projected_document_context_snapshot: AssistantDocumentContextRecoverySnapshotDTO | None = None
+    document_context_recovery_snapshot: AssistantDocumentContextRecoverySnapshotDTO | None = None
     summary: str = Field(min_length=1)
 
 
@@ -107,7 +132,12 @@ class AssistantContinuationCompactionSnapshotDTO(BaseModel):
     estimated_tokens_after: int = Field(ge=1)
     compacted_item_count: int = Field(ge=1)
     retained_item_count: int = Field(ge=1)
+    compressed_items_digest: str | None = Field(default=None, min_length=1)
+    projected_items_digest: str | None = Field(default=None, min_length=1)
     compacted_tool_names: list[str] = Field(default_factory=list)
+    compacted_document_refs: list[str] = Field(default_factory=list)
+    compacted_document_versions: dict[str, str] = Field(default_factory=dict)
+    compacted_catalog_versions: list[str] = Field(default_factory=list)
     trimmed_text_slot_count: int = Field(ge=0)
     dropped_content_item_count: int = Field(ge=0)
 
@@ -125,7 +155,17 @@ class AssistantProjectToolGuidanceDTO(BaseModel):
     guidance_type: AssistantProjectToolGuidanceType
     tool_names: list[str] = Field(default_factory=list)
     trigger_keywords: list[str] = Field(default_factory=list)
+    discovery_source: AssistantProjectToolDiscoverySource | None = None
     content: str = Field(min_length=1)
+
+
+class AssistantProjectToolDiscoveryDecisionDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    decision_type: AssistantProjectToolGuidanceType
+    tool_names: list[str] = Field(default_factory=list)
+    trigger_keywords: list[str] = Field(default_factory=list)
+    discovery_source: AssistantProjectToolDiscoverySource
 
 
 class AssistantOutputItemDTO(BaseModel):
@@ -225,14 +265,20 @@ def build_turn_messages_digest(messages: list[AssistantMessageDTO]) -> str:
 
 
 def build_turn_message_records_digest(messages: list[dict[str, str]]) -> str:
-    payload = json.dumps(
+    return build_structured_items_digest(
         [
             {
                 "content": str(item["content"]),
                 "role": str(item["role"]),
             }
             for item in messages
-        ],
+        ]
+    )
+
+
+def build_structured_items_digest(items: Any) -> str:
+    payload = json.dumps(
+        items,
         ensure_ascii=False,
         separators=(",", ":"),
         sort_keys=True,
@@ -252,6 +298,8 @@ __all__ = [
     "AssistantCompactionPhase",
     "AssistantCompactionTriggerReason",
     "AssistantDocumentContextDTO",
+    "AssistantDocumentContextProjectionMode",
+    "AssistantDocumentContextRecoverySnapshotDTO",
     "AssistantHookResultDTO",
     "AssistantMessageDTO",
     "AssistantMessageRole",
@@ -261,10 +309,13 @@ __all__ = [
     "AssistantOutputItemType",
     "AssistantOutputMetaDTO",
     "AssistantProjectToolGuidanceDTO",
+    "AssistantProjectToolDiscoveryDecisionDTO",
+    "AssistantProjectToolDiscoverySource",
     "AssistantProjectToolGuidanceType",
     "AssistantRequestedWriteScope",
     "AssistantTurnRequestDTO",
     "AssistantTurnResponseDTO",
+    "build_structured_items_digest",
     "build_turn_message_records_digest",
     "build_turn_messages_digest",
 ]

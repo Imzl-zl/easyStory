@@ -12,7 +12,7 @@
 
 > 本文档当前仍是 assistant runtime 中原生 tool-calling 的正式设计真值。
 >
-> 若你在跟踪本轮文档重构路线、待迁移章节或阶段状态，请看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。未明确回写到本文的目标语义，不视为正式真值。
+> 若你需要查看 2026-04-07 这轮 assistant runtime 收口的历史实施过程，请看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。当前正式语义以本文、相关 design 文档与代码为准。
 
 ## 1. 目的
 
@@ -46,7 +46,7 @@
 当前仍未完全闭合的边界主要是：
 
 - session 级 approval / resume 协议
-- 更完整的 context compaction 审计
+- 更完整的多次 compaction 历史链
 - 更丰富的 SSE 事件族与恢复协议
 
 ---
@@ -370,7 +370,10 @@ Entry(SSE/HTTP)
   - 只记录 runtime 输入压缩，不改写 transcript 真值
 - `continuation_compaction_snapshot`
   - 保存最近一次 tool loop continuation request budget compaction 的审计结果
-  - 当前至少记录 `phase=tool_loop_continuation`、`level=soft|hard`、前后 token 估算、受影响 item 数量与裁剪统计
+  - 当前至少记录 `phase=tool_loop_continuation`、`level=soft|hard`、前后 token 估算、受影响 item 数量、被裁剪原始 item 子视图的 `compressed_items_digest`、最终 continuation 投影视图的 `projected_items_digest`、`compacted_tool_names`、`compacted_document_refs`、`compacted_document_versions`、`compacted_catalog_versions` 与裁剪统计
+  - `soft` 表示仅发生 item 内部 payload trimming，latest continuation item 骨架仍保留
+  - `hard` 表示发生 top-level continuation item 删除，或 `content_items` 槽被直接移除
+  - `fail` 当前不进入 snapshot；若 continuation 预算收口后仍无法落入预算，会显式返回与初始 prompt compaction 共用的 `budget_exhausted` 终止错误
   - 与首轮 `compaction_snapshot` 分离，避免把消息历史压缩和 continuation 投影压缩混成一份真值
 - `continuation_request_snapshot`
   - 保存最近一次真正发送给模型的 continuation request projection
@@ -522,6 +525,8 @@ ordinary chat 不能继续把“当前文稿路径、截断正文、额外参考
   - 保存 request projection 的 flat 文稿上下文
 - `document_context_binding`
   - 保存归一化后的 `DocumentContextBinding[]` 或等价 binding item
+- `document_context_recovery`
+  - 保存基于 request projection + normalized binding 派生出的 latest recovery view
 - `tool_call`
   - 保存 `tool_call_id / tool_name / normalized_arguments`
 - `tool_result`
@@ -531,7 +536,7 @@ ordinary chat 不能继续把“当前文稿路径、截断正文、额外参考
 - `refusal`
   - 保存模型拒绝项
 - `compacted_context`
-  - 保存 compaction 的衍生产物
+  - 保存 compaction 的衍生产物；`content` 保留摘要文本，`payload` 直接复用完整 `compaction_snapshot`
 
 规则：
 
@@ -581,6 +586,7 @@ ordinary chat 不能继续把“当前文稿路径、截断正文、额外参考
 - `v1A` 实际只接受“缺失”或“仅包含 `active_document_ref` 的单元素 `document_ref[]`”；若显式传入其他目标，必须返回显式错误
 - `v1A` 保留 `input_data`，只作为兼容扩展袋，不直接废弃
 - Hook payload 在迁移期同时暴露 `request.input_data` 与 `request.document_context`
+- 当前 `before_assistant_response / after_assistant_response` hook payload 还会同步暴露 latest `request.document_context_bindings_snapshot`、`request.document_context_recovery_snapshot`、`request.document_context_injection_snapshot`、`request.compaction_snapshot`、`request.tool_guidance_snapshot`、`request.tool_catalog_version` 与 `request.exposed_tool_names_snapshot`
 - 老 Skill / Hook 若仍依赖 `input_data`，在 `v1A` 继续可运行；新增系统语义一律写入正式字段
 - `v1A` 只有 `active_document_ref` 允许成为实际写目标，因此 dirty buffer 拒签先只绑定 `active_buffer_state`
 - 若当前来源文稿或潜在写回目标存在 dirty buffer，则 runtime 不签发写入 grant；后续若要支持多目标写入，必须先为每个候选目标引入独立 buffer 快照
@@ -594,6 +600,13 @@ ordinary chat 不能继续把“当前文稿路径、截断正文、额外参考
    - ordinary chat runtime 内部冻结到 `AssistantTurnRun` 的 `DocumentContextBinding[]`
 3. project binding
    - `project` 文稿能力层正式消费的 `ProjectDocumentContextBinding`
+
+在当前实现里，`AssistantTurnRun` 还会额外冻结一份 `document_context_recovery_snapshot`：
+
+- 它不是新的第四套主真值，而是由 request projection + normalized binding 单次派生出的 latest recovery view
+- 这份 snapshot 当前至少保留 `active_path / active_document_ref / active_binding_version / selected_paths / selected_document_refs / active_buffer_state / catalog_version`
+- 恢复链若需要重新构造运行时文稿上下文，应优先读取这份 recovery view，而不是临时把 `document_context_snapshot` 与 `document_context_bindings_snapshot` 重新拼装成隐式真值
+- 同一 recovery view 当前也会进入 `NormalizedInputItem(item_type=document_context_recovery)`，让 replay / audit 与 run snapshot 共享同一份 latest 文稿恢复真值
 
 字段映射至少应固定为：
 
@@ -1111,17 +1124,23 @@ ordinary chat 的正常结束条件必须继续保持为：
 
 - compaction 成功时，运行时会生成早期历史摘要，并保留最近一段历史消息
 - `AssistantTurnRun.compaction_snapshot` 当前记录首轮历史 compaction
+- `AssistantTurnRun.document_context_recovery_snapshot` 当前记录最新可恢复的文稿上下文视图；它与原始 `document_context_snapshot`、`document_context_bindings_snapshot` 分层共存
+- `AssistantTurnRun.document_context_injection_snapshot` 当前记录 latest recovery view 经过 prompt-visible projection 后的单一注入视图；prepare 阶段只生成一次，prompt projection / prompt render / run snapshot / hook payload 共享同一份真值
+- 同一 latest recovery view 当前也会进入 `NormalizedInputItem(item_type=document_context_recovery)`
+- runtime `rule bundle` 当前仍只把用户层 / 项目层装配成两段最终文本注入 system prompt；主 `AGENTS.md` 若声明同作用域 `include`，递归展开只发生在 bundle 装配阶段，设置页 profile 仍保持主文件正文真值
+- `AssistantTurnRun.tool_guidance_snapshot` 当前记录 latest ordinary-chat 项目范围工具提示视图；prepare 阶段会先结合项目作用域、文稿上下文缺席、continuity 关键词命中与本轮实际 visible tools 解析 internal discovery decision，再把 resolved decision 投影成 guidance snapshot；当前 guidance snapshot 至少会显式冻结 `guidance_type / tool_names / trigger_keywords / discovery_source / content`，只有当 guidance 依赖的工具真实可见时才会冻结，并让 prompt projection / prompt render、`AssistantTurnContext` 与 `NormalizedInputItem(item_type=tool_guidance)` 共享同一份 frozen guidance 真值
 - `AssistantTurnRun.continuation_request_snapshot` 当前记录最近一次真正发给模型的 continuation request projection；若 continuation 语义允许空投影，则 `continuation_items=[]` 也是合法真值
 - `AssistantTurnRun.continuation_compaction_snapshot` 当前记录最近一次 tool loop continuation projection 的预算收口
-- 该 snapshot 当前已显式包含 `phase=initial_prompt` 与 `level=soft|hard`
+- 该 snapshot 当前已显式包含 `phase=tool_loop_continuation` 与 `level=soft|hard`，并会额外冻结 `compressed_items_digest + projected_items_digest + compacted_tool_names + compacted_document_refs + compacted_document_versions + compacted_catalog_versions`
+- 其中 `soft` 当前表示仅发生 continuation item 内部 payload trimming；`hard` 则表示 top-level continuation item 删除，或 `content_items` 槽被直接移除
+- `fail` 当前与 initial prompt compaction 一样，显式收口为共享 `budget_exhausted` 终止错误，而不是写入一份失败 snapshot
+- `AssistantTurnRun.compaction_snapshot` 当前除了 `protected_document_paths`，还会显式冻结当前可解析到的 `compressed_messages_digest`、压缩后消息投影视图的 `projected_messages_digest`、`summary_anchor_keywords`、`protected_document_refs`、`protected_document_reasons`、`protected_document_binding_versions`、`document_context_collapsed`、`document_context_projection_mode`、`projected_document_context_snapshot` 与 latest `document_context_recovery_snapshot`；其中 `projected_document_context_snapshot` 与 `document_context_injection_snapshot` 当前应保持一致
 - compaction 改的是 runtime 输入视图，不改 `messages` transcript 真值，也不改持久化会话历史
-- 同一摘要会进入 `NormalizedInputItem(item_type=compacted_context)`
+- 同一摘要会进入 `NormalizedInputItem(item_type=compacted_context)`；当前 `content` 保留摘要文本，但 `payload` 已直接复用完整 `compaction_snapshot`，不再把 `summary` 从 payload 中拆走
 - tool loop continuation 预算收口当前会先收窄 `project.read_documents / project.search_documents / project.list_documents` 的 bulky `structured_output` 投影，再裁剪最大文本槽；若 `structured_output` 已完整存在且仍超限，可清空冗余 `content_items`
 - continuation request snapshot 若存在 compaction，应冻结压缩后的 latest request view，而不是压缩前的原始 continuation projection
-- 当前 continuation compaction snapshot 只保留 latest snapshot，不记录多次 budget compaction 的完整历史
+- 当前 continuation compaction snapshot 只保留 latest snapshot；多次 budget compaction 的完整历史链不属于当前 v1 合同
 - 若任一阶段 compaction 或 continuation 预算收口后仍超限，应显式返回 `budget_exhausted`，而不是继续偷偷裁剪
-
-分级 compaction、context collapse、恢复注入与更完整的 continuation compaction 历史审计，目前都还不属于已落地真值。
 
 ### 10.6 取消语义
 
@@ -1290,7 +1309,7 @@ ordinary chat 一旦进入 tool loop，SSE 不能再只有文本 delta。
 11. `requested_write_scope` 在 `v1A` 只接受 `disabled | turn`
 12. `v1A` 只暴露 `approval_mode in {none, grant_bound}` 的工具
 13. 现有 hooks 在 `v1A` 明确为 run 级事件，不按每次 continuation 重复触发
-14. Hook payload 在 `v1A` 同时暴露 `request.input_data` 与 `request.document_context`
+14. Hook payload 在 `v1A` 同时暴露 `request.input_data`、`request.document_context`，以及 latest `request.document_context_bindings_snapshot / request.document_context_recovery_snapshot / request.document_context_injection_snapshot / request.compaction_snapshot / request.tool_guidance_snapshot / request.tool_catalog_version / request.exposed_tool_names_snapshot`
 15. Studio 旧 prompt stuffing 降为兼容层，不再作为正式运行时真值
 16. 当前请求装配仍以 `system_prompt + prompt` 投影给 provider；run snapshot / continuation 真值收口为 `NormalizedInputItem[]`
 17. `active_buffer_state` 与 `binding_version` 通过正式 request contract / 归一化 binding 透传，不再依赖 prompt stuffing

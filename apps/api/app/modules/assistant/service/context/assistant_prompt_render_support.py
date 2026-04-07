@@ -8,12 +8,12 @@ from app.modules.config_registry.schemas import SkillConfig
 from app.shared.runtime import SkillTemplateRenderer
 from app.shared.runtime.errors import ConfigurationError
 
-from ..dto import AssistantProjectToolGuidanceDTO, AssistantTurnRequestDTO
+from ..dto import AssistantTurnRequestDTO
 from .assistant_prompt_support import (
     build_conversation_history_projection,
     build_skill_variables,
     format_document_context,
-    render_project_tool_guidance,
+    render_project_tool_guidance_snapshot,
     require_latest_user_message,
     validate_skill_input,
 )
@@ -24,8 +24,8 @@ def render_prompt(
     template_renderer: SkillTemplateRenderer,
     skill: SkillConfig | None,
     payload: AssistantTurnRequestDTO,
-    document_context: dict[str, Any] | None = None,
-    project_tool_guidance: AssistantProjectToolGuidanceDTO | None = None,
+    document_context_injection_snapshot: dict[str, Any] | None = None,
+    tool_guidance_snapshot: dict[str, Any] | None = None,
     projected_messages: list[Any] | None = None,
     compacted_context_summary: str | None = None,
 ) -> str:
@@ -33,8 +33,8 @@ def render_prompt(
     if skill is None:
         return render_message_only_prompt(
             messages,
-            document_context=document_context,
-            project_tool_guidance=project_tool_guidance,
+            document_context_injection_snapshot=document_context_injection_snapshot,
+            tool_guidance_snapshot=tool_guidance_snapshot,
             compacted_context_summary=compacted_context_summary,
         )
     referenced_variables = template_renderer.referenced_variables(skill.prompt)
@@ -51,8 +51,8 @@ def render_prompt(
             rendered_skill_prompt=template_renderer.render(skill.prompt, variables),
             messages=messages,
             referenced_variables=referenced_variables,
-            document_context=document_context,
-            project_tool_guidance=project_tool_guidance,
+            document_context_injection_snapshot=document_context_injection_snapshot,
+            tool_guidance_snapshot=tool_guidance_snapshot,
             compacted_context_summary=compacted_context_summary,
         )
     except (SecurityError, UndefinedError) as exc:
@@ -62,14 +62,14 @@ def render_prompt(
 def render_message_only_prompt(
     messages: list[Any],
     *,
-    document_context: dict[str, Any] | None = None,
-    project_tool_guidance: AssistantProjectToolGuidanceDTO | None = None,
+    document_context_injection_snapshot: dict[str, Any] | None = None,
+    tool_guidance_snapshot: dict[str, Any] | None = None,
     compacted_context_summary: str | None = None,
 ) -> str:
     return render_message_context_sections(
         messages,
-        document_context=document_context,
-        project_tool_guidance=project_tool_guidance,
+        document_context_injection_snapshot=document_context_injection_snapshot,
+        tool_guidance_snapshot=tool_guidance_snapshot,
         compacted_context_summary=compacted_context_summary,
     )
 
@@ -79,8 +79,8 @@ def render_skill_prompt(
     rendered_skill_prompt: str,
     messages: list[Any],
     referenced_variables: set[str],
-    document_context: dict[str, Any] | None = None,
-    project_tool_guidance: AssistantProjectToolGuidanceDTO | None = None,
+    document_context_injection_snapshot: dict[str, Any] | None = None,
+    tool_guidance_snapshot: dict[str, Any] | None = None,
     compacted_context_summary: str | None = None,
 ) -> str:
     sections = [f"【当前 Skill 指令】\n{rendered_skill_prompt.strip()}"]
@@ -88,8 +88,8 @@ def render_skill_prompt(
     if "messages_json" in referenced_variables:
         sections.extend(
             _build_project_context_sections(
-                document_context=document_context,
-                project_tool_guidance=project_tool_guidance,
+                document_context_injection_snapshot=document_context_injection_snapshot,
+                tool_guidance_snapshot=tool_guidance_snapshot,
             )
         )
         return "\n\n".join(section for section in sections if section.strip())
@@ -101,8 +101,8 @@ def render_skill_prompt(
         sections.append(f"【当前会话历史】\n{history}")
     sections.extend(
         _build_project_context_sections(
-            document_context=document_context,
-            project_tool_guidance=project_tool_guidance,
+            document_context_injection_snapshot=document_context_injection_snapshot,
+            tool_guidance_snapshot=tool_guidance_snapshot,
         )
     )
     if "user_input" not in referenced_variables:
@@ -113,8 +113,8 @@ def render_skill_prompt(
 def render_message_context_sections(
     messages: list[Any],
     *,
-    document_context: dict[str, Any] | None = None,
-    project_tool_guidance: AssistantProjectToolGuidanceDTO | None = None,
+    document_context_injection_snapshot: dict[str, Any] | None = None,
+    tool_guidance_snapshot: dict[str, Any] | None = None,
     compacted_context_summary: str | None = None,
 ) -> str:
     latest_user_message = require_latest_user_message(messages)
@@ -126,8 +126,8 @@ def render_message_context_sections(
     if history:
         sections.insert(0, f"【当前会话历史】\n{history}")
     project_sections = _build_project_context_sections(
-        document_context=document_context,
-        project_tool_guidance=project_tool_guidance,
+        document_context_injection_snapshot=document_context_injection_snapshot,
+        tool_guidance_snapshot=tool_guidance_snapshot,
     )
     if project_sections:
         sections = [*sections[:-1], *project_sections, sections[-1]]
@@ -136,13 +136,15 @@ def render_message_context_sections(
 
 def _build_project_context_sections(
     *,
-    document_context: dict[str, Any] | None,
-    project_tool_guidance: AssistantProjectToolGuidanceDTO | None,
+    document_context_injection_snapshot: dict[str, Any] | None,
+    tool_guidance_snapshot: dict[str, Any] | None,
 ) -> list[str]:
     sections: list[str] = []
-    document_context_section = format_document_context(document_context)
+    document_context_section = format_document_context(
+        document_context_injection_snapshot
+    )
     if document_context_section:
         sections.append(document_context_section)
-    if project_tool_guidance:
-        sections.append(render_project_tool_guidance(project_tool_guidance))
+    if tool_guidance_snapshot:
+        sections.append(render_project_tool_guidance_snapshot(tool_guidance_snapshot))
     return sections

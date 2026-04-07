@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.shared.runtime.llm_protocol import LlmApiDialect, LlmAuthStrategy, LlmRuntimeKind
+from app.shared.runtime.llm.llm_protocol import LlmApiDialect, LlmAuthStrategy, LlmRuntimeKind
 
 CredentialOwnerType = Literal["system", "user", "project"]
 CredentialExtraHeaders = dict[str, str]

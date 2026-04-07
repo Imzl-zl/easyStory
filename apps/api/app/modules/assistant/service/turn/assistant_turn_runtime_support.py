@@ -11,15 +11,15 @@ from app.modules.config_registry.schemas import HookConfig
 
 from ..hooks_runtime.assistant_hook_support import build_assistant_hook_payload
 from ..context.assistant_prompt_support import (
-    build_project_tool_guidance_snapshot,
+    build_document_context_injection_snapshot,
     require_latest_user_message,
 )
 from ..dto import (
+    AssistantDocumentContextRecoverySnapshotDTO,
     AssistantHookResultDTO,
     AssistantNormalizedInputItemDTO,
     AssistantOutputItemDTO,
     AssistantOutputMetaDTO,
-    AssistantProjectToolGuidanceDTO,
     AssistantTurnRequestDTO,
     AssistantTurnResponseDTO,
     build_turn_message_records_digest,
@@ -47,6 +47,9 @@ class AssistantTurnContext:
     compaction_snapshot: dict[str, Any] | None
     document_context: dict[str, Any] | None
     document_context_bindings: list[dict[str, Any]]
+    document_context_recovery_snapshot: dict[str, Any] | None
+    document_context_injection_snapshot: dict[str, Any] | None
+    tool_guidance_snapshot: dict[str, Any] | None
     tool_catalog_version: str | None
     requested_write_scope: str
     requested_write_targets: list[str]
@@ -74,7 +77,10 @@ class AssistantTurnRunSnapshot:
     continuation_anchor_snapshot: dict[str, Any] | None
     compaction_snapshot: dict[str, Any] | None
     document_context_snapshot: dict[str, Any] | None
+    document_context_recovery_snapshot: dict[str, Any] | None
+    document_context_injection_snapshot: dict[str, Any] | None
     document_context_bindings_snapshot: tuple[dict[str, Any], ...]
+    tool_guidance_snapshot: dict[str, Any] | None
     tool_catalog_version: str | None
     requested_write_scope: str
     requested_write_targets_snapshot: tuple[str, ...]
@@ -125,8 +131,11 @@ def build_turn_context_hash(turn_context: AssistantTurnContext) -> str:
         "compaction_snapshot": turn_context.compaction_snapshot,
         "document_context": turn_context.document_context,
         "document_context_bindings": turn_context.document_context_bindings,
+        "document_context_recovery_snapshot": turn_context.document_context_recovery_snapshot,
+        "document_context_injection_snapshot": turn_context.document_context_injection_snapshot,
         "messages": turn_context.messages,
         "normalized_input_items": turn_context.normalized_input_items,
+        "tool_guidance_snapshot": turn_context.tool_guidance_snapshot,
         "requested_write_scope": turn_context.requested_write_scope,
         "requested_write_targets": turn_context.requested_write_targets,
     }
@@ -150,7 +159,10 @@ def freeze_turn_run_snapshot(
         continuation_anchor_snapshot=deepcopy(turn_context.continuation_anchor),
         compaction_snapshot=deepcopy(turn_context.compaction_snapshot),
         document_context_snapshot=deepcopy(turn_context.document_context),
+        document_context_recovery_snapshot=deepcopy(turn_context.document_context_recovery_snapshot),
+        document_context_injection_snapshot=deepcopy(turn_context.document_context_injection_snapshot),
         document_context_bindings_snapshot=tuple(deepcopy(turn_context.document_context_bindings)),
+        tool_guidance_snapshot=deepcopy(turn_context.tool_guidance_snapshot),
         tool_catalog_version=turn_context.tool_catalog_version,
         requested_write_scope=turn_context.requested_write_scope,
         requested_write_targets_snapshot=tuple(turn_context.requested_write_targets),
@@ -207,14 +219,37 @@ def build_turn_context(
     payload: AssistantTurnRequestDTO,
     *,
     compaction_snapshot: dict[str, Any] | None = None,
+    document_context_recovery_snapshot: dict[str, Any] | None = None,
+    document_context_injection_snapshot: dict[str, Any] | None = None,
     document_context_bindings: list[dict[str, Any]],
-    project_tool_guidance: AssistantProjectToolGuidanceDTO | None,
+    tool_guidance_snapshot: dict[str, Any] | None,
     owner_id: uuid.UUID,
     project_id: uuid.UUID | None,
     tool_catalog_version: str | None = None,
     user_rule_content: str | None,
     project_rule_content: str | None,
 ) -> AssistantTurnContext:
+    document_context = (
+        payload.document_context.model_dump(mode="json")
+        if payload.document_context is not None
+        else None
+    )
+    resolved_document_context_recovery_snapshot = (
+        deepcopy(document_context_recovery_snapshot)
+        if isinstance(document_context_recovery_snapshot, dict)
+        else build_document_context_recovery_snapshot(
+            document_context=document_context,
+            document_context_bindings=document_context_bindings,
+        )
+    )
+    resolved_document_context_injection_snapshot = (
+        deepcopy(document_context_injection_snapshot)
+        if isinstance(document_context_injection_snapshot, dict)
+        else build_document_context_injection_snapshot(
+            document_context,
+            document_context_recovery_snapshot=resolved_document_context_recovery_snapshot,
+        )
+    )
     return AssistantTurnContext(
         run_id=build_turn_run_id(
             owner_id=owner_id,
@@ -229,12 +264,11 @@ def build_turn_context(
         messages=dump_turn_messages(payload),
         messages_digest=build_turn_messages_digest(payload.messages),
         compaction_snapshot=deepcopy(compaction_snapshot),
-        document_context=(
-            payload.document_context.model_dump(mode="json")
-            if payload.document_context is not None
-            else None
-        ),
+        document_context=deepcopy(document_context),
         document_context_bindings=deepcopy(document_context_bindings),
+        document_context_recovery_snapshot=deepcopy(resolved_document_context_recovery_snapshot),
+        document_context_injection_snapshot=deepcopy(resolved_document_context_injection_snapshot),
+        tool_guidance_snapshot=deepcopy(tool_guidance_snapshot),
         tool_catalog_version=tool_catalog_version,
         requested_write_scope=payload.requested_write_scope,
         requested_write_targets=resolve_requested_write_targets(payload),
@@ -243,11 +277,44 @@ def build_turn_context(
             payload,
             compaction_snapshot=compaction_snapshot,
             document_context_bindings=document_context_bindings,
-            project_tool_guidance=project_tool_guidance,
+            document_context_recovery_snapshot=resolved_document_context_recovery_snapshot,
+            tool_guidance_snapshot=tool_guidance_snapshot,
             user_rule_content=user_rule_content,
             project_rule_content=project_rule_content,
         ),
     )
+
+
+def build_document_context_recovery_snapshot(
+    *,
+    document_context: dict[str, Any] | None,
+    document_context_bindings: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    payload = deepcopy(document_context) if isinstance(document_context, dict) else {}
+    active_binding = _read_active_document_context_binding(document_context_bindings)
+    selected_paths, selected_document_refs = _read_selected_document_context_bindings(
+        document_context_bindings
+    )
+    if selected_paths:
+        payload["selected_paths"] = selected_paths
+    if selected_document_refs:
+        payload["selected_document_refs"] = selected_document_refs
+    if active_binding is not None:
+        active_path = _read_optional_string(active_binding.get("path"))
+        if active_path is not None:
+            payload["active_path"] = active_path
+        active_document_ref = _read_optional_string(active_binding.get("document_ref"))
+        if active_document_ref is not None:
+            payload["active_document_ref"] = active_document_ref
+        active_binding_version = _read_optional_string(active_binding.get("binding_version"))
+        if active_binding_version is not None:
+            payload["active_binding_version"] = active_binding_version
+        active_buffer_state = _build_document_context_recovery_buffer_state(active_binding)
+        if active_buffer_state is not None:
+            payload["active_buffer_state"] = active_buffer_state
+    if not payload:
+        return None
+    return AssistantDocumentContextRecoverySnapshotDTO.model_validate(payload).model_dump(mode="json")
 
 
 def build_before_assistant_payload(
@@ -255,6 +322,7 @@ def build_before_assistant_payload(
     payload: AssistantTurnRequestDTO,
     project_id: uuid.UUID | None,
     turn_context: AssistantTurnContext,
+    visible_tool_descriptors: tuple["AssistantToolDescriptor", ...] = (),
 ) -> dict[str, Any]:
     return build_assistant_hook_payload(
         event="before_assistant_response",
@@ -268,6 +336,13 @@ def build_before_assistant_payload(
         messages=turn_context.messages,
         messages_digest=turn_context.messages_digest,
         document_context=turn_context.document_context,
+        document_context_bindings_snapshot=turn_context.document_context_bindings,
+        document_context_recovery_snapshot=turn_context.document_context_recovery_snapshot,
+        document_context_injection_snapshot=turn_context.document_context_injection_snapshot,
+        compaction_snapshot=turn_context.compaction_snapshot,
+        tool_guidance_snapshot=turn_context.tool_guidance_snapshot,
+        tool_catalog_version=turn_context.tool_catalog_version,
+        exposed_tool_names_snapshot=[item.name for item in visible_tool_descriptors],
         requested_write_scope=turn_context.requested_write_scope,
         requested_write_targets=turn_context.requested_write_targets,
         input_data=payload.input_data,
@@ -281,6 +356,7 @@ def build_after_assistant_payload(
     project_id: uuid.UUID | None,
     turn_context: AssistantTurnContext,
     content: str,
+    visible_tool_descriptors: tuple["AssistantToolDescriptor", ...] = (),
 ) -> dict[str, Any]:
     return build_assistant_hook_payload(
         event="after_assistant_response",
@@ -294,6 +370,13 @@ def build_after_assistant_payload(
         messages=turn_context.messages,
         messages_digest=turn_context.messages_digest,
         document_context=turn_context.document_context,
+        document_context_bindings_snapshot=turn_context.document_context_bindings,
+        document_context_recovery_snapshot=turn_context.document_context_recovery_snapshot,
+        document_context_injection_snapshot=turn_context.document_context_injection_snapshot,
+        compaction_snapshot=turn_context.compaction_snapshot,
+        tool_guidance_snapshot=turn_context.tool_guidance_snapshot,
+        tool_catalog_version=turn_context.tool_catalog_version,
+        exposed_tool_names_snapshot=[item.name for item in visible_tool_descriptors],
         requested_write_scope=turn_context.requested_write_scope,
         requested_write_targets=turn_context.requested_write_targets,
         input_data=payload.input_data,
@@ -363,7 +446,8 @@ def build_normalized_input_items(
     *,
     compaction_snapshot: dict[str, Any] | None,
     document_context_bindings: list[dict[str, Any]],
-    project_tool_guidance: AssistantProjectToolGuidanceDTO | None,
+    document_context_recovery_snapshot: dict[str, Any] | None,
+    tool_guidance_snapshot: dict[str, Any] | None,
     user_rule_content: str | None,
     project_rule_content: str | None,
 ) -> list[dict[str, Any]]:
@@ -380,11 +464,7 @@ def build_normalized_input_items(
             AssistantNormalizedInputItemDTO(
                 item_type="compacted_context",
                 content=_read_compaction_summary(compaction_snapshot),
-                payload={
-                    key: value
-                    for key, value in compaction_snapshot.items()
-                    if key != "summary"
-                },
+                payload=deepcopy(compaction_snapshot),
             )
         )
     if user_rule_content:
@@ -401,11 +481,11 @@ def build_normalized_input_items(
                 payload={"scope": "project", "content": project_rule_content},
             )
         )
-    if project_tool_guidance:
+    if isinstance(tool_guidance_snapshot, dict):
         items.append(
             AssistantNormalizedInputItemDTO(
                 item_type="tool_guidance",
-                payload=project_tool_guidance.model_dump(mode="json"),
+                payload=deepcopy(tool_guidance_snapshot),
             )
         )
     execution_mode_payload = _build_execution_mode_payload(spec)
@@ -437,6 +517,13 @@ def build_normalized_input_items(
             )
         )
     items.extend(_build_document_context_binding_items(document_context_bindings))
+    if isinstance(document_context_recovery_snapshot, dict):
+        items.append(
+            AssistantNormalizedInputItemDTO(
+                item_type="document_context_recovery",
+                payload=deepcopy(document_context_recovery_snapshot),
+            )
+        )
     return [item.model_dump(mode="json", exclude_none=True) for item in items]
 
 
@@ -455,22 +542,63 @@ def _build_execution_mode_payload(spec: AssistantExecutionSpec) -> dict[str, Any
         payload["system_prompt"] = spec.system_prompt
         payload["system_prompt_hash"] = _hash_text_content(spec.system_prompt)
     return payload
+def _read_active_document_context_binding(
+    document_context_bindings: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    for binding in document_context_bindings:
+        if not isinstance(binding, dict):
+            continue
+        if _read_optional_string(binding.get("selection_role")) == "active":
+            return binding
+    return None
 
 
-def resolve_project_tool_guidance_snapshot(
-    payload: AssistantTurnRequestDTO,
-    *,
-    has_project_scope: bool,
-) -> AssistantProjectToolGuidanceDTO | None:
-    return build_project_tool_guidance_snapshot(
-        has_project_scope=has_project_scope,
-        latest_user_message=require_latest_user_message(payload.messages),
-        document_context=(
-            payload.document_context.model_dump(mode="json")
-            if payload.document_context is not None
-            else None
-        ),
-    )
+def _read_selected_document_context_bindings(
+    document_context_bindings: list[dict[str, Any]],
+) -> tuple[list[str], list[str]]:
+    paths: list[str] = []
+    document_refs: list[str] = []
+    for binding in document_context_bindings:
+        if not isinstance(binding, dict):
+            continue
+        selection_role = _read_optional_string(binding.get("selection_role"))
+        if selection_role not in {"active", "selected"}:
+            continue
+        path = _read_optional_string(binding.get("path"))
+        if path is not None and path not in paths:
+            paths.append(path)
+        document_ref = _read_optional_string(binding.get("document_ref"))
+        if document_ref is not None and document_ref not in document_refs:
+            document_refs.append(document_ref)
+    return paths, document_refs
+
+
+def _build_document_context_recovery_buffer_state(
+    active_binding: dict[str, Any],
+) -> dict[str, Any] | None:
+    payload: dict[str, Any] = {}
+    dirty = active_binding.get("buffer_dirty")
+    if isinstance(dirty, bool):
+        payload["dirty"] = dirty
+    base_version = _read_optional_string(active_binding.get("base_version"))
+    if base_version is not None:
+        payload["base_version"] = base_version
+    buffer_hash = _read_optional_string(active_binding.get("buffer_hash"))
+    if buffer_hash is not None:
+        payload["buffer_hash"] = buffer_hash
+    buffer_source = _read_optional_string(active_binding.get("buffer_source"))
+    if buffer_source is not None:
+        payload["source"] = buffer_source
+    return payload or None
+
+
+def _read_optional_string(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    return normalized
 
 
 def _build_document_context_binding_items(

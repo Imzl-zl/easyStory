@@ -4,8 +4,10 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from . import provider_interop_stream_support as stream_support
-from .errors import ConfigurationError
+from ..errors import ConfigurationError
+from ..tool_provider import ToolProvider
+from .interop import provider_interop_stream_support as stream_support
+from .llm_interop_profiles import normalize_interop_profile
 from .llm_protocol import (
     HttpJsonResponse,
     LLMConnection,
@@ -23,7 +25,6 @@ from .llm_protocol import (
     resolve_continuation_support,
     send_json_http_request,
 )
-from .tool_provider import ToolProvider
 
 LLM_GENERATE_TOOL = "llm.generate"
 INCOMPLETE_STREAM_MESSAGE = (
@@ -126,7 +127,11 @@ class LLMToolProvider(ToolProvider):
                 continue
             parts.append(event.delta)
             yield LLMStreamEvent(delta=event.delta)
-        normalized = stream_support.build_stream_completion(parts, terminal_response)
+        normalized = stream_support.build_stream_completion(
+            api_dialect=api_dialect,
+            text_parts=parts,
+            terminal_response=terminal_response,
+        )
         if normalized is None:
             raise ConfigurationError("模型没有返回可展示的内容，请稍后重试。")
         if truncation_reason is not None:
@@ -267,6 +272,7 @@ def _build_connection(credential: dict[str, Any]) -> LLMConnection:
         client_name=_optional_string(credential.get("client_name")),
         client_version=_optional_string(credential.get("client_version")),
         runtime_kind=normalize_runtime_kind(_optional_string(credential.get("runtime_kind"))),
+        interop_profile=normalize_interop_profile(_optional_string(credential.get("interop_profile"))),
     )
 
 

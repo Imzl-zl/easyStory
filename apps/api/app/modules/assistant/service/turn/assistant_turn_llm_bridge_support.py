@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.config_registry.schemas import HookConfig
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_tool_provider import LLMStreamEvent
-from app.shared.runtime.provider_interop_stream_support import StreamInterruptedError
+from app.shared.runtime.llm.llm_tool_provider import LLMStreamEvent
+from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
 
 from ..assistant_execution_support import AssistantExecutionSpec
 from ..assistant_llm_runtime_support import (

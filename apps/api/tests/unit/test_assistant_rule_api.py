@@ -99,3 +99,63 @@ async def test_assistant_rule_api_reads_and_updates_project_rules(monkeypatch, t
         assert "这个项目统一写成古风口吻。" in rule_file.read_text(encoding="utf-8")
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_rule_api_preserves_include_frontmatter_on_user_rule_update(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    monkeypatch.setenv(
+        "EASYSTORY_ASSISTANT_CONFIG_ROOT",
+        str(tmp_path / "assistant-config"),
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-rule-user-include-api")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        rule_root = tmp_path / "assistant-config" / "users" / str(owner_id)
+        rule_root.mkdir(parents=True, exist_ok=True)
+        (rule_root / "AGENTS.md").write_text(
+            "---\n"
+            "enabled: true\n"
+            "scope: user\n"
+            "include:\n"
+            "  - fragments/style.md\n"
+            "---\n\n"
+            "主文件正文。\n",
+            encoding="utf-8",
+        )
+        (rule_root / "fragments").mkdir(parents=True, exist_ok=True)
+        (rule_root / "fragments" / "style.md").write_text("附加规则正文。\n", encoding="utf-8")
+        app = create_app(async_session_factory=async_session_factory)
+
+        async with started_async_client(app) as client:
+            initial = await client.get(
+                "/api/v1/assistant/rules/me",
+                headers=auth_headers(owner_id),
+            )
+            updated = await client.put(
+                "/api/v1/assistant/rules/me",
+                headers=auth_headers(owner_id),
+                json={"enabled": True, "content": "主文件已更新。"},
+            )
+            refreshed = await client.get(
+                "/api/v1/assistant/rules/me",
+                headers=auth_headers(owner_id),
+            )
+
+        assert initial.status_code == 200
+        assert initial.json()["content"] == "主文件正文。"
+        assert updated.status_code == 200
+        assert updated.json()["content"] == "主文件已更新。"
+        assert refreshed.status_code == 200
+        assert refreshed.json()["content"] == "主文件已更新。"
+        rule_text = (rule_root / "AGENTS.md").read_text(encoding="utf-8")
+        assert "include:" in rule_text
+        assert "fragments/style.md" in rule_text
+        assert "主文件已更新。" in rule_text
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)

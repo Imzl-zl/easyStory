@@ -5,11 +5,12 @@ import asyncio
 import pytest
 
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_protocol import HttpJsonResponse
-from app.shared.runtime.llm_tool_provider import LLMToolProvider
+from app.shared.runtime.llm.llm_protocol import HttpJsonResponse
+from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
 from app.shared.settings import (
     ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV,
     ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV,
+    clear_settings_cache,
 )
 
 
@@ -63,24 +64,29 @@ def test_execute_rejects_private_base_url_by_default() -> None:
         )
 
 
-def test_execute_rejects_public_http_base_url_by_default() -> None:
+def test_execute_rejects_public_http_base_url_by_default(monkeypatch) -> None:
+    monkeypatch.setenv(ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV, "false")
+    clear_settings_cache()
     provider = LLMToolProvider()
 
-    with pytest.raises(ConfigurationError, match="Public http model endpoints are disabled"):
-        asyncio.run(
-            provider.execute(
-                "llm.generate",
-                {
-                    "prompt": "测试提示词",
-                    "model": {"provider": "openai", "name": "gpt-4o-mini"},
-                    "credential": {
-                        "api_key": "test-key",
-                        "api_dialect": "openai_chat_completions",
-                        "base_url": "http://49.234.21.84:3000/v1",
+    try:
+        with pytest.raises(ConfigurationError, match="Public http model endpoints are disabled"):
+            asyncio.run(
+                provider.execute(
+                    "llm.generate",
+                    {
+                        "prompt": "测试提示词",
+                        "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                        "credential": {
+                            "api_key": "test-key",
+                            "api_dialect": "openai_chat_completions",
+                            "base_url": "http://49.234.21.84:3000/v1",
+                        },
                     },
-                },
+                )
             )
-        )
+    finally:
+        clear_settings_cache()
 
 
 def test_execute_allows_private_base_url_when_enabled(monkeypatch) -> None:

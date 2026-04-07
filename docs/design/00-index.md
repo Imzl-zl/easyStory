@@ -20,7 +20,7 @@
 
 > `docs/plans/` 默认是实施记录，不替代本目录和 `docs/specs/` 的正式设计真值。
 >
-> assistant runtime 当前若处于分节重构期，请先读 [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)、[22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[21-assistant-project-document-tools](./21-assistant-project-document-tools.md)，再看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md) 了解迁移路线和待改造主题。
+> assistant runtime 当前正式入口直接看 [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)、[22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[21-assistant-project-document-tools](./21-assistant-project-document-tools.md)；若需要查看 2026-04-07 这轮收口的历史过程，再看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。
 
 ---
 

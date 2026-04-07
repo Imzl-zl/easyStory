@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .errors import ConfigurationError
+from ..errors import ConfigurationError
+from .llm_interop_profiles import resolve_interop_capabilities
 from .llm_protocol_types import NormalizedLLMResponse, NormalizedLLMToolCall, normalize_api_dialect
 
 TRUNCATED_STOP_REASONS = frozenset({"length", "max_tokens", "max_output_tokens", "MAX_TOKENS"})
@@ -18,10 +19,27 @@ def parse_generation_response(
     if dialect == "openai_chat_completions":
         return _parse_openai_chat_response(payload)
     if dialect == "openai_responses":
-        return _parse_openai_responses_response(payload)
+        return _parse_openai_responses_response(payload, allow_empty_output=False)
     if dialect == "anthropic_messages":
         return _parse_anthropic_messages_response(payload)
     return _parse_gemini_generate_content_response(payload)
+
+
+def parse_stream_terminal_response(
+    api_dialect: str,
+    payload: dict[str, Any],
+    *,
+    interop_profile: str | None = None,
+) -> NormalizedLLMResponse:
+    dialect = normalize_api_dialect(api_dialect)
+    _raise_if_response_truncated(dialect, payload)
+    if dialect == "openai_responses":
+        capabilities = resolve_interop_capabilities(dialect, interop_profile)
+        return _parse_openai_responses_response(
+            payload,
+            allow_empty_output=capabilities.allows_responses_empty_output_in_stream_terminal,
+        )
+    return parse_generation_response(dialect, payload)
 
 
 def _parse_openai_chat_response(payload: dict[str, Any]) -> NormalizedLLMResponse:
@@ -43,13 +61,20 @@ def _parse_openai_chat_response(payload: dict[str, Any]) -> NormalizedLLMRespons
     )
 
 
-def _parse_openai_responses_response(payload: dict[str, Any]) -> NormalizedLLMResponse:
+def _parse_openai_responses_response(
+    payload: dict[str, Any],
+    *,
+    allow_empty_output: bool,
+) -> NormalizedLLMResponse:
     output_text = payload.get("output_text")
     if isinstance(output_text, str):
         content = output_text
     else:
-        content = _extract_responses_text(payload)
-    tool_calls = _extract_openai_responses_tool_calls(payload)
+        content = _extract_responses_text(payload, allow_empty_output=allow_empty_output)
+    tool_calls = _extract_openai_responses_tool_calls(
+        payload,
+        allow_empty_output=allow_empty_output,
+    )
     usage = _require_dict(payload.get("usage"), "usage", allow_none=True) or {}
     return _build_normalized_response(
         content,
@@ -60,7 +85,10 @@ def _parse_openai_responses_response(payload: dict[str, Any]) -> NormalizedLLMRe
         finish_reason=_extract_openai_responses_stop_reason(payload),
         tool_calls=tool_calls,
         provider_response_id=_optional_string(payload.get("id")),
-        provider_output_items=_build_openai_responses_output_items(payload),
+        provider_output_items=_build_openai_responses_output_items(
+            payload,
+            allow_empty_output=allow_empty_output,
+        ),
     )
 
 
@@ -144,8 +172,18 @@ def _build_gemini_empty_content_message(candidate: dict[str, Any]) -> str:
     return "candidates[0].content.parts must be a non-empty list"
 
 
-def _extract_responses_text(payload: dict[str, Any]) -> str:
-    output = _require_list(payload.get("output"), "output")
+def _extract_responses_text(
+    payload: dict[str, Any],
+    *,
+    allow_empty_output: bool,
+) -> str:
+    output = _extract_openai_responses_output(
+        payload,
+        allow_none=allow_empty_output,
+        allow_empty=allow_empty_output,
+    )
+    if not output:
+        return ""
     parts: list[str] = []
     for item in output:
         if not isinstance(item, dict):
@@ -313,8 +351,36 @@ def _build_openai_chat_output_items(message: dict[str, Any]) -> list[dict[str, A
     return items
 
 
-def _extract_openai_responses_tool_calls(payload: dict[str, Any]) -> list[NormalizedLLMToolCall]:
-    output = _require_list(payload.get("output"), "output", allow_none=True) or []
+def _extract_openai_responses_output(
+    payload: dict[str, Any],
+    *,
+    allow_none: bool,
+    allow_empty: bool,
+) -> list[Any] | None:
+    output = payload.get("output")
+    if output is None:
+        if allow_none:
+            return None
+        raise ConfigurationError("output must be a non-empty list")
+    if not isinstance(output, list):
+        raise ConfigurationError("output must be a non-empty list")
+    if not output:
+        if allow_empty:
+            return []
+        raise ConfigurationError("output must be a non-empty list")
+    return output
+
+
+def _extract_openai_responses_tool_calls(
+    payload: dict[str, Any],
+    *,
+    allow_empty_output: bool,
+) -> list[NormalizedLLMToolCall]:
+    output = _extract_openai_responses_output(
+        payload,
+        allow_none=True,
+        allow_empty=allow_empty_output,
+    ) or []
     items: list[NormalizedLLMToolCall] = []
     for item in output:
         if not isinstance(item, dict) or item.get("type") != "function_call":
@@ -330,14 +396,22 @@ def _extract_openai_responses_tool_calls(payload: dict[str, Any]) -> list[Normal
     return items
 
 
-def _build_openai_responses_output_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    output = _require_list(payload.get("output"), "output", allow_none=True)
+def _build_openai_responses_output_items(
+    payload: dict[str, Any],
+    *,
+    allow_empty_output: bool,
+) -> list[dict[str, Any]]:
+    output = _extract_openai_responses_output(
+        payload,
+        allow_none=True,
+        allow_empty=allow_empty_output,
+    )
     items: list[dict[str, Any]] = []
     text_index = 0
     tool_call_index = 0
     reasoning_index = 0
     refusal_index = 0
-    if output is None:
+    if output is None or output == []:
         output_text = payload.get("output_text")
         if isinstance(output_text, str) and output_text.strip():
             return [

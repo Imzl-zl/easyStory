@@ -11,12 +11,12 @@ import httpx
 from dotenv import dotenv_values
 
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_protocol import parse_generation_response, send_json_http_request
-from app.shared.runtime.provider_interop_stream_support import (
+from app.shared.runtime.llm.llm_protocol import parse_generation_response, send_json_http_request
+from app.shared.runtime.llm.interop.provider_interop_stream_support import (
     build_stream_probe_request,
     execute_stream_probe_request,
 )
-from app.shared.runtime.provider_interop_support import (
+from app.shared.runtime.llm.interop.provider_interop_support import (
     DEFAULT_PROVIDER_INTEROP_CONFIG_PATH,
     DEFAULT_PROVIDER_INTEROP_ENV_PATH,
     DEFAULT_PROVIDER_INTEROP_RATE_LIMIT_PATH,

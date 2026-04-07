@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .llm_protocol_types import PreparedLLMHttpRequest
+from ..llm_protocol_types import PreparedLLMHttpRequest
 
 GEMINI_MINIMAL_THINKING_LEVEL = "minimal"
 
@@ -18,6 +18,7 @@ def apply_gemini_probe_thinking_config(
         url=request.url,
         headers=request.headers,
         json_body=body,
+        interop_profile=request.interop_profile,
     )
 
 

@@ -16,7 +16,10 @@ from app.modules.assistant.service.context.assistant_prompt_render_support impor
     render_skill_prompt,
 )
 from app.modules.assistant.service.context.assistant_prompt_support import (
+    build_document_context_injection_snapshot,
     build_project_tool_guidance_snapshot,
+    build_project_tool_guidance_snapshot_from_discovery_decision,
+    resolve_project_tool_discovery_decision,
 )
 from app.modules.config_registry.schemas import AgentConfig
 from app.shared.runtime.errors import ConfigurationError
@@ -110,7 +113,7 @@ def test_render_message_only_prompt_includes_project_search_documents_guidance()
 
     prompt = render_message_only_prompt(
         [AssistantMessageDTO(role="user", content="帮我检查这一卷的人物关系和时间线是否一致。")],
-        project_tool_guidance=project_tool_guidance,
+        tool_guidance_snapshot=project_tool_guidance.model_dump(mode="json"),
     )
 
     assert "project.search_documents" in prompt
@@ -130,7 +133,7 @@ def test_render_skill_prompt_messages_json_path_keeps_project_search_documents_g
         rendered_skill_prompt="请根据 messages_json 总结 continuity 风险。",
         messages=[AssistantMessageDTO(role="user", content="检查全书连续性。")],
         referenced_variables={"messages_json"},
-        project_tool_guidance=project_tool_guidance,
+        tool_guidance_snapshot=project_tool_guidance.model_dump(mode="json"),
     )
 
     assert "project.search_documents" in prompt
@@ -146,14 +149,16 @@ def test_render_message_only_prompt_prefers_document_context_over_project_search
             "selected_paths": ["设定/人物.md"],
         },
     )
+    assert project_tool_guidance is None
 
     prompt = render_message_only_prompt(
         [AssistantMessageDTO(role="user", content="基于当前文稿继续写。")],
-        document_context={
-            "active_path": "正文/第001章.md",
-            "selected_paths": ["设定/人物.md"],
-        },
-        project_tool_guidance=project_tool_guidance,
+        document_context_injection_snapshot=build_document_context_injection_snapshot(
+            {
+                "active_path": "正文/第001章.md",
+                "selected_paths": ["设定/人物.md"],
+            }
+        ),
     )
 
     assert "【当前文稿上下文】" in prompt
@@ -177,6 +182,35 @@ def test_render_message_only_prompt_omits_project_search_documents_guidance_for_
 
     assert "project.search_documents" not in prompt
     assert prompt == "【用户当前消息】\n先读一下人物设定，再给我一个悬疑开场方向。"
+
+
+def test_resolve_project_tool_discovery_decision_requires_visible_tools() -> None:
+    decision = resolve_project_tool_discovery_decision(
+        has_project_scope=True,
+        visible_tool_names=("project.search_documents",),
+        latest_user_message="帮我检查这一卷的人物关系和时间线是否一致。",
+        document_context=None,
+    )
+
+    assert decision is None
+
+
+def test_build_project_tool_guidance_snapshot_projects_resolved_discovery_decision() -> None:
+    decision = resolve_project_tool_discovery_decision(
+        has_project_scope=True,
+        visible_tool_names=("project.search_documents", "project.read_documents"),
+        latest_user_message="帮我检查这一卷的人物关系和时间线是否一致。",
+        document_context=None,
+    )
+
+    guidance = build_project_tool_guidance_snapshot_from_discovery_decision(decision)
+
+    assert decision is not None
+    assert guidance is not None
+    assert guidance.guidance_type == decision.decision_type
+    assert guidance.tool_names == decision.tool_names
+    assert guidance.trigger_keywords == decision.trigger_keywords
+    assert guidance.discovery_source == decision.discovery_source
 
 
 def _build_structured_agent() -> AgentConfig:

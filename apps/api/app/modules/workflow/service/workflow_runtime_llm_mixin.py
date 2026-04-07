@@ -11,7 +11,7 @@ from app.modules.credential.models import ModelCredential
 from app.modules.credential.service.credential_connection_support import build_runtime_credential_payload
 from app.modules.workflow.models import WorkflowExecution
 from app.shared.runtime.errors import BudgetExceededError, ConfigurationError
-from app.shared.runtime.llm_tool_provider import LLM_GENERATE_TOOL
+from app.shared.runtime.llm.llm_tool_provider import LLM_GENERATE_TOOL
 
 from .workflow_runtime_llm_support import (
     ResolvedLLMCandidate,

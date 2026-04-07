@@ -5,7 +5,7 @@ import asyncio
 import pytest
 
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_tool_provider import LLMToolProvider
+from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
 
 
 def test_execute_stream_rejects_gemini_stream_without_finish_reason(monkeypatch) -> None:
@@ -38,7 +38,7 @@ def test_execute_stream_rejects_gemini_stream_without_finish_reason(monkeypatch)
         def stream(self, *args, **kwargs):
             return FakeResponse()
 
-    from app.shared.runtime import provider_interop_stream_support as stream_support
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
     provider = LLMToolProvider()
@@ -94,7 +94,7 @@ def test_execute_stream_accepts_gemini_stream_with_finish_reason(monkeypatch) ->
         def stream(self, *args, **kwargs):
             return FakeResponse()
 
-    from app.shared.runtime import provider_interop_stream_support as stream_support
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
     provider = LLMToolProvider()
@@ -120,9 +120,13 @@ def test_execute_stream_accepts_gemini_stream_with_finish_reason(monkeypatch) ->
     assert [event.delta for event in events[:-1]] == ["完整回复"]
     assert events[-1].response == {
         "content": "完整回复",
+        "finish_reason": "STOP",
         "model_name": "gemini-2.5-flash",
         "provider": "薄荷",
         "input_tokens": None,
         "output_tokens": None,
         "total_tokens": None,
+        "tool_calls": [],
+        "provider_response_id": None,
+        "output_items": [],
     }

@@ -5,6 +5,7 @@ import uuid
 
 from app.shared.runtime.errors import BusinessRuleError
 
+from ..context.assistant_prompt_support import build_document_context_injection_snapshot
 from ..hooks_runtime.assistant_hook_support import build_assistant_hook_payload
 from .assistant_turn_runtime_support import (
     build_turn_continuation_anchor_snapshot,
@@ -42,6 +43,11 @@ def build_request_error_hook_payload(
     payload: AssistantTurnRequestDTO,
     owner_id: uuid.UUID,
 ) -> dict[str, Any]:
+    document_context = (
+        payload.document_context.model_dump(mode="json")
+        if payload.document_context is not None
+        else None
+    )
     return build_assistant_hook_payload(
         event="on_error",
         agent_id=payload.agent_id,
@@ -58,11 +64,16 @@ def build_request_error_hook_payload(
         continuation_anchor=build_turn_continuation_anchor_snapshot(payload),
         messages=dump_turn_messages(payload),
         messages_digest=build_turn_messages_digest(payload.messages),
-        document_context=(
-            payload.document_context.model_dump(mode="json")
-            if payload.document_context is not None
-            else None
+        document_context=document_context,
+        document_context_bindings_snapshot=None,
+        document_context_recovery_snapshot=None,
+        document_context_injection_snapshot=build_document_context_injection_snapshot(
+            document_context
         ),
+        compaction_snapshot=None,
+        tool_guidance_snapshot=None,
+        tool_catalog_version=None,
+        exposed_tool_names_snapshot=[],
         requested_write_scope=payload.requested_write_scope,
         requested_write_targets=resolve_requested_write_targets(payload),
         input_data=payload.input_data,

@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from app.modules.credential.models import ModelCredential
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_protocol import (
+from app.shared.runtime.llm.llm_protocol import (
     normalize_api_dialect,
     normalize_auth_strategy,
     normalize_http_header_name,

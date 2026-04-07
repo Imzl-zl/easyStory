@@ -3,16 +3,22 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from app.shared.runtime.llm_protocol import LLMContinuationSupport
+from app.shared.runtime.llm.llm_protocol import LLMContinuationSupport
 from app.shared.runtime.token_counter import TokenCounter
 
 from ..context.assistant_input_budget_support import (
     estimate_assistant_request_tokens,
     trim_text_to_token_budget,
 )
+from ..assistant_compaction_contract_support import (
+    build_compaction_budget_exhausted_error,
+    resolve_continuation_compaction_level,
+)
 from ..assistant_run_budget import AssistantRunBudget
-from ..assistant_runtime_terminal import AssistantRuntimeTerminalError
-from ..dto import AssistantContinuationCompactionSnapshotDTO
+from ..dto import (
+    AssistantContinuationCompactionSnapshotDTO,
+    build_structured_items_digest,
+)
 
 TOOL_RESULT_TEXT_KEYS = frozenset({"content", "text", "message"})
 
@@ -49,7 +55,7 @@ def apply_tool_loop_request_budget(
     if estimated_tokens <= max_input_tokens:
         return request_items, _replace_latest_items(provider_continuation_state, request_items), None
     if not request_items:
-        raise _build_budget_exhausted_error()
+        raise build_compaction_budget_exhausted_error()
     compacted_items = _compact_continuation_items(
         request_items,
         target_tokens=max_input_tokens,
@@ -71,7 +77,7 @@ def apply_tool_loop_request_budget(
         token_counter=counter,
     )
     if estimated_compacted_tokens > max_input_tokens:
-        raise _build_budget_exhausted_error()
+        raise build_compaction_budget_exhausted_error()
     return (
         compacted_items,
         compacted_state,
@@ -365,7 +371,8 @@ def _build_continuation_compaction_snapshot(
     estimated_tokens_after: int,
     token_counter: TokenCounter,
 ) -> dict[str, Any]:
-    compacted_item_count = _count_compacted_items(original_items, compacted_items)
+    compacted_source_items = _collect_compacted_source_items(original_items, compacted_items)
+    compacted_item_count = len(compacted_source_items)
     trimmed_text_slot_count = _count_trimmed_text_slots(
         original_items,
         compacted_items,
@@ -375,17 +382,30 @@ def _build_continuation_compaction_snapshot(
     snapshot = AssistantContinuationCompactionSnapshotDTO(
         trigger_reason="max_input_tokens_exceeded",
         phase="tool_loop_continuation",
-        level=(
-            "hard"
-            if dropped_content_item_count > 0 or len(compacted_items) < len(original_items)
-            else "soft"
+        level=resolve_continuation_compaction_level(
+            original_item_count=len(original_items),
+            retained_item_count=len(compacted_items),
+            dropped_content_item_count=dropped_content_item_count,
         ),
         budget_limit_tokens=budget_limit_tokens,
         estimated_tokens_before=estimated_tokens_before,
         estimated_tokens_after=estimated_tokens_after,
         compacted_item_count=max(1, compacted_item_count),
         retained_item_count=len(compacted_items),
+        compressed_items_digest=(
+            build_structured_items_digest(compacted_source_items)
+            if compacted_source_items
+            else None
+        ),
+        projected_items_digest=build_structured_items_digest(compacted_items),
         compacted_tool_names=_collect_compacted_tool_names(original_items, compacted_items),
+        compacted_document_refs=_collect_compacted_document_refs(original_items, compacted_items),
+        compacted_document_versions=_collect_compacted_document_versions(
+            original_items, compacted_items
+        ),
+        compacted_catalog_versions=_collect_compacted_catalog_versions(
+            original_items, compacted_items
+        ),
         trimmed_text_slot_count=trimmed_text_slot_count,
         dropped_content_item_count=dropped_content_item_count,
     )
@@ -396,12 +416,18 @@ def _count_compacted_items(
     original_items: list[dict[str, Any]],
     compacted_items: list[dict[str, Any]],
 ) -> int:
-    changed = sum(
-        1
-        for index, item in enumerate(compacted_items)
-        if index >= len(original_items) or item != original_items[index]
-    )
-    return changed + max(0, len(original_items) - len(compacted_items))
+    return len(_collect_compacted_source_items(original_items, compacted_items))
+
+
+def _collect_compacted_source_items(
+    original_items: list[dict[str, Any]],
+    compacted_items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    source_items: list[dict[str, Any]] = []
+    for index, original in enumerate(original_items):
+        if index >= len(compacted_items) or compacted_items[index] != original:
+            source_items.append(original)
+    return source_items
 
 
 def _collect_compacted_tool_names(
@@ -419,7 +445,79 @@ def _collect_compacted_tool_names(
             continue
         seen.add(tool_name)
         tool_names.append(tool_name)
+    for original in original_items[len(compacted_items) :]:
+        tool_name = _read_compaction_tool_name(original)
+        if tool_name is None or tool_name in seen:
+            continue
+        seen.add(tool_name)
+        tool_names.append(tool_name)
     return tool_names
+
+
+def _collect_compacted_document_refs(
+    original_items: list[dict[str, Any]],
+    compacted_items: list[dict[str, Any]],
+) -> list[str]:
+    refs: list[str] = []
+    seen: set[str] = set()
+    for index, item in enumerate(compacted_items):
+        original = original_items[index] if index < len(original_items) else None
+        if not isinstance(original, dict) or item == original:
+            continue
+        for candidate in (original, item):
+            for document_ref in _iter_compaction_document_refs(candidate):
+                if document_ref in seen:
+                    continue
+                seen.add(document_ref)
+                refs.append(document_ref)
+    for original in original_items[len(compacted_items) :]:
+        for document_ref in _iter_compaction_document_refs(original):
+            if document_ref in seen:
+                continue
+            seen.add(document_ref)
+            refs.append(document_ref)
+    return refs
+
+
+def _collect_compacted_document_versions(
+    original_items: list[dict[str, Any]],
+    compacted_items: list[dict[str, Any]],
+) -> dict[str, str]:
+    versions: dict[str, str] = {}
+    for index, item in enumerate(compacted_items):
+        original = original_items[index] if index < len(original_items) else None
+        if not isinstance(original, dict) or item == original:
+            continue
+        _merge_compaction_document_versions(versions, original)
+        _merge_compaction_document_versions(versions, item)
+    for original in original_items[len(compacted_items) :]:
+        _merge_compaction_document_versions(versions, original)
+    return dict(sorted(versions.items()))
+
+
+def _collect_compacted_catalog_versions(
+    original_items: list[dict[str, Any]],
+    compacted_items: list[dict[str, Any]],
+) -> list[str]:
+    versions: list[str] = []
+    seen: set[str] = set()
+    for index, item in enumerate(compacted_items):
+        original = original_items[index] if index < len(original_items) else None
+        if not isinstance(original, dict) or item == original:
+            continue
+        for candidate in (original, item):
+            catalog_version = _read_compaction_catalog_version(candidate)
+            if catalog_version is None or catalog_version in seen:
+                continue
+            seen.add(catalog_version)
+            versions.append(catalog_version)
+    for original in original_items[len(compacted_items) :]:
+        catalog_version = _read_compaction_catalog_version(original)
+        if catalog_version is None or catalog_version in seen:
+            continue
+        seen.add(catalog_version)
+        versions.append(catalog_version)
+    return versions
 
 
 def _read_compaction_tool_name(item: dict[str, Any]) -> str | None:
@@ -430,6 +528,75 @@ def _read_compaction_tool_name(item: dict[str, Any]) -> str | None:
             return tool_name
     tool_name = item.get("tool_name")
     return tool_name if isinstance(tool_name, str) and tool_name.strip() else None
+
+
+def _iter_compaction_document_refs(item: dict[str, Any]) -> tuple[str, ...]:
+    payload = item.get("payload")
+    if not isinstance(payload, dict):
+        return ()
+    structured_output = payload.get("structured_output")
+    if not isinstance(structured_output, dict):
+        return ()
+    documents = structured_output.get("documents")
+    if not isinstance(documents, list):
+        return ()
+    refs: list[str] = []
+    seen: set[str] = set()
+    for document in documents:
+        if not isinstance(document, dict):
+            continue
+        document_ref = document.get("document_ref")
+        if not isinstance(document_ref, str):
+            continue
+        normalized = document_ref.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        refs.append(normalized)
+    return tuple(refs)
+
+
+def _merge_compaction_document_versions(
+    versions: dict[str, str],
+    item: dict[str, Any],
+) -> None:
+    payload = item.get("payload")
+    if not isinstance(payload, dict):
+        return
+    structured_output = payload.get("structured_output")
+    if not isinstance(structured_output, dict):
+        return
+    documents = structured_output.get("documents")
+    if not isinstance(documents, list):
+        return
+    for document in documents:
+        if not isinstance(document, dict):
+            continue
+        document_ref = document.get("document_ref")
+        version = document.get("version")
+        if not isinstance(document_ref, str) or not isinstance(version, str):
+            continue
+        normalized_ref = document_ref.strip()
+        normalized_version = version.strip()
+        if not normalized_ref or not normalized_version:
+            continue
+        versions.setdefault(normalized_ref, normalized_version)
+
+
+def _read_compaction_catalog_version(item: dict[str, Any]) -> str | None:
+    payload = item.get("payload")
+    if not isinstance(payload, dict):
+        return None
+    structured_output = payload.get("structured_output")
+    if not isinstance(structured_output, dict):
+        return None
+    catalog_version = structured_output.get("catalog_version")
+    if not isinstance(catalog_version, str):
+        return None
+    normalized = catalog_version.strip()
+    if not normalized:
+        return None
+    return normalized
 
 
 def _count_trimmed_text_slots(
@@ -467,10 +634,3 @@ def _count_dropped_content_items(
             continue
         dropped += max(0, len(original_content_items) - len(compacted_content_items))
     return dropped
-
-
-def _build_budget_exhausted_error() -> AssistantRuntimeTerminalError:
-    return AssistantRuntimeTerminalError(
-        code="budget_exhausted",
-        message="本轮上下文预算已耗尽，压缩后仍无法继续执行。",
-    )

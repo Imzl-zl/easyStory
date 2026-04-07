@@ -5,9 +5,9 @@ import json
 import pytest
 
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_protocol_requests import prepare_generation_request
-from app.shared.runtime.llm_protocol_responses import parse_generation_response
-from app.shared.runtime.llm_protocol_types import (
+from app.shared.runtime.llm.llm_protocol_requests import prepare_generation_request
+from app.shared.runtime.llm.llm_protocol_responses import parse_generation_response
+from app.shared.runtime.llm.llm_protocol_types import (
     LLMConnection,
     LLMFunctionToolDefinition,
     LLMGenerateRequest,
@@ -487,3 +487,14 @@ def test_parse_openai_responses_response_preserves_invalid_tool_arguments_for_ru
     assert normalized.tool_calls[0].arguments_text == '{"paths":["设定/人物.md"]'
     assert normalized.tool_calls[0].arguments_error == "Tool call arguments JSON is invalid"
     assert normalized.provider_output_items[0]["payload"]["arguments_error"] == "Tool call arguments JSON is invalid"
+
+
+def test_parse_openai_responses_response_keeps_non_stream_contract_strict_for_empty_output() -> None:
+    with pytest.raises(ConfigurationError, match="output must be a non-empty list"):
+        parse_generation_response(
+            "openai_responses",
+            {
+                "id": "resp_empty",
+                "output": [],
+            },
+        )

@@ -7,7 +7,7 @@ import pytest
 
 from app.modules.credential.infrastructure import AsyncHttpCredentialVerifier
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
-from app.shared.runtime.llm_protocol import (
+from app.shared.runtime.llm.llm_protocol import (
     NormalizedLLMResponse,
     VERIFY_SYSTEM_PROMPT,
     VERIFY_USER_PROMPT,
@@ -28,6 +28,7 @@ def _ok_response(
 ) -> NormalizedLLMResponse:
     return NormalizedLLMResponse(
         content=content,
+        finish_reason=None,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_tokens=total_tokens,

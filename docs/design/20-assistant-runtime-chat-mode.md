@@ -12,7 +12,7 @@
 
 > 本文档当前仍是 assistant runtime 的正式设计真值。
 >
-> 若你在跟踪本轮文档重构路线、待迁移章节或阶段状态，请看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。未明确回写到本文的目标语义，不视为正式真值。
+> 若你需要查看 2026-04-07 这轮 assistant runtime 收口的历史实施过程，请看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。当前正式语义以本文、相关 design 文档与代码为准。
 
 ## 1. 目的
 
@@ -250,6 +250,8 @@ Skill 模式下，`prompt` 当前实际顺序是：
 - `hook_selection`
 - `model_selection`
 - flat `document_context`
+- `document_context_binding`
+- `document_context_recovery`
 - 归一化后的 `document_context_binding`
 
 ### 3.2 规则层
@@ -267,12 +269,12 @@ Skill 模式下，`prompt` 当前实际顺序是：
 
 项目规则更具体，优先级高于用户规则。
 
-当前规则模型的正式口径只有“每个作用域一份启用态 + 一段内容文本”：
+当前规则模型的正式口径是：
 
-- 用户层一份 `content`
-- 项目层一份 `content`
-
-规则拆分、`include`、以及更细粒度的规则装配仍未进入当前运行时真值。
+- 每个作用域仍只有一份主 `AGENTS.md` 作为设置页读写入口
+- runtime `rule bundle` 当前仍只有 `user_content / project_content` 两段最终装配真值
+- 主 `AGENTS.md` 的 YAML frontmatter 当前允许显式声明同作用域 `include` 列表；运行时会在 build rule bundle 时按声明顺序递归展开
+- include 只允许停留在当前 `user` / `project` 作用域目录内；循环 include、缺失文件、越出作用域根目录都直接报错
 
 ### 3.2A Platform Safety Baseline
 
@@ -396,6 +398,8 @@ MCP 是能力层，不是模板层。
   - request projection：前端 / API 透传的 `document_context`
   - runtime normalized binding：ordinary chat runtime 内部冻结到 run snapshot 的 `DocumentContextBinding[]`
   - project binding：项目文稿能力层消费的 `ProjectDocumentContextBinding`
+- 除了原始 request projection 和 normalized binding 之外，`AssistantTurnRun` 当前还会显式冻结 `document_context_recovery_snapshot`，作为“基于 bindings 回放后的 latest recovery view”；它用于保留 runtime 真正应恢复的活动文稿、binding version、selected refs/paths 与 active buffer state，不再要求恢复链临时从两份旧 snapshot 重新拼装
+- `AssistantTurnRun` 当前还会显式冻结 `document_context_injection_snapshot`，作为 latest recovery view 经过 prompt-visible projection 后的单一注入真值；prepare 阶段只生成一次，后续 prompt projection / prompt render / run snapshot / hook payload 共享同一份 injection view，不再从 `document_context_snapshot + bindings_snapshot` 现推
 - 若当前 Studio 存在活动编辑器，`active_buffer_state` 必须随 turn request 一起透传；runtime 不反向读取前端本地编辑缓冲区
 - 若活动文稿可能成为本轮读写目标，但请求里缺失可信 `active_buffer_state`，runtime 不能猜测其缓冲区状态，只能拒绝对该文稿签发写入 grant
 - `requested_write_scope` 与 `requested_write_targets` 必须分层；前者回答“本轮有没有写能力”，后者回答“哪些文稿可成为候选写目标”
@@ -406,9 +410,10 @@ MCP 是能力层，不是模板层。
 - `input_data` 在迁移期继续保留，只作为现有 Skill / Hook / Agent 的兼容扩展袋
 - 新的系统级文稿上下文不再继续写进 `input_data`
 - Hook payload 在迁移期同时暴露 `request.input_data` 与 `request.document_context`
-- 当前 prompt 层的“项目范围工具提示”是仍在生效的显式装配逻辑：只有在项目作用域内、且请求未附带活动或已选文稿、并且用户消息命中 continuity 关键词时，prepare 阶段才会冻结 `project.search_documents -> project.read_documents` 的提示 snapshot
-- 该提示只影响 prompt，不改变实际可见工具集合；工具暴露真值仍以 [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md) 的 exposure policy 为准
-- 该提示当前还会同步冻结为显式 `tool_guidance` snapshot，至少包含 `guidance_type / tool_names / trigger_keywords / content`；prompt render 直接消费这份 frozen snapshot，不再在渲染阶段按消息和文稿上下文重新启发式计算
+- 当前 `before_assistant_response / after_assistant_response` hook payload 还会同步暴露 latest `request.document_context_bindings_snapshot`、`request.document_context_recovery_snapshot`、`request.document_context_injection_snapshot`、`request.compaction_snapshot`、`request.tool_guidance_snapshot`、`request.tool_catalog_version` 与 `request.exposed_tool_names_snapshot`，让 hook 与 turn snapshot 共享同一份 context governance / tool exposure 真值
+- 当前 prompt 层的“项目范围工具提示”仍是 ordinary chat 的显式装配逻辑：prepare 阶段会先基于项目作用域、文稿上下文缺席、continuity 关键词命中与本轮实际 visible tools 解析 internal discovery decision，只有当 `project.search_documents / project.read_documents` 真实同时可见时才会决议为 `project_search_then_read`
+- 该提示仍不是独立的 tool discovery phase；工具暴露真值继续以 [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md) 的 exposure policy 为准，但 guidance 本身不再直接从“候选关键词命中”冻结，而是由 resolved discovery decision 投影出来
+- 该提示当前会以显式 `tool_guidance` snapshot 冻结，至少包含 `guidance_type / tool_names / trigger_keywords / discovery_source / content`；resolved discovery decision 投影出的 guidance 才会进入 `AssistantTurnContext / AssistantTurnRunSnapshot / AssistantTurnRun`，并被 prompt projection / prompt render 与 `NormalizedInputItem(item_type=tool_guidance)` 共同消费，不再在渲染阶段按消息和文稿上下文重新启发式计算
 
 上下文压缩口径：
 
@@ -420,12 +425,18 @@ MCP 是能力层，不是模板层。
 - compaction 成功后，会同时留下：
   - prompt 中的 `【压缩后的早期对话摘要】`
   - run snapshot 里的 `compaction_snapshot`
-  - `NormalizedInputItem(item_type=compacted_context)`
+  - `NormalizedInputItem(item_type=compacted_context)`，其中 `content` 保留摘要文本，`payload` 直接复用完整 `compaction_snapshot`
+- `compaction_snapshot` 当前除了 `protected_document_paths` 之外，还会显式冻结当前可解析到的 `compressed_messages_digest`、压缩后实际消息投影视图的 `projected_messages_digest`、`summary_anchor_keywords`、`protected_document_refs`、`protected_document_reasons`、`protected_document_binding_versions`、`document_context_collapsed`、`document_context_projection_mode`、`projected_document_context_snapshot` 与 latest `document_context_recovery_snapshot`；其中 `projected_document_context_snapshot` 与 `document_context_injection_snapshot` 当前应保持同一份 prompt-visible recovery 真值，让 compaction audit 能直接对齐被压缩消息切片、压缩后消息视图、摘要锚点、binding / recovery 真值，以及 prompt 最终保留的文稿上下文层级，而不再只依赖路径字符串
 - 当前 `compaction_snapshot` 已至少包含：
   - `phase=initial_prompt`
   - `level=soft|hard`
+  - `soft` 表示摘要之外至少还保留了一段最近原始消息
+  - `hard` 表示早期历史已完全折叠到摘要里，不再保留最近原始消息槽
+- `fail` 当前不进入 snapshot；若初始 prompt 在压缩后仍无法落入预算，会显式返回共享 `budget_exhausted` 终止错误
   - `trigger_reason / budget_limit_tokens / estimated_tokens_before / estimated_tokens_after`
-- 当前尚未落地分级 compaction / context collapse / recovery；这部分继续留在计划文档，不在本文冒充现状
+  - `document_context_collapsed=false|true`
+  - `document_context_projection_mode=full|active_only|selected_only|omitted`
+- 当前 v1 已正式落地 latest compaction / context collapse / recovery 合同；若后续需要多次 compaction 的完整历史链，再另起计划，不回滚这里的单真值口径
 
 长期记忆口径：
 

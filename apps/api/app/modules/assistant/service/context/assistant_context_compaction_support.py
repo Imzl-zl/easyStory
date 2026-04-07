@@ -25,17 +25,25 @@ from app.shared.runtime import SkillTemplateRenderer
 from app.shared.runtime.token_counter import TokenCounter
 
 from .assistant_prompt_render_support import render_prompt
+from .assistant_prompt_support import (
+    build_document_context_injection_snapshot,
+    is_document_context_projection_collapsed,
+    resolve_document_context_projection_mode,
+)
+from ..assistant_compaction_contract_support import (
+    build_compaction_budget_exhausted_error,
+    resolve_initial_prompt_compaction_level,
+)
 from .assistant_input_budget_support import (
     estimate_assistant_request_tokens,
     trim_text_to_token_budget,
 )
 from ..assistant_run_budget import AssistantRunBudget
-from ..assistant_runtime_terminal import AssistantRuntimeTerminalError
 from ..dto import (
     AssistantCompactionSnapshotDTO,
     AssistantMessageDTO,
-    AssistantProjectToolGuidanceDTO,
     AssistantTurnRequestDTO,
+    build_turn_messages_digest,
 )
 
 COMPACTION_RECENT_HISTORY_CANDIDATES = (4, 2, 0)
@@ -115,7 +123,9 @@ def resolve_assistant_prompt_projection(
     skill: SkillConfig | None,
     payload: AssistantTurnRequestDTO,
     document_context: dict[str, Any] | None,
-    project_tool_guidance: AssistantProjectToolGuidanceDTO | None,
+    document_context_injection_snapshot: dict[str, Any] | None,
+    document_context_recovery_snapshot: dict[str, Any] | None,
+    tool_guidance_snapshot: dict[str, Any] | None,
     document_context_bindings: list[dict[str, Any]],
     system_prompt: str | None,
     run_budget: AssistantRunBudget | None,
@@ -127,8 +137,8 @@ def resolve_assistant_prompt_projection(
         template_renderer=template_renderer,
         skill=skill,
         payload=payload,
-        document_context=document_context,
-        project_tool_guidance=project_tool_guidance,
+        document_context_injection_snapshot=document_context_injection_snapshot,
+        tool_guidance_snapshot=tool_guidance_snapshot,
     )
     max_input_tokens = None if run_budget is None else run_budget.max_input_tokens
     if max_input_tokens is None:
@@ -143,14 +153,33 @@ def resolve_assistant_prompt_projection(
         return AssistantPromptProjection(prompt=full_prompt)
     referenced_variables = _resolve_referenced_variables(template_renderer, skill)
     if "messages_json" in referenced_variables:
-        raise _build_budget_exhausted_error()
+        raise build_compaction_budget_exhausted_error()
     history_messages = list(payload.messages[:-1])
     if not history_messages:
-        raise _build_budget_exhausted_error()
-    protected_document_paths = _collect_protected_document_paths(
+        raise build_compaction_budget_exhausted_error()
+    protected_document_reasons = _collect_protected_document_reasons(
         payload.document_context.model_dump(mode="json") if payload.document_context is not None else None,
         document_context_bindings=document_context_bindings,
         messages=history_messages,
+    )
+    protected_document_paths = tuple(sorted(protected_document_reasons))
+    protected_document_refs = _collect_protected_document_refs(
+        payload.document_context.model_dump(mode="json") if payload.document_context is not None else None,
+        document_context_bindings=document_context_bindings,
+        protected_document_paths=protected_document_paths,
+    )
+    protected_document_binding_versions = _collect_protected_document_binding_versions(
+        payload.document_context.model_dump(mode="json") if payload.document_context is not None else None,
+        document_context_bindings=document_context_bindings,
+        protected_document_paths=protected_document_paths,
+    )
+    projected_document_context_snapshot = (
+        dict(document_context_injection_snapshot)
+        if isinstance(document_context_injection_snapshot, dict)
+        else build_document_context_injection_snapshot(
+            document_context,
+            document_context_recovery_snapshot=document_context_recovery_snapshot,
+        )
     )
     for preserved_count in _resolve_recent_history_candidates(len(history_messages)):
         compacted_messages = history_messages[:-preserved_count] if preserved_count else history_messages
@@ -159,9 +188,14 @@ def resolve_assistant_prompt_projection(
         projected_history = [] if preserved_count == 0 else history_messages[-preserved_count:]
         projected_messages = [*projected_history, payload.messages[-1]]
         for summary_token_budget in _resolve_summary_token_budgets(max_input_tokens):
+            summary_anchor_keywords = _build_summary_anchor_keywords(
+                compacted_messages,
+                protected_document_paths=protected_document_paths,
+            )
             summary = _build_compacted_summary(
                 compacted_messages,
                 protected_document_paths=protected_document_paths,
+                anchor_keywords=summary_anchor_keywords,
                 target_tokens=summary_token_budget,
                 token_counter=counter,
             )
@@ -169,8 +203,8 @@ def resolve_assistant_prompt_projection(
                 template_renderer=template_renderer,
                 skill=skill,
                 payload=payload,
-                document_context=document_context,
-                project_tool_guidance=project_tool_guidance,
+                document_context_injection_snapshot=projected_document_context_snapshot,
+                tool_guidance_snapshot=tool_guidance_snapshot,
                 projected_messages=projected_messages,
                 compacted_context_summary=summary,
             )
@@ -185,20 +219,45 @@ def resolve_assistant_prompt_projection(
             snapshot = AssistantCompactionSnapshotDTO(
                 trigger_reason="max_input_tokens_exceeded",
                 phase="initial_prompt",
-                level=_resolve_compaction_level(preserved_count),
+                level=resolve_initial_prompt_compaction_level(
+                    preserved_recent_message_count=preserved_count
+                ),
                 budget_limit_tokens=max_input_tokens,
                 estimated_tokens_before=estimated_full_tokens,
                 estimated_tokens_after=estimated_compacted_tokens,
                 compressed_message_count=len(compacted_messages),
+                compressed_messages_digest=build_turn_messages_digest(compacted_messages),
+                projected_messages_digest=build_turn_messages_digest(projected_messages),
                 preserved_recent_message_count=preserved_count,
+                summary_anchor_keywords=list(summary_anchor_keywords),
                 protected_document_paths=list(protected_document_paths),
+                protected_document_refs=list(protected_document_refs),
+                protected_document_reasons=dict(protected_document_reasons),
+                protected_document_binding_versions=dict(protected_document_binding_versions),
+                document_context_collapsed=is_document_context_projection_collapsed(
+                    document_context_recovery_snapshot,
+                    projected_document_context_snapshot,
+                ),
+                document_context_projection_mode=resolve_document_context_projection_mode(
+                    projected_document_context_snapshot
+                ),
+                projected_document_context_snapshot=(
+                    dict(projected_document_context_snapshot)
+                    if isinstance(projected_document_context_snapshot, dict)
+                    else None
+                ),
+                document_context_recovery_snapshot=(
+                    dict(document_context_recovery_snapshot)
+                    if isinstance(document_context_recovery_snapshot, dict)
+                    else None
+                ),
                 summary=summary,
             )
             return AssistantPromptProjection(
                 prompt=compacted_prompt,
                 compaction_snapshot=snapshot.model_dump(mode="json"),
             )
-    raise _build_budget_exhausted_error()
+    raise build_compaction_budget_exhausted_error()
 
 
 def estimate_prompt_tokens(
@@ -248,52 +307,122 @@ def _resolve_summary_token_budgets(max_input_tokens: int) -> tuple[int, ...]:
     return tuple(ordered)
 
 
-def _resolve_compaction_level(preserved_recent_message_count: int) -> str:
-    if preserved_recent_message_count > 0:
-        return "soft"
-    return "hard"
-
-
-def _collect_protected_document_paths(
+def _collect_protected_document_reasons(
     document_context: dict[str, Any] | None,
     *,
     document_context_bindings: list[dict[str, Any]],
     messages: list[AssistantMessageDTO],
-) -> tuple[str, ...]:
-    paths: set[str] = set()
+) -> dict[str, list[str]]:
+    reasons: dict[str, set[str]] = {}
+
+    def _add_reason(path: str | None, reason: str) -> None:
+        if not path:
+            return
+        reasons.setdefault(path, set()).add(reason)
+
     if isinstance(document_context, dict):
-        paths.update(_read_string_list(document_context.get("selected_paths")))
+        for path in _read_string_list(document_context.get("selected_paths")):
+            _add_reason(path, "selected_path")
         active_path = _read_optional_string(document_context.get("active_path"))
         if active_path:
-            paths.add(active_path)
+            _add_reason(active_path, "active_path")
     for binding in document_context_bindings:
         path = _read_optional_string(binding.get("path"))
         if path:
-            paths.add(path)
+            _add_reason(path, "binding")
     for message in messages:
-        paths.update(DOCUMENT_PATH_PATTERN.findall(message.content))
-    protected = sorted(
-        path
-        for path in paths
-        if path in CRITICAL_DOCUMENT_PATHS or path.startswith("数据层/")
-    )
-    return tuple(protected)
+        for path in DOCUMENT_PATH_PATTERN.findall(message.content):
+            _add_reason(path, "message_reference")
+    protected: dict[str, list[str]] = {}
+    for path, path_reasons in sorted(reasons.items()):
+        if path in CRITICAL_DOCUMENT_PATHS:
+            path_reasons.add("critical_path")
+        if path.startswith("数据层/"):
+            path_reasons.add("data_layer_path")
+        if "critical_path" not in path_reasons and "data_layer_path" not in path_reasons:
+            continue
+        protected[path] = sorted(path_reasons)
+    return protected
+
+
+def _collect_protected_document_refs(
+    document_context: dict[str, Any] | None,
+    *,
+    document_context_bindings: list[dict[str, Any]],
+    protected_document_paths: tuple[str, ...],
+) -> tuple[str, ...]:
+    if not protected_document_paths:
+        return ()
+    protected_path_set = set(protected_document_paths)
+    refs: set[str] = set()
+    if isinstance(document_context, dict):
+        active_path = _read_optional_string(document_context.get("active_path"))
+        active_document_ref = _read_optional_string(document_context.get("active_document_ref"))
+        if active_path in protected_path_set and active_document_ref:
+            refs.add(active_document_ref)
+        for path, document_ref in zip(
+            _read_string_list(document_context.get("selected_paths")),
+            _read_string_list(document_context.get("selected_document_refs")),
+            strict=False,
+        ):
+            if path in protected_path_set and document_ref:
+                refs.add(document_ref)
+    for binding in document_context_bindings:
+        path = _read_optional_string(binding.get("path"))
+        document_ref = _read_optional_string(binding.get("document_ref"))
+        if path in protected_path_set and document_ref:
+            refs.add(document_ref)
+    return tuple(sorted(refs))
+
+
+def _collect_protected_document_binding_versions(
+    document_context: dict[str, Any] | None,
+    *,
+    document_context_bindings: list[dict[str, Any]],
+    protected_document_paths: tuple[str, ...],
+) -> dict[str, str]:
+    if not protected_document_paths:
+        return {}
+    protected_path_set = set(protected_document_paths)
+    binding_versions: dict[str, str] = {}
+    if isinstance(document_context, dict):
+        active_path = _read_optional_string(document_context.get("active_path"))
+        active_document_ref = _read_optional_string(document_context.get("active_document_ref"))
+        active_binding_version = _read_optional_string(document_context.get("active_binding_version"))
+        if (
+            active_path in protected_path_set
+            and active_document_ref is not None
+            and active_binding_version is not None
+        ):
+            binding_versions[active_document_ref] = active_binding_version
+    for binding in document_context_bindings:
+        path = _read_optional_string(binding.get("path"))
+        document_ref = _read_optional_string(binding.get("document_ref"))
+        binding_version = _read_optional_string(binding.get("binding_version"))
+        if path in protected_path_set and document_ref is not None and binding_version is not None:
+            binding_versions[document_ref] = binding_version
+    return dict(sorted(binding_versions.items()))
 
 
 def _build_compacted_summary(
     messages: list[AssistantMessageDTO],
     *,
     protected_document_paths: tuple[str, ...],
+    anchor_keywords: list[str] | None = None,
     target_tokens: int,
     token_counter: TokenCounter,
 ) -> str:
     sections: list[str] = []
-    anchor_keywords = _build_summary_anchor_keywords(
-        messages,
-        protected_document_paths=protected_document_paths,
+    resolved_anchor_keywords = (
+        list(anchor_keywords)
+        if anchor_keywords is not None
+        else _build_summary_anchor_keywords(
+            messages,
+            protected_document_paths=protected_document_paths,
+        )
     )
-    if anchor_keywords:
-        sections.append("连续性锚点：" + "、".join(anchor_keywords))
+    if resolved_anchor_keywords:
+        sections.append("连续性锚点：" + "、".join(resolved_anchor_keywords))
     excerpts = _collect_priority_excerpts(messages)
     if excerpts:
         sections.append("高优先级连续性信息：\n" + "\n".join(f"- {item}" for item in excerpts))
@@ -371,14 +500,6 @@ def _trim_text_to_token_budget(
         target_tokens=target_tokens,
         token_counter=token_counter,
     )
-
-
-def _build_budget_exhausted_error() -> AssistantRuntimeTerminalError:
-    return AssistantRuntimeTerminalError(
-        code="budget_exhausted",
-        message="本轮上下文预算已耗尽，压缩后仍无法继续执行。",
-    )
-
 
 def _resolve_role_label(message: AssistantMessageDTO) -> str:
     return "助手" if message.role == "assistant" else "用户"

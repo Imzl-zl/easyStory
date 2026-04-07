@@ -4,7 +4,10 @@ from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_protocol import LLMContinuationSupport, allows_provider_continuation_state
+from app.shared.runtime.llm.llm_protocol import (
+    LLMContinuationSupport,
+    allows_provider_continuation_state,
+)
 
 from ..dto import AssistantNormalizedInputItemDTO
 from .assistant_tool_runtime_dto import AssistantToolResultEnvelope

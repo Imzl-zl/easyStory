@@ -6,8 +6,8 @@ import json
 import pytest
 
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_protocol import HttpJsonResponse
-from app.shared.runtime.llm_tool_provider import LLMStreamEvent, LLMToolProvider
+from app.shared.runtime.llm.llm_protocol import HttpJsonResponse
+from app.shared.runtime.llm.llm_tool_provider import LLMStreamEvent, LLMToolProvider
 
 
 def _build_runtime_replay_continuation_items() -> list[dict[str, object]]:
@@ -821,7 +821,7 @@ def test_execute_stream_yields_chunks_and_completed_result(monkeypatch) -> None:
         def stream(self, *args, **kwargs):
             return FakeResponse()
 
-    from app.shared.runtime import provider_interop_stream_support as stream_support
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
     provider = LLMToolProvider()
@@ -904,7 +904,7 @@ def test_execute_stream_uses_openai_completed_payload_when_no_deltas(monkeypatch
         def stream(self, *args, **kwargs):
             return FakeResponse()
 
-    from app.shared.runtime import provider_interop_stream_support as stream_support
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
     provider = LLMToolProvider()
@@ -990,7 +990,7 @@ def test_execute_stream_accepts_openai_completed_payload_with_tool_calls_and_no_
         def stream(self, *args, **kwargs):
             return FakeResponse()
 
-    from app.shared.runtime import provider_interop_stream_support as stream_support
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
     provider = LLMToolProvider()
@@ -1053,6 +1053,216 @@ def test_execute_stream_accepts_openai_completed_payload_with_tool_calls_and_no_
     ]
 
 
+def test_execute_stream_accepts_openai_completed_payload_with_empty_output_and_deltas(
+    monkeypatch,
+) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.output_text.delta"
+            yield 'data: {"delta":"今天"}'
+            yield ""
+            yield "event: response.output_text.delta"
+            yield 'data: {"delta":"有新方向"}'
+            yield ""
+            yield "event: response.completed"
+            yield (
+                'data: {"type":"response.completed","response":{"id":"resp_delta_first","output":[],'
+                '"usage":{"input_tokens":8,"output_tokens":10,"total_tokens":18}}}'
+            )
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    provider = LLMToolProvider()
+
+    async def collect_events():
+        return [
+            event
+            async for event in provider.execute_stream(
+                "llm.generate",
+                {
+                    "prompt": "给个方向",
+                    "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_responses",
+                    },
+                },
+            )
+        ]
+
+    events = asyncio.run(collect_events())
+
+    assert [event.delta for event in events[:-1]] == ["今天", "有新方向"]
+    assert events[-1].response == {
+        "content": "今天有新方向",
+        "finish_reason": None,
+        "model_name": "gpt-4.1-mini",
+        "provider": "openai",
+        "input_tokens": 8,
+        "output_tokens": 10,
+        "total_tokens": 18,
+        "tool_calls": [],
+        "provider_response_id": "resp_delta_first",
+        "output_items": [],
+    }
+
+
+def test_execute_stream_rejects_openai_empty_output_with_strict_interop_profile(
+    monkeypatch,
+) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.output_text.delta"
+            yield 'data: {"delta":"今天"}'
+            yield ""
+            yield "event: response.completed"
+            yield 'data: {"type":"response.completed","response":{"id":"resp_strict","output":[]}}'
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    provider = LLMToolProvider()
+
+    async def collect_events():
+        return [
+            event
+            async for event in provider.execute_stream(
+                "llm.generate",
+                {
+                    "prompt": "给个方向",
+                    "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_responses",
+                        "interop_profile": "responses_strict",
+                    },
+                },
+            )
+        ]
+
+    with pytest.raises(ConfigurationError, match="output must be a non-empty list"):
+        asyncio.run(collect_events())
+
+
+def test_execute_stream_rejects_openai_terminal_content_conflict(monkeypatch) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.output_text.delta"
+            yield 'data: {"delta":"今天有新方向"}'
+            yield ""
+            yield "event: response.completed"
+            yield (
+                'data: {"type":"response.completed","response":{"output":[{"type":"message",'
+                '"content":[{"type":"output_text","text":"明天改方向"}]}]}}'
+            )
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    provider = LLMToolProvider()
+
+    async def collect_events():
+        return [
+            event
+            async for event in provider.execute_stream(
+                "llm.generate",
+                {
+                    "prompt": "给个方向",
+                    "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_responses",
+                    },
+                },
+            )
+        ]
+
+    with pytest.raises(ConfigurationError, match="流式终态文本与已累计的增量文本不一致"):
+        asyncio.run(collect_events())
+
+
 def test_execute_stream_accepts_gemini_terminal_payload_with_tool_calls_and_no_text(
     monkeypatch,
 ) -> None:
@@ -1090,7 +1300,7 @@ def test_execute_stream_accepts_gemini_terminal_payload_with_tool_calls_and_no_t
         def stream(self, *args, **kwargs):
             return FakeResponse()
 
-    from app.shared.runtime import provider_interop_stream_support as stream_support
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
     provider = LLMToolProvider()
@@ -1173,7 +1383,7 @@ def test_execute_stream_raises_when_upstream_reports_truncation(monkeypatch) -> 
         def stream(self, *args, **kwargs):
             return FakeResponse()
 
-    from app.shared.runtime import provider_interop_stream_support as stream_support
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
     provider = LLMToolProvider()

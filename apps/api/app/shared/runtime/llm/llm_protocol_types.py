@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 import httpx
 
-from .errors import ConfigurationError
+from ..errors import ConfigurationError
 
 LlmApiDialect = Literal[
     "openai_chat_completions",
@@ -80,6 +80,7 @@ class LLMConnection:
     client_name: str | None = None
     client_version: str | None = None
     runtime_kind: LlmRuntimeKind | None = None
+    interop_profile: str | None = None
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,7 @@ class PreparedLLMHttpRequest:
     url: str
     headers: dict[str, str]
     json_body: dict[str, Any]
+    interop_profile: str | None = None
 
 
 @dataclass(frozen=True)

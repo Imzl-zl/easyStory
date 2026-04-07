@@ -12,12 +12,12 @@ from app.modules.credential.service import CredentialService
 from app.modules.credential.service.credential_connection_support import build_runtime_credential_payload
 from app.shared.runtime import ToolProvider
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_protocol import (
+from app.shared.runtime.llm.llm_protocol import (
     LLMContinuationSupport,
     allows_provider_continuation_state,
     resolve_continuation_support,
 )
-from app.shared.runtime.llm_tool_provider import LLM_GENERATE_TOOL, LLMStreamEvent
+from app.shared.runtime.llm.llm_tool_provider import LLM_GENERATE_TOOL, LLMStreamEvent
 
 from .tooling.assistant_tool_loop import AssistantToolLoopModelStreamEvent
 

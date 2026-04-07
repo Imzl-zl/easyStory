@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .errors import ConfigurationError
-from .llm_protocol import normalize_http_header_name
+from ...errors import ConfigurationError
+from ..llm_protocol import normalize_http_header_name
 
 
 def _load_json_file(path: Path) -> dict[str, Any]:

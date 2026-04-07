@@ -68,18 +68,11 @@ class AssistantRuleService:
         owner_id: uuid.UUID,
         project_id: uuid.UUID | None,
     ) -> AssistantRuleBundleDTO:
-        user_rules = await self.get_user_rules(db, owner_id=owner_id)
-        project_rules = None
+        project_content = None
         if project_id is not None:
-            project_rules = await self.get_project_rules(db, project_id, owner_id=owner_id)
+            project = await self.project_service.require_project(db, project_id, owner_id=owner_id)
+            project_content = self.config_store.resolve_project_rule_runtime_content(project.id)
         return AssistantRuleBundleDTO(
-            user_content=_resolve_runtime_content(user_rules),
-            project_content=_resolve_runtime_content(project_rules),
+            user_content=self.config_store.resolve_user_rule_runtime_content(owner_id),
+            project_content=project_content,
         )
-
-
-def _resolve_runtime_content(profile: AssistantRuleProfileDTO | None) -> str | None:
-    if profile is None or not profile.enabled:
-        return None
-    content = profile.content.strip()
-    return content or None

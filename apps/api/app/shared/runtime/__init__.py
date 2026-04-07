@@ -32,15 +32,15 @@ def __getattr__(name: str):
 
         return PROJECT_DOCUMENT_ROOT_DIR
     if name == "LLMToolProvider":
-        from .llm_tool_provider import LLMToolProvider
+        from .llm.llm_tool_provider import LLMToolProvider
 
         return LLMToolProvider
     if name == "McpToolCallResult":
-        from .mcp_client import McpToolCallResult
+        from .mcp.mcp_client import McpToolCallResult
 
         return McpToolCallResult
     if name == "McpToolCaller":
-        from .mcp_client import McpToolCaller
+        from .mcp.mcp_client import McpToolCaller
 
         return McpToolCaller
     if name == "ModelPrice":
@@ -52,11 +52,11 @@ def __getattr__(name: str):
 
         return ModelPricing
     if name == "PluginRegistry":
-        from .plugin_registry import PluginRegistry
+        from .plugins.plugin_registry import PluginRegistry
 
         return PluginRegistry
     if name == "StreamableHttpMcpToolCaller":
-        from .mcp_client import StreamableHttpMcpToolCaller
+        from .mcp.mcp_client import StreamableHttpMcpToolCaller
 
         return StreamableHttpMcpToolCaller
     if name == "SkillTemplateRenderer":

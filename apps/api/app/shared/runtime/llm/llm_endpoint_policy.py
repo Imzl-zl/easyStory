@@ -9,7 +9,7 @@ from app.shared.settings import (
     get_settings,
 )
 
-from .errors import ConfigurationError
+from ..errors import ConfigurationError
 
 PUBLIC_ENDPOINT_SCHEMES = frozenset({"https"})
 PRIVATE_ENDPOINT_SCHEMES = frozenset({"http", "https"})

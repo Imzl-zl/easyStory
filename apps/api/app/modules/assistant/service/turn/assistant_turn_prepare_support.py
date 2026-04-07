@@ -17,6 +17,13 @@ from ..context.assistant_document_context_support import (
     NormalizedAssistantTurnPayload,
     normalize_turn_payload,
 )
+from ..context.assistant_prompt_support import (
+    build_document_context_injection_snapshot,
+    build_project_tool_guidance_snapshot_from_discovery_decision,
+    freeze_project_tool_guidance_snapshot,
+    require_latest_user_message,
+    resolve_project_tool_discovery_decision,
+)
 from ..assistant_execution_support import resolve_execution_spec
 from ..hooks.assistant_hook_service import AssistantHookService
 from ..assistant_llm_runtime_support import resolve_assistant_max_output_tokens
@@ -32,9 +39,9 @@ from .assistant_turn_run_store import AssistantTurnRunStore
 from .assistant_turn_runtime_support import (
     PreparedAssistantTurn,
     build_before_assistant_payload,
+    build_document_context_recovery_snapshot,
     build_turn_context,
     freeze_turn_run_snapshot,
-    resolve_project_tool_guidance_snapshot,
 )
 from ..dto import AssistantTurnRequestDTO, build_turn_messages_digest
 
@@ -108,15 +115,29 @@ async def prepare_assistant_turn(
         user_content=rule_bundle.user_content,
         project_content=rule_bundle.project_content,
     )
-    project_tool_guidance = resolve_project_tool_guidance_snapshot(
-        normalized_payload,
-        has_project_scope=project_id is not None,
+    document_context_recovery_snapshot = build_document_context_recovery_snapshot(
+        document_context=(
+            normalized_payload.document_context.model_dump(mode="json")
+            if normalized_payload.document_context is not None
+            else None
+        ),
+        document_context_bindings=normalized_turn_payload.document_context_bindings,
+    )
+    document_context_injection_snapshot = build_document_context_injection_snapshot(
+        (
+            normalized_payload.document_context.model_dump(mode="json")
+            if normalized_payload.document_context is not None
+            else None
+        ),
+        document_context_recovery_snapshot=document_context_recovery_snapshot,
     )
     provisional_turn_context = build_turn_context(
         spec,
         normalized_payload,
+        document_context_recovery_snapshot=document_context_recovery_snapshot,
+        document_context_injection_snapshot=document_context_injection_snapshot,
         document_context_bindings=normalized_turn_payload.document_context_bindings,
-        project_tool_guidance=project_tool_guidance,
+        tool_guidance_snapshot=None,
         owner_id=owner_id,
         project_id=project_id,
         tool_catalog_version=None,
@@ -140,6 +161,20 @@ async def prepare_assistant_turn(
         project_id=project_id,
         visible_tool_descriptors=visible_tool_descriptors,
     )
+    tool_guidance_snapshot = freeze_project_tool_guidance_snapshot(
+        build_project_tool_guidance_snapshot_from_discovery_decision(
+            resolve_project_tool_discovery_decision(
+                has_project_scope=project_id is not None,
+                visible_tool_names=tuple(item.name for item in visible_tool_descriptors),
+                latest_user_message=require_latest_user_message(normalized_payload.messages),
+                document_context=(
+                    normalized_payload.document_context.model_dump(mode="json")
+                    if normalized_payload.document_context is not None
+                    else None
+                ),
+            )
+        )
+    )
     run_budget = enrich_assistant_run_budget_with_input_window(
         run_budget,
         context_window_tokens=resolved_llm_runtime.context_window_tokens,
@@ -157,7 +192,9 @@ async def prepare_assistant_turn(
             if normalized_payload.document_context is not None
             else None
         ),
-        project_tool_guidance=project_tool_guidance,
+        document_context_injection_snapshot=document_context_injection_snapshot,
+        document_context_recovery_snapshot=document_context_recovery_snapshot,
+        tool_guidance_snapshot=tool_guidance_snapshot,
         document_context_bindings=normalized_turn_payload.document_context_bindings,
         system_prompt=system_prompt,
         run_budget=run_budget,
@@ -171,8 +208,10 @@ async def prepare_assistant_turn(
         spec,
         normalized_payload,
         compaction_snapshot=prompt_projection.compaction_snapshot,
+        document_context_recovery_snapshot=document_context_recovery_snapshot,
+        document_context_injection_snapshot=document_context_injection_snapshot,
         document_context_bindings=normalized_turn_payload.document_context_bindings,
-        project_tool_guidance=project_tool_guidance,
+        tool_guidance_snapshot=tool_guidance_snapshot,
         owner_id=owner_id,
         project_id=project_id,
         tool_catalog_version=tool_catalog_version,
@@ -180,7 +219,13 @@ async def prepare_assistant_turn(
         project_rule_content=rule_bundle.project_content,
     )
     return PreparedAssistantTurn(
-        before_payload=build_before_assistant_payload(spec, normalized_payload, project_id, turn_context),
+        before_payload=build_before_assistant_payload(
+            spec,
+            normalized_payload,
+            project_id,
+            turn_context,
+            visible_tool_descriptors=visible_tool_descriptors,
+        ),
         hooks=list(
             resolved_hooks
             if resolved_hooks is not None

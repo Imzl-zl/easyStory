@@ -12,7 +12,7 @@ from app.modules.config_registry.schemas.config_schemas import ModelConfig, Skil
 from app.modules.template.service import TemplateQueryService
 from app.shared.runtime import SkillTemplateRenderer, ToolProvider
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_tool_provider import LLM_GENERATE_TOOL
+from app.shared.runtime.llm.llm_tool_provider import LLM_GENERATE_TOOL
 
 from .dto import (
     ProjectCreateDTO,

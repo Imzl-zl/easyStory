@@ -17,7 +17,7 @@ from app.modules.project.service import (
 )
 from app.shared.runtime import PluginRegistry, SkillTemplateRenderer, ToolProvider
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm_tool_provider import LLMStreamEvent
+from app.shared.runtime.llm.llm_tool_provider import LLMStreamEvent
 
 from .rules.assistant_rule_service import AssistantRuleService
 from .agents.assistant_agent_service import AssistantAgentService
@@ -625,6 +625,7 @@ class AssistantService:
             prepared.project_id,
             prepared.turn_context,
             content,
+            visible_tool_descriptors=prepared.visible_tool_descriptors,
         )
         after_results = await self._run_hook_event(
             db,

@@ -1,8 +1,30 @@
 from __future__ import annotations
 
+from app.shared.runtime.errors import ConfigurationError
+
 
 def normalize_rule_content(content: str) -> str:
     return content.strip()
+
+
+def normalize_rule_include_paths(raw_include: object) -> tuple[str, ...]:
+    if raw_include is None:
+        return ()
+    if not isinstance(raw_include, list):
+        raise ConfigurationError("Assistant rule file include must be a YAML string list")
+    include_paths: list[str] = []
+    for item in raw_include:
+        if not isinstance(item, str) or not item.strip():
+            raise ConfigurationError(
+                "Assistant rule file include entries must be non-empty strings"
+            )
+        include_paths.append(item.strip())
+    return tuple(include_paths)
+
+
+def assemble_rule_runtime_content(*sections: str) -> str:
+    normalized_sections = [normalize_rule_content(section) for section in sections if section.strip()]
+    return "\n\n".join(normalized_sections)
 
 
 def build_assistant_system_prompt(

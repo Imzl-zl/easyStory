@@ -8,9 +8,10 @@ from typing import Any
 
 from dotenv import dotenv_values
 
-from .errors import ConfigurationError
+from ...errors import ConfigurationError
 from .gemini_probe_support import apply_gemini_probe_thinking_config
-from .llm_protocol import (
+from ..llm_interop_profiles import normalize_interop_profile
+from ..llm_protocol import (
     LLMConnection,
     LLMGenerateRequest,
     build_verification_request,
@@ -46,6 +47,7 @@ class ProviderInteropProfile:
     base_url: str | None
     default_model: str | None
     api_key_env: str
+    interop_profile: str | None = None
     auth_strategy: str | None = None
     api_key_header_name: str | None = None
     extra_headers: dict[str, str] | None = None
@@ -58,6 +60,7 @@ class ProviderInteropOverride:
     api_dialect: str | None = None
     base_url: str | None = None
     model_name: str | None = None
+    interop_profile: str | None = None
     auth_strategy: str | None = None
     api_key_header_name: str | None = None
     extra_headers: dict[str, str] | None = None
@@ -120,6 +123,7 @@ def resolve_provider_interop_profile(
             auth_strategy=auth_strategy,
             api_key_header_name=header_name,
             extra_headers=_resolve_extra_headers(profile, active_override),
+            interop_profile=_resolve_interop_profile(profile, active_override),
         ),
         max_requests_per_minute=profile.max_requests_per_minute,
         notes=profile.notes,
@@ -187,6 +191,7 @@ def _parse_profile(raw_profile: Any) -> ProviderInteropProfile:
         base_url=_optional_profile_string(raw_profile.get("base_url")),
         default_model=_optional_profile_string(raw_profile.get("default_model")),
         api_key_env=_require_profile_string(raw_profile, "api_key_env"),
+        interop_profile=normalize_interop_profile(_optional_profile_string(raw_profile.get("interop_profile"))),
         auth_strategy=normalize_auth_strategy(_optional_profile_string(raw_profile.get("auth_strategy"))),
         api_key_header_name=_optional_profile_string(raw_profile.get("api_key_header_name")),
         extra_headers=_optional_profile_headers(raw_profile.get("extra_headers")),
@@ -234,6 +239,15 @@ def _resolve_extra_headers(
         return merged or None
     merged.update(_optional_profile_headers(override.extra_headers) or {})
     return merged or None
+
+
+def _resolve_interop_profile(
+    profile: ProviderInteropProfile,
+    override: ProviderInteropOverride,
+) -> str | None:
+    if override.interop_profile is not None:
+        return normalize_interop_profile(override.interop_profile)
+    return profile.interop_profile
 
 
 def _resolve_api_key(api_key_env: str, env_values: dict[str, str | None]) -> str:

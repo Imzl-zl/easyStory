@@ -171,12 +171,16 @@ scope: user
 
 - `enabled`：是否在每次聊天时自动注入这份规则
 - `scope`：`user` 或 `project`
+- `include`：可选；声明当前作用域目录内需要继续装配的相对 Markdown 路径列表，运行时按声明顺序递归展开
 - 正文：真正注入到 assistant system prompt 的长期规则内容
+- 当前 `/api/v1/assistant/rules/*` 仍以主 `AGENTS.md` 正文作为设置页读写真值；runtime `rule bundle` 才会在装配阶段递归解析 `include`
 
 兼容规则：
 
 - 若文件只有纯 Markdown 正文、没有 frontmatter，则运行时按“已启用规则文件”处理
 - 若 frontmatter 非法或 `scope` 与目录层级不一致，运行时直接报错，不做静默降级
+- `include` 必须是非空字符串列表，且所有路径都必须保持在当前 `user` / `project` 作用域目录内
+- 循环 include、缺失文件或越过当前作用域根目录的 include，运行时直接报错，不做静默降级
 
 ### 2.2 Assistant 偏好文件
 

@@ -5,7 +5,7 @@ from typing import Any, Protocol
 
 from app.modules.config_registry.schemas import McpServerConfig
 
-from .errors import ConfigurationError
+from ..errors import ConfigurationError
 
 
 @dataclass(frozen=True)

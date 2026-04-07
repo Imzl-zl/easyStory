@@ -17,7 +17,7 @@ from app.modules.project.schemas import ProjectSettingProjectionError, resolve_s
 from app.modules.project.service import ProjectService
 from app.shared.runtime import SkillTemplateRenderer, ToolProvider
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
-from app.shared.runtime.llm_tool_provider import LLM_GENERATE_TOOL
+from app.shared.runtime.llm.llm_tool_provider import LLM_GENERATE_TOOL
 
 from .chapter_store import require_approved_asset
 from .dto import AssetType, StoryAssetGenerateDTO, StoryAssetMutationDTO, StoryAssetSaveDTO

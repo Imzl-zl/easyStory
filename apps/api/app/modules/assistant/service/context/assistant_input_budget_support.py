@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.shared.runtime.llm_protocol import LLMContinuationSupport
+from app.shared.runtime.llm.llm_protocol import LLMContinuationSupport
 from app.shared.runtime.token_counter import TokenCounter
 
 DEFAULT_TOKEN_MODEL = "default"
@@ -111,4 +111,3 @@ def _estimate_json_tokens(
         json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True),
         DEFAULT_TOKEN_MODEL,
     )
-

@@ -8,13 +8,13 @@ from typing import Protocol
 import httpx
 
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
-from app.shared.runtime.llm_protocol import (
+from app.shared.runtime.llm.llm_protocol import (
     LLMConnection,
     NormalizedLLMResponse,
     PreparedLLMHttpRequest,
     build_verification_request,
 )
-from app.shared.runtime.provider_interop_stream_support import (
+from app.shared.runtime.llm.interop.provider_interop_stream_support import (
     build_stream_probe_request,
     execute_stream_probe_request,
 )

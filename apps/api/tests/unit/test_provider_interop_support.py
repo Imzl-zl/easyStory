@@ -5,7 +5,7 @@ import json
 import pytest
 
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.provider_interop_support import (
+from app.shared.runtime.llm.interop.provider_interop_support import (
     ProviderInteropOverride,
     build_provider_interop_probe_request,
     enforce_provider_interop_rate_limit,
@@ -39,6 +39,32 @@ def test_load_provider_interop_profiles_reads_local_json(tmp_path) -> None:
     assert len(profiles) == 1
     assert profiles[0].id == "gpt"
     assert profiles[0].default_model == "gpt-5.2-codex"
+
+
+def test_load_provider_interop_profiles_reads_explicit_interop_profile(tmp_path) -> None:
+    config_path = tmp_path / "provider-interop.local.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "gpt",
+                        "provider": "openai",
+                        "api_dialect": "openai_responses",
+                        "interop_profile": "responses_strict",
+                        "base_url": "https://proxy.example.com/v1",
+                        "default_model": "gpt-5.2-codex",
+                        "api_key_env": "TEST_GPT_API_KEY",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    profiles = load_provider_interop_profiles(config_path)
+
+    assert profiles[0].interop_profile == "responses_strict"
 
 
 def test_resolve_provider_interop_profile_applies_override_and_env(tmp_path) -> None:
@@ -136,6 +162,44 @@ def test_build_provider_interop_probe_request_supports_custom_prompt(tmp_path) -
         }
     ]
     assert request.json_body["instructions"] == "请直接回答用户问题。"
+
+
+def test_resolve_provider_interop_profile_preserves_interop_profile_into_request(tmp_path) -> None:
+    config_path = tmp_path / "provider-interop.local.json"
+    env_path = tmp_path / ".env.provider-interop.local"
+    config_path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "gpt",
+                        "provider": "openai",
+                        "api_dialect": "openai_responses",
+                        "interop_profile": "responses_strict",
+                        "base_url": "https://proxy.example.com/v1",
+                        "default_model": "gpt-5.2-codex",
+                        "api_key_env": "TEST_GPT_API_KEY",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    env_path.write_text("TEST_GPT_API_KEY=test-key\n", encoding="utf-8")
+
+    resolved = resolve_provider_interop_profile(
+        "gpt",
+        config_path=config_path,
+        env_path=env_path,
+    )
+
+    request = build_provider_interop_probe_request(
+        resolved,
+        prompt="今天有什么新闻",
+    )
+
+    assert resolved.connection.interop_profile == "responses_strict"
+    assert request.interop_profile == "responses_strict"
 
 
 def test_build_provider_interop_probe_request_sets_minimal_gemini_thinking(tmp_path) -> None:

@@ -14,8 +14,8 @@ from app.modules.config_registry.schemas.hook_action_config import (
     WebhookHookConfig,
 )
 
-from .errors import ConfigurationError
-from .mcp_client import McpToolCaller
+from ..errors import ConfigurationError
+from ..mcp.mcp_client import McpToolCaller
 
 
 class AgentPluginRunner(Protocol):

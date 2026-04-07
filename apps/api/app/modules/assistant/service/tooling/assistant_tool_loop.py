@@ -7,9 +7,9 @@ from typing import Any, TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.runtime.llm_protocol import LLMContinuationSupport
+from app.shared.runtime.llm.llm_protocol import LLMContinuationSupport
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.provider_interop_stream_support import StreamInterruptedError
+from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
 
 from ..assistant_run_budget import AssistantRunBudget, build_assistant_run_budget
 from ..assistant_runtime_terminal import (
