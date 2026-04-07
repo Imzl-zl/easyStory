@@ -5,10 +5,14 @@
 | 文档类型 | 功能设计 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-04-03 |
-| 更新时间 | 2026-04-06 |
+| 更新时间 | 2026-04-07 |
 | 关联文档 | [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)、[22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[16-mcp-architecture](./16-mcp-architecture.md)、[系统架构设计](../specs/architecture.md) |
 
 ---
+
+> 本文档当前仍是 assistant runtime 中“项目文稿工具域”的正式设计真值。
+>
+> 若你在跟踪本轮文档重构路线、待迁移章节或阶段状态，请看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。未明确回写到本文的目标语义，不视为正式真值。
 
 ## 1. 目的
 
@@ -569,9 +573,9 @@ tool loop 自身边界错误仍由 runtime 单独处理，例如 `tool_loop_exha
 
 - `path -> document_ref`
 - `document_ref` 是否命中当前 `write_grant.target_document_refs`
-- `base_version` 是否命中 grant 与当前文稿版本约束
+- `base_version / buffer_hash / source` 是否命中 grant 与当前可信缓冲区快照约束
 - `v1A` 下当前目标是否就是 `active_document_ref`
-- 当前 `document_context.active_buffer_state` 是否允许写回
+- 当前 `document_context.active_buffer_state` 是否允许写回；`v1A` 下最少要求 `dirty=false + base_version + buffer_hash + source=studio_editor`
 - 当前目标 `binding_version` 是否仍命中 grant 与路径解析锚点
 - 若本轮显式依赖目录 freshness，再额外判断 `catalog_version` 是否仍可接受
 

@@ -5,7 +5,7 @@ from app.modules.assistant.service import (
     AssistantMcpService,
     AssistantMcpUpdateDTO,
 )
-from app.modules.assistant.service.assistant_mcp_file_store import AssistantMcpFileStore
+from app.modules.assistant.service.mcp.assistant_mcp_file_store import AssistantMcpFileStore
 from app.modules.config_registry import ConfigLoader
 from app.modules.project.service import create_project_service
 from app.shared.runtime.errors import BusinessRuleError

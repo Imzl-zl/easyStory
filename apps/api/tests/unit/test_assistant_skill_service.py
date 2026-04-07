@@ -9,14 +9,22 @@ from app.modules.assistant.service import (
     AssistantTurnRequestDTO,
 )
 from app.modules.assistant.service.assistant_config_file_store import AssistantConfigFileStore
-from app.modules.assistant.service.assistant_skill_support import parse_skill_markdown
-from app.modules.assistant.service.assistant_rule_dto import AssistantRuleProfileUpdateDTO
+from app.modules.assistant.service.skills.assistant_skill_support import (
+    parse_skill_markdown,
+)
+from app.modules.assistant.service.rules.assistant_rule_dto import AssistantRuleProfileUpdateDTO
 from app.modules.assistant.service.dto import AssistantMessageDTO
-from app.modules.assistant.service.preferences_dto import AssistantPreferencesUpdateDTO
-from app.modules.assistant.service.preferences_service import AssistantPreferencesService
+from app.modules.assistant.service.preferences.preferences_dto import (
+    AssistantPreferencesUpdateDTO,
+)
+from app.modules.assistant.service.preferences.preferences_service import (
+    AssistantPreferencesService,
+)
 from app.modules.assistant.service.factory import create_assistant_rule_service
 from app.modules.assistant.service.assistant_service import AssistantService
-from app.modules.assistant.service.assistant_skill_file_store import AssistantSkillFileStore
+from app.modules.assistant.service.skills.assistant_skill_file_store import (
+    AssistantSkillFileStore,
+)
 from app.modules.config_registry import ConfigLoader
 from app.modules.project.service import create_project_service
 from app.shared.runtime import SkillTemplateRenderer

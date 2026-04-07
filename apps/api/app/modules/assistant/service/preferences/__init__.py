@@ -1,0 +1,1 @@
+"""Assistant preferences support package."""

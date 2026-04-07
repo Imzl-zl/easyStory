@@ -292,6 +292,14 @@ def _build_openai_chat_output_items(message: dict[str, Any]) -> list[dict[str, A
             }
         )
     for index, tool_call in enumerate(_extract_openai_chat_tool_calls(message), start=1):
+        payload = {
+            "tool_name": tool_call.tool_name,
+            "arguments": tool_call.arguments,
+            "arguments_text": tool_call.arguments_text,
+            "tool_call_id": tool_call.tool_call_id,
+        }
+        if tool_call.arguments_error is not None:
+            payload["arguments_error"] = tool_call.arguments_error
         items.append(
             {
                 "item_type": "tool_call",
@@ -299,12 +307,7 @@ def _build_openai_chat_output_items(message: dict[str, Any]) -> list[dict[str, A
                 "status": "completed",
                 "provider_ref": tool_call.provider_ref,
                 "call_id": tool_call.tool_call_id,
-                "payload": {
-                    "tool_name": tool_call.tool_name,
-                    "arguments": tool_call.arguments,
-                    "arguments_text": tool_call.arguments_text,
-                    "tool_call_id": tool_call.tool_call_id,
-                },
+                "payload": payload,
             }
         )
     return items
@@ -354,10 +357,20 @@ def _build_openai_responses_output_items(payload: dict[str, Any]) -> list[dict[s
         provider_ref = _optional_string(item.get("id"))
         if item_type == "function_call":
             tool_call_index += 1
-            arguments, arguments_text = _parse_tool_arguments(item.get("arguments"))
+            arguments, arguments_text, arguments_error = _parse_tool_arguments(
+                item.get("arguments")
+            )
             call_id = _optional_string(item.get("call_id")) or provider_ref
             if call_id is None:
                 continue
+            payload = {
+                "tool_name": _optional_string(item.get("name")),
+                "arguments": arguments,
+                "arguments_text": arguments_text,
+                "tool_call_id": call_id,
+            }
+            if arguments_error is not None:
+                payload["arguments_error"] = arguments_error
             items.append(
                 {
                     "item_type": "tool_call",
@@ -365,12 +378,7 @@ def _build_openai_responses_output_items(payload: dict[str, Any]) -> list[dict[s
                     "status": "completed",
                     "provider_ref": provider_ref,
                     "call_id": call_id,
-                    "payload": {
-                        "tool_name": _optional_string(item.get("name")),
-                        "arguments": arguments,
-                        "arguments_text": arguments_text,
-                        "tool_call_id": call_id,
-                    },
+                    "payload": payload,
                 }
             )
             continue
@@ -458,37 +466,42 @@ def _build_tool_call(
     *,
     tool_call_id: str | None,
     tool_name: str | None,
-    arguments: tuple[dict[str, Any] | None, str | None],
+    arguments: tuple[dict[str, Any], str | None, str | None],
     provider_ref: str | None = None,
 ) -> NormalizedLLMToolCall:
     if tool_call_id is None:
         raise ConfigurationError("Tool call is missing id")
     if tool_name is None:
         raise ConfigurationError("Tool call is missing name")
-    parsed_arguments, arguments_text = arguments
+    parsed_arguments, arguments_text, arguments_error = arguments
     return NormalizedLLMToolCall(
         tool_call_id=tool_call_id,
         tool_name=tool_name,
         arguments=parsed_arguments,
         arguments_text=arguments_text,
+        arguments_error=arguments_error,
         provider_ref=provider_ref,
     )
 
 
-def _parse_tool_arguments(value: Any) -> tuple[dict[str, Any] | None, str | None]:
+def _parse_tool_arguments(value: Any) -> tuple[dict[str, Any], str | None, str | None]:
     if isinstance(value, dict):
-        return value, json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+        return (
+            value,
+            json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True),
+            None,
+        )
     if value is None:
-        return None, None
+        return {}, None, None
     if not isinstance(value, str):
-        raise ConfigurationError("Tool call arguments must be an object or JSON string")
+        return {}, None, "Tool call arguments must be an object or JSON string"
     text = value.strip()
     if not text:
-        return None, None
+        return {}, None, None
     try:
         parsed = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise ConfigurationError("Tool call arguments JSON is invalid") from exc
+    except json.JSONDecodeError:
+        return {}, text, "Tool call arguments JSON is invalid"
     if not isinstance(parsed, dict):
-        raise ConfigurationError("Tool call arguments JSON must decode to an object")
-    return parsed, text
+        return {}, text, "Tool call arguments JSON must decode to an object"
+    return parsed, text, None

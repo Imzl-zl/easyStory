@@ -1,38 +1,38 @@
-from .assistant_rule_dto import AssistantRuleProfileDTO, AssistantRuleProfileUpdateDTO
-from .assistant_rule_service import AssistantRuleService
-from .assistant_agent_dto import (
+from .rules.assistant_rule_dto import AssistantRuleProfileDTO, AssistantRuleProfileUpdateDTO
+from .rules.assistant_rule_service import AssistantRuleService
+from .agents.assistant_agent_dto import (
     AssistantAgentCreateDTO,
     AssistantAgentDetailDTO,
     AssistantAgentSummaryDTO,
     AssistantAgentUpdateDTO,
 )
-from .assistant_agent_service import AssistantAgentService
-from .assistant_hook_dto import (
+from .agents.assistant_agent_service import AssistantAgentService
+from .hooks.assistant_hook_dto import (
     AssistantHookCreateDTO,
     AssistantHookDetailDTO,
     AssistantHookSummaryDTO,
     AssistantHookUpdateDTO,
 )
-from .assistant_hook_service import AssistantHookService
-from .assistant_mcp_dto import (
+from .hooks.assistant_hook_service import AssistantHookService
+from .mcp.assistant_mcp_dto import (
     AssistantMcpCreateDTO,
     AssistantMcpDetailDTO,
     AssistantMcpSummaryDTO,
     AssistantMcpUpdateDTO,
 )
-from .assistant_mcp_service import AssistantMcpService
-from .assistant_skill_dto import (
+from .mcp.assistant_mcp_service import AssistantMcpService
+from .skills.assistant_skill_dto import (
     AssistantSkillCreateDTO,
     AssistantSkillDetailDTO,
     AssistantSkillSummaryDTO,
     AssistantSkillUpdateDTO,
 )
-from .assistant_skill_service import AssistantSkillService
-from .assistant_tool_executor import AssistantToolExecutor
-from .assistant_tool_exposure_policy import AssistantToolExposurePolicy
-from .assistant_tool_loop import AssistantToolLoop, AssistantToolLoopModelStreamEvent
-from .assistant_tool_policy_resolver import AssistantToolPolicyResolver
-from .assistant_tool_registry import AssistantToolDescriptorRegistry
+from .skills.assistant_skill_service import AssistantSkillService
+from .tooling.assistant_tool_executor import AssistantToolExecutor
+from .tooling.assistant_tool_exposure_policy import AssistantToolExposurePolicy
+from .tooling.assistant_tool_loop import AssistantToolLoop, AssistantToolLoopModelStreamEvent
+from .tooling.assistant_tool_policy_resolver import AssistantToolPolicyResolver
+from .tooling.assistant_tool_registry import AssistantToolDescriptorRegistry
 from .assistant_runtime_terminal import (
     AssistantRuntimeTerminalError,
     attach_assistant_stream_error_meta,
@@ -40,8 +40,8 @@ from .assistant_runtime_terminal import (
     resolve_assistant_terminal_payload,
 )
 from .assistant_run_budget import AssistantRunBudget
-from .assistant_tool_step_store import AssistantToolStepRecord, AssistantToolStepStore
-from .assistant_turn_run_store import AssistantTurnRunRecord, AssistantTurnRunStore
+from .tooling.assistant_tool_step_store import AssistantToolStepRecord, AssistantToolStepStore
+from .turn.assistant_turn_run_store import AssistantTurnRunRecord, AssistantTurnRunStore
 from .assistant_service import AssistantService
 from .dto import AssistantHookResultDTO, AssistantMessageDTO, AssistantTurnRequestDTO, AssistantTurnResponseDTO
 from .factory import (
@@ -58,8 +58,8 @@ from .factory import (
     create_assistant_tool_loop,
     create_assistant_tool_step_store,
 )
-from .preferences_dto import AssistantPreferencesDTO, AssistantPreferencesUpdateDTO
-from .preferences_service import AssistantPreferencesService
+from .preferences.preferences_dto import AssistantPreferencesDTO, AssistantPreferencesUpdateDTO
+from .preferences.preferences_service import AssistantPreferencesService
 
 __all__ = [
     "AssistantPreferencesDTO",

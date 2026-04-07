@@ -14,11 +14,13 @@ from app.modules.assistant.service import (
     AssistantSkillCreateDTO,
     AssistantSkillService,
 )
-from app.modules.assistant.service.assistant_agent_file_store import AssistantAgentFileStore
-from app.modules.assistant.service.assistant_hook_file_store import AssistantHookFileStore
-from app.modules.assistant.service.assistant_mcp_file_store import AssistantMcpFileStore
-from app.modules.assistant.service.assistant_user_hook_support import parse_hook_document
-from app.modules.assistant.service.assistant_skill_file_store import AssistantSkillFileStore
+from app.modules.assistant.service.agents.assistant_agent_file_store import AssistantAgentFileStore
+from app.modules.assistant.service.hooks.assistant_hook_file_store import AssistantHookFileStore
+from app.modules.assistant.service.mcp.assistant_mcp_file_store import AssistantMcpFileStore
+from app.modules.assistant.service.hooks.assistant_user_hook_support import parse_hook_document
+from app.modules.assistant.service.skills.assistant_skill_file_store import (
+    AssistantSkillFileStore,
+)
 from app.modules.config_registry import ConfigLoader
 from app.modules.project.service import create_project_service
 from app.shared.runtime.errors import ConfigurationError

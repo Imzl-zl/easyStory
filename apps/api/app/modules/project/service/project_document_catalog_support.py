@@ -136,16 +136,12 @@ def _resolve_visible_content_state(
     return document.content_state
 
 
-def _pair_paths_and_cursors(paths: list[str], cursors: list[str]) -> dict[str, str]:
+def _pair_paths_and_cursors(paths: list[str], cursors: list[str]) -> tuple[str | None, ...]:
     if not cursors:
-        return {}
+        return tuple(None for _ in paths)
     if len(paths) != len(cursors):
         raise ValueError("cursors must align with paths")
-    return {
-        path: cursor
-        for path, cursor in zip(paths, cursors, strict=True)
-        if cursor
-    }
+    return tuple(cursor or None for cursor in cursors)
 
 
 def _build_catalog_version(

@@ -15,9 +15,14 @@ AssistantMessageRole = Literal["user", "assistant"]
 AssistantRequestedWriteScope = Literal["disabled", "turn"]
 AssistantOutputItemType = Literal["text", "tool_call", "tool_result", "reasoning", "refusal"]
 AssistantCompactionTriggerReason = Literal["max_input_tokens_exceeded"]
+AssistantCompactionPhase = Literal["initial_prompt"]
+AssistantCompactionLevel = Literal["soft", "hard"]
+AssistantContinuationCompactionPhase = Literal["tool_loop_continuation"]
+AssistantProjectToolGuidanceType = Literal["project_search_then_read"]
 AssistantNormalizedInputItemType = Literal[
     "message",
     "rule",
+    "tool_guidance",
     "skill_instruction",
     "hook_selection",
     "model_selection",
@@ -80,6 +85,8 @@ class AssistantCompactionSnapshotDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     trigger_reason: AssistantCompactionTriggerReason
+    phase: AssistantCompactionPhase
+    level: AssistantCompactionLevel
     budget_limit_tokens: int = Field(ge=1)
     estimated_tokens_before: int = Field(ge=1)
     estimated_tokens_after: int = Field(ge=1)
@@ -87,6 +94,38 @@ class AssistantCompactionSnapshotDTO(BaseModel):
     preserved_recent_message_count: int = Field(ge=0)
     protected_document_paths: list[str] = Field(default_factory=list)
     summary: str = Field(min_length=1)
+
+
+class AssistantContinuationCompactionSnapshotDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    trigger_reason: AssistantCompactionTriggerReason
+    phase: AssistantContinuationCompactionPhase
+    level: AssistantCompactionLevel
+    budget_limit_tokens: int = Field(ge=1)
+    estimated_tokens_before: int = Field(ge=1)
+    estimated_tokens_after: int = Field(ge=1)
+    compacted_item_count: int = Field(ge=1)
+    retained_item_count: int = Field(ge=1)
+    compacted_tool_names: list[str] = Field(default_factory=list)
+    trimmed_text_slot_count: int = Field(ge=0)
+    dropped_content_item_count: int = Field(ge=0)
+
+
+class AssistantContinuationRequestSnapshotDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    continuation_items: list[dict[str, Any]] = Field(default_factory=list)
+    provider_continuation_state: dict[str, Any] | None = None
+
+
+class AssistantProjectToolGuidanceDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    guidance_type: AssistantProjectToolGuidanceType
+    tool_names: list[str] = Field(default_factory=list)
+    trigger_keywords: list[str] = Field(default_factory=list)
+    content: str = Field(min_length=1)
 
 
 class AssistantOutputItemDTO(BaseModel):
@@ -205,7 +244,12 @@ __all__ = [
     "ASSISTANT_MESSAGE_MAX_LENGTH",
     "AssistantActiveBufferStateDTO",
     "AssistantContinuationAnchorDTO",
+    "AssistantContinuationCompactionPhase",
+    "AssistantContinuationCompactionSnapshotDTO",
+    "AssistantContinuationRequestSnapshotDTO",
     "AssistantCompactionSnapshotDTO",
+    "AssistantCompactionLevel",
+    "AssistantCompactionPhase",
     "AssistantCompactionTriggerReason",
     "AssistantDocumentContextDTO",
     "AssistantHookResultDTO",
@@ -216,6 +260,8 @@ __all__ = [
     "AssistantOutputItemDTO",
     "AssistantOutputItemType",
     "AssistantOutputMetaDTO",
+    "AssistantProjectToolGuidanceDTO",
+    "AssistantProjectToolGuidanceType",
     "AssistantRequestedWriteScope",
     "AssistantTurnRequestDTO",
     "AssistantTurnResponseDTO",

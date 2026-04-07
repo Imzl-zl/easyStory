@@ -49,7 +49,7 @@ from app.modules.assistant.service import (
     create_assistant_service,
     resolve_assistant_terminal_payload,
 )
-from app.modules.assistant.service.assistant_turn_runtime_support import build_turn_run_id
+from app.modules.assistant.service.turn.assistant_turn_runtime_support import build_turn_run_id
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
 from app.shared.db import get_async_db_session

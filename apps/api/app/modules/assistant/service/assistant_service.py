@@ -19,20 +19,20 @@ from app.shared.runtime import PluginRegistry, SkillTemplateRenderer, ToolProvid
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm_tool_provider import LLMStreamEvent
 
-from .assistant_rule_service import AssistantRuleService
-from .assistant_agent_service import AssistantAgentService
-from .assistant_hook_service import AssistantHookService
-from .assistant_mcp_service import AssistantMcpService
-from .assistant_skill_service import AssistantSkillService
-from .assistant_tool_executor import AssistantToolExecutor
-from .assistant_tool_exposure_policy import AssistantToolExposurePolicy
-from .assistant_tool_loop import AssistantToolLoop
-from .assistant_tool_registry import AssistantToolDescriptorRegistry
-from .assistant_hook_providers import build_assistant_plugin_registry
-from .assistant_hook_support import (
+from .rules.assistant_rule_service import AssistantRuleService
+from .agents.assistant_agent_service import AssistantAgentService
+from .hooks.assistant_hook_service import AssistantHookService
+from .mcp.assistant_mcp_service import AssistantMcpService
+from .skills.assistant_skill_service import AssistantSkillService
+from .tooling.assistant_tool_executor import AssistantToolExecutor
+from .tooling.assistant_tool_exposure_policy import AssistantToolExposurePolicy
+from .tooling.assistant_tool_loop import AssistantToolLoop
+from .tooling.assistant_tool_registry import AssistantToolDescriptorRegistry
+from .hooks_runtime.assistant_hook_providers import build_assistant_plugin_registry
+from .hooks_runtime.assistant_hook_support import (
     AssistantHookExecutionContext,
 )
-from .assistant_hook_runtime_support import (
+from .hooks_runtime.assistant_hook_runtime_support import (
     execute_assistant_hook_with_retry,
     run_assistant_agent_hook,
     run_assistant_hook_event,
@@ -53,13 +53,13 @@ from .assistant_runtime_claim_support import (
     build_current_runtime_claim_snapshot,
     resolve_runtime_claim_state,
 )
-from .assistant_turn_runtime_support import (
+from .turn.assistant_turn_runtime_support import (
     PreparedAssistantTurn,
     build_after_assistant_payload,
     build_turn_response,
 )
-from .assistant_turn_prepare_support import prepare_assistant_turn, resolve_requested_hooks
-from .assistant_turn_llm_bridge_support import (
+from .turn.assistant_turn_prepare_support import prepare_assistant_turn, resolve_requested_hooks
+from .turn.assistant_turn_llm_bridge_support import (
     call_assistant_turn_llm,
     should_stream_with_tool_loop,
     stream_assistant_turn_llm,
@@ -71,8 +71,8 @@ from .assistant_llm_runtime_support import (
     resolve_assistant_llm_runtime,
     stream_assistant_llm,
 )
-from .assistant_turn_run_store import AssistantTurnRunStore
-from .assistant_turn_run_support import (
+from .turn.assistant_turn_run_store import AssistantTurnRunStore
+from .turn.assistant_turn_run_support import (
     build_running_turn_record,
     build_terminal_turn_record,
     ensure_existing_turn_matches_request,
@@ -83,7 +83,7 @@ from .dto import (
     AssistantTurnRequestDTO,
     AssistantTurnResponseDTO,
 )
-from .preferences_service import AssistantPreferencesService
+from .preferences.preferences_service import AssistantPreferencesService
 
 
 @dataclass(frozen=True)

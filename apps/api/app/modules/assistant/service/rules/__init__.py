@@ -1,0 +1,1 @@
+"""Assistant rules support package."""

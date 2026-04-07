@@ -42,6 +42,10 @@ from .project_document_catalog_support import (
     _resolve_title,
     _to_catalog_entry,
 )
+from .project_document_buffer_state_support import (
+    TRUSTED_ACTIVE_BUFFER_SOURCE,
+    build_project_document_buffer_hash,
+)
 from .project_document_search_support import (
     PROJECT_DOCUMENT_SEARCH_DEFAULT_LIMIT,
     _build_search_hit,
@@ -196,8 +200,8 @@ class ProjectDocumentCapabilityService:
         catalog_version = _build_catalog_version(catalog_documents.values())
         items: list[ProjectDocumentReadItemDTO] = []
         errors: list[ProjectDocumentReadErrorDTO] = []
-        cursor_by_path = _pair_paths_and_cursors(requested_paths, requested_cursors)
-        for path in requested_paths:
+        aligned_cursors = _pair_paths_and_cursors(requested_paths, requested_cursors)
+        for index, path in enumerate(requested_paths):
             resolved = documents.get(path)
             if resolved is None:
                 errors.append(
@@ -208,7 +212,7 @@ class ProjectDocumentCapabilityService:
                     )
                 )
                 continue
-            cursor = cursor_by_path.get(path)
+            cursor = aligned_cursors[index]
             read_item, read_error = _build_read_projection(
                 resolved,
                 catalog_version=catalog_version,
@@ -1124,27 +1128,41 @@ def _validate_active_buffer_state(
             "write_grant_expired",
             "当前写回授权基线已变化，请重新读取当前文稿后再尝试写入。",
         )
-    buffer_hash = active_buffer_state.get("buffer_hash")
-    if buffer_hash is None:
+    raw_buffer_hash = active_buffer_state.get("buffer_hash")
+    if raw_buffer_hash is None:
+        if require_trusted_snapshot:
+            raise ProjectDocumentMutationError(
+                "active_buffer_state_required",
+                "当前活动文稿缺少可信缓冲区快照，暂不能写回。",
+            )
         return
-    if not isinstance(buffer_hash, str) or not buffer_hash.strip():
+    if not isinstance(raw_buffer_hash, str) or not raw_buffer_hash.strip():
         raise ProjectDocumentMutationError(
             "active_buffer_state_invalid",
             "当前活动文稿缓冲区快照无效，暂不能写回。",
         )
-    if buffer_hash != _build_editor_buffer_hash(current_content):
+    raw_source = active_buffer_state.get("source")
+    if raw_source is None:
+        if require_trusted_snapshot:
+            raise ProjectDocumentMutationError(
+                "active_buffer_state_required",
+                "当前活动文稿缺少可信缓冲区快照，暂不能写回。",
+            )
+    elif not isinstance(raw_source, str) or not raw_source.strip():
+        raise ProjectDocumentMutationError(
+            "active_buffer_state_invalid",
+            "当前活动文稿缓冲区快照无效，暂不能写回。",
+        )
+    elif raw_source.strip() != TRUSTED_ACTIVE_BUFFER_SOURCE:
+        raise ProjectDocumentMutationError(
+            "active_buffer_state_invalid",
+            "当前活动文稿缓冲区快照来源不可信，暂不能写回。",
+        )
+    if raw_buffer_hash.strip() != build_project_document_buffer_hash(current_content):
         raise ProjectDocumentMutationError(
             "write_grant_expired",
             "当前写回授权缓冲区已变化，请刷新当前文稿后再尝试写入。",
         )
-
-
-def _build_editor_buffer_hash(content: str) -> str:
-    hash_value = 0xCBF29CE484222325
-    for character in content:
-        hash_value ^= ord(character)
-        hash_value = (hash_value * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
-    return f"fnv1a64:{hash_value:016x}"
 
 
 def _validate_document_content(content: str, *, schema_id: str | None, path: str) -> None:

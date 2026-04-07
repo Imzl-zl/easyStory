@@ -12,13 +12,15 @@ from tests.unit.test_assistant_service import (
     _build_config_root,
 )
 from app.modules.assistant.service.factory import create_assistant_rule_service
-from app.modules.assistant.service.assistant_hook_providers import build_assistant_plugin_registry
+from app.modules.assistant.service.hooks_runtime.assistant_hook_providers import (
+    build_assistant_plugin_registry,
+)
 from app.modules.assistant.service.assistant_runtime_terminal import (
     AssistantRuntimeTerminalError,
     attach_assistant_stream_error_meta,
 )
 from app.modules.assistant.service.assistant_service import AssistantService, AssistantStreamEvent
-from app.modules.assistant.service.assistant_turn_run_store import AssistantTurnRunStore
+from app.modules.assistant.service.turn.assistant_turn_run_store import AssistantTurnRunStore
 from app.modules.config_registry import ConfigLoader
 from app.modules.project.service import create_project_service
 from app.shared.runtime import SkillTemplateRenderer

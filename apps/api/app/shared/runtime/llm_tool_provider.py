@@ -84,7 +84,7 @@ class LLMToolProvider(ToolProvider):
             "input_tokens": normalized.input_tokens,
             "output_tokens": normalized.output_tokens,
             "total_tokens": normalized.total_tokens,
-            "tool_calls": [tool_call.__dict__ for tool_call in normalized.tool_calls],
+            "tool_calls": [_serialize_tool_call(tool_call) for tool_call in normalized.tool_calls],
             "provider_response_id": normalized.provider_response_id,
             "output_items": normalized.provider_output_items,
         }
@@ -144,7 +144,7 @@ class LLMToolProvider(ToolProvider):
                 "input_tokens": normalized.input_tokens,
                 "output_tokens": normalized.output_tokens,
                 "total_tokens": normalized.total_tokens,
-                "tool_calls": [tool_call.__dict__ for tool_call in normalized.tool_calls],
+                "tool_calls": [_serialize_tool_call(tool_call) for tool_call in normalized.tool_calls],
                 "provider_response_id": normalized.provider_response_id,
                 "output_items": normalized.provider_output_items,
             }
@@ -188,6 +188,13 @@ def _build_request(params: dict[str, Any]) -> LLMRequest:
         continuation_support=continuation_support,
         connection=connection,
     )
+
+
+def _serialize_tool_call(tool_call: Any) -> dict[str, Any]:
+    payload = dict(tool_call.__dict__)
+    if payload.get("arguments_error") is None:
+        payload.pop("arguments_error", None)
+    return payload
 
 
 def _to_generate_request(request: LLMRequest) -> LLMGenerateRequest:

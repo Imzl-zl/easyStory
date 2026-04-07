@@ -13,20 +13,20 @@ from app.modules.project.service import (
 from app.shared.runtime import LLMToolProvider, SkillTemplateRenderer
 
 from .assistant_config_file_store import AssistantConfigFileStore
-from .assistant_agent_file_store import AssistantAgentFileStore
-from .assistant_agent_service import AssistantAgentService
-from .assistant_hook_file_store import AssistantHookFileStore
-from .assistant_hook_service import AssistantHookService
-from .assistant_mcp_file_store import AssistantMcpFileStore
-from .assistant_mcp_service import AssistantMcpService
-from .assistant_tool_executor import AssistantToolExecutor
-from .assistant_tool_exposure_policy import AssistantToolExposurePolicy
-from .assistant_tool_loop import AssistantToolLoop
-from .assistant_tool_registry import AssistantToolDescriptorRegistry
-from .assistant_tool_step_store import AssistantToolStepStore
-from .assistant_skill_file_store import AssistantSkillFileStore
-from .assistant_rule_service import AssistantRuleService
-from .assistant_skill_service import AssistantSkillService
+from .agents.assistant_agent_file_store import AssistantAgentFileStore
+from .agents.assistant_agent_service import AssistantAgentService
+from .hooks.assistant_hook_file_store import AssistantHookFileStore
+from .hooks.assistant_hook_service import AssistantHookService
+from .mcp.assistant_mcp_file_store import AssistantMcpFileStore
+from .mcp.assistant_mcp_service import AssistantMcpService
+from .tooling.assistant_tool_executor import AssistantToolExecutor
+from .tooling.assistant_tool_exposure_policy import AssistantToolExposurePolicy
+from .tooling.assistant_tool_loop import AssistantToolLoop
+from .tooling.assistant_tool_registry import AssistantToolDescriptorRegistry
+from .tooling.assistant_tool_step_store import AssistantToolStepStore
+from .skills.assistant_skill_file_store import AssistantSkillFileStore
+from .rules.assistant_rule_service import AssistantRuleService
+from .skills.assistant_skill_service import AssistantSkillService
 from .assistant_service import AssistantService
 from .factory_support import (
     build_default_assistant_agent_store,
@@ -37,8 +37,8 @@ from .factory_support import (
     build_default_assistant_tool_step_store,
     build_default_assistant_turn_run_store,
 )
-from .preferences_service import AssistantPreferencesService
-from .assistant_turn_run_store import AssistantTurnRunStore
+from .preferences.preferences_service import AssistantPreferencesService
+from .turn.assistant_turn_run_store import AssistantTurnRunStore
 
 DEFAULT_CONFIG_ROOT = Path(__file__).resolve().parents[6] / "config"
 

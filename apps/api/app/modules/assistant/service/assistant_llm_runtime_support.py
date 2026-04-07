@@ -19,7 +19,7 @@ from app.shared.runtime.llm_protocol import (
 )
 from app.shared.runtime.llm_tool_provider import LLM_GENERATE_TOOL, LLMStreamEvent
 
-from .assistant_tool_loop import AssistantToolLoopModelStreamEvent
+from .tooling.assistant_tool_loop import AssistantToolLoopModelStreamEvent
 
 
 @dataclass(frozen=True)

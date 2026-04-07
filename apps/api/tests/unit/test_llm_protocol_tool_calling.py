@@ -464,20 +464,26 @@ def test_parse_gemini_response_generates_tool_call_id_when_missing() -> None:
     assert normalized.tool_calls[0].arguments == {"paths": ["设定/人物.md"]}
 
 
-def test_parse_openai_responses_response_rejects_invalid_tool_arguments_json() -> None:
-    with pytest.raises(ConfigurationError, match="Tool call arguments JSON is invalid"):
-        parse_generation_response(
-            "openai_responses",
-            {
-                "id": "resp_bad",
-                "output": [
-                    {
-                        "id": "fc_bad",
-                        "type": "function_call",
-                        "call_id": "call_bad",
-                        "name": "project.read_documents",
-                        "arguments": '{"paths":["设定/人物.md"]',
-                    }
-                ],
-            },
-        )
+def test_parse_openai_responses_response_preserves_invalid_tool_arguments_for_runtime_recovery() -> None:
+    normalized = parse_generation_response(
+        "openai_responses",
+        {
+            "id": "resp_bad",
+            "output": [
+                {
+                    "id": "fc_bad",
+                    "type": "function_call",
+                    "call_id": "call_bad",
+                    "name": "project.read_documents",
+                    "arguments": '{"paths":["设定/人物.md"]',
+                }
+            ],
+        },
+    )
+
+    assert normalized.tool_calls[0].tool_call_id == "call_bad"
+    assert normalized.tool_calls[0].tool_name == "project.read_documents"
+    assert normalized.tool_calls[0].arguments == {}
+    assert normalized.tool_calls[0].arguments_text == '{"paths":["设定/人物.md"]'
+    assert normalized.tool_calls[0].arguments_error == "Tool call arguments JSON is invalid"
+    assert normalized.provider_output_items[0]["payload"]["arguments_error"] == "Tool call arguments JSON is invalid"

@@ -23,8 +23,9 @@ from app.modules.assistant.service import (
     AssistantToolStepStore,
 )
 from app.modules.assistant.service.assistant_runtime_terminal import AssistantRuntimeTerminalError
-from app.modules.assistant.service.assistant_tool_loop_result_support import _build_tool_call_start_payload
-from app.modules.assistant.service.assistant_tool_runtime_dto import (
+from app.modules.assistant.service.tooling.assistant_tool_loop_result_support import _build_tool_call_start_payload
+from app.modules.assistant.service.tooling.assistant_tool_catalog_support import build_tool_catalog_version
+from app.modules.assistant.service.tooling.assistant_tool_runtime_dto import (
     AssistantToolApprovalGrant,
     AssistantToolDescriptor,
     AssistantToolPolicyDecision,
@@ -34,10 +35,28 @@ from app.modules.assistant.service.assistant_tool_runtime_dto import (
 )
 from app.modules.project.infrastructure import ProjectDocumentFileStore, ProjectDocumentIdentityStore
 from app.modules.project.service import ProjectDocumentCapabilityService, ProjectService
+from app.modules.project.service.project_document_buffer_state_support import (
+    TRUSTED_ACTIVE_BUFFER_SOURCE,
+    build_project_document_buffer_hash,
+)
 from app.shared.runtime.llm_protocol import resolve_continuation_support
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, ready_project_setting
+
+
+def _build_trusted_active_buffer_state(
+    *,
+    base_version: str,
+    content: str,
+    dirty: bool = False,
+) -> dict[str, object]:
+    return {
+        "dirty": dirty,
+        "base_version": base_version,
+        "buffer_hash": build_project_document_buffer_hash(content),
+        "source": TRUSTED_ACTIVE_BUFFER_SOURCE,
+    }
 
 
 def test_assistant_tool_step_store_appends_and_reads_history(tmp_path):
@@ -229,6 +248,24 @@ def test_assistant_tool_descriptor_registry_uses_strict_project_document_schemas
     assert diff_summary_schema["required"] == ["changed", "previous_chars", "next_chars"]
 
 
+def test_build_tool_catalog_version_is_order_stable_and_tracks_visible_descriptors():
+    registry = AssistantToolDescriptorRegistry()
+    list_descriptor = registry.get_descriptor("project.list_documents")
+    read_descriptor = registry.get_descriptor("project.read_documents")
+    write_descriptor = registry.get_descriptor("project.write_document")
+    assert list_descriptor is not None
+    assert read_descriptor is not None
+    assert write_descriptor is not None
+
+    read_only_version = build_tool_catalog_version((list_descriptor, read_descriptor))
+    reordered_version = build_tool_catalog_version((read_descriptor, list_descriptor))
+    writable_version = build_tool_catalog_version((list_descriptor, read_descriptor, write_descriptor))
+
+    assert read_only_version.startswith("tool_catalog:")
+    assert reordered_version == read_only_version
+    assert writable_version != read_only_version
+
+
 def test_assistant_tool_loop_resolves_minimal_run_budget_from_existing_boundaries():
     registry = AssistantToolDescriptorRegistry()
     policy = AssistantToolExposurePolicy(registry=registry)
@@ -355,6 +392,7 @@ def test_assistant_tool_loop_rejects_budget_dependent_visible_tool_rewrite():
 def test_assistant_tool_exposure_policy_only_exposes_project_tools_inside_project_scope():
     registry = AssistantToolDescriptorRegistry()
     policy = AssistantToolExposurePolicy(registry=registry)
+    editor_content = "# 人物\n\n林渊"
 
     assert (
         policy.resolve_visible_tools(
@@ -383,6 +421,30 @@ def test_assistant_tool_exposure_policy_only_exposes_project_tools_inside_projec
             active_document_ref="project_file:1",
             active_binding_version="binding-1",
             active_buffer_state={"dirty": False, "base_version": "sha256:base"},
+            document_context_bindings=(
+                {
+                    "document_ref": "project_file:1",
+                    "selection_role": "active",
+                    "writable": True,
+                },
+            ),
+        )
+    )] == [
+        "project.list_documents",
+        "project.search_documents",
+        "project.read_documents",
+    ]
+    assert [item.name for item in policy.resolve_visible_tools(
+        context=AssistantToolExposureContext(
+            project_id=uuid.uuid4(),
+            requested_write_scope="turn",
+            allowed_target_document_refs=("project_file:1",),
+            active_document_ref="project_file:1",
+            active_binding_version="binding-1",
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version="sha256:base",
+                content=editor_content,
+            ),
             document_context_bindings=(
                 {
                     "document_ref": "project_file:1",
@@ -490,6 +552,7 @@ def test_assistant_tool_policy_resolver_builds_approval_grant_for_grant_bound_wr
     assert descriptor is not None
     resolver = AssistantToolPolicyResolver()
     document_ref = "project_file:1"
+    editor_content = "# 人物\n\n林渊"
 
     hidden_decision = resolver.resolve(
         descriptor=descriptor,
@@ -506,7 +569,10 @@ def test_assistant_tool_policy_resolver_builds_approval_grant_for_grant_bound_wr
             allowed_target_document_refs=(document_ref,),
             active_document_ref=document_ref,
             active_binding_version="binding-1",
-            active_buffer_state={"dirty": False, "base_version": "sha256:base"},
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version="sha256:base",
+                content=editor_content,
+            ),
             document_context_bindings=(
                 {
                     "document_ref": document_ref,
@@ -529,6 +595,12 @@ def test_assistant_tool_policy_resolver_builds_approval_grant_for_grant_bound_wr
     assert visible_decision.approval_grant.base_version_constraints == {
         document_ref: "sha256:base"
     }
+    assert visible_decision.approval_grant.buffer_hash_constraints == {
+        document_ref: build_project_document_buffer_hash(editor_content)
+    }
+    assert visible_decision.approval_grant.buffer_source_constraints == {
+        document_ref: TRUSTED_ACTIVE_BUFFER_SOURCE
+    }
 
 
 def test_assistant_tool_policy_resolver_hides_grant_bound_write_for_non_writable_active_binding():
@@ -546,7 +618,10 @@ def test_assistant_tool_policy_resolver_hides_grant_bound_write_for_non_writable
             allowed_target_document_refs=(document_ref,),
             active_document_ref=document_ref,
             active_binding_version="binding-1",
-            active_buffer_state={"dirty": False, "base_version": "sha256:base"},
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version="sha256:base",
+                content="# 大纲\n\n当前大纲",
+            ),
             document_context_bindings=(
                 {
                     "document_ref": document_ref,
@@ -994,6 +1069,7 @@ def test_assistant_tool_loop_drops_provider_continuation_state_for_runtime_repla
         },
     )()
     captured_calls: list[dict[str, object]] = []
+    recorded_states: list[object] = []
 
     async def model_caller(
         *,
@@ -1044,6 +1120,7 @@ def test_assistant_tool_loop_drops_provider_continuation_state_for_runtime_repla
                     ],
                     "provider_response_id": "resp_tool_1",
                 },
+                state_recorder=recorded_states.append,
                 visible_descriptors=(read_descriptor,),
             )
         ]
@@ -1054,6 +1131,10 @@ def test_assistant_tool_loop_drops_provider_continuation_state_for_runtime_repla
     continuation_items = captured_calls[0]["continuation_items"]
     assert isinstance(continuation_items, list)
     assert [item["item_type"] for item in continuation_items] == ["tool_call", "tool_result"]
+    assert recorded_states[-1].continuation_request_snapshot == {
+        "continuation_items": continuation_items,
+        "provider_continuation_state": None,
+    }
     assert items[-1].raw_output is not None
     assert items[-1].raw_output["content"] == "后续回复"
 
@@ -1092,6 +1173,7 @@ def test_assistant_tool_loop_keeps_provider_continuation_state_for_hybrid_suppor
         },
     )()
     captured_calls: list[dict[str, object]] = []
+    recorded_states: list[object] = []
 
     async def model_caller(
         *,
@@ -1142,6 +1224,7 @@ def test_assistant_tool_loop_keeps_provider_continuation_state_for_hybrid_suppor
                     ],
                     "provider_response_id": "resp_tool_1",
                 },
+                state_recorder=recorded_states.append,
                 visible_descriptors=(read_descriptor,),
             )
         ]
@@ -1152,6 +1235,10 @@ def test_assistant_tool_loop_keeps_provider_continuation_state_for_hybrid_suppor
     assert isinstance(provider_state, dict)
     assert provider_state["previous_response_id"] == "resp_tool_1"
     assert provider_state["latest_items"] == captured_calls[0]["continuation_items"]
+    assert recorded_states[-1].continuation_request_snapshot == {
+        "continuation_items": captured_calls[0]["continuation_items"],
+        "provider_continuation_state": provider_state,
+    }
     assert items[-1].raw_output is not None
     assert items[-1].raw_output["content"] == "后续回复"
 
@@ -1216,6 +1303,7 @@ def test_assistant_tool_loop_compacts_runtime_replay_continuation_to_fit_input_b
         },
     )()
     captured_calls: list[dict[str, object]] = []
+    recorded_states: list[object] = []
 
     async def model_caller(
         *,
@@ -1272,6 +1360,7 @@ def test_assistant_tool_loop_compacts_runtime_replay_continuation_to_fit_input_b
                     max_parallel_tool_calls=1,
                     tool_timeout_seconds=15,
                 ),
+                state_recorder=recorded_states.append,
                 visible_descriptors=(read_descriptor,),
             )
         ]
@@ -1288,6 +1377,18 @@ def test_assistant_tool_loop_compacts_runtime_replay_continuation_to_fit_input_b
     assert "resource_uri" not in document
     assert len(document["content"]) < len(long_content)
     assert len(payload["content_items"][0]["text"]) < len(long_content)
+    assert recorded_states
+    assert recorded_states[-1].continuation_request_snapshot == {
+        "continuation_items": continuation_items,
+        "provider_continuation_state": None,
+    }
+    snapshot = recorded_states[-1].continuation_compaction_snapshot
+    assert snapshot is not None
+    assert snapshot["phase"] == "tool_loop_continuation"
+    assert snapshot["estimated_tokens_before"] > snapshot["estimated_tokens_after"]
+    assert snapshot["compacted_item_count"] >= 1
+    assert snapshot["compacted_tool_names"] == ["project.read_documents"]
+    assert snapshot["trimmed_text_slot_count"] >= 1
     assert items[-1].raw_output is not None
     assert items[-1].raw_output["content"] == "后续回复"
 
@@ -1519,7 +1620,8 @@ def test_assistant_tool_executor_executes_project_write_document(db, tmp_path):
     project = create_project(db, project_setting=ready_project_setting())
     file_store = ProjectDocumentFileStore(tmp_path)
     identity_store = ProjectDocumentIdentityStore(tmp_path)
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     capability_service = ProjectDocumentCapabilityService(
         project_service=ProjectService(
             document_file_store=file_store,
@@ -1564,10 +1666,15 @@ def test_assistant_tool_executor_executes_project_write_document(db, tmp_path):
                     document_ref=target.document_ref,
                     binding_version=binding_version,
                     base_version=target.version,
+                    buffer_hash=build_project_document_buffer_hash(current_content),
+                    buffer_source=TRUSTED_ACTIVE_BUFFER_SOURCE,
                 ),
                 active_document_ref=target.document_ref,
                 active_binding_version=binding_version,
-                active_buffer_state={"dirty": False, "base_version": target.version},
+                active_buffer_state=_build_trusted_active_buffer_state(
+                    base_version=target.version,
+                    content=current_content,
+                ),
             ),
         )
     )
@@ -1609,6 +1716,8 @@ def test_build_tool_call_start_payload_includes_write_and_search_target_summary(
         "path": "设定/人物.md",
         "base_version": "sha256:base",
     }
+    assert "arguments" not in write_payload
+    assert "arguments_text" not in write_payload
     assert search_payload["target_summary"] == {
         "path_prefix": "数据层",
         "query": "人物关系",
@@ -1617,13 +1726,16 @@ def test_build_tool_call_start_payload_includes_write_and_search_target_summary(
         "schema_ids": ["project.character_relations"],
         "content_states": ["ready"],
     }
+    assert "arguments" not in search_payload
+    assert "arguments_text" not in search_payload
 
 
 def test_assistant_tool_executor_raises_terminal_error_for_unauthorized_write_target(db, tmp_path):
     project = create_project(db, project_setting=ready_project_setting())
     file_store = ProjectDocumentFileStore(tmp_path)
     identity_store = ProjectDocumentIdentityStore(tmp_path)
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     capability_service = ProjectDocumentCapabilityService(
         project_service=ProjectService(
             document_file_store=file_store,
@@ -1664,7 +1776,10 @@ def test_assistant_tool_executor_raises_terminal_error_for_unauthorized_write_ta
                     allowed_target_document_refs=(target.document_ref,),
                     active_document_ref=target.document_ref,
                     active_binding_version=binding_version,
-                    active_buffer_state={"dirty": False, "base_version": target.version},
+                    active_buffer_state=_build_trusted_active_buffer_state(
+                        base_version=target.version,
+                        content=current_content,
+                    ),
                 ),
             )
         )
@@ -1680,7 +1795,8 @@ def test_assistant_tool_loop_returns_errored_envelope_for_recoverable_write_conf
     project = create_project(db, project_setting=ready_project_setting())
     file_store = ProjectDocumentFileStore(tmp_path)
     identity_store = ProjectDocumentIdentityStore(tmp_path)
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     capability_service = ProjectDocumentCapabilityService(
         project_service=ProjectService(
             document_file_store=file_store,
@@ -1716,7 +1832,10 @@ def test_assistant_tool_loop_returns_errored_envelope_for_recoverable_write_conf
                     document_kind=target.document_kind,
                     writable=target.writable,
                 ),
-                "active_buffer_state": {"dirty": False, "base_version": "sha256:stale"},
+                "active_buffer_state": _build_trusted_active_buffer_state(
+                    base_version="sha256:stale",
+                    content=current_content,
+                ),
             },
             "document_context_bindings": [],
         },
@@ -1749,6 +1868,8 @@ def test_assistant_tool_loop_returns_errored_envelope_for_recoverable_write_conf
                     document_ref=target.document_ref,
                     binding_version=turn_context.document_context["active_binding_version"],
                     base_version="sha256:stale",
+                    buffer_hash=build_project_document_buffer_hash(current_content),
+                    buffer_source=TRUSTED_ACTIVE_BUFFER_SOURCE,
                 ),
             ),
             should_stop=None,
@@ -1780,6 +1901,12 @@ def test_assistant_tool_loop_returns_errored_envelope_for_recoverable_write_conf
             target.document_ref: "sha256:stale"
         },
         "approval_mode_snapshot": "grant_bound",
+        "buffer_hash_constraints": {
+            target.document_ref: build_project_document_buffer_hash(current_content)
+        },
+        "buffer_source_constraints": {
+            target.document_ref: TRUSTED_ACTIVE_BUFFER_SOURCE
+        },
         "expires_at": None,
     }
 
@@ -1791,7 +1918,8 @@ def test_assistant_tool_loop_marks_grant_bound_write_pending_without_approval_gr
     project = create_project(db, project_setting=ready_project_setting())
     file_store = ProjectDocumentFileStore(tmp_path)
     identity_store = ProjectDocumentIdentityStore(tmp_path)
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     capability_service = ProjectDocumentCapabilityService(
         project_service=ProjectService(
             document_file_store=file_store,
@@ -1828,7 +1956,10 @@ def test_assistant_tool_loop_marks_grant_bound_write_pending_without_approval_gr
             "document_context": {
                 "active_document_ref": target.document_ref,
                 "active_binding_version": binding_version,
-                "active_buffer_state": {"dirty": False, "base_version": target.version},
+                "active_buffer_state": _build_trusted_active_buffer_state(
+                    base_version=target.version,
+                    content=current_content,
+                ),
             },
             "document_context_bindings": [],
         },
@@ -1900,6 +2031,8 @@ def _build_turn_approval_grant(
     document_ref: str,
     binding_version: str,
     base_version: str,
+    buffer_hash: str = "fnv1a64:test",
+    buffer_source: str = TRUSTED_ACTIVE_BUFFER_SOURCE,
 ) -> AssistantToolApprovalGrant:
     return AssistantToolApprovalGrant(
         grant_id=f"grant:test:{tool_name}:{document_ref}",
@@ -1908,5 +2041,7 @@ def _build_turn_approval_grant(
         binding_version_constraints={document_ref: binding_version},
         base_version_constraints={document_ref: base_version},
         approval_mode_snapshot="grant_bound",
+        buffer_hash_constraints={document_ref: buffer_hash},
+        buffer_source_constraints={document_ref: buffer_source},
         expires_at=None,
     )

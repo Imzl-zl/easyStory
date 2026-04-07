@@ -22,6 +22,10 @@ from app.modules.project.service import (
     ProjectDocumentSaveDTO,
     ProjectService,
 )
+from app.modules.project.service.project_document_buffer_state_support import (
+    TRUSTED_ACTIVE_BUFFER_SOURCE,
+    build_project_document_buffer_hash,
+)
 from app.modules.project.service.project_document_capability_service import (
     ProjectDocumentMutationError,
     _build_catalog_version,
@@ -31,6 +35,20 @@ from app.modules.project.service.project_document_version_support import (
 )
 from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_content, create_content_version, create_project, ready_project_setting
+
+
+def _build_trusted_active_buffer_state(
+    *,
+    base_version: str,
+    content: str,
+    dirty: bool = False,
+) -> dict[str, object]:
+    return {
+        "dirty": dirty,
+        "base_version": base_version,
+        "buffer_hash": build_project_document_buffer_hash(content),
+        "source": TRUSTED_ACTIVE_BUFFER_SOURCE,
+    }
 
 
 class _FailOnAppendRevisionStore(ProjectDocumentRevisionStore):
@@ -158,7 +176,8 @@ def test_project_document_capability_catalog_includes_canonical_and_file_entries
 
     file_store = ProjectDocumentFileStore(tmp_path)
     identity_store = ProjectDocumentIdentityStore(tmp_path)
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     capability_service = ProjectDocumentCapabilityService(
         project_service=ProjectService(
             document_file_store=file_store,
@@ -185,7 +204,8 @@ def test_project_document_capability_catalog_uses_metadata_only_file_resolution(
     project = create_project(db, project_setting=ready_project_setting())
     file_store = _MetadataOnlyCatalogFileStore(tmp_path)
     identity_store = ProjectDocumentIdentityStore(tmp_path)
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     capability_service = ProjectDocumentCapabilityService(
         project_service=ProjectService(
             document_file_store=file_store,
@@ -205,7 +225,8 @@ def test_project_document_capability_catalog_uses_metadata_only_file_resolution(
 def test_project_document_capability_catalog_requires_identity_store_for_file_documents(db, tmp_path):
     project = create_project(db, project_setting=ready_project_setting())
     file_store = ProjectDocumentFileStore(tmp_path)
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     capability_service = ProjectDocumentCapabilityService(
         project_service=ProjectService(document_file_store=file_store),
         document_file_store=file_store,
@@ -231,7 +252,8 @@ def test_project_document_capability_search_documents_matches_query_and_filters(
     project = create_project(db, project_setting=ready_project_setting())
     file_store = ProjectDocumentFileStore(tmp_path)
     identity_store = ProjectDocumentIdentityStore(tmp_path)
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     file_store.save_project_document(
         project.id,
         "数据层/人物关系.json",
@@ -271,7 +293,8 @@ def test_project_document_capability_search_documents_uses_metadata_only_file_re
     project = create_project(db, project_setting=ready_project_setting())
     file_store = _MetadataOnlyCatalogFileStore(tmp_path)
     identity_store = ProjectDocumentIdentityStore(tmp_path)
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     capability_service = ProjectDocumentCapabilityService(
         project_service=ProjectService(
             document_file_store=file_store,
@@ -414,7 +437,8 @@ def test_project_document_capability_read_documents_uses_targeted_file_resolutio
     project = create_project(db, project_setting=ready_project_setting())
     file_store = _TrackingDocumentReadFileStore(tmp_path)
     identity_store = ProjectDocumentIdentityStore(tmp_path)
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     file_store.save_project_document(project.id, "附录/灵感.md", "# 灵感\n\n不要被读到")
     capability_service = ProjectDocumentCapabilityService(
         project_service=ProjectService(
@@ -555,6 +579,40 @@ def test_project_document_capability_read_documents_truncates_with_stable_cursor
     assert second_item.content == long_text[4000:]
 
 
+def test_project_document_capability_read_documents_aligns_duplicate_paths_with_distinct_cursors(
+    db,
+    tmp_path,
+):
+    project = create_project(db, project_setting=ready_project_setting())
+    file_store = ProjectDocumentFileStore(tmp_path)
+    identity_store = ProjectDocumentIdentityStore(tmp_path)
+    long_text = "A" * 4500 + "B" * 200
+    file_store.save_project_document(project.id, "附录/长文稿.md", long_text)
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=ProjectService(
+            document_file_store=file_store,
+            document_identity_store=identity_store,
+        ),
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+
+    result = asyncio.run(
+        capability_service.read_documents(
+            async_db(db),
+            project.id,
+            paths=["附录/长文稿.md", "附录/长文稿.md"],
+            cursors=["offset:0", "offset:4000"],
+        )
+    )
+
+    assert [item.path for item in result.documents] == ["附录/长文稿.md", "附录/长文稿.md"]
+    assert result.documents[0].content == long_text[:4000]
+    assert result.documents[0].next_cursor == "offset:4000"
+    assert result.documents[1].content == long_text[4000:]
+    assert result.documents[1].next_cursor is None
+
+
 def test_project_document_capability_keeps_file_document_ref_stable_after_rename(db, tmp_path):
     project = create_project(db, project_setting=ready_project_setting())
     file_store = ProjectDocumentFileStore(tmp_path)
@@ -653,7 +711,8 @@ def test_project_document_capability_write_document_returns_version_revision_and
         document_file_store=file_store,
         document_identity_store=identity_store,
     )
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
     target = next(item for item in catalog if item.path == "设定/人物.md")
 
@@ -666,7 +725,10 @@ def test_project_document_capability_write_document_returns_version_revision_and
             base_version=target.version,
             expected_document_ref=target.document_ref,
             expected_binding_version=_build_entry_binding_version(target),
-            active_buffer_state={"dirty": False, "base_version": target.version},
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version=target.version,
+                content=current_content,
+            ),
             allowed_target_document_refs=(target.document_ref,),
             require_trusted_buffer_state=True,
             run_audit_id="run-audit-1",
@@ -689,7 +751,10 @@ def test_project_document_capability_write_document_returns_version_revision_and
             base_version=result.version,
             expected_document_ref=target.document_ref,
             expected_binding_version=_build_entry_binding_version(target),
-            active_buffer_state={"dirty": False, "base_version": result.version},
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version=result.version,
+                content="# 人物\n\n林渊\n\n新增：夜雨观察力极强。",
+            ),
             allowed_target_document_refs=(target.document_ref,),
             require_trusted_buffer_state=True,
             run_audit_id="run-audit-1-repeat",
@@ -728,10 +793,10 @@ def test_project_document_capability_prepare_write_document_uses_targeted_file_r
             path="设定/人物.md",
             content="# 人物\n\n林渊\n\n新增：夜雨观察力极强。",
             base_version=build_project_file_document_version(current_content),
-            active_buffer_state={
-                "dirty": False,
-                "base_version": build_project_file_document_version(current_content),
-            },
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version=build_project_file_document_version(current_content),
+                content=current_content,
+            ),
             run_audit_id="run-audit-targeted-prepare",
         )
     )
@@ -755,7 +820,8 @@ def test_project_document_capability_write_document_reuses_revision_for_same_run
         document_file_store=file_store,
         document_identity_store=identity_store,
     )
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
     target = next(item for item in catalog if item.path == "设定/人物.md")
 
@@ -768,7 +834,10 @@ def test_project_document_capability_write_document_reuses_revision_for_same_run
             base_version=target.version,
             expected_document_ref=target.document_ref,
             expected_binding_version=_build_entry_binding_version(target),
-            active_buffer_state={"dirty": False, "base_version": target.version},
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version=target.version,
+                content=current_content,
+            ),
             allowed_target_document_refs=(target.document_ref,),
             require_trusted_buffer_state=True,
             run_audit_id="run-audit-idempotent",
@@ -783,7 +852,10 @@ def test_project_document_capability_write_document_reuses_revision_for_same_run
             base_version=first.version,
             expected_document_ref=target.document_ref,
             expected_binding_version=_build_entry_binding_version(target),
-            active_buffer_state={"dirty": False, "base_version": first.version},
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version=first.version,
+                content="# 人物\n\n林渊\n\n新增：夜雨观察力极强。",
+            ),
             allowed_target_document_refs=(target.document_ref,),
             require_trusted_buffer_state=True,
             run_audit_id="run-audit-idempotent",
@@ -812,7 +884,8 @@ def test_project_document_capability_commit_prepared_write_document_surfaces_eff
         document_identity_store=identity_store,
         document_revision_store=_FailOnAppendRevisionStore(tmp_path / "revisions"),
     )
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
     target = next(item for item in catalog if item.path == "设定/人物.md")
 
@@ -825,7 +898,10 @@ def test_project_document_capability_commit_prepared_write_document_surfaces_eff
             base_version=target.version,
             expected_document_ref=target.document_ref,
             expected_binding_version=_build_entry_binding_version(target),
-            active_buffer_state={"dirty": False, "base_version": target.version},
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version=target.version,
+                content=current_content,
+            ),
             allowed_target_document_refs=(target.document_ref,),
             require_trusted_buffer_state=True,
             run_audit_id="run-audit-failing-revision",
@@ -868,7 +944,8 @@ def test_project_document_capability_write_document_recovers_missing_revision_fo
         document_identity_store=identity_store,
         document_revision_store=_FailOnAppendRevisionStore(tmp_path / "revisions"),
     )
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     catalog = asyncio.run(failing_service.list_document_catalog(async_db(db), project.id))
     target = next(item for item in catalog if item.path == "设定/人物.md")
     content = "# 人物\n\n林渊\n\n新增：夜雨观察力极强。"
@@ -883,7 +960,10 @@ def test_project_document_capability_write_document_recovers_missing_revision_fo
                 base_version=target.version,
                 expected_document_ref=target.document_ref,
                 expected_binding_version=_build_entry_binding_version(target),
-                active_buffer_state={"dirty": False, "base_version": target.version},
+                active_buffer_state=_build_trusted_active_buffer_state(
+                    base_version=target.version,
+                    content=current_content,
+                ),
                 allowed_target_document_refs=(target.document_ref,),
                 require_trusted_buffer_state=True,
                 run_audit_id="run-audit-recovery",
@@ -905,7 +985,10 @@ def test_project_document_capability_write_document_recovers_missing_revision_fo
             base_version=target.version,
             expected_document_ref=target.document_ref,
             expected_binding_version=_build_entry_binding_version(target),
-            active_buffer_state={"dirty": False, "base_version": target.version},
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version=target.version,
+                content=content,
+            ),
             allowed_target_document_refs=(target.document_ref,),
             require_trusted_buffer_state=True,
             run_audit_id="run-audit-recovery",
@@ -949,7 +1032,8 @@ def test_project_document_capability_commit_holds_revision_lock_during_file_save
     file_store = _LockAwareFileStore(tmp_path, revision_store=revision_store)
     identity_store = ProjectDocumentIdentityStore(tmp_path)
     project = create_project(db, project_setting=ready_project_setting())
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     file_store.require_lock_for_save = True
     project_service = ProjectService(
         document_file_store=file_store,
@@ -1105,7 +1189,8 @@ def test_project_document_capability_write_document_requires_trusted_buffer_stat
         document_file_store=file_store,
         document_identity_store=identity_store,
     )
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
     target = next(item for item in catalog if item.path == "设定/人物.md")
 
@@ -1143,7 +1228,8 @@ def test_project_document_capability_write_document_rejects_dirty_active_buffer(
         document_file_store=file_store,
         document_identity_store=identity_store,
     )
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
     target = next(item for item in catalog if item.path == "设定/人物.md")
 
@@ -1157,7 +1243,11 @@ def test_project_document_capability_write_document_rejects_dirty_active_buffer(
                 base_version=target.version,
                 expected_document_ref=target.document_ref,
                 expected_binding_version=_build_entry_binding_version(target),
-                active_buffer_state={"dirty": True, "base_version": target.version},
+                active_buffer_state=_build_trusted_active_buffer_state(
+                    base_version=target.version,
+                    content=current_content,
+                    dirty=True,
+                ),
                 allowed_target_document_refs=(target.document_ref,),
                 require_trusted_buffer_state=True,
                 run_audit_id="run-audit-5",
@@ -1182,7 +1272,8 @@ def test_project_document_capability_write_document_rejects_stale_buffer_hash(db
         document_file_store=file_store,
         document_identity_store=identity_store,
     )
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
     target = next(item for item in catalog if item.path == "设定/人物.md")
 
@@ -1200,6 +1291,7 @@ def test_project_document_capability_write_document_rejects_stale_buffer_hash(db
                     "dirty": False,
                     "base_version": target.version,
                     "buffer_hash": "fnv1a64:0000000000000000",
+                    "source": TRUSTED_ACTIVE_BUFFER_SOURCE,
                 },
                 allowed_target_document_refs=(target.document_ref,),
                 require_trusted_buffer_state=True,
@@ -1208,6 +1300,49 @@ def test_project_document_capability_write_document_rejects_stale_buffer_hash(db
         )
 
     assert exc_info.value.code == "write_grant_expired"
+
+
+def test_project_document_capability_write_document_requires_trusted_buffer_source(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    file_store = ProjectDocumentFileStore(tmp_path)
+    identity_store = ProjectDocumentIdentityStore(tmp_path)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
+    catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
+    target = next(item for item in catalog if item.path == "设定/人物.md")
+
+    with pytest.raises(ProjectDocumentMutationError) as exc_info:
+        asyncio.run(
+            capability_service.write_document(
+                async_db(db),
+                project.id,
+                path="设定/人物.md",
+                content="# 人物\n\n林渊\n\n新增：谨慎。",
+                base_version=target.version,
+                expected_document_ref=target.document_ref,
+                expected_binding_version=_build_entry_binding_version(target),
+                active_buffer_state={
+                    "dirty": False,
+                    "base_version": target.version,
+                    "buffer_hash": build_project_document_buffer_hash(current_content),
+                    "source": "external_editor",
+                },
+                allowed_target_document_refs=(target.document_ref,),
+                require_trusted_buffer_state=True,
+                run_audit_id="run-audit-untrusted-source",
+            )
+        )
+
+    assert exc_info.value.code == "active_buffer_state_invalid"
 
 
 def test_project_document_capability_write_document_rejects_revision_state_mismatch(db, tmp_path):
@@ -1223,7 +1358,8 @@ def test_project_document_capability_write_document_rejects_revision_state_misma
         document_file_store=file_store,
         document_identity_store=identity_store,
     )
-    file_store.save_project_document(project.id, "设定/人物.md", "# 人物\n\n林渊")
+    current_content = "# 人物\n\n林渊"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
     catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
     target = next(item for item in catalog if item.path == "设定/人物.md")
     asyncio.run(
@@ -1235,7 +1371,10 @@ def test_project_document_capability_write_document_rejects_revision_state_misma
             base_version=target.version,
             expected_document_ref=target.document_ref,
             expected_binding_version=_build_entry_binding_version(target),
-            active_buffer_state={"dirty": False, "base_version": target.version},
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version=target.version,
+                content=current_content,
+            ),
             allowed_target_document_refs=(target.document_ref,),
             require_trusted_buffer_state=True,
             run_audit_id="run-audit-6",
@@ -1258,7 +1397,10 @@ def test_project_document_capability_write_document_rejects_revision_state_misma
                 base_version=tampered.version,
                 expected_document_ref=tampered.document_ref,
                 expected_binding_version=_build_entry_binding_version(tampered),
-                active_buffer_state={"dirty": False, "base_version": tampered.version},
+                active_buffer_state=_build_trusted_active_buffer_state(
+                    base_version=tampered.version,
+                    content="# 人物\n\n被外部绕过修改",
+                ),
                 allowed_target_document_refs=(tampered.document_ref,),
                 require_trusted_buffer_state=True,
                 run_audit_id="run-audit-7",

@@ -125,8 +125,9 @@ class LLMFunctionToolDefinition:
 class NormalizedLLMToolCall:
     tool_call_id: str
     tool_name: str
-    arguments: dict[str, Any] | None
+    arguments: dict[str, Any]
     arguments_text: str | None = None
+    arguments_error: str | None = None
     provider_ref: str | None = None
 
 

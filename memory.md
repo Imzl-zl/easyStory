@@ -7,7 +7,7 @@
 
 - 后端测试：最近一次已知全量 `cd apps/api && ruff check app tests && pytest -q` 通过（记录日期：2026-03-23）
 - 前端检查：最近一次已知 `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-04-04）
-- 最后更新：2026-04-06
+- 最后更新：2026-04-07
 
 ## 已完成能力
 
@@ -79,8 +79,8 @@
 - endpoint 安全策略必须同时落在写入入口和运行时出口
 - 程序化 Alembic 优先复用现有 `connection` / `engine`，不要退回字符串化 URL
 - config_registry 对外暴露语义化 DTO，写回前必须 staged full-config 校验，未知字段直接失败
-- `assistant runtime` 当前正式口径：默认可直接走“规则 + 当前会话消息历史”的纯聊天；`skill_id` / `agent_id` 现在是可选增强而非硬前提，且 Studio 聊天已移除默认内置 Skill 绑定；Skill 模式已收口为“规则 + Skill + 当前会话历史 + 当前消息”，runtime 会自动补齐 Skill 未显式声明的 `conversation_history / user_input`；assistant turn 的 `messages` 只允许 `user / assistant`，规则和 Skill 不进入历史；`mcp` 继续通过 hook/plugin 路径执行，agent 通用 tool-calling 仍是下一阶段
-- assistant tool-calling 当前正式口径：ordinary chat 已支持本地 `project.*` 工具串行执行；非 `openai_responses` provider 统一走结构化 runtime replay，不再把 continuation 压回自然语言 prompt；共享前端 stream client 目前明确以 `completed / error / cancelled tool_result` 为终止真值优先级
+- `assistant runtime` 当前正式口径：默认可直接走“规则 + 当前会话消息历史”的纯聊天；`skill_id` / `agent_id` 现在是可选增强而非硬前提，且 Studio 聊天已移除默认内置 Skill 绑定；Skill 模式已收口为“规则 + Skill + 当前会话历史 + 当前消息”，runtime 会自动补齐 Skill 未显式声明的 `conversation_history / user_input`；assistant turn 的 `messages` 只允许 `user / assistant`，规则和 Skill 不进入历史；`continuation_anchor_snapshot` 现已归一化冻结 validated direct-parent digest，不再在省略 `messages_digest` 时只剩 `previous_run_id`；assistant 内部目录标准化当前已把 turn 生命周期代码统一收口到 `apps/api/app/modules/assistant/service/turn/`，把 tooling descriptor/policy/executor/loop/store 文件统一收口到 `apps/api/app/modules/assistant/service/tooling/`，把 context 纯 support 文件统一收口到 `apps/api/app/modules/assistant/service/context/`，把 hook payload/runtime/provider 文件统一收口到 `apps/api/app/modules/assistant/service/hooks_runtime/`，把 rules DTO/service/support 统一收口到 `apps/api/app/modules/assistant/service/rules/`，把 preferences DTO/service/support 统一收口到 `apps/api/app/modules/assistant/service/preferences/`，把 skills DTO/file-store/service/support 统一收口到 `apps/api/app/modules/assistant/service/skills/`，并把 agents DTO/file-store/service/support、mcp DTO/file-store/service/support、hooks 配置 DTO/file-store/service/support 统一收口到 `apps/api/app/modules/assistant/service/agents/`、`apps/api/app/modules/assistant/service/mcp/`、`apps/api/app/modules/assistant/service/hooks/`；本轮根壳评估已完成，prompt render 已回收至 `service/context/assistant_prompt_render_support.py`，其余 `assistant_service.py / factory.py / dto.py` 继续保留为稳定根壳；`mcp` 继续通过 hook/plugin 路径执行，agent 通用 tool-calling 仍是下一阶段
+- assistant tool-calling 当前正式口径：ordinary chat 已支持本地 `project.*` 工具串行执行；非 `openai_responses` provider 统一走结构化 runtime replay，不再把 continuation 压回自然语言 prompt；`tool_catalog_version` 现已独立收口为“本轮最终可见 descriptor 快照版本”，不再借用 `document_context.catalog_version`；项目范围工具提示现已同步进入显式 `tool_guidance` snapshot；initial prompt compaction snapshot 现已具备 `phase / level` 元信息；latest continuation request view 现已进入显式 `continuation_request_snapshot`，并与 `provider_continuation_state / continuation_compaction_snapshot` 分离；latest tool-loop continuation budget compaction 现已进入显式 `continuation_compaction_snapshot`；共享前端 stream client 目前明确以 `completed / error / cancelled tool_result` 为终止真值优先级
 - assistant tool-calling `v1B` 当前已推进到 continuity-first 文稿工具面：`project.list_documents / search_documents / read_documents / write_document` 已接入 runtime；长历史 compaction、tool-loop continuation budget、metadata-only 文稿搜索已收口；`grant_bound` 写路径现已具备显式 `approval_grant` 骨架，并把 grant snapshot 落到 `AssistantToolStep / AssistantTurnRun`
 - assistant SSE 当前正式口径：除普通 `completed`/tool 事件外，`error` 事件也应尽量携带同一 run 的结构化元数据，前端不再只依赖裸错误消息来推断归属
 - 用户 Hook 当前正式支持 `agent | mcp` 两类动作；MCP 会先解析用户自己的 `mcp_servers/<server_id>/MCP.yaml`，找不到再回退系统 MCP
@@ -100,7 +100,6 @@
 
 ## 最近活跃窗口（2026-03-26 ~ 03-30）
 
-- 2026-03-26：完成 provider interop、本地 probe、assistant runtime 与 workflow hooks runtime 的第一轮真实闭环；运行时显式暴露错误，不做静默降级。
 - 2026-03-27：完成 Workspace / Studio / Engine 的一轮布局收口，工作台侧栏、页头骨架、状态区和移动端细节已统一。
 - 2026-03-28：assistant 配置主真值切到 `apps/api/.runtime/assistant-config/`，多用户体验改为“AI 助手 / 模型连接”双入口，并补齐未保存离开保护。
 - 2026-03-29：修复本地 SQLite 开发库迁移卡死导致的“页面一直加载中”；登录、项目大厅、AI 聊天、模型连接页恢复。
@@ -118,4 +117,4 @@
 - 2026-04-06：修正 `Incubator` store 边角语义：空会话判定已把 `latestCompletedRunId` 纳入非空条件，与 `Studio` 保持一致；相关 `Incubator` store/request/submit` 定向测试与 `eslint` 已通过。
 - 2026-04-06：继续强化共享 stream client 的协议异常暴露：malformed SSE payload 不再向上冒原始 `SyntaxError`，而是统一转成 `stream_payload_invalid` 结构化终止错误；中途修正了“误把正常 `error` 事件也包成 payload invalid”的实现错误，相关定向测试与 `eslint` 已通过。
 - 2026-04-06：assistant 文稿工具继续稳步推进到 `v1B`：补齐 `project.search_documents` 契约、continuity-first 搜索排序、长历史 compaction/budget、tool-loop continuation 预算，以及 `project.write_document` 的显式 `approval_grant` 骨架；当前 grant 已进入 policy decision、execution context、tool step snapshot 与 turn run snapshot，定向后端回归已通过。
-- 2026-04-06：继续修正 assistant 文稿工具 runtime 边界：hidden tool 现在会在 runtime 计划阶段被显式拒绝，不再“只是隐藏但仍可执行”；`grant_bound` 只会对 `writable=true` 的 active 文稿签发 grant；`AssistantToolStep.approval_state` 也已改为依赖实际 grant，避免无 grant 写调用被错误记成 `approved`。
+- 2026-04-07：assistant runtime context governance 继续收口并推进内部结构标准化：项目范围工具提示现已由 prepare 阶段冻结一次 `tool_guidance` snapshot，并由 prompt render 与 `normalized_input_items_snapshot` 共同消费；initial prompt compaction snapshot 已补齐 `phase / level` 元信息，`continuation_anchor_snapshot` 已归一化冻结 validated direct-parent digest，latest continuation request view 已进入显式 `continuation_request_snapshot`，latest continuation budget compaction 已进入显式 `continuation_compaction_snapshot`；assistant 目录标准化现已形成 `service/turn/`、`service/tooling/`、`service/context/`、`service/hooks_runtime/`、`service/rules/`、`service/preferences/`、`service/skills/`、`service/agents/`、`service/mcp/` 与 `service/hooks/` 十个稳定子域，且 prompt render 已从根级 `assistant_execution_support.py` 收回 `service/context/assistant_prompt_render_support.py`；assistant 定向后端回归已更新到 `70 passed`（本轮定向）/ `129 passed`（上一轮更大集合）。

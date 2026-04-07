@@ -5,7 +5,7 @@ from typing import Any
 
 from app.shared.runtime.errors import ConfigurationError
 
-from .assistant_tool_runtime_dto import AssistantToolDescriptor
+from .tooling.assistant_tool_runtime_dto import AssistantToolDescriptor
 
 DEFAULT_ASSISTANT_MAX_PARALLEL_TOOL_CALLS = 1
 

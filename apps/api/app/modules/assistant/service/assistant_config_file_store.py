@@ -9,13 +9,13 @@ import yaml
 
 from app.shared.runtime.errors import ConfigurationError
 
-from .assistant_rule_dto import AssistantRuleProfileDTO, AssistantRuleProfileUpdateDTO
-from .assistant_rule_support import normalize_rule_content
-from .preferences_dto import (
+from .rules.assistant_rule_dto import AssistantRuleProfileDTO, AssistantRuleProfileUpdateDTO
+from .rules.assistant_rule_support import normalize_rule_content
+from .preferences.preferences_dto import (
     AssistantPreferencesDTO,
     AssistantPreferencesUpdateDTO,
 )
-from .preferences_support import (
+from .preferences.preferences_support import (
     build_preferences_dto,
     build_updated_preferences,
     has_custom_preferences,
