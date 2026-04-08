@@ -8,8 +8,11 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.config_registry.schemas import ModelConfig
-from app.modules.credential.service import CredentialService
-from app.modules.credential.service.credential_connection_support import build_runtime_credential_payload
+from app.modules.credential.service import (
+    CredentialService,
+    RuntimeCredentialPayload,
+    build_runtime_credential_payload,
+)
 from app.shared.runtime import ToolProvider
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
@@ -20,16 +23,20 @@ from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
 from app.shared.runtime.llm.llm_protocol import (
     LLMContinuationSupport,
     allows_provider_continuation_state,
-    resolve_continuation_support,
+    resolve_connection_continuation_support,
 )
-from app.shared.runtime.llm.llm_tool_provider import LLM_GENERATE_TOOL, LLMStreamEvent
+from app.shared.runtime.llm.llm_tool_provider import (
+    LLM_GENERATE_TOOL,
+    LLMGenerateToolResponse,
+    LLMStreamEvent,
+)
 
 from .tooling.assistant_tool_loop import AssistantToolLoopModelStreamEvent
 
 
 @dataclass(frozen=True)
 class ResolvedAssistantLlmRuntime:
-    credential_payload: dict[str, Any]
+    credential_payload: RuntimeCredentialPayload
     continuation_support: LLMContinuationSupport
     credential_display_name: str
     verified_probe_kind: ConformanceProbeKind | None = None
@@ -51,12 +58,16 @@ async def resolve_assistant_llm_runtime(
         user_id=owner_id,
         project_id=project_id,
     )
+    credential_payload = build_runtime_credential_payload(
+        credential,
+        decrypt_api_key=credential_service.crypto.decrypt,
+    )
     return ResolvedAssistantLlmRuntime(
-        credential_payload=build_runtime_credential_payload(
-            credential,
-            decrypt_api_key=credential_service.crypto.decrypt,
+        credential_payload=credential_payload,
+        continuation_support=resolve_connection_continuation_support(
+            credential.api_dialect,
+            credential.interop_profile,
         ),
-        continuation_support=resolve_continuation_support(credential.api_dialect),
         credential_display_name=credential.display_name,
         verified_probe_kind=(
             normalize_conformance_probe_kind(credential.verified_probe_kind)
@@ -79,7 +90,7 @@ async def call_assistant_llm(
     tools: list[dict[str, Any]] | None = None,
     continuation_items: list[dict[str, Any]] | None = None,
     provider_continuation_state: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+) -> LLMGenerateToolResponse:
     return await tool_provider.execute(
         LLM_GENERATE_TOOL,
         {
@@ -135,13 +146,13 @@ async def stream_assistant_llm(
 
 def build_tool_loop_model_caller(
     *,
-    llm_caller: Callable[..., Awaitable[dict[str, Any]]],
+    llm_caller: Callable[..., Awaitable[LLMGenerateToolResponse]],
     db: AsyncSession,
     model: ModelConfig,
     owner_id: uuid.UUID,
     project_id: uuid.UUID | None,
     runtime_context: ResolvedAssistantLlmRuntime,
-) -> Callable[..., Awaitable[dict[str, Any]]]:
+) -> Callable[..., Awaitable[LLMGenerateToolResponse]]:
     async def model_caller(
         *,
         prompt: str,
@@ -149,7 +160,7 @@ def build_tool_loop_model_caller(
         tools: list[dict[str, Any]],
         continuation_items: list[dict[str, Any]] | None = None,
         provider_continuation_state: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> LLMGenerateToolResponse:
         return await llm_caller(
             db,
             prompt=prompt,

@@ -10,8 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.config_registry import ConfigLoader
 from app.modules.config_registry.schemas.config_schemas import ModelConfig, NodeConfig, SkillConfig, WorkflowConfig
-from app.modules.credential.service import CredentialService
-from app.modules.credential.service.credential_connection_support import build_runtime_credential_payload
+from app.modules.credential.service import CredentialService, build_runtime_credential_payload
 from app.modules.project.models import Project
 from app.modules.project.schemas import ProjectSettingProjectionError, resolve_setting_variable
 from app.modules.project.service import ProjectService

@@ -17,6 +17,7 @@
 - Credential Center 高级兼容设置与能力真值闭环：凭证现正式支持 `interop_profile / auth_strategy / api_key_header_name / extra_headers / verified_probe_kind`，且保存、验证、assistant runtime 与前端配置入口已对齐；其中 `extra_headers` 已收口为仅允许非敏感元数据头，`interop_profile` 已按 `api_dialect` 做显式约束，`verified_probe_kind` 记录当前最高已证明 capability
 - Credential Center 显式验证语义与 assistant 门控已收口：产品面现已区分 `验证连接(text_probe)` 与 `验证工具调用(tool_continuation_probe)`；共享 verifier 已复用 conformance probe 主链，assistant 在 visible `project.*` 工具存在时会显式要求 `tool_continuation_probe`，避免再出现“验证成功但 tool loop 实际不可用”的单一 verify 假象
 - 2026-04-08 review remediation 已完成：`tool_definition_probe` 现仅接受精确 success token；`tool_continuation_probe` follow-up 改为校验只存在于 tool result 中的动态 echoed 值，不再把期望答案写进 prompt；`verified_probe_kind` 写回已改为数据库当前值参与的原子 promote，避免并发低等级验证覆盖高等级 capability 真值
+- 2026-04-08 晚间继续收口了工具能力真值与空工具响应语义：若显式工具验证失败，当前库里同级或更高的 `verified_probe_kind` 会被清掉；同时 shared runtime 与 verifier 现已统一把“tools 打开后上游返回空 assistant 响应（无文本、无 tool_calls）”识别为明确协议错误。最新本地实测：`薄荷codex` 仍通过 `tool_continuation_probe`；`bwen` 当前只保留 `text_probe`；`ice` 当前 tool probe 失败且旧 `tool_continuation_probe` 真值已清空。
 - 项目与前置资产闭环：project CRUD、结构化摘要提示（原 setting completeness）、story asset generation / confirm
 - 内容主链路闭环：outline / opening_plan / chapter / content version、章节确认与 stale 传播
 - 工作流闭环：control plane、runtime、auto-review / fix、workflow logs / prompt replay / audit

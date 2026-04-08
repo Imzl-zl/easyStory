@@ -6,7 +6,7 @@ import { Button } from "@arco-design/web-react";
 import { matchAssistantMarkdownDocument } from "@/features/shared/assistant/assistant-markdown-document-support";
 
 import { formatStudioChatAttachmentSize } from "./studio-chat-attachment-support";
-import type { StudioChatMessage } from "./studio-chat-support";
+import type { StudioChatMessage, StudioChatToolProgressTone } from "./studio-chat-support";
 
 type StudioChatMessageBubbleProps = {
   message: StudioChatMessage;
@@ -45,6 +45,19 @@ export function StudioChatMessageBubble({
       onMouseLeave={() => setShowActions(false)}
     >
       <p className="m-0 mb-1.5 text-[0.66rem] font-semibold tracking-widest uppercase text-[var(--text-tertiary)]">{isAssistant ? "助手" : "你"}</p>
+      {isAssistant && message.toolProgress?.length ? (
+        <div className="mb-2.5 flex flex-col gap-1.5">
+          {message.toolProgress.map((item) => (
+            <ToolProgressCard
+              key={item.toolCallId}
+              detail={item.detail}
+              label={item.label}
+              statusLabel={item.statusLabel}
+              tone={item.tone}
+            />
+          ))}
+        </div>
+      ) : null}
       <div className={MESSAGE_CONTENT_CLASS}>
         {isAssistant ? (
           <MarkdownContent
@@ -77,6 +90,33 @@ export function StudioChatMessageBubble({
         </div>
       ) : null}
     </article>
+  );
+}
+
+function ToolProgressCard({
+  detail,
+  label,
+  statusLabel,
+  tone,
+}: {
+  detail?: string;
+  label: string;
+  statusLabel: string;
+  tone: StudioChatToolProgressTone;
+}) {
+  const toneClasses = resolveToolProgressToneClasses(tone);
+  return (
+    <section className={`rounded-[16px] border px-3 py-2 ${toneClasses.card}`}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="m-0 text-[12px] font-medium text-[var(--text-primary)]">{label}</p>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase ${toneClasses.badge}`}>
+          {statusLabel}
+        </span>
+      </div>
+      {detail ? (
+        <p className="m-0 mt-1 text-[11px] leading-5 text-[var(--text-secondary)] break-words [overflow-wrap:anywhere]">{detail}</p>
+      ) : null}
+    </section>
   );
 }
 
@@ -150,4 +190,29 @@ function renderStudioMarkdown(text: string) {
     `<pre class="my-3 max-w-full overflow-x-auto rounded-2xl bg-[rgba(61,61,61,0.05)] px-3.5 py-3 text-[var(--text-primary)] font-mono text-xs leading-relaxed" data-lang="${lang}"><code>${code.trim()}</code></pre>`);
 
   return html;
+}
+
+function resolveToolProgressToneClasses(tone: StudioChatToolProgressTone) {
+  switch (tone) {
+    case "danger":
+      return {
+        badge: "bg-[rgba(178,65,46,0.12)] text-[#8b4335]",
+        card: "border-[rgba(178,65,46,0.16)] bg-[rgba(178,65,46,0.04)]",
+      };
+    case "muted":
+      return {
+        badge: "bg-[rgba(61,61,61,0.08)] text-[var(--text-secondary)]",
+        card: "border-[rgba(44,36,22,0.08)] bg-[rgba(255,255,255,0.46)]",
+      };
+    case "success":
+      return {
+        badge: "bg-[rgba(107,143,113,0.14)] text-[#52705a]",
+        card: "border-[rgba(107,143,113,0.14)] bg-[rgba(255,255,255,0.52)]",
+      };
+    default:
+      return {
+        badge: "bg-[rgba(107,143,113,0.14)] text-[#52705a]",
+        card: "border-[rgba(107,143,113,0.16)] bg-[rgba(107,143,113,0.06)]",
+      };
+  }
 }

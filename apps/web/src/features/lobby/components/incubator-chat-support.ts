@@ -183,26 +183,53 @@ export function resolveChatOutputModeLabel(streamOutput: boolean) {
 }
 
 export function resolveInterruptedIncubatorReply(content: string) {
-  const trimmed = content.trim();
-  if (!trimmed || trimmed === INCUBATOR_PENDING_REPLY_MESSAGE) {
-    return null;
-  }
-  return `${trimmed}\n\n${INCUBATOR_INTERRUPTED_REPLY_MESSAGE}`;
+  return resolveInterruptedAssistantReply(content, {
+    interruptedMessage: INCUBATOR_INTERRUPTED_REPLY_MESSAGE,
+    pendingMessage: INCUBATOR_PENDING_REPLY_MESSAGE,
+  });
 }
 
 export function resolveFailedIncubatorReply(
   content: string,
   errorMessage: string,
 ) {
+  return resolveFailedAssistantReply(content, errorMessage, {
+    interruptedMessage: INCUBATOR_INTERRUPTED_REPLY_MESSAGE,
+    pendingMessage: INCUBATOR_PENDING_REPLY_MESSAGE,
+  });
+}
+
+export function resolveFailedAssistantReply(
+  content: string,
+  errorMessage: string,
+  options: {
+    interruptedMessage: string;
+    pendingMessage: string;
+  },
+) {
   const trimmedContent = content.trim();
   const trimmedError = errorMessage.trim();
-  if (!trimmedContent || trimmedContent === INCUBATOR_PENDING_REPLY_MESSAGE) {
+  if (!trimmedContent || trimmedContent === options.pendingMessage) {
     return trimmedError || null;
   }
   if (TRUNCATED_REPLY_ERROR_PATTERN.test(trimmedError)) {
     return `${trimmedContent}\n\n${trimmedError}`;
   }
-  return resolveInterruptedIncubatorReply(trimmedContent) ?? (trimmedError || null);
+  return resolveInterruptedAssistantReply(trimmedContent, options) ?? (trimmedError || null);
+}
+
+function resolveInterruptedAssistantReply(
+  content: string,
+  options: {
+    interruptedMessage: string;
+    pendingMessage: string;
+  },
+) {
+  const trimmed = content.trim();
+  if (!trimmed || trimmed === options.pendingMessage) {
+    return null;
+  }
+  return `${trimmed}\n\n${options.interruptedMessage}`;
 }
 
 export function shouldShowPromptSuggestions(hasUserMessage: boolean) {

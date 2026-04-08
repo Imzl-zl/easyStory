@@ -2,10 +2,12 @@
 
 import type { StudioChatAttachmentMeta } from "./studio-chat-attachment-support";
 import {
+  finalizeStudioChatToolProgress,
   INITIAL_STUDIO_CHAT_SETTINGS,
   STUDIO_PENDING_REPLY_MESSAGE,
   type StudioChatMessage,
   type StudioChatSettings,
+  type StudioChatToolProgressEntry,
 } from "./studio-chat-support";
 import type {
   StudioChatProjectState,
@@ -152,6 +154,7 @@ function normalizeMessage(value: unknown, mode: "persisted" | "runtime"): Studio
     requestContent: readStringValue(record.requestContent) ?? undefined,
     role: record.role === "assistant" ? "assistant" : "user",
     status,
+    toolProgress: normalizeToolProgress(record.toolProgress),
   };
   if (mode !== "persisted" || normalizedMessage.status !== "pending") {
     return normalizedMessage;
@@ -162,6 +165,7 @@ function normalizeMessage(value: unknown, mode: "persisted" | "runtime"): Studio
     content: interruptedContent,
     rawMarkdown: interruptedContent,
     status: "error",
+    toolProgress: finalizeStudioChatToolProgress(normalizedMessage.toolProgress, "interrupted"),
   };
 }
 
@@ -176,6 +180,30 @@ function normalizeAttachments(value: unknown): StudioChatAttachmentMeta[] | unde
     const size = typeof record.size === "number" && Number.isFinite(record.size) ? record.size : null;
     return id && name && size !== null ? [{ id, name, size }] : [];
   });
+}
+
+function normalizeToolProgress(value: unknown): StudioChatToolProgressEntry[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const entries = value.flatMap((item) => {
+    const record = isRecord(item) ? item : {};
+    const label = readOptionalString(record.label);
+    const statusLabel = readOptionalString(record.statusLabel);
+    const toolCallId = readOptionalString(record.toolCallId);
+    const tone = normalizeToolProgressTone(record.tone);
+    if (!label || !statusLabel || !toolCallId || !tone) {
+      return [];
+    }
+    return [{
+      detail: readOptionalString(record.detail) ?? undefined,
+      label,
+      statusLabel,
+      toolCallId,
+      tone,
+    }];
+  });
+  return entries.length > 0 ? entries : undefined;
 }
 
 function buildInterruptedMessageContent(content: string) {
@@ -198,6 +226,13 @@ function readOptionalSkillId(value: unknown) {
 function readOptionalString(value: unknown) {
   const normalized = readStringValue(value)?.trim();
   return normalized || null;
+}
+
+function normalizeToolProgressTone(value: unknown): StudioChatToolProgressEntry["tone"] | null {
+  if (value === "danger" || value === "muted" || value === "running" || value === "success") {
+    return value;
+  }
+  return null;
 }
 
 function readStringValue(value: unknown) {

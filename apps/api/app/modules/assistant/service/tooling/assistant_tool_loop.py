@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.shared.runtime.llm.llm_protocol import LLMContinuationSupport
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
+from app.shared.runtime.llm.llm_tool_provider import LLMGenerateToolResponse
 
 from ..assistant_run_budget import AssistantRunBudget, build_assistant_run_budget
 from ..assistant_runtime_terminal import (
@@ -72,28 +73,28 @@ if TYPE_CHECKING:
     from ..turn.assistant_turn_runtime_support import AssistantTurnContext
 
 
-ToolModelCaller = Callable[..., Awaitable[dict[str, Any]]]
+ToolModelCaller = Callable[..., Awaitable[LLMGenerateToolResponse]]
 ToolStreamModelCaller = Callable[..., AsyncIterator["AssistantToolLoopModelStreamEvent"]]
 DEFAULT_ASSISTANT_TOOL_LOOP_MAX_ITERATIONS = 8
 
 
 @dataclass(frozen=True)
 class AssistantToolLoopResult:
-    raw_output: dict[str, Any]
+    raw_output: LLMGenerateToolResponse
 
 
 @dataclass(frozen=True)
 class AssistantToolLoopIterationItem:
     event_name: str | None = None
     event_payload: dict[str, Any] | None = None
-    raw_output: dict[str, Any] | None = None
+    raw_output: LLMGenerateToolResponse | None = None
     raw_output_already_streamed: bool = False
 
 
 @dataclass(frozen=True)
 class AssistantToolLoopModelStreamEvent:
     delta: str | None = None
-    raw_output: dict[str, Any] | None = None
+    raw_output: LLMGenerateToolResponse | None = None
 
 
 class AssistantToolLoop:
@@ -264,7 +265,7 @@ class AssistantToolLoop:
         continuation_support: LLMContinuationSupport,
         model_caller: ToolModelCaller,
         stream_model_caller: ToolStreamModelCaller | None = None,
-        initial_raw_output: dict[str, Any] | None = None,
+        initial_raw_output: LLMGenerateToolResponse | None = None,
         run_budget: AssistantRunBudget | None = None,
         tool_policy_decisions: tuple[AssistantToolPolicyDecision, ...] | None = None,
         visible_descriptors: tuple[AssistantToolDescriptor, ...] | None = None,
@@ -405,10 +406,6 @@ class AssistantToolLoop:
                     raw_output_already_streamed=raw_output_already_streamed,
                 )
                 return
-            _ensure_serial_tool_calls(
-                tool_calls,
-                max_parallel_tool_calls=resolved_run_budget.max_parallel_tool_calls,
-            )
             _record_tool_loop_state(
                 state_recorder,
                 pending_tool_calls_snapshot=_build_pending_tool_calls_snapshot(tool_calls),
@@ -734,19 +731,6 @@ async def _iterate_model_response(
     yield AssistantToolLoopIterationItem(
         raw_output=raw_output,
         raw_output_already_streamed=streamed_output,
-    )
-
-
-def _ensure_serial_tool_calls(
-    tool_calls: list[dict[str, Any]],
-    *,
-    max_parallel_tool_calls: int,
-) -> None:
-    if len(tool_calls) <= max_parallel_tool_calls:
-        return
-    raise AssistantRuntimeTerminalError(
-        code="parallel_tool_calls_unsupported",
-        message="当前运行时只支持串行工具调用，请逐个执行工具。",
     )
 
 

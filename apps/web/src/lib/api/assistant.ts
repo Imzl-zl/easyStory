@@ -92,6 +92,12 @@ type AssistantTurnStreamEvent =
     data: AssistantTurnErrorPayload;
   };
 
+type AssistantTurnStreamCallbacks = {
+  onChunk: (delta: string) => void;
+  onToolCallResult?: (payload: AssistantTurnToolCallResultPayload) => void;
+  onToolCallStart?: (payload: AssistantTurnToolCallStartPayload) => void;
+};
+
 export class AssistantTurnStreamTerminalError extends Error {
   readonly code?: string;
   readonly terminalStatus?: string;
@@ -139,8 +145,7 @@ export function runAssistantTurn(payload: AssistantTurnPayload) {
 
 export async function runAssistantTurnStream(
   payload: AssistantTurnPayload,
-  options: {
-    onChunk: (delta: string) => void;
+  options: AssistantTurnStreamCallbacks & {
     signal?: AbortSignal;
   },
 ) {
@@ -178,7 +183,7 @@ export async function runAssistantTurnStream(
         const completedResult = consumeAssistantTurnStreamChunk(
           buffer.trim(),
           streamState,
-          options.onChunk,
+          options,
         );
         if (completedResult) {
           return completedResult;
@@ -198,7 +203,7 @@ export async function runAssistantTurnStream(
         const completedResult = consumeAssistantTurnStreamChunk(
           chunk,
           streamState,
-          options.onChunk,
+          options,
         );
         if (completedResult) {
           return completedResult;
@@ -219,7 +224,7 @@ type AssistantTurnStreamState = {
 function consumeAssistantTurnStreamChunk(
   chunk: string,
   streamState: AssistantTurnStreamState,
-  onChunk: (delta: string) => void,
+  callbacks: AssistantTurnStreamCallbacks,
 ) {
   let event: AssistantTurnStreamEvent | null;
   try {
@@ -230,26 +235,31 @@ function consumeAssistantTurnStreamChunk(
   return consumeAssistantTurnStreamEvent(
     event,
     streamState,
-    onChunk,
+    callbacks,
   );
 }
 
 function consumeAssistantTurnStreamEvent(
   event: AssistantTurnStreamEvent | null,
   streamState: AssistantTurnStreamState,
-  onChunk: (delta: string) => void,
+  callbacks: AssistantTurnStreamCallbacks,
 ): AssistantTurnResult | null {
   if (!event) {
     return null;
   }
   streamState.latestEventMeta = resolveAssistantTurnStreamEventMeta(event);
+  if (event.event === "tool_call_start") {
+    callbacks.onToolCallStart?.(event.data);
+    return null;
+  }
   if (event.event === "chunk") {
     if (event.data.delta) {
-      onChunk(event.data.delta);
+      callbacks.onChunk(event.data.delta);
     }
     return null;
   }
   if (event.event === "tool_call_result") {
+    callbacks.onToolCallResult?.(event.data);
     streamState.cancelledToolMessage = resolveTerminalToolResultMessage(event.data);
     streamState.cancelledToolMeta = resolveTerminalToolResultMeta(event.data);
     return null;

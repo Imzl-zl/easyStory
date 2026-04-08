@@ -37,6 +37,7 @@ class LLMInteropCapabilities:
     profile: LlmInteropProfile | None
     tool_name_policy: ToolNamePolicy = "safe_ascii_only"
     tool_schema_mode: ToolSchemaMode = "portable_subset"
+    supports_provider_response_continuation: bool = False
     allows_responses_empty_output_in_stream_terminal: bool = False
     captures_chat_reasoning_content: bool = False
     expects_chat_usage_extra_chunk: bool = False
@@ -74,9 +75,11 @@ def resolve_interop_capabilities(
         raise ConfigurationError(
             f"interop_profile '{normalized_profile}' is not supported for api_dialect '{dialect}'"
         )
+    if dialect == "anthropic_messages":
+        return LLMInteropCapabilities(profile=None, tool_schema_mode="portable_subset")
     if dialect == "gemini_generate_content":
         return LLMInteropCapabilities(profile=None, tool_schema_mode="gemini_compatible")
-    return LLMInteropCapabilities(profile=None, tool_schema_mode="portable_subset")
+    raise ConfigurationError(f"Unsupported api_dialect for interop capabilities: {dialect}")
 
 
 def _resolve_responses_capabilities(
@@ -92,6 +95,8 @@ def _resolve_responses_capabilities(
         )
     return LLMInteropCapabilities(
         profile=interop_profile,
+        tool_schema_mode="openai_strict_compatible",
+        supports_provider_response_continuation=(interop_profile == "responses_strict"),
         allows_responses_empty_output_in_stream_terminal=(
             interop_profile == "responses_delta_first_terminal_empty_output"
         ),
@@ -112,6 +117,7 @@ def _resolve_chat_capabilities(
         )
     return LLMInteropCapabilities(
         profile=interop_profile,
+        tool_schema_mode="openai_strict_compatible",
         captures_chat_reasoning_content=(interop_profile == "chat_compat_reasoning_content"),
         expects_chat_usage_extra_chunk=(interop_profile == "chat_compat_usage_extra_chunk"),
     )

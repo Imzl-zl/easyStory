@@ -5,6 +5,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from ...errors import ConfigurationError
+from .gemini_probe_support import apply_gemini_probe_thinking_config
 from ..llm_protocol import (
     LLMConnection,
     LLMFunctionToolDefinition,
@@ -14,7 +15,7 @@ from ..llm_protocol import (
     allows_provider_continuation_state,
     build_verification_request,
     prepare_generation_request,
-    resolve_continuation_support,
+    resolve_connection_continuation_support,
 )
 from ..llm_protocol_types import NormalizedLLMToolCall
 
@@ -128,18 +129,26 @@ def build_conformance_probe_request(
     if probe_kind == "text_probe":
         return build_verification_request(connection)
     if probe_kind == "tool_definition_probe":
-        return _build_generate_request(
+        return _apply_probe_request_adjustments(
             connection,
+            _build_generate_request(
+                connection,
+                model_name=model_name,
+                prompt=TOOL_DEFINITION_PROBE_PROMPT,
+                system_prompt=TOOL_DEFINITION_PROBE_SYSTEM_PROMPT,
+            ),
             model_name=model_name,
-            prompt=TOOL_DEFINITION_PROBE_PROMPT,
-            system_prompt=TOOL_DEFINITION_PROBE_SYSTEM_PROMPT,
         )
     if probe_kind in {"tool_call_probe", "tool_continuation_probe"}:
-        return _build_generate_request(
+        return _apply_probe_request_adjustments(
             connection,
+            _build_generate_request(
+                connection,
+                model_name=model_name,
+                prompt=TOOL_CALL_PROBE_PROMPT,
+                system_prompt=TOOL_CALL_PROBE_SYSTEM_PROMPT,
+            ),
             model_name=model_name,
-            prompt=TOOL_CALL_PROBE_PROMPT,
-            system_prompt=TOOL_CALL_PROBE_SYSTEM_PROMPT,
         )
     raise ConfigurationError(f"Unsupported conformance probe kind: {probe_kind}")
 
@@ -158,14 +167,17 @@ def build_tool_continuation_probe_followup_request(
         tool_call=tool_call,
         result_echo=resolved_result_echo,
     )
-    continuation_support = resolve_continuation_support(connection.api_dialect)
+    continuation_support = resolve_connection_continuation_support(
+        connection.api_dialect,
+        connection.interop_profile,
+    )
     provider_continuation_state = _build_provider_continuation_state(
         initial_response=initial_response,
         continuation_items=continuation_items,
         connection=connection,
         continuation_support=continuation_support,
     )
-    return prepare_generation_request(
+    request = prepare_generation_request(
         LLMGenerateRequest(
             connection=connection,
             model_name=model_name,
@@ -178,7 +190,13 @@ def build_tool_continuation_probe_followup_request(
             tools=[PROBE_TOOL_DEFINITION],
             continuation_items=continuation_items,
             provider_continuation_state=provider_continuation_state,
+            force_tool_call=False,
         )
+    )
+    return _apply_probe_request_adjustments(
+        connection,
+        request,
+        model_name=model_name,
     )
 
 
@@ -222,11 +240,10 @@ def validate_tool_continuation_probe_response(
     content = response.content.strip()
     if not content:
         raise ConfigurationError("Tool continuation probe returned empty final content")
-    expected_text = render_tool_continuation_probe_success_text(expected_echo)
-    if content != expected_text:
+    if expected_echo not in content:
         raise ConfigurationError(
-            "Tool continuation probe final content must equal exactly "
-            f"'{expected_text}'"
+            "Tool continuation probe final content must include echoed value "
+            f"'{expected_echo}'"
         )
 
 
@@ -267,8 +284,20 @@ def _build_generate_request(
             max_tokens=PROBE_MAX_TOKENS,
             top_p=1.0,
             tools=[PROBE_TOOL_DEFINITION],
+            force_tool_call=True,
         )
     )
+
+
+def _apply_probe_request_adjustments(
+    connection: LLMConnection,
+    request: PreparedLLMHttpRequest,
+    *,
+    model_name: str,
+) -> PreparedLLMHttpRequest:
+    if connection.api_dialect == "gemini_generate_content":
+        return apply_gemini_probe_thinking_config(request, model_name)
+    return request
 
 
 def _build_tool_probe_continuation_items(
@@ -311,6 +340,9 @@ def _build_tool_probe_continuation_items(
             "status": "completed",
             "tool_name": tool_call.tool_name,
             "payload": {
+                "echoed": result_echo,
+                "ok": True,
+                "probe": "tool_continuation_probe",
                 "tool_name": tool_call.tool_name,
                 "structured_output": structured_output,
                 "content_items": [

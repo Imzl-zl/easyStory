@@ -1,0 +1,167 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e12] [cursor=pointer]:
+    - img [ref=e13]
+  - alert [ref=e16]
+  - link "跳到主内容" [ref=e17] [cursor=pointer]:
+    - /url: "#workspace-main"
+  - generic [ref=e18]:
+    - banner [ref=e19]:
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - link "返回书架" [ref=e22] [cursor=pointer]:
+            - /url: /workspace/lobby
+            - generic [ref=e23]: ←
+            - text: 返回书架
+          - generic [ref=e24]:
+            - generic [ref=e25]: 当前项目
+            - generic [ref=e26]: 创作工作台
+        - navigation "工作台导航" [ref=e27]:
+          - link "创作" [ref=e28] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/studio
+          - link "推进" [ref=e29] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/engine
+          - link "洞察" [ref=e30] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/lab
+        - generic [ref=e31]:
+          - link "项目设置" [ref=e32] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/settings
+          - generic [ref=e33]:
+            - generic [ref=e35]: z
+            - generic [ref=e36]: zhanglu
+          - button "退出" [ref=e37] [cursor=pointer]
+    - main [ref=e38]:
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - heading "项目说明.md" [level=1] [ref=e43]
+          - generic [ref=e44]:
+            - generic [ref=e45]: 项目说明.md
+            - paragraph [ref=e46]: 王云飞的警匪故事 · 项目说明.md
+          - generic [ref=e47]:
+            - button "文件已保存" [disabled] [ref=e48]
+            - button "收起助手" [ref=e49] [cursor=pointer]
+            - button "作品推进" [ref=e50] [cursor=pointer]
+        - complementary:
+          - navigation "作品目录":
+            - generic [ref=e53]:
+              - heading "创作结构" [level=2] [ref=e54]
+              - paragraph [ref=e55]: 右键标题区或节点可管理
+            - list [ref=e56]:
+              - listitem [ref=e57]:
+                - button "项目说明.md" [ref=e59] [cursor=pointer]:
+                  - img [ref=e61]
+                  - generic [ref=e64]: 项目说明.md
+              - listitem [ref=e65]:
+                - button "设定" [expanded] [ref=e67] [cursor=pointer]:
+                  - img [ref=e69]
+                  - generic [ref=e71]: 设定
+                - list [ref=e72]:
+                  - listitem [ref=e73]:
+                    - button "世界观.md" [ref=e75] [cursor=pointer]:
+                      - img [ref=e77]
+                      - generic [ref=e80]: 世界观.md
+                  - listitem [ref=e81]:
+                    - button "人物设定.md" [ref=e83] [cursor=pointer]:
+                      - img [ref=e85]
+                      - generic [ref=e88]: 人物设定.md
+                  - listitem [ref=e89]:
+                    - button "伏笔与坑.md" [ref=e91] [cursor=pointer]:
+                      - img [ref=e93]
+                      - generic [ref=e96]: 伏笔与坑.md
+                  - listitem [ref=e97]:
+                    - button "势力关系.md" [ref=e99] [cursor=pointer]:
+                      - img [ref=e101]
+                      - generic [ref=e104]: 势力关系.md
+                  - listitem [ref=e105]:
+                    - button "特殊规则.md" [ref=e107] [cursor=pointer]:
+                      - img [ref=e109]
+                      - generic [ref=e112]: 特殊规则.md
+              - listitem [ref=e113]:
+                - button "数据层" [ref=e115] [cursor=pointer]:
+                  - img [ref=e117]
+                  - generic [ref=e119]: 数据层
+              - listitem [ref=e120]:
+                - button "大纲" [ref=e122] [cursor=pointer]:
+                  - img [ref=e124]
+                  - generic [ref=e126]: 大纲
+              - listitem [ref=e127]:
+                - button "正文" [ref=e129] [cursor=pointer]:
+                  - img [ref=e131]
+                  - generic [ref=e133]: 正文
+              - listitem [ref=e134]:
+                - button "时间轴" [ref=e136] [cursor=pointer]:
+                  - img [ref=e138]
+                  - generic [ref=e140]: 时间轴
+              - listitem [ref=e141]:
+                - button "附录" [ref=e143] [cursor=pointer]:
+                  - img [ref=e145]
+                  - generic [ref=e147]: 附录
+              - listitem [ref=e148]:
+                - button "校验" [ref=e150] [cursor=pointer]:
+                  - img [ref=e152]
+                  - generic [ref=e154]: 校验
+              - listitem [ref=e155]:
+                - button "导出" [ref=e157] [cursor=pointer]:
+                  - img [ref=e159]
+                  - generic [ref=e161]: 导出
+        - main [ref=e162]:
+          - generic [ref=e163]:
+            - generic [ref=e164]:
+              - generic [ref=e166]:
+                - generic [ref=e167]:
+                  - heading "项目说明.md" [level=2] [ref=e168]
+                  - generic [ref=e169]: 已同步
+                - paragraph [ref=e170]: 项目说明.md
+              - generic [ref=e172]:
+                - button "编辑" [ref=e173] [cursor=pointer]
+                - button "分栏" [ref=e174] [cursor=pointer]
+                - button "预览" [ref=e175] [cursor=pointer]
+            - textbox "开始整理你的设定、章节或正文…" [ref=e178]: "# 项目说明 - 项目名称：王云飞的警匪故事 - 当前状态：draft - 题材：警匪 - 核心冲突：大学生恩怨导致的宿命对决，穿越后演变为黑帮大佬与警队尖刀的对抗 - 剧情走向：王云飞与许强同归于尽后，一起穿越到香港80、90年代，许强成为幕后黑帮大佬，王云飞成为警队尖刀，展开一场黑帮大佬与警队尖刀的对决 - 目标章节：30"
+            - generic [ref=e179]:
+              - generic [ref=e180]: 165 字符 · 14 词
+              - generic [ref=e181]: 文件已同步
+        - complementary [ref=e182]:
+          - complementary [ref=e184]:
+            - generic [ref=e185]:
+              - generic [ref=e187]:
+                - generic [ref=e188]:
+                  - heading "共创助手" [level=2] [ref=e189]
+                  - generic [ref=e190]: 创作中
+                - paragraph [ref=e191]: 当前文稿 · 项目说明.md
+              - generic [ref=e192]:
+                - button "Skill 本次 · novel-writer" [disabled] [ref=e194]:
+                  - generic [ref=e195]: Skill
+                  - generic [ref=e196]: 本次 · novel-writer
+                  - generic [ref=e197]: ▾
+                - generic [ref=e198]:
+                  - button "+ 新对话" [disabled] [ref=e199]:
+                    - generic [ref=e200]: +
+                    - generic [ref=e201]: 新对话
+                  - button "历史 主角是谁？ 1 条" [disabled] [ref=e235]:
+                    - generic [ref=e203]: 历史
+                    - generic [ref=e204]: 主角是谁？
+                    - generic [ref=e205]: 1 条
+                    - generic [ref=e206]: ▾
+            - generic [ref=e207]:
+              - article [ref=e236]:
+                - paragraph [ref=e237]: 你
+                - paragraph [ref=e239]: 主角是谁？
+              - article [ref=e240]:
+                - paragraph [ref=e241]: 助手
+                - generic [ref=e243]: 正在贴合当前文稿整理思路…
+            - generic [ref=e213]:
+              - textbox "写你的要求，或直接带文件进来一起改。" [ref=e214]
+              - generic [ref=e215]:
+                - generic [ref=e216]:
+                  - button "上传文件" [ref=e217]:
+                    - img [ref=e218]
+                  - button "上下文 0 ⌄" [ref=e221]:
+                    - img [ref=e223]
+                    - generic [ref=e225]: 上下文 0
+                    - generic [ref=e226]: ⌄
+                  - button "gemini-2.5-flash ⌄" [ref=e228]:
+                    - img [ref=e230]
+                    - generic [ref=e232]: gemini-2.5-flash
+                    - generic [ref=e233]: ⌄
+                - button "发送" [disabled] [ref=e234]:
+                  - img [ref=e248]
+                  - text: 发送

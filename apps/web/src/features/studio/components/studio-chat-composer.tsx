@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
-import { Button, Checkbox, Input, Radio } from "@arco-design/web-react";
+import type { KeyboardEvent, ReactNode } from "react";
+import { Button, Input, Radio } from "@arco-design/web-react";
 
 import type { DocumentTreeNode } from "@/features/studio/components/studio-page-support";
 
 import { STUDIO_ATTACHMENT_ACCEPT, type StudioChatAttachmentMeta } from "./studio-chat-attachment-support";
+import { StudioChatContextSelectorContent } from "./studio-chat-context-selector";
+import { renderStudioFloatingPanel, useFloatingPanelStyle } from "./studio-chat-floating-panel-support";
 import type { StudioChatSettings, StudioProviderOption } from "./studio-chat-support";
-import { buildStudioComposerHint } from "./studio-chat-ui-support";
 
 type StudioChatComposerProps = {
   attachments: StudioChatAttachmentMeta[];
@@ -40,10 +40,6 @@ const MODEL_PICKER_PANEL_CLASS =
   "overflow-y-auto rounded-2xl border border-[rgba(44,36,22,0.1)] bg-white/95 p-3.5 shadow-[0_18px_46px_rgba(44,36,22,0.18)] backdrop-blur-sm";
 const MODEL_PICKER_PROVIDER_LIST_CLASS =
   "mt-2 grid gap-1 rounded-xl border border-[rgba(44,36,22,0.1)] bg-[rgba(249,247,243,0.92)] p-1 max-h-56 overflow-y-auto";
-const CONTEXT_PICKER_PANEL_CLASS =
-  "overflow-hidden rounded-xl border border-[rgba(44,36,22,0.1)] bg-white/95 shadow-[0_18px_46px_rgba(44,36,22,0.16)] backdrop-blur-sm";
-const FLOATING_PANEL_VIEWPORT_MARGIN = 16;
-const FLOATING_PANEL_GAP = 8;
 
 export function StudioChatComposer({
   attachments,
@@ -71,14 +67,11 @@ export function StudioChatComposer({
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showProviderList, setShowProviderList] = useState(false);
   const [showContextSelector, setShowContextSelector] = useState(false);
-  const [contextSearchQuery, setContextSearchQuery] = useState("");
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ 设定: true, 大纲: true, 章节: true });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const modelButtonRef = useRef<HTMLButtonElement>(null);
   const contextSelectorRef = useRef<HTMLDivElement>(null);
   const contextButtonRef = useRef<HTMLButtonElement>(null);
-  const composerRef = useRef<HTMLDivElement>(null);
   const modelPickerStyle = useFloatingPanelStyle(showModelPicker, modelButtonRef, {
     align: "right",
     maxHeight: 480,
@@ -90,10 +83,6 @@ export function StudioChatComposer({
     preferredWidth: 352,
   });
 
-  const toggleGroup = useCallback((groupName: string) => {
-    setExpandedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }));
-  }, []);
-
   const currentProviderOption = useMemo(
     () =>
       providerOptions.find((option) => option.value === settings.provider)
@@ -101,45 +90,6 @@ export function StudioChatComposer({
       ?? null,
     [providerOptions, settings.provider],
   );
-
-  const filteredContexts = useMemo(() => {
-    const fileContexts = availableContexts.filter((n) => n.type === "file");
-    if (!contextSearchQuery.trim()) {
-      return fileContexts;
-    }
-    const query = contextSearchQuery.toLowerCase();
-    return fileContexts.filter(
-      (node) =>
-        node.path.toLowerCase().includes(query) ||
-        node.label.toLowerCase().includes(query),
-    );
-  }, [availableContexts, contextSearchQuery]);
-
-  const groupedContexts = useMemo(() => {
-    const groups: { [key: string]: typeof filteredContexts } = {
-      设定: [],
-      大纲: [],
-      正文: [],
-      附录: [],
-    };
-
-    filteredContexts.forEach((node) => {
-      const path = node.path.toLowerCase();
-      if (path.includes("设定") || path.includes("setting")) {
-        groups["设定"].push(node);
-      } else if (path.includes("大纲") || path.includes("outline")) {
-        groups["大纲"].push(node);
-      } else if (path.includes("附录") || path.includes("appendix")) {
-        groups["附录"].push(node);
-      } else {
-        groups["正文"].push(node);
-      }
-    });
-
-    return groups;
-  }, [filteredContexts]);
-
-  const totalFileCount = availableContexts.filter((n) => n.type === "file").length;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -208,7 +158,7 @@ export function StudioChatComposer({
   );
 
   return (
-    <div className="relative z-20 shrink-0 border-t border-[rgba(44,36,22,0.08)] bg-gradient-to-b from-[var(--bg-surface)] to-[rgba(248,243,235,0.92)]" ref={composerRef}>
+    <div className="relative z-20 shrink-0 border-t border-[rgba(44,36,22,0.08)] bg-gradient-to-b from-[var(--bg-surface)] to-[rgba(248,243,235,0.92)]">
       <div className="relative z-20 px-3 py-2.5">
         {credentialNotice ? (
           <div className="mb-2 flex items-center gap-2 rounded-lg bg-[rgba(178,65,46,0.08)] px-3 py-2 text-sm text-[var(--accent-danger)]">
@@ -260,56 +210,14 @@ export function StudioChatComposer({
                 <ContextIcon />
               </ToolbarChipButton>
 
-              {showContextSelector ? renderFloatingPanel(
-                <div
-                  className={CONTEXT_PICKER_PANEL_CLASS}
-                  ref={contextSelectorRef}
-                  style={contextSelectorStyle}
-                >
-                  <p className="border-b border-[rgba(44,36,22,0.06)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)]">
-                    附加文档上下文 ({selectedContextPaths.length}/{totalFileCount})
-                  </p>
-                  <input
-                    type="text"
-                    className="w-full border-b border-[rgba(44,36,22,0.06)] bg-transparent px-3 py-2 text-sm focus:bg-[rgba(107,143,113,0.05)] focus:outline-none"
-                    placeholder="搜索章节..."
-                    value={contextSearchQuery}
-                    onChange={(e) => setContextSearchQuery(e.target.value)}
-                  />
-                  <div className="max-h-52 overflow-y-auto scrollbar-thin">
-                    {Object.entries(groupedContexts).map(([groupName, nodes]) => {
-                      if (nodes.length === 0) return null;
-                      return (
-                        <div key={groupName}>
-                          <div
-                            className={`flex cursor-pointer items-center gap-2 px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.05)] ${expandedGroups[groupName] ? "bg-[rgba(107,143,113,0.08)]" : ""}`}
-                            onClick={() => toggleGroup(groupName)}
-                          >
-                            <span className={`transition-transform ${expandedGroups[groupName] ? "rotate-90" : ""}`}>▶</span>
-                            <span>{groupName}</span>
-                            <span className="ml-auto opacity-60">{nodes.length}</span>
-                          </div>
-                          {expandedGroups[groupName] ? (
-                            <div className="py-1">
-                              {nodes.map((node) => (
-                                <label className="flex cursor-pointer items-center gap-2 px-3 py-1 hover:bg-[rgba(107,143,113,0.05)]" key={node.id}>
-                                  <Checkbox
-                                    checked={selectedContextPaths.includes(node.path)}
-                                    onChange={() => onToggleContext(node.path)}
-                                  />
-                                  <span className="min-w-0 flex-1 truncate text-sm">{node.label}</span>
-                                  <span className="max-w-[80px] shrink-0 truncate text-xs text-[var(--text-muted)]">
-                                    {node.path.split("/").slice(-2, -1)[0]}
-                                  </span>
-                                </label>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>,
+              {showContextSelector ? renderStudioFloatingPanel(
+                <StudioChatContextSelectorContent
+                  availableContexts={availableContexts}
+                  onToggleContext={onToggleContext}
+                  panelRef={contextSelectorRef}
+                  panelStyle={contextSelectorStyle}
+                  selectedContextPaths={selectedContextPaths}
+                />,
               ) : null}
             </div>
 
@@ -323,7 +231,7 @@ export function StudioChatComposer({
                 <SparkIcon />
               </ToolbarChipButton>
 
-              {showModelPicker ? renderFloatingPanel(
+              {showModelPicker ? renderStudioFloatingPanel(
                 <div
                   className={MODEL_PICKER_PANEL_CLASS}
                   ref={modelPickerRef}
@@ -500,77 +408,4 @@ function ComposerIcon({ path }: { path: string }) {
       <path d={path} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
     </svg>
   );
-}
-
-type FloatingPanelOptions = {
-  align: "left" | "right";
-  maxHeight: number;
-  preferredWidth: number;
-};
-
-function useFloatingPanelStyle(
-  open: boolean,
-  anchorRef: React.RefObject<HTMLElement | null>,
-  options: FloatingPanelOptions,
-) {
-  const [style, setStyle] = useState<CSSProperties>();
-
-  useEffect(() => {
-    if (!open) return;
-
-    function updateStyle() {
-      const anchor = anchorRef.current;
-      if (!anchor) return;
-      const rect = anchor.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const width = Math.min(
-        options.preferredWidth,
-        viewportWidth - FLOATING_PANEL_VIEWPORT_MARGIN * 2,
-      );
-      const left =
-        options.align === "right"
-          ? clamp(
-              rect.right - width,
-              FLOATING_PANEL_VIEWPORT_MARGIN,
-              viewportWidth - width - FLOATING_PANEL_VIEWPORT_MARGIN,
-            )
-          : clamp(
-              rect.left,
-              FLOATING_PANEL_VIEWPORT_MARGIN,
-              viewportWidth - width - FLOATING_PANEL_VIEWPORT_MARGIN,
-            );
-
-      setStyle({
-        position: "fixed",
-        zIndex: 70,
-        left,
-        bottom: viewportHeight - rect.top + FLOATING_PANEL_GAP,
-        width,
-        maxHeight: Math.min(
-          options.maxHeight,
-          Math.max(180, rect.top - FLOATING_PANEL_VIEWPORT_MARGIN - FLOATING_PANEL_GAP),
-        ),
-      });
-    }
-
-    updateStyle();
-    window.addEventListener("resize", updateStyle);
-    window.addEventListener("scroll", updateStyle, true);
-    return () => {
-      window.removeEventListener("resize", updateStyle);
-      window.removeEventListener("scroll", updateStyle, true);
-    };
-  }, [anchorRef, open, options.align, options.maxHeight, options.preferredWidth]);
-
-  return style;
-}
-
-function renderFloatingPanel(panel: ReactNode) {
-  if (typeof document === "undefined") return null;
-  return createPortal(panel, document.body);
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
 }

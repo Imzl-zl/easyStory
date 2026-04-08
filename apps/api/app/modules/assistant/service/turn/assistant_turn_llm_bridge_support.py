@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.config_registry.schemas import HookConfig
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm.llm_tool_provider import LLMStreamEvent
+from app.shared.runtime.llm.llm_tool_provider import LLMGenerateToolResponse, LLMStreamEvent
 from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
 
 from ..assistant_execution_support import AssistantExecutionSpec
@@ -26,7 +26,7 @@ from .assistant_turn_runtime_support import PreparedAssistantTurn
 
 @dataclass
 class _InitialToolLoopStreamCapture:
-    raw_output: dict[str, Any] | None = None
+    raw_output: LLMGenerateToolResponse | None = None
 
 
 def build_turn_tool_loop_state_recorder(
@@ -59,13 +59,13 @@ def should_stream_with_tool_loop(
     return assistant_tool_loop is not None and bool(prepared.visible_tool_descriptors)
 
 
-def has_tool_calls(raw_output: dict[str, Any]) -> bool:
+def has_tool_calls(raw_output: LLMGenerateToolResponse) -> bool:
     tool_calls = raw_output.get("tool_calls")
     return isinstance(tool_calls, list) and bool(tool_calls)
 
 
 def build_buffered_final_chunk_payload(
-    raw_output: dict[str, Any],
+    raw_output: LLMGenerateToolResponse,
 ) -> dict[str, Any] | None:
     content = raw_output.get("content")
     if not isinstance(content, str) or not content:
@@ -93,7 +93,7 @@ async def call_assistant_turn_llm(
     call_llm,
     run_on_error_hooks,
     runtime_context=None,
-) -> dict[str, Any]:
+) -> LLMGenerateToolResponse:
     try:
         resolved_runtime = runtime_context or await resolve_llm_runtime(
             db,
@@ -321,7 +321,7 @@ async def _stream_tool_loop_followup(
     runtime_context,
     call_llm,
     call_llm_stream,
-    raw_output: dict[str, Any],
+    raw_output: LLMGenerateToolResponse,
 ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
     async for item in assistant_tool_loop.iterate(
         db,

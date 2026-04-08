@@ -22,14 +22,14 @@ from ..llm_protocol import (
     resolve_model_name,
 )
 from .provider_interop_config_support import (
-    _load_json_file,
-    _optional_positive_int,
-    _optional_profile_headers,
-    _optional_profile_string,
-    _prune_timestamps,
-    _require_profile_string,
-    _to_path,
-    _write_json_file,
+    load_json_file,
+    optional_positive_int,
+    optional_profile_headers,
+    optional_profile_string,
+    prune_timestamps,
+    require_profile_string,
+    to_path,
+    write_json_file,
 )
 
 DEFAULT_PROVIDER_INTEROP_CONFIG_PATH = Path(".runtime/provider-interop.local.json")
@@ -79,7 +79,7 @@ class ResolvedProviderInteropProfile:
 def load_provider_interop_profiles(
     config_path: str | Path = DEFAULT_PROVIDER_INTEROP_CONFIG_PATH,
 ) -> list[ProviderInteropProfile]:
-    payload = _load_json_file(_to_path(config_path))
+    payload = load_json_file(to_path(config_path))
     raw_profiles = payload.get("profiles")
     if not isinstance(raw_profiles, list):
         raise ConfigurationError("provider interop config must contain a 'profiles' array")
@@ -167,10 +167,10 @@ def enforce_provider_interop_rate_limit(
     if max_requests_per_minute < 1:
         raise ConfigurationError("max_requests_per_minute must be >= 1")
     current_timestamp = now_seconds or int(time.time())
-    path = _to_path(rate_limit_path)
+    path = to_path(rate_limit_path)
     state = _load_rate_limit_state(path)
     threshold = current_timestamp - RATE_LIMIT_WINDOW_SECONDS
-    timestamps = _prune_timestamps(state.get(profile_id, []), threshold)
+    timestamps = prune_timestamps(state.get(profile_id, []), threshold)
     if len(timestamps) >= max_requests_per_minute:
         raise ConfigurationError(
             f"Local rate limit exceeded for profile '{profile_id}': "
@@ -178,25 +178,25 @@ def enforce_provider_interop_rate_limit(
         )
     timestamps.append(current_timestamp)
     state[profile_id] = timestamps
-    _write_json_file(path, state)
+    write_json_file(path, state)
 
 
 def _parse_profile(raw_profile: Any) -> ProviderInteropProfile:
     if not isinstance(raw_profile, dict):
         raise ConfigurationError("provider interop profile must be an object")
     return ProviderInteropProfile(
-        id=_require_profile_string(raw_profile, "id"),
-        provider=_require_profile_string(raw_profile, "provider"),
-        api_dialect=normalize_api_dialect(_require_profile_string(raw_profile, "api_dialect")),
-        base_url=_optional_profile_string(raw_profile.get("base_url")),
-        default_model=_optional_profile_string(raw_profile.get("default_model")),
-        api_key_env=_require_profile_string(raw_profile, "api_key_env"),
-        interop_profile=normalize_interop_profile(_optional_profile_string(raw_profile.get("interop_profile"))),
-        auth_strategy=normalize_auth_strategy(_optional_profile_string(raw_profile.get("auth_strategy"))),
-        api_key_header_name=_optional_profile_string(raw_profile.get("api_key_header_name")),
-        extra_headers=_optional_profile_headers(raw_profile.get("extra_headers")),
-        max_requests_per_minute=_optional_positive_int(raw_profile.get("max_requests_per_minute")),
-        notes=_optional_profile_string(raw_profile.get("notes")),
+        id=require_profile_string(raw_profile, "id"),
+        provider=require_profile_string(raw_profile, "provider"),
+        api_dialect=normalize_api_dialect(require_profile_string(raw_profile, "api_dialect")),
+        base_url=optional_profile_string(raw_profile.get("base_url")),
+        default_model=optional_profile_string(raw_profile.get("default_model")),
+        api_key_env=require_profile_string(raw_profile, "api_key_env"),
+        interop_profile=normalize_interop_profile(optional_profile_string(raw_profile.get("interop_profile"))),
+        auth_strategy=normalize_auth_strategy(optional_profile_string(raw_profile.get("auth_strategy"))),
+        api_key_header_name=optional_profile_string(raw_profile.get("api_key_header_name")),
+        extra_headers=optional_profile_headers(raw_profile.get("extra_headers")),
+        max_requests_per_minute=optional_positive_int(raw_profile.get("max_requests_per_minute")),
+        notes=optional_profile_string(raw_profile.get("notes")),
     )
 
 
@@ -237,7 +237,7 @@ def _resolve_extra_headers(
     merged = dict(profile.extra_headers or {})
     if override.extra_headers is None:
         return merged or None
-    merged.update(_optional_profile_headers(override.extra_headers) or {})
+    merged.update(optional_profile_headers(override.extra_headers) or {})
     return merged or None
 
 
@@ -258,7 +258,7 @@ def _resolve_api_key(api_key_env: str, env_values: dict[str, str | None]) -> str
 
 
 def _load_env_values(env_path: str | Path) -> dict[str, str | None]:
-    path = _to_path(env_path)
+    path = to_path(env_path)
     if not path.exists():
         return {}
     values = dotenv_values(path)
@@ -268,7 +268,7 @@ def _load_env_values(env_path: str | Path) -> dict[str, str | None]:
 def _load_rate_limit_state(path: Path) -> dict[str, list[int]]:
     if not path.exists():
         return {}
-    payload = _load_json_file(path)
+    payload = load_json_file(path)
     state: dict[str, list[int]] = {}
     for profile_id, timestamps in payload.items():
         if isinstance(profile_id, str) and isinstance(timestamps, list):

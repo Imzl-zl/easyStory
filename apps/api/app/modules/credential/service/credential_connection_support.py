@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TypedDict
 
 from app.modules.credential.models import ModelCredential
 from app.shared.runtime.errors import ConfigurationError
@@ -30,6 +31,24 @@ SENSITIVE_EXTRA_HEADER_NAMES = frozenset(
     }
 )
 SENSITIVE_EXTRA_HEADER_FRAGMENTS = ("token", "secret", "api-key", "api_key")
+
+
+class RuntimeCredentialPayload(TypedDict):
+    api_key: str
+    api_dialect: str
+    base_url: str | None
+    default_model: str | None
+    interop_profile: str | None
+    verified_probe_kind: str | None
+    context_window_tokens: int | None
+    default_max_output_tokens: int | None
+    auth_strategy: str | None
+    api_key_header_name: str | None
+    extra_headers: dict[str, str] | None
+    user_agent_override: str | None
+    client_name: str | None
+    client_version: str | None
+    runtime_kind: str | None
 
 
 def normalize_connection_settings(credential: ModelCredential) -> None:
@@ -64,7 +83,7 @@ def build_runtime_credential_payload(
     credential: ModelCredential,
     *,
     decrypt_api_key: Callable[[str], str],
-) -> dict[str, object]:
+) -> RuntimeCredentialPayload:
     return {
         "api_key": decrypt_api_key(credential.encrypted_key),
         "api_dialect": credential.api_dialect,

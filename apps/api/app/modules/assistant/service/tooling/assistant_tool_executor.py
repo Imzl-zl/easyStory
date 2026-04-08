@@ -49,6 +49,12 @@ def _normalize_required_search_tokens(value: object, *, field_name: str) -> obje
     return normalized_items
 
 
+def _normalize_optional_token_list(value: object, *, field_name: str) -> object:
+    if value is None:
+        return []
+    return _normalize_required_search_tokens(value, field_name=field_name)
+
+
 class ProjectListDocumentsToolArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -62,6 +68,8 @@ class ProjectReadDocumentsToolArgs(BaseModel):
     @field_validator("paths", "cursors", mode="before")
     @classmethod
     def validate_string_lists(cls, value: object, info) -> object:
+        if info.field_name == "cursors":
+            return _normalize_optional_token_list(value, field_name=info.field_name)
         return _normalize_required_search_tokens(value, field_name=info.field_name)
 
     @model_validator(mode="after")
@@ -94,7 +102,19 @@ class ProjectSearchDocumentsToolArgs(BaseModel):
     @field_validator("schema_ids", mode="before")
     @classmethod
     def validate_schema_ids(cls, value: object) -> object:
-        return _normalize_required_search_tokens(value, field_name="schema_ids")
+        return _normalize_optional_token_list(value, field_name="schema_ids")
+
+    @field_validator("sources", "content_states", mode="before")
+    @classmethod
+    def validate_optional_filter_lists(cls, value: object, info) -> object:
+        return _normalize_optional_token_list(value, field_name=info.field_name)
+
+    @field_validator("limit", mode="before")
+    @classmethod
+    def validate_optional_limit(cls, value: object) -> object:
+        if value is None:
+            return PROJECT_SEARCH_DOCUMENTS_DEFAULT_LIMIT
+        return value
 
     @model_validator(mode="after")
     def validate_search_constraints(self) -> "ProjectSearchDocumentsToolArgs":

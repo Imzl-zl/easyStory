@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Message } from "@arco-design/web-react";
 
-import { runAssistantTurn, runAssistantTurnStream } from "@/lib/api/assistant";
+import {
+  AssistantTurnStreamTerminalError,
+  runAssistantTurn,
+  runAssistantTurnStream,
+} from "@/lib/api/assistant";
 import { getErrorMessage } from "@/lib/api/client";
 import { listProjectDocumentCatalog } from "@/lib/api/projects";
 import type { AssistantActiveBufferState } from "@/lib/api/types";
@@ -19,11 +23,14 @@ import {
 import { useStudioChatCredentialModel } from "./studio-chat-credential-model";
 import {
   appendStudioChatMessageDelta,
+  applyStudioChatToolCallResult,
+  applyStudioChatToolCallStart,
   buildNextStudioChatSettingsForProvider,
   buildStudioAssistantTurnPayload,
   buildStudioDocumentCatalogQueryKey,
   buildStudioUserRequestContent,
   createStudioChatMessage,
+  finalizeStudioChatToolProgress,
   INITIAL_STUDIO_CHAT_SETTINGS,
   replaceStudioChatMessage,
   resolveStudioFailedReply,
@@ -266,6 +273,10 @@ function buildFailedStudioMessage(
     rawMarkdown: failedMessage?.rawMarkdown ?? "",
     role: "assistant" as const,
     status: "error" as const,
+    toolProgress: finalizeStudioChatToolProgress(
+      failedMessage?.toolProgress,
+      resolveStudioToolProgressTerminalReason(error),
+    ),
   };
 }
 
@@ -278,6 +289,14 @@ async function runStudioChatStream(
     onChunk: (delta) => {
       updateMessages((current) =>
         appendStudioChatMessageDelta(current, messageId, delta));
+    },
+    onToolCallResult: (payload) => {
+      updateMessages((current) =>
+        applyStudioChatToolCallResult(current, messageId, payload));
+    },
+    onToolCallStart: (payload) => {
+      updateMessages((current) =>
+        applyStudioChatToolCallStart(current, messageId, payload));
     },
   });
 }
@@ -296,4 +315,10 @@ function buildStudioUserMessage(options: {
     attachments: extractStudioChatAttachmentMeta(options.attachments),
     requestContent,
   });
+}
+
+function resolveStudioToolProgressTerminalReason(error: unknown) {
+  return error instanceof AssistantTurnStreamTerminalError && error.terminalStatus === "cancelled"
+    ? "cancelled"
+    : "interrupted";
 }

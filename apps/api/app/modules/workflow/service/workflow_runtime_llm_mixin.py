@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.config_registry.schemas.config_schemas import ModelConfig, WorkflowConfig
 from app.modules.credential.models import ModelCredential
-from app.modules.credential.service.credential_connection_support import build_runtime_credential_payload
+from app.modules.credential.service import build_runtime_credential_payload
 from app.modules.workflow.models import WorkflowExecution
 from app.shared.runtime.errors import BudgetExceededError, ConfigurationError
 from app.shared.runtime.llm.llm_tool_provider import LLM_GENERATE_TOOL

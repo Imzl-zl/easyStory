@@ -73,11 +73,13 @@ def prepare_generation_request(request: LLMGenerateRequest) -> PreparedLLMHttpRe
             capabilities=capabilities,
             tool_name_aliases=tool_name_aliases,
         )
-    return _build_gemini_generate_content_request(
-        request,
-        capabilities=capabilities,
-        tool_name_aliases=tool_name_aliases,
-    )
+    if dialect == "gemini_generate_content":
+        return _build_gemini_generate_content_request(
+            request,
+            capabilities=capabilities,
+            tool_name_aliases=tool_name_aliases,
+        )
+    raise ConfigurationError(f"Unsupported api_dialect for request preparation: {dialect}")
 
 
 def build_verification_request(connection: LLMConnection) -> PreparedLLMHttpRequest:
@@ -135,6 +137,8 @@ def _build_openai_chat_request(
             for tool in request.tools
         ]
         body["parallel_tool_calls"] = False
+        if request.force_tool_call:
+            body["tool_choice"] = "required"
     _merge_generation_params(body, request)
     if request.response_format == JSON_OBJECT_RESPONSE_FORMAT:
         body["response_format"] = {"type": "json_object"}
@@ -181,6 +185,8 @@ def _build_openai_responses_request(
             for tool in request.tools
         ]
         body["parallel_tool_calls"] = False
+        if request.force_tool_call:
+            body["tool_choice"] = "required"
     if request.system_prompt:
         body["instructions"] = request.system_prompt
     _merge_generation_params(body, request, max_tokens_field="max_output_tokens")
@@ -224,6 +230,11 @@ def _build_anthropic_messages_request(
             }
             for tool in request.tools
         ]
+        if request.force_tool_call:
+            body["tool_choice"] = {
+                "type": "any",
+                "disable_parallel_tool_use": True,
+            }
     if request.system_prompt:
         body["system"] = [{"type": "text", "text": request.system_prompt}]
     if request.temperature is not None:
@@ -271,6 +282,12 @@ def _build_gemini_generate_content_request(
                 )
             }
         ]
+        if request.force_tool_call:
+            body["toolConfig"] = _build_gemini_force_tool_config(
+                request,
+                tool_name_aliases=tool_name_aliases,
+                tool_name_policy=capabilities.tool_name_policy,
+            )
     if request.system_prompt:
         body["system_instruction"] = {"parts": [{"text": request.system_prompt}]}
     return PreparedLLMHttpRequest(
@@ -301,6 +318,28 @@ def _build_gemini_function_declarations(
         }
         for tool in request.tools
     ]
+
+
+def _build_gemini_force_tool_config(
+    request: LLMGenerateRequest,
+    *,
+    tool_name_aliases: dict[str, str],
+    tool_name_policy: str,
+) -> dict[str, Any]:
+    allowed_tool_names = [
+        encode_tool_name(
+            tool.name,
+            tool_name_aliases=tool_name_aliases,
+            policy=tool_name_policy,
+        )
+        for tool in request.tools
+    ]
+    return {
+        "functionCallingConfig": {
+            "mode": "ANY",
+            "allowedFunctionNames": allowed_tool_names,
+        }
+    }
 
 
 def _build_openai_chat_messages(

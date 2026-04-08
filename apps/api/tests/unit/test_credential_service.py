@@ -14,13 +14,14 @@ from app.modules.credential.models import ModelCredential
 from app.modules.credential.service import (
     CredentialCreateDTO,
     CredentialUpdateDTO,
+    build_runtime_credential_payload,
     create_credential_service,
 )
 from app.modules.credential.service.credential_verification_support import (
     verify_credential_record,
 )
 from app.modules.observability.models import AuditLog
-from app.shared.runtime.errors import ConflictError, NotFoundError
+from app.shared.runtime.errors import BusinessRuleError, ConflictError, NotFoundError
 from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, create_user
 
@@ -78,6 +79,14 @@ class FakeVerifier:
         )
 
 
+class FailingVerifier:
+    def __init__(self, message: str = "工具调用验证失败") -> None:
+        self.message = message
+
+    async def verify(self, **_kwargs) -> CredentialVerificationResult:
+        raise BusinessRuleError(self.message)
+
+
 def _create_payload(**overrides) -> CredentialCreateDTO:
     payload = {
         "owner_type": "user",
@@ -98,6 +107,29 @@ def test_credential_crypto_round_trip(monkeypatch) -> None:
 
     assert encrypted != "sk-secret-1234"
     assert crypto.decrypt(encrypted) == "sk-secret-1234"
+
+
+def test_build_runtime_credential_payload_is_reexported_from_service_package(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    crypto = CredentialCrypto()
+    credential = ModelCredential(
+        owner_type="system",
+        owner_id=None,
+        provider="openai",
+        api_dialect=OPENAI_DIALECT,
+        display_name="系统",
+        encrypted_key=crypto.encrypt("sk-service-1234"),
+        default_model=OPENAI_MODEL,
+    )
+
+    payload = build_runtime_credential_payload(
+        credential,
+        decrypt_api_key=crypto.decrypt,
+    )
+
+    assert payload["api_key"] == "sk-service-1234"
+    assert payload["api_dialect"] == OPENAI_DIALECT
+    assert payload["default_model"] == OPENAI_MODEL
 
 
 def test_create_user_credential_encrypts_and_audits(db, monkeypatch) -> None:
@@ -429,6 +461,87 @@ def test_verify_credential_record_does_not_downgrade_stale_verified_probe_kind(
     assert stored.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
     assert stored.verified_probe_kind == "tool_continuation_probe"
     assert audits[-1].details["verified_probe_kind"] == "tool_continuation_probe"
+
+
+def test_verify_credential_failed_tool_probe_clears_stale_verified_probe_kind(
+    db,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    verified_at = datetime.now(timezone.utc).replace(microsecond=0)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier(verified_at=verified_at))
+    created = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(display_name="OpenAI"),
+            actor_user_id=user.id,
+        )
+    )
+    stored = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
+    stored.verified_probe_kind = "tool_continuation_probe"
+    stored.last_verified_at = verified_at
+    db.commit()
+
+    with pytest.raises(BusinessRuleError, match="当前探测失败"):
+        asyncio.run(
+            verify_credential_record(
+                async_db(db),
+                credential=stored,
+                verifier=FailingVerifier("当前探测失败"),
+                decrypt_api_key=service.crypto.decrypt,
+                actor_user_id=user.id,
+                event_type="credential_verify",
+                audit_log_service=service.audit_log_service,
+                probe_kind="tool_continuation_probe",
+            )
+        )
+
+    refreshed = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
+    audits = db.query(AuditLog).filter(AuditLog.event_type == "credential_verify").all()
+    assert refreshed.verified_probe_kind is None
+    assert refreshed.last_verified_at is None
+    assert audits[-1].details["status"] == "failed"
+    assert audits[-1].details["verified_probe_kind"] is None
+
+
+def test_verify_credential_failed_higher_probe_preserves_lower_verified_probe_kind(
+    db,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    verified_at = datetime.now(timezone.utc).replace(microsecond=0)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier(verified_at=verified_at))
+    created = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(display_name="OpenAI"),
+            actor_user_id=user.id,
+        )
+    )
+    stored = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
+    stored.verified_probe_kind = "text_probe"
+    stored.last_verified_at = verified_at
+    db.commit()
+
+    with pytest.raises(BusinessRuleError, match="当前探测失败"):
+        asyncio.run(
+            verify_credential_record(
+                async_db(db),
+                credential=stored,
+                verifier=FailingVerifier("当前探测失败"),
+                decrypt_api_key=service.crypto.decrypt,
+                actor_user_id=user.id,
+                event_type="credential_verify",
+                audit_log_service=service.audit_log_service,
+                probe_kind="tool_continuation_probe",
+            )
+        )
+
+    refreshed = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
+    assert refreshed.verified_probe_kind == "text_probe"
+    assert refreshed.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
 
 
 def test_update_and_disable_credential(db, monkeypatch) -> None:

@@ -102,6 +102,75 @@ def test_execute_stream_probe_request_collects_openai_responses_text(monkeypatch
     assert normalized.content == "今天有新闻"
 
 
+def test_execute_stream_probe_request_rejects_empty_tool_response(monkeypatch) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://proxy.example.com/v1/chat/completions",
+        headers={"Accept": "text/event-stream"},
+        json_body={
+            "model": "gpt-5.4",
+            "stream": True,
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "project_read_documents",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"paths": {"type": "array"}},
+                            "required": ["paths"],
+                        },
+                    },
+                }
+            ],
+        },
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield 'data: {"id":"chatcmpl_123","choices":[{"delta":{"role":"assistant"},"finish_reason":null}]}'
+            yield ""
+            yield 'data: {"id":"chatcmpl_123","choices":[{"delta":{},"finish_reason":"stop"}]}'
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+
+    with pytest.raises(ConfigurationError, match="启用工具时返回了空响应"):
+        asyncio.run(
+            stream_support.execute_stream_probe_request(
+                request,
+                api_dialect="openai_chat_completions",
+                print_response=False,
+            )
+        )
+
+
 def test_execute_stream_probe_request_ignores_openai_completed_payload(monkeypatch) -> None:
     request = PreparedLLMHttpRequest(
         method="POST",
@@ -288,6 +357,145 @@ def test_execute_stream_probe_request_accepts_openai_empty_output_when_deltas_ex
     assert normalized.output_tokens == 10
     assert normalized.total_tokens == 18
     assert normalized.provider_output_items == []
+
+
+def test_execute_stream_probe_request_recovers_openai_responses_tool_calls_from_output_item_events(
+    monkeypatch,
+) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://proxy.example.com/v1/responses",
+        headers={"Accept": "text/event-stream"},
+        json_body={"model": "gpt-5.2-codex", "stream": True},
+        tool_name_aliases={"project.read_documents": "project_read_documents"},
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.output_item.done"
+            yield (
+                'data: {"type":"response.output_item.done","item":{"id":"fc_123","type":"function_call",'
+                '"call_id":"call_123","name":"project_read_documents","arguments":"{\\"paths\\":[\\"设定/人物.md\\"]}"}}'
+            )
+            yield ""
+            yield "event: response.completed"
+            yield (
+                'data: {"type":"response.completed","response":{"id":"resp_123","output":[],'
+                '"usage":{"input_tokens":8,"output_tokens":10,"total_tokens":18}}}'
+            )
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+
+    normalized = asyncio.run(
+        stream_support.execute_stream_probe_request(
+            request,
+            api_dialect="openai_responses",
+            print_response=False,
+        )
+    )
+
+    assert normalized.content == ""
+    assert normalized.provider_response_id == "resp_123"
+    assert normalized.tool_calls[0].tool_call_id == "call_123"
+    assert normalized.tool_calls[0].tool_name == "project.read_documents"
+    assert normalized.tool_calls[0].arguments == {"paths": ["设定/人物.md"]}
+
+
+def test_execute_stream_probe_request_recovers_openai_chat_tool_calls_from_delta_events(
+    monkeypatch,
+) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://proxy.example.com/v1/chat/completions",
+        headers={"Accept": "text/event-stream"},
+        json_body={"model": "gpt-5.4", "stream": True},
+        tool_name_aliases={"project.read_documents": "project_read_documents"},
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield (
+                'data: {"id":"chatcmpl_123","choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123",'
+                '"type":"function","function":{"name":"project_read_documents","arguments":""}}],"role":"assistant"},'
+                '"finish_reason":null}]}'
+            )
+            yield ""
+            yield (
+                'data: {"id":"chatcmpl_123","choices":[{"delta":{"tool_calls":[{"index":0,"function":'
+                '{"arguments":"{\\"paths\\":[\\"设定/人物.md\\"]}"}}]},"finish_reason":null}]}'
+            )
+            yield ""
+            yield 'data: {"id":"chatcmpl_123","choices":[{"delta":{},"finish_reason":"tool_calls"}]}'
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+
+    normalized = asyncio.run(
+        stream_support.execute_stream_probe_request(
+            request,
+            api_dialect="openai_chat_completions",
+            print_response=False,
+        )
+    )
+
+    assert normalized.content == ""
+    assert normalized.finish_reason == "tool_calls"
+    assert normalized.tool_calls[0].tool_call_id == "call_123"
+    assert normalized.tool_calls[0].tool_name == "project.read_documents"
+    assert normalized.tool_calls[0].arguments == {"paths": ["设定/人物.md"]}
 
 
 def test_execute_stream_probe_request_rejects_openai_empty_output_when_strict_profile(

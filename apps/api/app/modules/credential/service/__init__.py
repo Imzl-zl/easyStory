@@ -1,4 +1,5 @@
 from .credential_query_support import CREDENTIAL_DELETE_IN_USE_MESSAGE
+from .credential_connection_support import RuntimeCredentialPayload, build_runtime_credential_payload
 from .credential_service import CredentialService
 from .dto import (
     CredentialCreateDTO,
@@ -17,6 +18,8 @@ __all__ = [
     "CredentialVerifyProbeKind",
     "CredentialVerifyResultDTO",
     "CredentialViewDTO",
+    "RuntimeCredentialPayload",
+    "build_runtime_credential_payload",
     "create_credential_resolution_service",
     "create_credential_service",
 ]

@@ -49,6 +49,12 @@ async def verify_credential_record(
             probe_kind=probe_kind,
         )
     except Exception as exc:
+        await _invalidate_failed_probe_state(
+            db,
+            credential_id=credential.id,
+            failed_probe_kind=probe_kind,
+        )
+        await db.refresh(credential)
         record_audit(
             db,
             actor_user_id=actor_user_id,
@@ -58,6 +64,7 @@ async def verify_credential_record(
                 "status": "failed",
                 "error": str(exc),
                 "probe_kind": probe_kind,
+                "verified_probe_kind": credential.verified_probe_kind,
             },
             audit_log_service=audit_log_service,
         )
@@ -111,19 +118,50 @@ async def _persist_verified_probe_state(
     )
 
 
+async def _invalidate_failed_probe_state(
+    db: AsyncSession,
+    *,
+    credential_id: uuid.UUID,
+    failed_probe_kind: ConformanceProbeKind,
+) -> None:
+    failed_rank = resolve_conformance_probe_kind_rank(failed_probe_kind)
+    if failed_rank is None:
+        raise ValueError("failed_probe_kind must be a supported conformance probe kind")
+    current_rank = _build_current_probe_rank_expression()
+    await db.execute(
+        update(ModelCredential)
+        .where(ModelCredential.id == credential_id)
+        .values(
+            verified_probe_kind=case(
+                (current_rank >= failed_rank, None),
+                else_=ModelCredential.verified_probe_kind,
+            ),
+            last_verified_at=case(
+                (current_rank >= failed_rank, None),
+                else_=ModelCredential.last_verified_at,
+            ),
+        )
+        .execution_options(synchronize_session=False)
+    )
+
+
 def _build_promoted_probe_kind_expression(
     *,
     candidate_probe_kind: ConformanceProbeKind,
     candidate_rank: int,
 ):
-    current_rank = case(
+    current_rank = _build_current_probe_rank_expression()
+    return case(
+        (current_rank <= candidate_rank, candidate_probe_kind),
+        else_=ModelCredential.verified_probe_kind,
+    )
+
+
+def _build_current_probe_rank_expression():
+    return case(
         *[
             (ModelCredential.verified_probe_kind == probe_kind, rank)
             for probe_kind, rank in CONFORMANCE_PROBE_KIND_RANKS.items()
         ],
         else_=-1,
-    )
-    return case(
-        (current_rank <= candidate_rank, candidate_probe_kind),
-        else_=ModelCredential.verified_probe_kind,
     )

@@ -17,6 +17,7 @@ from ..llm_stream_events import (
     build_truncated_stream_message,
     extract_stream_truncation_reason,
     parse_raw_stream_event,
+    synthesize_stream_terminal_response,
 )
 from ..llm_stream_transport import (
     StreamEventBuffer,
@@ -28,6 +29,7 @@ from ..llm_stream_transport import (
     iterate_raw_stream_events,
 )
 from ..llm_terminal_assembly import build_stream_completion
+from ..llm_response_validation import raise_if_empty_tool_response
 
 __all__ = [
     "ParsedStreamEvent",
@@ -84,6 +86,7 @@ async def execute_stream_probe_request(
     active_interop_profile = interop_profile or request.interop_profile
     text_parts: list[str] = []
     raw_events: list[dict[str, Any]] = []
+    raw_event_tuples: list[tuple[str | None, dict[str, Any]]] = []
     terminal_response: NormalizedLLMResponse | None = None
     async for event in iterate_stream_request(
         request,
@@ -93,15 +96,29 @@ async def execute_stream_probe_request(
         timeout_seconds=timeout_seconds,
     ):
         raw_events.append({"event": event.event_name, "data": event.payload})
+        raw_event_tuples.append((event.event_name, event.payload))
         if event.terminal_response is not None:
             terminal_response = event.terminal_response
         if event.delta:
             text_parts.append(event.delta)
+    synthesized_terminal = synthesize_stream_terminal_response(
+        api_dialect,
+        raw_events=raw_event_tuples,
+        tool_name_aliases=request.tool_name_aliases,
+    )
+    if synthesized_terminal is not None:
+        terminal_response = synthesized_terminal
     normalized = build_stream_completion(
         api_dialect=api_dialect,
         text_parts=text_parts,
         terminal_response=terminal_response,
     )
+    if normalized is None:
+        raise_if_empty_tool_response(
+            has_tools=bool(request.json_body.get("tools")),
+            content="",
+            tool_calls=[],
+        )
     if print_response:
         print(
             json.dumps(
@@ -115,6 +132,11 @@ async def execute_stream_probe_request(
         )
     if normalized is None:
         raise ConfigurationError("Streaming probe returned no text content")
+    raise_if_empty_tool_response(
+        has_tools=bool(request.json_body.get("tools")),
+        content=normalized.content,
+        tool_calls=normalized.tool_calls,
+    )
     return normalized
 
 

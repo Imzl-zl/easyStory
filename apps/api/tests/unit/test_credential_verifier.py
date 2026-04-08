@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import re
 
+import app.modules.credential.infrastructure.verifier as verifier_module
 import httpx
 import pytest
 
 from app.modules.credential.infrastructure import AsyncHttpCredentialVerifier
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
+from app.shared.runtime.llm.interop.provider_interop_stream_support import ParsedStreamEvent
 from app.shared.runtime.llm.llm_protocol import (
+    HttpJsonResponse,
     NormalizedLLMResponse,
     PreparedLLMHttpRequest,
     VERIFY_SYSTEM_PROMPT,
@@ -101,6 +104,169 @@ def test_verify_credential_accepts_non_exact_probe_reply() -> None:
     assert result.message == "验证成功"
 
 
+def test_verify_credential_text_probe_returns_after_first_stream_delta(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_iterate_stream_request(*_args, **_kwargs):
+        yield ParsedStreamEvent(
+            event_name="content_block_delta",
+            payload={},
+            delta="我",
+        )
+        raise AssertionError("text probe should stop after first non-empty delta")
+
+    monkeypatch.setattr(
+        verifier_module,
+        "iterate_stream_request",
+        fake_iterate_stream_request,
+    )
+
+    verifier = AsyncHttpCredentialVerifier()
+    result = asyncio.run(
+        verifier.verify(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://proxy.example.com",
+            api_dialect="openai_chat_completions",
+            default_model="gpt-4o-mini",
+            client_name="easyStory",
+        )
+    )
+
+    assert result.message == "验证成功"
+    assert result.probe_kind == "text_probe"
+
+
+def test_verify_credential_text_probe_accepts_terminal_response_without_delta(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_iterate_stream_request(*_args, **_kwargs):
+        yield ParsedStreamEvent(
+            event_name="response.completed",
+            payload={},
+            delta="",
+            terminal_response=_ok_response("今天天气真好。"),
+        )
+
+    monkeypatch.setattr(
+        verifier_module,
+        "iterate_stream_request",
+        fake_iterate_stream_request,
+    )
+
+    verifier = AsyncHttpCredentialVerifier()
+    result = asyncio.run(
+        verifier.verify(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://proxy.example.com",
+            api_dialect="openai_responses",
+            default_model="gpt-4.1-mini",
+            client_name="easyStory",
+        )
+    )
+
+    assert result.message == "验证成功"
+    assert result.probe_kind == "text_probe"
+
+
+def test_verify_credential_text_probe_uses_json_request_for_anthropic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_send_json_http_request(request, *, timeout_seconds):
+        captured["request"] = request
+        captured["timeout_seconds"] = timeout_seconds
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "content": [{"type": "text", "text": "今天天气真好。"}],
+                "id": "msg_123",
+                "model": "claude-sonnet-4.6",
+                "role": "assistant",
+                "stop_reason": "end_turn",
+                "type": "message",
+                "usage": {"input_tokens": 3, "output_tokens": 2},
+            },
+            text='{"content":[{"type":"text","text":"今天天气真好。"}]}',
+        )
+
+    async def unexpected_iterate_stream_request(*_args, **_kwargs):
+        raise AssertionError("anthropic text probe should use plain JSON request")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(
+        verifier_module,
+        "send_json_http_request",
+        fake_send_json_http_request,
+    )
+    monkeypatch.setattr(
+        verifier_module,
+        "iterate_stream_request",
+        unexpected_iterate_stream_request,
+    )
+
+    verifier = AsyncHttpCredentialVerifier()
+    result = asyncio.run(
+        verifier.verify(
+            provider="claude",
+            api_key="test-key",
+            base_url="https://proxy.example.com",
+            api_dialect="anthropic_messages",
+            default_model="claude-sonnet-4-6",
+            client_name="easyStory",
+        )
+    )
+
+    request = captured["request"]
+    assert request.url == "https://proxy.example.com/v1/messages"
+    assert "stream" not in request.json_body
+    assert captured["timeout_seconds"] == verifier_module.VERIFY_TEXT_PROBE_TIMEOUT_SECONDS
+    assert result.message == "验证成功"
+    assert result.probe_kind == "text_probe"
+
+
+def test_verify_credential_text_probe_rejects_truncated_json_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_send_json_http_request(_request, *, timeout_seconds):
+        assert timeout_seconds == verifier_module.VERIFY_TEXT_PROBE_TIMEOUT_SECONDS
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "content": [{"type": "text", "text": "只返回了半截"}],
+                "id": "msg_123",
+                "model": "claude-sonnet-4.6",
+                "role": "assistant",
+                "stop_reason": "max_tokens",
+                "type": "message",
+                "usage": {"input_tokens": 3, "output_tokens": 2},
+            },
+            text='{"content":[{"type":"text","text":"只返回了半截"}]}',
+        )
+
+    monkeypatch.setattr(
+        verifier_module,
+        "send_json_http_request",
+        fake_send_json_http_request,
+    )
+
+    verifier = AsyncHttpCredentialVerifier()
+
+    with pytest.raises(BusinessRuleError, match="上游在输出尚未完成时提前停止了这次回复"):
+        asyncio.run(
+            verifier.verify(
+                provider="claude",
+                api_key="test-key",
+                base_url="https://proxy.example.com",
+                api_dialect="anthropic_messages",
+                default_model="claude-sonnet-4-6",
+                client_name="easyStory",
+            )
+        )
+
+
 def test_verify_credential_rejects_empty_probe_content() -> None:
     async def stream_request_sender(_request, *, api_dialect):
         assert api_dialect == "openai_chat_completions"
@@ -179,6 +345,32 @@ def test_verify_credential_surfaces_stream_protocol_error() -> None:
                 base_url=None,
                 api_dialect="openai_chat_completions",
                 default_model="gpt-4o-mini",
+                user_agent_override=None,
+                client_name="easyStory",
+            )
+        )
+
+
+def test_verify_credential_surfaces_empty_tool_response_protocol_error() -> None:
+    async def stream_request_sender(_request, *, api_dialect):
+        assert api_dialect == "openai_chat_completions"
+        raise ConfigurationError(
+            "当前连接在启用工具时返回了空响应：既没有文本，也没有工具调用。"
+            "这通常表示该连接当前不支持所选协议下的工具调用。"
+            "请重新执行“验证工具”，或切换可稳定支持工具调用的连接。"
+        )
+
+    verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
+
+    with pytest.raises(BusinessRuleError, match="启用工具时返回了空响应"):
+        asyncio.run(
+            verifier.verify(
+                provider="openai",
+                api_key="test-key",
+                base_url=None,
+                api_dialect="openai_chat_completions",
+                default_model="gpt-4o-mini",
+                probe_kind="tool_continuation_probe",
                 user_agent_override=None,
                 client_name="easyStory",
             )
@@ -282,8 +474,10 @@ def test_verify_tool_continuation_probe_replays_followup_request() -> None:
                     )
                 ],
             )
-        output_payload = json.loads(request.json_body["input"][0]["output"])
-        echoed = output_payload["echoed"]
+        prompt_text = request.json_body["input"][0]["content"][0]["text"]
+        matched = re.search(r'"echoed":"(probe-result-[^"]+)"', prompt_text)
+        assert matched is not None
+        echoed = matched.group(1)
         assert echoed.startswith("probe-result-")
         assert echoed != "ping"
         return _ok_response(
@@ -309,12 +503,12 @@ def test_verify_tool_continuation_probe_replays_followup_request() -> None:
 
     assert len(captured_requests) == 2
     assert captured_requests[0].json_body["tools"][0]["name"] == "probe_echo_payload"
-    assert captured_requests[1].json_body["previous_response_id"] == "resp_123"
+    assert "previous_response_id" not in captured_requests[1].json_body
     followup_input = captured_requests[1].json_body["input"]
     assert len(followup_input) == 1
-    assert followup_input[0]["type"] == "function_call_output"
-    assert followup_input[0]["call_id"] == "call_123"
-    assert json.loads(followup_input[0]["output"])["echoed"].startswith("probe-result-")
+    assert followup_input[0]["role"] == "user"
+    prompt_text = followup_input[0]["content"][0]["text"]
+    assert "probe-result-" in prompt_text
     assert result.message == "工具调用验证成功"
     assert result.probe_kind == "tool_continuation_probe"
 

@@ -5,8 +5,10 @@ import json
 import pytest
 
 from app.shared.runtime.errors import ConfigurationError
+from app.shared.runtime.llm.llm_protocol import resolve_connection_continuation_support
 from app.shared.runtime.llm.llm_protocol_requests import prepare_generation_request
 from app.shared.runtime.llm.llm_protocol_responses import (
+    extract_response_truncation_reason,
     parse_generation_response,
     parse_stream_terminal_response,
 )
@@ -87,6 +89,41 @@ def test_prepare_generation_request_includes_openai_responses_tools() -> None:
     assert request.tool_name_aliases == {"project.read_documents": "project_read_documents"}
 
 
+def test_prepare_generation_request_forces_tool_call_for_openai_responses() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="openai_responses",
+                api_key="test-key",
+                base_url="https://api.openai.com",
+            ),
+            model_name="gpt-4o-mini",
+            prompt="读一下设定",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            force_tool_call=True,
+            tools=[
+                LLMFunctionToolDefinition(
+                    name="project.read_documents",
+                    description="读取项目文稿。",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "paths": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["paths"],
+                    },
+                )
+            ],
+        )
+    )
+
+    assert request.json_body["tool_choice"] == "required"
+
+
 def test_prepare_generation_request_compiles_portable_tool_schema_for_openai_responses() -> None:
     request = prepare_generation_request(
         LLMGenerateRequest(
@@ -125,6 +162,46 @@ def test_prepare_generation_request_compiles_portable_tool_schema_for_openai_res
     params = request.json_body["tools"][0]["parameters"]
     assert "anyOf" not in params
     assert params["description"] == "Provide at least one of: path_prefix, query."
+    assert params["required"] == ["query", "path_prefix"]
+    assert params["properties"]["query"]["type"] == ["string", "null"]
+    assert params["properties"]["path_prefix"]["type"] == ["string", "null"]
+
+
+def test_prepare_generation_request_normalizes_openai_chat_tool_schema_for_strict_mode() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="openai_chat_completions",
+                api_key="test-key",
+                base_url="https://api.openai.com",
+            ),
+            model_name="gpt-4o-mini",
+            prompt="读取文稿。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            tools=[
+                LLMFunctionToolDefinition(
+                    name="project.read_documents",
+                    description="读取项目文稿。",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "paths": {"type": "array", "items": {"type": "string"}},
+                            "cursors": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["paths"],
+                    },
+                )
+            ],
+        )
+    )
+
+    params = request.json_body["tools"][0]["function"]["parameters"]
+    assert params["required"] == ["paths", "cursors"]
+    assert params["properties"]["cursors"]["type"] == ["array", "null"]
 
 
 def test_prepare_generation_request_uses_previous_response_id_for_openai_responses_continuation() -> None:
@@ -185,6 +262,21 @@ def test_resolve_continuation_support_distinguishes_provider_continuation_and_ru
     assert anthropic_support.tolerates_interleaved_tool_results is False
     assert anthropic_support.requires_full_replay_after_local_tools is True
     assert allows_provider_continuation_state(anthropic_support) is False
+
+
+def test_resolve_connection_continuation_support_uses_profile_specific_responses_strategy() -> None:
+    gateway_support = resolve_connection_continuation_support("openai_responses")
+    strict_support = resolve_connection_continuation_support(
+        "openai_responses",
+        "responses_strict",
+    )
+
+    assert gateway_support.continuation_mode == "runtime_replay"
+    assert gateway_support.tolerates_interleaved_tool_results is False
+    assert gateway_support.requires_full_replay_after_local_tools is True
+    assert allows_provider_continuation_state(gateway_support) is False
+    assert strict_support.continuation_mode == "hybrid"
+    assert allows_provider_continuation_state(strict_support) is True
 
 
 def test_prepare_generation_request_falls_back_to_runtime_replay_for_anthropic() -> None:
@@ -257,6 +349,44 @@ def test_prepare_generation_request_compiles_portable_tool_schema_for_anthropic(
     params = request.json_body["tools"][0]["input_schema"]
     assert "anyOf" not in params
     assert params["description"] == "Provide at least one of: path_prefix, query."
+
+
+def test_prepare_generation_request_forces_tool_call_for_anthropic() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="anthropic_messages",
+                api_key="test-key",
+                base_url="https://api.anthropic.com",
+            ),
+            model_name="claude-sonnet-4-20250514",
+            prompt="读取文稿。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            force_tool_call=True,
+            tools=[
+                LLMFunctionToolDefinition(
+                    name="project.read_documents",
+                    description="读取项目文稿。",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "paths": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["paths"],
+                    },
+                )
+            ],
+        )
+    )
+
+    assert request.json_body["tool_choice"] == {
+        "type": "any",
+        "disable_parallel_tool_use": True,
+    }
 
 
 def test_prepare_generation_request_falls_back_to_runtime_replay_for_openai_chat_completions() -> None:
@@ -439,6 +569,46 @@ def test_prepare_generation_request_simplifies_required_only_anyof_for_gemini() 
         {"required": ["query"]},
         {"required": ["path_prefix"]},
     ]
+
+
+def test_prepare_generation_request_forces_tool_call_for_gemini() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="gemini_generate_content",
+                api_key="test-key",
+                base_url="https://generativelanguage.googleapis.com",
+            ),
+            model_name="gemini-2.5-pro",
+            prompt="读一下设定。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            force_tool_call=True,
+            tools=[
+                LLMFunctionToolDefinition(
+                    name="project.read_documents",
+                    description="读取项目文稿。",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "paths": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["paths"],
+                    },
+                )
+            ],
+        )
+    )
+
+    assert request.json_body["toolConfig"] == {
+        "functionCallingConfig": {
+            "mode": "ANY",
+            "allowedFunctionNames": ["project_read_documents"],
+        }
+    }
 
 
 def test_prepare_generation_request_rejects_mixed_openai_responses_continuation() -> None:
@@ -662,6 +832,49 @@ def test_parse_openai_responses_response_preserves_invalid_tool_arguments_for_ru
     assert normalized.tool_calls[0].arguments_text == '{"paths":["设定/人物.md"]'
     assert normalized.tool_calls[0].arguments_error == "Tool call arguments JSON is invalid"
     assert normalized.provider_output_items[0]["payload"]["arguments_error"] == "Tool call arguments JSON is invalid"
+
+
+def test_parse_generation_response_leaves_truncation_decision_to_callers() -> None:
+    payload = {
+        "choices": [
+            {
+                "finish_reason": "length",
+                "message": {"content": "只返回了半截"},
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 20,
+            "total_tokens": 30,
+        },
+    }
+
+    normalized = parse_generation_response(
+        "openai_chat_completions",
+        payload,
+    )
+
+    assert normalized.content == "只返回了半截"
+    assert normalized.finish_reason == "length"
+    assert extract_response_truncation_reason("openai_chat_completions", payload) == "length"
+
+
+def test_parse_stream_terminal_response_leaves_truncation_decision_to_callers() -> None:
+    payload = {
+        "id": "resp_truncated",
+        "output_text": "只返回了半截",
+        "incomplete_details": {"reason": "max_output_tokens"},
+        "usage": {"input_tokens": 10, "output_tokens": 20, "total_tokens": 30},
+    }
+
+    normalized = parse_stream_terminal_response(
+        "openai_responses",
+        payload,
+    )
+
+    assert normalized.content == "只返回了半截"
+    assert normalized.finish_reason == "max_output_tokens"
+    assert extract_response_truncation_reason("openai_responses", payload) == "max_output_tokens"
 
 
 def test_parse_openai_responses_response_keeps_non_stream_contract_strict_for_empty_output() -> None:

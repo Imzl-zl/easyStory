@@ -14,6 +14,7 @@ export function buildSucceededStudioConversationSession(
   },
 ): StudioChatSession {
   const normalized = normalizeStudioAssistantReply(options.content);
+  const currentMessage = current.messages.find((message) => message.id === options.messageId);
   return {
     ...current,
     ...(options.consumedNextTurnSkillId ? { nextTurnSkillId: null } : {}),
@@ -25,6 +26,7 @@ export function buildSucceededStudioConversationSession(
       requestContent: options.content,
       role: "assistant",
       status: normalized.status,
+      toolProgress: currentMessage?.toolProgress,
     }),
   };
 }

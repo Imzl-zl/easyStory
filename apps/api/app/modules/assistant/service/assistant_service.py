@@ -17,7 +17,7 @@ from app.modules.project.service import (
 )
 from app.shared.runtime import PluginRegistry, SkillTemplateRenderer, ToolProvider
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm.llm_tool_provider import LLMStreamEvent
+from app.shared.runtime.llm.llm_tool_provider import LLMGenerateToolResponse, LLMStreamEvent
 
 from .rules.assistant_rule_service import AssistantRuleService
 from .agents.assistant_agent_service import AssistantAgentService
@@ -653,7 +653,7 @@ class AssistantService:
         *,
         event_seq: int,
         extra: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> LLMGenerateToolResponse:
         payload: dict[str, Any] = {
             "run_id": str(prepared.turn_context.run_id),
             "conversation_id": prepared.turn_context.conversation_id,
@@ -777,7 +777,7 @@ class AssistantService:
         tool_policy_decisions: tuple[Any, ...] = (),
         visible_tool_descriptors: tuple[Any, ...] = (),
         runtime_context: ResolvedAssistantLlmRuntime | None = None,
-    ) -> dict[str, Any]:
+    ) -> LLMGenerateToolResponse:
         return await call_assistant_turn_llm(
             db,
             hooks,

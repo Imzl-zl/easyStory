@@ -27,6 +27,7 @@ class _FakeCredentialService:
             encrypted_key=f"{provider}-key",
             api_dialect="openai_responses",
             default_model="gpt-4o-mini",
+            interop_profile="responses_strict",
             verified_probe_kind="tool_continuation_probe",
             is_active=True,
         )
@@ -59,6 +60,7 @@ class _CompactingCredentialService(_FakeCredentialService):
             encrypted_key=f"{provider}-key",
             api_dialect="openai_responses",
             default_model="gpt-4o-mini",
+            interop_profile="responses_strict",
             context_window_tokens=280,
             verified_probe_kind="tool_continuation_probe",
             is_active=True,
@@ -93,6 +95,7 @@ class _TextOnlyCredentialService(_FakeCredentialService):
             encrypted_key=f"{provider}-key",
             api_dialect="openai_responses",
             default_model="gpt-4o-mini",
+            interop_profile="responses_strict",
             verified_probe_kind="text_probe",
             is_active=True,
         )

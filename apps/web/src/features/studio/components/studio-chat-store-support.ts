@@ -60,6 +60,16 @@ export function createEmptyStudioChatSession(): StudioChatSession {
   };
 }
 
+function createNextStudioChatSessionSeed(current: StudioChatSession | null): StudioChatSession {
+  if (!current) {
+    return createEmptyStudioChatSession();
+  }
+  return {
+    ...createEmptyStudioChatSession(),
+    settings: { ...current.settings },
+  };
+}
+
 export function createEmptyStudioChatProjectState(): StudioChatProjectState {
   const conversation = buildConversationRecord(createEmptyStudioChatSession());
   return { activeConversationId: conversation.id, conversations: [conversation] };
@@ -123,7 +133,9 @@ export function createConversationForProjectState(projectState: StudioChatProjec
   if (activeConversation && isStudioChatSessionEmpty(activeConversation.session)) {
     return projectState ?? currentProjectState;
   }
-  const conversation = buildConversationRecord(createEmptyStudioChatSession());
+  const conversation = buildConversationRecord(
+    createNextStudioChatSessionSeed(activeConversation?.session ?? null),
+  );
   return {
     activeConversationId: conversation.id,
     conversations: [conversation, ...currentProjectState.conversations],

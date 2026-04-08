@@ -47,8 +47,9 @@ test("assistant api sends explicit buffered flag for non-stream turn requests", 
   assert.equal(JSON.parse(requestBody).stream, false);
 });
 
-test("assistant api stream ignores tool events and resolves final output", async () => {
+test("assistant api stream forwards tool events and resolves final output", async () => {
   const originalFetch = global.fetch;
+  const toolEvents: string[] = [];
 
   global.fetch = async () => new Response(
     [
@@ -81,9 +82,19 @@ test("assistant api stream ignores tool events and resolves final output", async
       requested_write_scope: "disabled",
     }, {
       onChunk: () => {},
+      onToolCallResult: (payload) => {
+        toolEvents.push(`result:${payload.tool_name}:${payload.status}`);
+      },
+      onToolCallStart: (payload) => {
+        toolEvents.push(`start:${payload.tool_name}:${payload.tool_call_id}`);
+      },
     });
     assert.equal(result.content, "好的");
     assert.equal(result.run_id, "run-1");
+    assert.deepEqual(toolEvents, [
+      "start:project.read_documents:call-1",
+      "result:project.read_documents:completed",
+    ]);
   } finally {
     global.fetch = originalFetch;
   }

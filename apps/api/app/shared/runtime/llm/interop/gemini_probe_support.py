@@ -19,6 +19,7 @@ def apply_gemini_probe_thinking_config(
         headers=request.headers,
         json_body=body,
         interop_profile=request.interop_profile,
+        tool_name_aliases=dict(request.tool_name_aliases),
     )
 
 

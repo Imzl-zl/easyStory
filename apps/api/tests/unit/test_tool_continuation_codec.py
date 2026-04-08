@@ -52,6 +52,7 @@ def test_build_prompt_with_continuation_renders_tool_projection_with_alias() -> 
     assert "继续处理。" in prompt
     assert "名称：project_read_documents" in prompt
     assert "林渊" in prompt
+    assert prompt.index("继续处理。") < prompt.index("【工具调用】")
 
 
 def test_build_openai_responses_input_prefers_provider_continuation_tool_outputs() -> None:

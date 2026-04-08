@@ -22,15 +22,23 @@ from app.shared.runtime.llm.llm_protocol import (
     LLMConnection,
     NormalizedLLMResponse,
     PreparedLLMHttpRequest,
+    parse_generation_response,
     resolve_model_name,
+    send_json_http_request,
 )
+from app.shared.runtime.llm.llm_response_validation import raise_if_truncated_response
 from app.shared.runtime.llm.interop.provider_interop_stream_support import (
+    build_stream_completion,
     build_stream_probe_request,
     execute_stream_probe_request,
+    iterate_stream_request,
+    synthesize_stream_terminal_response,
 )
 
 VERIFY_TIMEOUT_SECONDS = 5
+VERIFY_TEXT_PROBE_TIMEOUT_SECONDS = 30
 VERIFY_EMPTY_CONTENT_MESSAGE = "测试消息没有返回可用内容"
+TEXT_PROBE_JSON_DIALECTS = frozenset({"anthropic_messages", "gemini_generate_content"})
 RETIRED_MODEL_MARKERS = (
     "is no longer available",
     "please switch to",
@@ -45,6 +53,9 @@ MODEL_CONFIGURATION_ERROR_MARKERS = (
 )
 STREAM_HTTP_ERROR_PATTERN = re.compile(
     r"^LLM streaming request failed: HTTP (?P<status>\d{3})(?: - (?P<detail>.*))?$"
+)
+REQUEST_HTTP_ERROR_PATTERN = re.compile(
+    r"^LLM request failed: HTTP (?P<status>\d{3})(?: - (?P<detail>.*))?$"
 )
 
 
@@ -91,7 +102,7 @@ class AsyncHttpCredentialVerifier:
         *,
         stream_request_sender: AsyncCredentialStreamRequestSender | None = None,
     ) -> None:
-        self.stream_request_sender = stream_request_sender or _default_stream_request_sender
+        self.stream_request_sender = stream_request_sender
 
     async def verify(
         self,
@@ -174,6 +185,7 @@ class AsyncHttpCredentialVerifier:
                 probe_kind=probe_kind,
             ),
             api_dialect=api_dialect,
+            probe_kind=probe_kind,
         )
         if probe_kind == "text_probe":
             self._validate_text_probe_response(provider, initial_response)
@@ -194,6 +206,7 @@ class AsyncHttpCredentialVerifier:
                 result_echo=result_echo,
             ),
             api_dialect=api_dialect,
+            probe_kind=probe_kind,
         )
         validate_tool_continuation_probe_response(
             followup_response,
@@ -205,11 +218,21 @@ class AsyncHttpCredentialVerifier:
         request: PreparedLLMHttpRequest,
         *,
         api_dialect: str,
+        probe_kind: ConformanceProbeKind,
     ) -> NormalizedLLMResponse:
-        return await self.stream_request_sender(
-            build_stream_probe_request(request, api_dialect=api_dialect),
-            api_dialect=api_dialect,
-        )
+        if probe_kind == "text_probe" and self.stream_request_sender is None:
+            if api_dialect in TEXT_PROBE_JSON_DIALECTS:
+                return await _default_text_probe_json_request_sender(
+                    request,
+                    api_dialect=api_dialect,
+                )
+            return await _default_text_probe_request_sender(
+                build_stream_probe_request(request, api_dialect=api_dialect),
+                api_dialect=api_dialect,
+            )
+        streamed_request = build_stream_probe_request(request, api_dialect=api_dialect)
+        sender = self.stream_request_sender or _default_stream_request_sender
+        return await sender(streamed_request, api_dialect=api_dialect)
 
     def _validate_text_probe_response(
         self,
@@ -233,7 +256,7 @@ def _raise_stream_http_error(
     probe_kind: ConformanceProbeKind,
 ) -> None:
     detail = str(error).strip()
-    match = STREAM_HTTP_ERROR_PATTERN.match(detail)
+    match = STREAM_HTTP_ERROR_PATTERN.match(detail) or REQUEST_HTTP_ERROR_PATTERN.match(detail)
     if match is None:
         return
     status_code = int(match.group("status"))
@@ -266,6 +289,81 @@ async def _default_stream_request_sender(
     )
 
 
+async def _default_text_probe_request_sender(
+    request: PreparedLLMHttpRequest,
+    *,
+    api_dialect: str,
+) -> NormalizedLLMResponse:
+    text_parts: list[str] = []
+    raw_event_tuples: list[tuple[str | None, dict[str, object]]] = []
+    terminal_response: NormalizedLLMResponse | None = None
+    async for event in iterate_stream_request(
+        request,
+        api_dialect=api_dialect,
+        print_status=True,
+        timeout_seconds=VERIFY_TEXT_PROBE_TIMEOUT_SECONDS,
+    ):
+        raw_event_tuples.append((event.event_name, event.payload))
+        if event.delta:
+            text_parts.append(event.delta)
+            partial_content = "".join(text_parts).strip()
+            if partial_content:
+                return NormalizedLLMResponse(
+                    content=partial_content,
+                    finish_reason=None,
+                    input_tokens=None,
+                    output_tokens=None,
+                    total_tokens=None,
+                )
+        if event.terminal_response is None:
+            continue
+        terminal_response = event.terminal_response
+        normalized = build_stream_completion(
+            api_dialect=api_dialect,
+            text_parts=text_parts,
+            terminal_response=terminal_response,
+        )
+        if normalized is not None and normalized.content.strip():
+            return normalized
+    synthesized_terminal = synthesize_stream_terminal_response(
+        api_dialect,
+        raw_events=raw_event_tuples,
+        tool_name_aliases=request.tool_name_aliases,
+    )
+    if synthesized_terminal is not None:
+        terminal_response = synthesized_terminal
+    normalized = build_stream_completion(
+        api_dialect=api_dialect,
+        text_parts=text_parts,
+        terminal_response=terminal_response,
+    )
+    if normalized is None or not normalized.content.strip():
+        raise ConfigurationError("Streaming probe returned no text content")
+    return normalized
+
+
+async def _default_text_probe_json_request_sender(
+    request: PreparedLLMHttpRequest,
+    *,
+    api_dialect: str,
+) -> NormalizedLLMResponse:
+    response = await send_json_http_request(
+        request,
+        timeout_seconds=VERIFY_TEXT_PROBE_TIMEOUT_SECONDS,
+    )
+    if response.status_code >= 400:
+        raise ConfigurationError(_build_request_http_error_message(response))
+    raise_if_truncated_response(
+        api_dialect=api_dialect,
+        payload=response.json_body or {},
+    )
+    return parse_generation_response(
+        api_dialect,
+        response.json_body or {},
+        tool_name_aliases=request.tool_name_aliases,
+    )
+
+
 def _normalize_probe_error_message(reply: str) -> str | None:
     normalized_reply = reply.strip()
     lowered_reply = normalized_reply.lower()
@@ -274,6 +372,19 @@ def _normalize_probe_error_message(reply: str) -> str | None:
     if any(marker in lowered_reply for marker in MODEL_CONFIGURATION_ERROR_MARKERS):
         return f"默认模型或接口类型不匹配。上游提示：{normalized_reply}"
     return None
+
+
+def _build_request_http_error_message(response) -> str:
+    if response.json_body is not None:
+        error = response.json_body.get("error")
+        if isinstance(error, dict) and isinstance(error.get("message"), str):
+            return f"LLM request failed: HTTP {response.status_code} - {error['message']}"
+        if isinstance(error, str):
+            return f"LLM request failed: HTTP {response.status_code} - {error}"
+    suffix = response.text.strip()
+    if suffix:
+        return f"LLM request failed: HTTP {response.status_code} - {suffix}"
+    return f"LLM request failed: HTTP {response.status_code}"
 
 
 def _format_probe_failure_message(

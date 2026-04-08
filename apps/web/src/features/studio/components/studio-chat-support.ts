@@ -7,7 +7,7 @@ import type {
 } from "@/lib/api/types";
 import {
   buildAssistantModelOverride,
-  resolveFailedIncubatorReply,
+  resolveFailedAssistantReply,
   resolveIncubatorAssistantReply,
 } from "@/features/lobby/components/incubator-chat-support";
 import {
@@ -27,10 +27,30 @@ import { normalizeStudioSkillId } from "./studio-chat-skill-support";
 const STUDIO_CONTEXT_SELECTION_MAX_COUNT = 8;
 
 export const STUDIO_PENDING_REPLY_MESSAGE = "正在贴合当前文稿整理思路…";
+const STUDIO_INTERRUPTED_REPLY_MESSAGE = "这次回复中断了，你可以重新发送。";
+const STUDIO_TOOL_PROGRESS_DETAIL_MAX_LENGTH = 40;
+const STUDIO_TOOL_LABELS: Record<string, string> = {
+  "project.list_documents": "整理文稿目录",
+  "project.read_documents": "读取文稿",
+  "project.search_documents": "检索文稿",
+  "project.write_document": "写入文稿",
+};
 
 export function buildStudioDocumentCatalogQueryKey(projectId: string) {
   return ["project-document-catalog", projectId] as const;
 }
+
+export type StudioChatToolProgressTone = "running" | "success" | "danger" | "muted";
+
+export type StudioChatToolProgressEntry = {
+  detail?: string;
+  label: string;
+  statusLabel: string;
+  toolCallId: string;
+  tone: StudioChatToolProgressTone;
+};
+
+export type StudioChatToolProgressTerminalReason = "cancelled" | "interrupted";
 
 export type StudioChatMessage = {
   attachments?: StudioChatAttachmentMeta[];
@@ -40,6 +60,7 @@ export type StudioChatMessage = {
   rawMarkdown: string;
   requestContent?: string;
   status?: "pending" | "error";
+  toolProgress?: StudioChatToolProgressEntry[];
 };
 
 export type StudioChatSettings = {
@@ -70,6 +91,7 @@ export function createStudioChatMessage(
     rawMarkdown?: string;
     requestContent?: string;
     status?: StudioChatMessage["status"];
+    toolProgress?: StudioChatMessage["toolProgress"];
   } = {},
 ): StudioChatMessage {
   return {
@@ -80,6 +102,7 @@ export function createStudioChatMessage(
     requestContent: options.requestContent,
     role,
     status: options.status,
+    toolProgress: options.toolProgress,
   };
 }
 
@@ -88,19 +111,15 @@ export function appendStudioChatMessageDelta(
   messageId: string,
   delta: string,
 ): StudioChatMessage[] {
-  return messages.map((message) =>
-    message.id === messageId
-      ? {
-        ...message,
-        content: message.status === "pending" && message.content === STUDIO_PENDING_REPLY_MESSAGE
-          ? delta
-          : `${message.content}${delta}`,
-        rawMarkdown: message.status === "pending" && message.rawMarkdown === STUDIO_PENDING_REPLY_MESSAGE
-          ? delta
-          : `${message.rawMarkdown}${delta}`,
-      }
-      : message,
-  );
+  return mapStudioChatMessage(messages, messageId, (message) => ({
+    ...message,
+    content: message.status === "pending" && message.content === STUDIO_PENDING_REPLY_MESSAGE
+      ? delta
+      : `${message.content}${delta}`,
+    rawMarkdown: message.status === "pending" && message.rawMarkdown === STUDIO_PENDING_REPLY_MESSAGE
+      ? delta
+      : `${message.rawMarkdown}${delta}`,
+  }));
 }
 
 export function replaceStudioChatMessage(
@@ -108,7 +127,75 @@ export function replaceStudioChatMessage(
   messageId: string,
   nextMessage: StudioChatMessage,
 ): StudioChatMessage[] {
-  return messages.map((message) => (message.id === messageId ? nextMessage : message));
+  return mapStudioChatMessage(messages, messageId, () => nextMessage);
+}
+
+export function applyStudioChatToolCallStart(
+  messages: StudioChatMessage[],
+  messageId: string,
+  payload: {
+    target_summary?: unknown;
+    tool_call_id: string;
+    tool_name: string;
+  },
+): StudioChatMessage[] {
+  return mapStudioChatMessage(messages, messageId, (message) => ({
+    ...message,
+    toolProgress: upsertStudioToolProgressEntry(message.toolProgress, {
+      detail: resolveStudioToolStartDetail(payload.target_summary),
+      label: resolveStudioToolLabel(payload.tool_name),
+      statusLabel: "处理中",
+      toolCallId: payload.tool_call_id,
+      tone: "running",
+    }),
+  }));
+}
+
+export function applyStudioChatToolCallResult(
+  messages: StudioChatMessage[],
+  messageId: string,
+  payload: {
+    error?: unknown;
+    result_summary?: unknown;
+    status: string;
+    tool_call_id: string;
+    tool_name: string;
+  },
+): StudioChatMessage[] {
+  const nextStatus = resolveStudioToolResultStatus(payload.status);
+  return mapStudioChatMessage(messages, messageId, (message) => ({
+    ...message,
+    toolProgress: upsertStudioToolProgressEntry(message.toolProgress, {
+      detail: resolveStudioToolResultDetail(payload.result_summary, payload.error),
+      label: resolveStudioToolLabel(payload.tool_name),
+      statusLabel: nextStatus.statusLabel,
+      toolCallId: payload.tool_call_id,
+      tone: nextStatus.tone,
+    }),
+  }));
+}
+
+export function finalizeStudioChatToolProgress(
+  entries: StudioChatToolProgressEntry[] | undefined,
+  reason: StudioChatToolProgressTerminalReason,
+) {
+  if (!entries?.length) {
+    return entries;
+  }
+  const statusLabel = reason === "cancelled" ? "已停止" : "已中断";
+  let didChange = false;
+  const nextEntries = entries.map((entry) => {
+    if (entry.tone !== "running") {
+      return entry;
+    }
+    didChange = true;
+    return {
+      ...entry,
+      statusLabel,
+      tone: "muted" as const,
+    };
+  });
+  return didChange ? nextEntries : entries;
 }
 
 export function buildStudioAssistantTurnPayload(options: {
@@ -210,7 +297,10 @@ export function normalizeStudioAssistantReply(content: string) {
 }
 
 export function resolveStudioFailedReply(content: string, errorMessage: string) {
-  return resolveFailedIncubatorReply(content, errorMessage);
+  return resolveFailedAssistantReply(content, errorMessage, {
+    interruptedMessage: STUDIO_INTERRUPTED_REPLY_MESSAGE,
+    pendingMessage: STUDIO_PENDING_REPLY_MESSAGE,
+  });
 }
 
 export function buildStudioUserRequestContent(options: {
@@ -222,6 +312,149 @@ export function buildStudioUserRequestContent(options: {
     return options.message;
   }
   return `${options.message}\n\n请结合我附带的文件继续：\n\n${attachmentContext}`;
+}
+
+function mapStudioChatMessage(
+  messages: StudioChatMessage[],
+  messageId: string,
+  updater: (message: StudioChatMessage) => StudioChatMessage,
+) {
+  let didChange = false;
+  const nextMessages = messages.map((message) => {
+    if (message.id !== messageId) {
+      return message;
+    }
+    const nextMessage = updater(message);
+    didChange = didChange || nextMessage !== message;
+    return nextMessage;
+  });
+  return didChange ? nextMessages : messages;
+}
+
+function upsertStudioToolProgressEntry(
+  entries: StudioChatToolProgressEntry[] | undefined,
+  nextEntry: StudioChatToolProgressEntry,
+) {
+  const currentEntries = entries ?? [];
+  const currentIndex = currentEntries.findIndex((item) => item.toolCallId === nextEntry.toolCallId);
+  if (currentIndex < 0) {
+    return [...currentEntries, nextEntry];
+  }
+  return currentEntries.map((item, index) =>
+    index === currentIndex
+      ? {
+        ...item,
+        detail: nextEntry.detail ?? item.detail,
+        label: nextEntry.label,
+        statusLabel: nextEntry.statusLabel,
+        tone: nextEntry.tone,
+      }
+      : item);
+}
+
+function resolveStudioToolLabel(toolName: string) {
+  return STUDIO_TOOL_LABELS[toolName] ?? "调用工具";
+}
+
+function resolveStudioToolStartDetail(summary: unknown) {
+  const record = readStudioToolRecord(summary);
+  if (!record) {
+    return undefined;
+  }
+  const path = readStudioToolString(record.path);
+  if (path) {
+    return path;
+  }
+  const query = readStudioToolString(record.query);
+  if (query) {
+    return `检索：${truncateStudioToolDetail(query)}`;
+  }
+  const paths = readStudioToolStringArray(record.paths);
+  if (paths.length === 1) {
+    return paths[0];
+  }
+  const documentCount = readStudioToolCount(record.document_count) ?? (paths.length > 1 ? paths.length : null);
+  if (documentCount) {
+    return `${documentCount} 篇文稿`;
+  }
+  const pathPrefix = readStudioToolString(record.path_prefix);
+  if (pathPrefix) {
+    return pathPrefix;
+  }
+  const limit = readStudioToolCount(record.limit);
+  if (limit) {
+    return `最多 ${limit} 篇`;
+  }
+  return undefined;
+}
+
+function resolveStudioToolResultDetail(summary: unknown, error: unknown) {
+  const summaryRecord = readStudioToolRecord(summary);
+  const summaryMessage = readStudioToolString(summaryRecord?.message);
+  if (summaryMessage) {
+    return truncateStudioToolDetail(summaryMessage);
+  }
+  const documentCount = readStudioToolCount(summaryRecord?.document_count);
+  if (documentCount) {
+    return `${documentCount} 篇文稿`;
+  }
+  const paths = readStudioToolStringArray(summaryRecord?.paths);
+  if (paths.length === 1) {
+    return paths[0];
+  }
+  if (paths.length > 1) {
+    return `${paths.length} 篇文稿`;
+  }
+  const resourceCount = readStudioToolCount(summaryRecord?.resource_count);
+  if (resourceCount) {
+    return `${resourceCount} 项资源`;
+  }
+  const contentItemCount = readStudioToolCount(summaryRecord?.content_item_count);
+  if (contentItemCount) {
+    return `${contentItemCount} 项内容`;
+  }
+  const errorMessage = readStudioToolString(readStudioToolRecord(error)?.message);
+  return errorMessage ? truncateStudioToolDetail(errorMessage) : undefined;
+}
+
+function resolveStudioToolResultStatus(status: string) {
+  switch (status.trim()) {
+    case "cancelled":
+      return { statusLabel: "已停止", tone: "muted" as const };
+    case "committed":
+      return { statusLabel: "已写入", tone: "success" as const };
+    case "failed":
+    case "rejected":
+      return { statusLabel: "失败", tone: "danger" as const };
+    case "completed":
+      return { statusLabel: "已完成", tone: "success" as const };
+    default:
+      return { statusLabel: "已返回", tone: "success" as const };
+  }
+}
+
+function truncateStudioToolDetail(value: string) {
+  return value.length > STUDIO_TOOL_PROGRESS_DETAIL_MAX_LENGTH
+    ? `${value.slice(0, STUDIO_TOOL_PROGRESS_DETAIL_MAX_LENGTH)}…`
+    : value;
+}
+
+function readStudioToolRecord(value: unknown) {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : null;
+}
+
+function readStudioToolString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function readStudioToolStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+}
+
+function readStudioToolCount(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.trunc(value) : null;
 }
 
 function buildStudioDocumentContext(

@@ -177,9 +177,7 @@ class ProjectIncubatorService:
         *,
         owner_id: uuid.UUID,
     ):
-        from app.modules.credential.service.credential_connection_support import (
-            build_runtime_credential_payload,
-        )
+        from app.modules.credential.service import build_runtime_credential_payload
 
         credential_service = self._resolve_credential_service()
         resolved = await credential_service.resolve_active_credential_model(

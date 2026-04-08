@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  applyStudioChatToolCallResult,
+  applyStudioChatToolCallStart,
   buildStudioAssistantTurnPayload,
   buildStudioUserRequestContent,
   createStudioChatMessage,
+  finalizeStudioChatToolProgress,
   INITIAL_STUDIO_CHAT_SETTINGS,
+  resolveStudioFailedReply,
 } from "./studio-chat-support";
 
 test("studio chat payload uses document_context and continuation anchor", () => {
@@ -232,5 +236,98 @@ test("studio chat payload requires the last message to be from the user", () => 
         settings: INITIAL_STUDIO_CHAT_SETTINGS,
       }),
     /latest user message/,
+  );
+});
+
+test("studio failed reply replaces pending placeholder with explicit backend error", () => {
+  assert.equal(
+    resolveStudioFailedReply(
+      "正在贴合当前文稿整理思路…",
+      "模型连接“薄荷codex”尚未通过“验证工具”，当前不能启用项目工具。",
+    ),
+    "模型连接“薄荷codex”尚未通过“验证工具”，当前不能启用项目工具。",
+  );
+});
+
+test("studio failed reply keeps partial content when stream was interrupted after output", () => {
+  assert.equal(
+    resolveStudioFailedReply(
+      "我已经读到了项目说明。",
+      "实时回复意外中断，请重试。",
+    ),
+    "我已经读到了项目说明。\n\n这次回复中断了，你可以重新发送。",
+  );
+});
+
+test("studio chat tool progress uses friendly labels and updates result state", () => {
+  const assistantMessage = createStudioChatMessage("assistant", "正在贴合当前文稿整理思路…", {
+    status: "pending",
+  });
+  const withStart = applyStudioChatToolCallStart([assistantMessage], assistantMessage.id, {
+    target_summary: {
+      path: "设定/人物.md",
+    },
+    tool_call_id: "call-1",
+    tool_name: "project.read_documents",
+  });
+  const withResult = applyStudioChatToolCallResult(withStart, assistantMessage.id, {
+    result_summary: {
+      document_count: 1,
+    },
+    status: "completed",
+    tool_call_id: "call-1",
+    tool_name: "project.read_documents",
+  });
+
+  assert.deepEqual(withStart[0]?.toolProgress, [{
+    detail: "设定/人物.md",
+    label: "读取文稿",
+    statusLabel: "处理中",
+    toolCallId: "call-1",
+    tone: "running",
+  }]);
+  assert.deepEqual(withResult[0]?.toolProgress, [{
+    detail: "1 篇文稿",
+    label: "读取文稿",
+    statusLabel: "已完成",
+    toolCallId: "call-1",
+    tone: "success",
+  }]);
+});
+
+test("studio chat tool progress finalizes running entries without rewriting terminal ones", () => {
+  assert.deepEqual(
+    finalizeStudioChatToolProgress([
+      {
+        detail: "设定/人物.md",
+        label: "读取文稿",
+        statusLabel: "处理中",
+        toolCallId: "call-1",
+        tone: "running",
+      },
+      {
+        detail: "1 篇文稿",
+        label: "检索文稿",
+        statusLabel: "已完成",
+        toolCallId: "call-2",
+        tone: "success",
+      },
+    ], "interrupted"),
+    [
+      {
+        detail: "设定/人物.md",
+        label: "读取文稿",
+        statusLabel: "已中断",
+        toolCallId: "call-1",
+        tone: "muted",
+      },
+      {
+        detail: "1 篇文稿",
+        label: "检索文稿",
+        statusLabel: "已完成",
+        toolCallId: "call-2",
+        tone: "success",
+      },
+    ],
   );
 });

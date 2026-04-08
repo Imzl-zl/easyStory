@@ -5,7 +5,7 @@ from typing import Any
 
 from ..llm_interop_profiles import resolve_interop_capabilities
 from ..llm_protocol import NormalizedLLMResponse
-from ..llm_protocol_responses import parse_stream_terminal_response
+from ..llm_protocol_responses import parse_generation_response, parse_stream_terminal_response
 
 
 @dataclass(frozen=True)
@@ -129,6 +129,25 @@ def extract_stream_terminal_response(
         interop_profile=interop_profile,
         tool_name_aliases=tool_name_aliases,
     )
+
+
+def synthesize_stream_terminal_response(
+    api_dialect: str,
+    *,
+    raw_events: list[tuple[str | None, dict[str, Any]]],
+    tool_name_aliases: dict[str, str] | None = None,
+) -> NormalizedLLMResponse | None:
+    if api_dialect == "openai_responses":
+        return _synthesize_openai_responses_terminal_response(
+            raw_events,
+            tool_name_aliases=tool_name_aliases or {},
+        )
+    if api_dialect == "openai_chat_completions":
+        return _synthesize_openai_chat_terminal_response(
+            raw_events,
+            tool_name_aliases=tool_name_aliases or {},
+        )
+    return None
 
 
 def _extract_terminal_payload(
@@ -272,6 +291,136 @@ def _extract_gemini_delta(payload: dict[str, Any]) -> str:
         for part in parts
         if isinstance(part, dict) and isinstance(part.get("text"), str)
     )
+
+
+def _synthesize_openai_responses_terminal_response(
+    raw_events: list[tuple[str | None, dict[str, Any]]],
+    *,
+    tool_name_aliases: dict[str, str],
+) -> NormalizedLLMResponse | None:
+    function_calls: dict[str, dict[str, Any]] = {}
+    completed_response: dict[str, Any] | None = None
+    for event_name, payload in raw_events:
+        if event_name == "response.completed":
+            response = payload.get("response")
+            if isinstance(response, dict):
+                completed_response = response
+            continue
+        if event_name not in {"response.output_item.added", "response.output_item.done"}:
+            continue
+        item = payload.get("item")
+        if not isinstance(item, dict) or item.get("type") != "function_call":
+            continue
+        item_id = _optional_string(item.get("call_id")) or _optional_string(item.get("id"))
+        if item_id is None:
+            item_id = f"function_call:{len(function_calls)}"
+        function_calls[item_id] = dict(item)
+    if not function_calls:
+        return None
+    reconstructed_payload = dict(completed_response or {})
+    reconstructed_payload["output"] = list(function_calls.values())
+    return parse_generation_response(
+        "openai_responses",
+        reconstructed_payload,
+        tool_name_aliases=tool_name_aliases,
+    )
+
+
+def _synthesize_openai_chat_terminal_response(
+    raw_events: list[tuple[str | None, dict[str, Any]]],
+    *,
+    tool_name_aliases: dict[str, str],
+) -> NormalizedLLMResponse | None:
+    tool_calls_by_index: dict[int, dict[str, Any]] = {}
+    finish_reason: str | None = None
+    usage: dict[str, Any] | None = None
+    response_id: str | None = None
+    for _, payload in raw_events:
+        if response_id is None:
+            response_id = _optional_string(payload.get("id"))
+        payload_usage = payload.get("usage")
+        if isinstance(payload_usage, dict):
+            usage = payload_usage
+        choices = payload.get("choices")
+        if not isinstance(choices, list) or not choices:
+            continue
+        first_choice = choices[0]
+        if not isinstance(first_choice, dict):
+            continue
+        choice_finish_reason = _optional_string(first_choice.get("finish_reason"))
+        if choice_finish_reason is not None:
+            finish_reason = choice_finish_reason
+        delta = first_choice.get("delta")
+        if not isinstance(delta, dict):
+            continue
+        tool_calls = delta.get("tool_calls")
+        if not isinstance(tool_calls, list):
+            continue
+        for fallback_index, item in enumerate(tool_calls):
+            if not isinstance(item, dict):
+                continue
+            index = item.get("index")
+            if not isinstance(index, int):
+                index = fallback_index
+            current = tool_calls_by_index.setdefault(
+                index,
+                {
+                    "id": None,
+                    "type": "function",
+                    "function": {
+                        "name": "",
+                        "arguments": "",
+                    },
+                },
+            )
+            call_id = _optional_string(item.get("id"))
+            if call_id is not None:
+                current["id"] = call_id
+            call_type = _optional_string(item.get("type"))
+            if call_type is not None:
+                current["type"] = call_type
+            function = item.get("function")
+            if not isinstance(function, dict):
+                continue
+            name = _optional_string(function.get("name"))
+            if name is not None:
+                previous_name = current["function"]["name"]
+                current["function"]["name"] = (
+                    f"{previous_name}{name}" if previous_name and not previous_name.endswith(name) else name
+                )
+            arguments_chunk = function.get("arguments")
+            if isinstance(arguments_chunk, str):
+                current["function"]["arguments"] += arguments_chunk
+    if not tool_calls_by_index:
+        return None
+    reconstructed_payload: dict[str, Any] = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [tool_calls_by_index[index] for index in sorted(tool_calls_by_index)],
+                },
+                "finish_reason": finish_reason or "tool_calls",
+            }
+        ]
+    }
+    if usage is not None:
+        reconstructed_payload["usage"] = usage
+    if response_id is not None:
+        reconstructed_payload["id"] = response_id
+    return parse_generation_response(
+        "openai_chat_completions",
+        reconstructed_payload,
+        tool_name_aliases=tool_name_aliases,
+    )
+
+
+def _optional_string(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped or None
 
 
 def _extract_gemini_stop_reason(payload: dict[str, Any]) -> str | None:

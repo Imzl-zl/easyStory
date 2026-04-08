@@ -86,10 +86,47 @@ def test_build_conformance_probe_request_uses_safe_tool_alias() -> None:
     )
 
     assert request.json_body["tools"][0]["name"] == "probe_echo_payload"
+    assert request.json_body["tool_choice"] == "required"
     assert request.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
 
 
-def test_build_tool_continuation_probe_followup_request_uses_provider_continuation_for_responses() -> None:
+def test_build_conformance_probe_request_disables_gemini_probe_thinking() -> None:
+    request = build_conformance_probe_request(
+        LLMConnection(
+            api_dialect="gemini_generate_content",
+            api_key="test-key",
+            base_url="https://generativelanguage.googleapis.com",
+        ),
+        model_name="gemini-2.5-flash",
+        probe_kind="tool_call_probe",
+    )
+
+    assert request.json_body["toolConfig"]["functionCallingConfig"] == {
+        "mode": "ANY",
+        "allowedFunctionNames": ["probe_echo_payload"],
+    }
+    assert request.json_body["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+    assert request.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
+
+
+def test_build_conformance_probe_request_forces_anthropic_tool_call() -> None:
+    request = build_conformance_probe_request(
+        LLMConnection(
+            api_dialect="anthropic_messages",
+            api_key="test-key",
+            base_url="https://api.anthropic.com",
+        ),
+        model_name="claude-sonnet-4-20250514",
+        probe_kind="tool_call_probe",
+    )
+
+    assert request.json_body["tool_choice"] == {
+        "type": "any",
+        "disable_parallel_tool_use": True,
+    }
+
+
+def test_build_tool_continuation_probe_followup_request_replays_for_default_responses_profile() -> None:
     request = build_tool_continuation_probe_followup_request(
         LLMConnection(
             api_dialect="openai_responses",
@@ -101,14 +138,9 @@ def test_build_tool_continuation_probe_followup_request_uses_provider_continuati
         result_echo="probe-result-123",
     )
 
-    assert request.json_body["previous_response_id"] == "resp_123"
-    assert request.json_body["input"] == [
-        {
-            "type": "function_call_output",
-            "call_id": "call_123",
-            "output": '{"echoed":"probe-result-123","ok":true,"probe":"tool_continuation_probe"}',
-        }
-    ]
+    assert "previous_response_id" not in request.json_body
+    replay_prompt = request.json_body["input"][0]["content"][0]["text"]
+    assert "probe-result-123" in replay_prompt
     assert request.json_body["tools"][0]["name"] == "probe_echo_payload"
 
 
@@ -142,13 +174,60 @@ def test_build_tool_continuation_probe_followup_request_replays_for_chat_dialect
     assert "ping" not in followup_user_message["content"]
 
 
-def test_build_tool_continuation_probe_followup_request_requires_response_id_for_responses() -> None:
+def test_build_tool_continuation_probe_followup_request_exposes_echoed_value_for_gemini() -> None:
+    request = build_tool_continuation_probe_followup_request(
+        LLMConnection(
+            api_dialect="gemini_generate_content",
+            api_key="test-key",
+            base_url="https://generativelanguage.googleapis.com",
+        ),
+        model_name="gemini-2.5-flash",
+        initial_response=_tool_call_response(provider_response_id=None),
+        result_echo="probe-result-gemini",
+    )
+
+    followup_user_prompt = request.json_body["contents"][0]["parts"][0]["text"]
+    response_payload = request.json_body["contents"][2]["parts"][0]["functionResponse"]["response"]
+
+    assert response_payload["echoed"] == "probe-result-gemini"
+    assert response_payload["structured_output"]["echoed"] == "probe-result-gemini"
+    assert "probe-result-gemini" not in followup_user_prompt
+    assert request.json_body["contents"][1]["parts"][0]["functionCall"]["name"] == "probe_echo_payload"
+    assert request.json_body["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+    assert request.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
+
+
+def test_build_tool_continuation_probe_followup_request_uses_provider_continuation_for_responses_strict() -> None:
+    request = build_tool_continuation_probe_followup_request(
+        LLMConnection(
+            api_dialect="openai_responses",
+            api_key="test-key",
+            base_url="https://api.openai.com",
+            interop_profile="responses_strict",
+        ),
+        model_name="gpt-5.4",
+        initial_response=_tool_call_response(provider_response_id="resp_123"),
+        result_echo="probe-result-strict",
+    )
+
+    assert request.json_body["previous_response_id"] == "resp_123"
+    assert request.json_body["input"] == [
+        {
+            "type": "function_call_output",
+            "call_id": "call_123",
+            "output": '{"echoed":"probe-result-strict","ok":true,"probe":"tool_continuation_probe"}',
+        }
+    ]
+
+
+def test_build_tool_continuation_probe_followup_request_requires_response_id_for_responses_strict() -> None:
     with pytest.raises(ConfigurationError, match="requires provider_response_id"):
         build_tool_continuation_probe_followup_request(
             LLMConnection(
                 api_dialect="openai_responses",
                 api_key="test-key",
                 base_url="https://api.openai.com",
+                interop_profile="responses_strict",
             ),
             model_name="gpt-5.4",
             initial_response=_tool_call_response(provider_response_id=None),
@@ -184,11 +263,11 @@ def test_validate_tool_call_probe_response_rejects_wrong_arguments() -> None:
         )
 
 
-def test_validate_tool_continuation_probe_response_requires_exact_final_text() -> None:
-    with pytest.raises(ConfigurationError, match="must equal exactly"):
+def test_validate_tool_continuation_probe_response_requires_dynamic_echo_in_final_text() -> None:
+    with pytest.raises(ConfigurationError, match="must include echoed value"):
         validate_tool_continuation_probe_response(
             NormalizedLLMResponse(
-                content="工具续接成功：ping，但这是猜的。",
+                content="工具续接成功，但没有带回工具结果。",
                 finish_reason=None,
                 input_tokens=None,
                 output_tokens=None,
@@ -198,7 +277,7 @@ def test_validate_tool_continuation_probe_response_requires_exact_final_text() -
         )
     validate_tool_continuation_probe_response(
         NormalizedLLMResponse(
-            content=render_tool_continuation_probe_success_text("probe-result-789"),
+            content=f"收到结果，{render_tool_continuation_probe_success_text('probe-result-789')}",
             finish_reason=None,
             input_tokens=None,
             output_tokens=None,

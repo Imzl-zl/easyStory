@@ -31,6 +31,11 @@ from app.modules.assistant.service.tooling.assistant_tool_loop_budget_support im
     apply_tool_loop_request_budget,
 )
 from app.modules.assistant.service.tooling.assistant_tool_loop_result_support import _build_tool_call_start_payload
+from app.modules.assistant.service.tooling.assistant_tool_executor import (
+    PROJECT_SEARCH_DOCUMENTS_DEFAULT_LIMIT,
+    ProjectReadDocumentsToolArgs,
+    ProjectSearchDocumentsToolArgs,
+)
 from app.modules.assistant.service.tooling.assistant_tool_catalog_support import build_tool_catalog_version
 from app.modules.assistant.service.tooling.assistant_tool_runtime_dto import (
     AssistantToolApprovalGrant,
@@ -231,6 +236,39 @@ def test_assistant_tool_descriptor_registry_exposes_project_read_documents_descr
     assert write_descriptor.plane == "mutation"
     assert write_descriptor.mutability == "write"
     assert write_descriptor.idempotency_class == "conditional_write"
+
+
+def test_project_read_documents_tool_args_treats_null_cursors_as_empty_list():
+    arguments = ProjectReadDocumentsToolArgs.model_validate(
+        {
+            "paths": ["设定/人物.md"],
+            "cursors": None,
+        }
+    )
+
+    assert arguments.cursors == []
+
+
+def test_project_search_documents_tool_args_treats_null_optional_filters_as_omitted():
+    arguments = ProjectSearchDocumentsToolArgs.model_validate(
+        {
+            "query": "人物关系",
+            "path_prefix": None,
+            "sources": None,
+            "schema_ids": None,
+            "content_states": None,
+            "writable": None,
+            "limit": None,
+        }
+    )
+
+    assert arguments.query == "人物关系"
+    assert arguments.path_prefix is None
+    assert arguments.sources == []
+    assert arguments.schema_ids == []
+    assert arguments.content_states == []
+    assert arguments.writable is None
+    assert arguments.limit == PROJECT_SEARCH_DOCUMENTS_DEFAULT_LIMIT
 
 
 def test_assistant_tool_descriptor_registry_uses_strict_project_document_schemas():

@@ -352,6 +352,14 @@ class _InfiniteToolCallProvider(_FakeToolProvider):
 class _ParallelToolCallProvider(_FakeToolProvider):
     async def execute(self, tool_name: str, params: dict) -> dict:
         await super().execute(tool_name, params)
+        if _request_contains_continuation_fragment(params, "call.project.read_documents.2"):
+            return {
+                "content": "我已按顺序读取人物设定，可以继续给出分析。",
+                "model_name": "gpt-4o-mini",
+                "input_tokens": 12,
+                "output_tokens": 10,
+                "total_tokens": 22,
+            }
         return {
             "content": "",
             "model_name": "gpt-4o-mini",
@@ -471,6 +479,7 @@ class _ToolLoopCompactingCredentialService(_FakeCredentialService):
             encrypted_key=f"{provider}-key",
             api_dialect="openai_responses",
             default_model="gpt-4o-mini",
+            interop_profile="responses_strict",
             context_window_tokens=1600,
             verified_probe_kind="tool_continuation_probe",
             is_active=True,
@@ -3242,7 +3251,7 @@ async def test_assistant_service_fails_when_tool_loop_exhausted(db, tmp_path) ->
     assert failed_run.write_effective is False
 
 
-async def test_assistant_service_fails_when_provider_returns_parallel_tool_calls(db, tmp_path) -> None:
+async def test_assistant_service_executes_multiple_tool_calls_from_single_model_turn(db, tmp_path) -> None:
     config_root = _build_config_root(tmp_path)
     loader = ConfigLoader(config_root)
     tool_provider = _ParallelToolCallProvider()
@@ -3289,10 +3298,9 @@ async def test_assistant_service_fails_when_provider_returns_parallel_tool_calls
         messages=[AssistantMessageDTO(role="user", content="并行读一下人物设定。")],
     )
 
-    with pytest.raises(BusinessRuleError) as exc_info:
-        await service.turn(async_db(db), payload, owner_id=owner.id)
+    response = await service.turn(async_db(db), payload, owner_id=owner.id)
 
-    failed_run = turn_run_store.get_run(
+    completed_run = turn_run_store.get_run(
         build_turn_run_id(
             owner_id=owner.id,
             project_id=project.id,
@@ -3301,13 +3309,21 @@ async def test_assistant_service_fails_when_provider_returns_parallel_tool_calls
         )
     )
 
-    assert exc_info.value.code == "parallel_tool_calls_unsupported"
-    assert str(exc_info.value) == "当前运行时只支持串行工具调用，请逐个执行工具。"
-    assert failed_run is not None
-    assert failed_run.budget_snapshot == _expected_run_budget(max_steps=4, tool_timeout_seconds=15)
-    assert failed_run.budget_snapshot["max_parallel_tool_calls"] == 1
-    assert failed_run.terminal_status == "failed"
-    assert failed_run.terminal_error_code == "parallel_tool_calls_unsupported"
+    assert response.content == "我已按顺序读取人物设定，可以继续给出分析。"
+    assert [item.item_type for item in response.output_items] == [
+        "tool_call",
+        "tool_result",
+        "tool_call",
+        "tool_result",
+        "text",
+    ]
+    assert response.output_items[0].call_id == "call.project.read_documents.1"
+    assert response.output_items[2].call_id == "call.project.read_documents.2"
+    assert completed_run is not None
+    assert completed_run.budget_snapshot == _expected_run_budget(max_steps=4, tool_timeout_seconds=15)
+    assert completed_run.budget_snapshot["max_parallel_tool_calls"] == 1
+    assert completed_run.terminal_status == "completed"
+    assert completed_run.terminal_error_code is None
 
 
 async def test_assistant_service_preserves_terminal_payload_when_on_error_hook_also_fails(

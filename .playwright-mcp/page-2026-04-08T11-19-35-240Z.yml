@@ -1,0 +1,253 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - link "跳到主内容" [ref=e12] [cursor=pointer]:
+    - /url: "#workspace-main"
+  - generic [ref=e13]:
+    - banner [ref=e14]:
+      - generic [ref=e15]:
+        - link "easyStory 写作空间" [ref=e16] [cursor=pointer]:
+          - /url: /workspace/lobby
+          - generic [ref=e17]: easyStory
+          - generic [ref=e18]: 写作空间
+        - navigation "工作台导航" [ref=e19]:
+          - link "书架" [ref=e20] [cursor=pointer]:
+            - /url: /workspace/lobby
+          - link "创作" [ref=e21] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/studio
+          - link "推进" [ref=e22] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/engine
+          - link "洞察" [ref=e23] [cursor=pointer]:
+            - /url: /workspace/project/d582fe89-9416-4061-8071-022c491defa6/lab
+        - generic [ref=e24]:
+          - link "我的助手" [ref=e25] [cursor=pointer]:
+            - /url: /workspace/lobby/settings?tab=assistant
+          - generic [ref=e26]:
+            - generic [ref=e28]: z
+            - generic [ref=e29]: zhanglu
+          - button "退出" [ref=e30] [cursor=pointer]
+    - main [ref=e31]:
+      - generic [ref=e33]:
+        - complementary [ref=e34]:
+          - generic [ref=e35]:
+            - generic [ref=e36]:
+              - generic [ref=e37]:
+                - heading "AI 设置" [level=2] [ref=e38]
+                - paragraph [ref=e39]: 先完成长期规则、Skills 和模型连接；进阶能力按需要再添加。
+              - link "返回项目大厅" [ref=e40] [cursor=pointer]:
+                - /url: /workspace/lobby
+            - generic [ref=e41]:
+              - generic [ref=e42]:
+                - generic [ref=e43]:
+                  - paragraph [ref=e44]: 主路径
+                  - paragraph [ref=e45]: 先把每天都会用到的默认协作方式定稳，再决定是否继续往下扩展。
+                - generic [ref=e46]:
+                  - button "AI 助手 长期规则、默认方式 进入" [ref=e47]:
+                    - generic [ref=e48]:
+                      - generic [ref=e49]:
+                        - generic [ref=e50]: AI 助手
+                        - generic [ref=e51]: 长期规则、默认方式
+                      - generic [ref=e52]: 进入
+                  - button "Skills 保存常用聊天方式 进入" [ref=e53]:
+                    - generic [ref=e54]:
+                      - generic [ref=e55]:
+                        - generic [ref=e56]: Skills
+                        - generic [ref=e57]: 保存常用聊天方式
+                      - generic [ref=e58]: 进入
+                  - button "模型连接 选择默认连接和模型 当前" [ref=e59]:
+                    - generic [ref=e60]:
+                      - generic [ref=e61]:
+                        - generic [ref=e62]: 模型连接
+                        - generic [ref=e63]: 选择默认连接和模型
+                      - generic [ref=e64]: 当前
+              - generic [ref=e65]:
+                - generic [ref=e66]:
+                  - paragraph [ref=e67]: 高级能力
+                  - paragraph [ref=e68]: 这些能力保留给更细的控制需求，不必一开始全部配置。
+                - generic [ref=e69]:
+                  - button "Agents 进阶：固定助手角色 进入" [ref=e70]:
+                    - generic [ref=e71]:
+                      - generic [ref=e72]:
+                        - generic [ref=e73]: Agents
+                        - generic [ref=e74]: 进阶：固定助手角色
+                      - generic [ref=e75]: 进入
+                  - button "Hooks 进阶：自动动作 进入" [ref=e76]:
+                    - generic [ref=e77]:
+                      - generic [ref=e78]:
+                        - generic [ref=e79]: Hooks
+                        - generic [ref=e80]: 进阶：自动动作
+                      - generic [ref=e81]: 进入
+                  - button "MCP 进阶：外部工具连接 进入" [ref=e82]:
+                    - generic [ref=e83]:
+                      - generic [ref=e84]:
+                        - generic [ref=e85]: MCP
+                        - generic [ref=e86]: 进阶：外部工具连接
+                      - generic [ref=e87]: 进入
+          - generic [ref=e88]:
+            - paragraph [ref=e89]: 作用域
+            - paragraph [ref=e90]: 这里只管理你自己的默认设置。
+            - paragraph [ref=e91]: 项目专属规则请前往“项目设置”。
+        - generic [ref=e92]:
+          - generic [ref=e94]:
+            - heading "模型连接" [level=2] [ref=e95]
+            - paragraph [ref=e96]: 配置并管理 AI 模型连接。可同时添加多个连接，按项目场景灵活切换。
+          - generic [ref=e98]:
+            - generic [ref=e99]:
+              - button "全局连接" [ref=e100] [cursor=pointer]
+              - button "当前项目连接" [ref=e101] [cursor=pointer]
+              - paragraph [ref=e102]: 项目上下文：d582fe89-9416-4061-8071-022c491defa6
+            - generic [ref=e103]:
+              - button "连接列表" [ref=e104] [cursor=pointer]
+              - button "审计日志" [ref=e105] [cursor=pointer]
+            - generic [ref=e199]:
+              - generic [ref=e200]:
+                - generic [ref=e201]:
+                  - generic [ref=e202]:
+                    - heading "已有连接" [level=3] [ref=e203]
+                    - paragraph [ref=e204]: 查看、验证连接与工具兼容性，并管理已有连接。
+                  - button "添加新连接" [ref=e205] [cursor=pointer]
+                - article [ref=e206]:
+                  - generic [ref=e207]:
+                    - generic [ref=e208]:
+                      - heading "ice" [level=3] [ref=e209]
+                      - generic [ref=e210]: 启用中
+                    - paragraph [ref=e211]: 连接代号：ice · 接入方式：OpenAI 兼容服务
+                    - paragraph [ref=e212]: 默认模型：gpt-5.4 · 密钥尾号：sk-...eac9
+                    - paragraph [ref=e213]: 上下文窗口：未填写 · 回复上限：未填写
+                    - paragraph [ref=e214]: 工具能力：已验证完整工具调用
+                    - paragraph [ref=e215]: 服务地址：https://ice.v.ua · 最近验证：04/08 03:08 UTC
+                  - generic [ref=e216]:
+                    - button "编辑" [ref=e217] [cursor=pointer]
+                    - button "验证连接" [ref=e218] [cursor=pointer]
+                    - button "验证工具" [ref=e219] [cursor=pointer]
+                    - button "停用" [ref=e220] [cursor=pointer]
+                    - button "删除" [ref=e221] [cursor=pointer]
+                - article [ref=e222]:
+                  - generic [ref=e223]:
+                    - generic [ref=e224]:
+                      - heading "bwen" [level=3] [ref=e225]
+                      - generic [ref=e226]: 启用中
+                    - paragraph [ref=e227]: 连接代号：lucky · 接入方式：OpenAI Responses 服务
+                    - paragraph [ref=e228]: 默认模型：gpt-5.4 · 密钥尾号：sk-...12ea
+                    - paragraph [ref=e229]: 上下文窗口：未填写 · 回复上限：未填写
+                    - paragraph [ref=e230]: 工具能力：已验证完整工具调用
+                    - paragraph [ref=e231]: 服务地址：https://api.bwen.net · 最近验证：04/08 03:08 UTC
+                  - generic [ref=e232]:
+                    - button "编辑" [ref=e233] [cursor=pointer]
+                    - button "验证连接" [ref=e234] [cursor=pointer]
+                    - button "验证工具" [ref=e235] [cursor=pointer]
+                    - button "停用" [ref=e236] [cursor=pointer]
+                    - button "删除" [ref=e237] [cursor=pointer]
+                - article [ref=e238]:
+                  - generic [ref=e239]:
+                    - generic [ref=e240]:
+                      - heading "薄荷codex" [level=3] [ref=e241]
+                      - generic [ref=e242]: 启用中
+                    - paragraph [ref=e243]: 连接代号：薄荷 · 接入方式：Gemini / Google 服务
+                    - paragraph [ref=e244]: 默认模型：gemini-2.5-flash · 密钥尾号：sk-...TDA0
+                    - paragraph [ref=e245]: 上下文窗口：未填写 · 回复上限：未填写
+                    - paragraph [ref=e246]: 工具能力：已验证完整工具调用
+                    - paragraph [ref=e247]: 服务地址：https://x666.me · 最近验证：04/08 02:45 UTC
+                  - generic [ref=e248]:
+                    - button "编辑" [ref=e249] [cursor=pointer]
+                    - button "验证连接" [ref=e250] [cursor=pointer]
+                    - button "验证工具" [ref=e251] [cursor=pointer]
+                    - button "停用" [ref=e252] [cursor=pointer]
+                    - button "删除" [ref=e253] [cursor=pointer]
+              - generic [ref=e254]:
+                - generic [ref=e255]:
+                  - heading "添加模型连接" [level=3] [ref=e256]
+                  - paragraph [ref=e257]: 填好下面几项就能保存一条连接。以后想再接别的模型，继续添加新的连接即可。
+                - generic [ref=e258]:
+                  - generic [ref=e259]:
+                    - generic [ref=e260]: 连接代号
+                    - textbox "连接代号 用于区分不同连接，建议填英文、拼音或短横线，例如 openai-main。" [ref=e261]:
+                      - /placeholder: 例如：openai-main
+                    - paragraph [ref=e262]: 用于区分不同连接，建议填英文、拼音或短横线，例如 openai-main。
+                  - generic [ref=e263]:
+                    - generic [ref=e264]: 服务类型
+                    - combobox [ref=e265] [cursor=pointer]:
+                      - generic [ref=e266]:
+                        - generic [ref=e267]:
+                          - textbox
+                          - generic [ref=e268]: OpenAI 兼容服务
+                        - img [ref=e271]
+                  - generic [ref=e273]:
+                    - generic [ref=e274]: 显示名称
+                    - textbox "显示名称 这个名字会显示在列表和聊天页里。" [ref=e275]:
+                      - /placeholder: 例如：薄荷 Gemini
+                    - paragraph [ref=e276]: 这个名字会显示在列表和聊天页里。
+                  - generic [ref=e277]:
+                    - generic [ref=e278]: 访问密钥
+                    - textbox "访问密钥" [ref=e279]
+                  - generic [ref=e280]:
+                    - generic [ref=e281]: 服务地址
+                    - textbox "服务地址 官方服务通常保持默认地址即可。自建代理如果使用特殊地址，请先确认后端已允许该地址类型。" [ref=e282]:
+                      - /placeholder: https://api.openai.com
+                      - text: https://api.openai.com
+                    - paragraph [ref=e283]: 官方服务通常保持默认地址即可。自建代理如果使用特殊地址，请先确认后端已允许该地址类型。
+                  - generic [ref=e284]:
+                    - generic [ref=e285]: 默认模型
+                    - textbox "默认模型 保存后，验证和聊天会默认使用这个模型。" [ref=e286]:
+                      - /placeholder: 例如：gpt-4.1 / gemini-2.5-pro
+                    - paragraph [ref=e287]: 保存后，验证和聊天会默认使用这个模型。
+                  - generic [ref=e288]:
+                    - generic [ref=e289]: 上下文窗口
+                    - textbox "上下文窗口 多数平台也叫最大输入 token，用来表示这条连接可容纳的上下文规模。" [ref=e290]:
+                      - /placeholder: 例如：128000
+                    - paragraph [ref=e291]: 多数平台也叫最大输入 token，用来表示这条连接可容纳的上下文规模。
+                  - generic [ref=e292]:
+                    - generic [ref=e293]: 默认单次回复上限
+                    - textbox "默认单次回复上限 留空则按聊天页或上游默认值处理；填写后会作为这条连接的默认回复上限。" [ref=e294]:
+                      - /placeholder: 例如：8192
+                    - paragraph [ref=e295]: 留空则按聊天页或上游默认值处理；填写后会作为这条连接的默认回复上限。
+                - generic [ref=e296]:
+                  - generic [ref=e297]:
+                    - heading "客户端标识" [level=4] [ref=e298]
+                    - paragraph [ref=e299]: 某些中转站会按客户端标识分流。需要伪装成 Codex CLI、Claude Code、Gemini CLI 或浏览器时，优先在这里设置。
+                  - generic [ref=e300]:
+                    - paragraph [ref=e301]:
+                      - text: 可选。你可以先选一个常见客户端预设，再按上游要求手改
+                      - code [ref=e302]: User-Agent
+                      - text: ；这只影响请求头，不会把连接真正变成官方客户端。
+                    - generic [ref=e303]:
+                      - generic [ref=e304]: 客户端预设
+                      - combobox [ref=e305] [cursor=pointer]:
+                        - generic [ref=e306]:
+                          - generic [ref=e307]:
+                            - textbox
+                            - generic [ref=e308]: 不伪装
+                          - img [ref=e311]
+                      - paragraph [ref=e313]: 适合某些中转站按客户端标识分流的场景。预设会填充下面的 User-Agent 覆盖，仍然可以继续修改。
+                    - generic [ref=e314]:
+                      - generic [ref=e315]: User-Agent 覆盖
+                      - textbox "User-Agent 覆盖 填写后会优先作为最终 User-Agent 发送，覆盖下面的应用名/版本/运行环境组合。" [ref=e316]:
+                        - /placeholder: 例如：codex-cli/0.118.0 (server; node)
+                      - paragraph [ref=e317]: 填写后会优先作为最终 User-Agent 发送，覆盖下面的应用名/版本/运行环境组合。
+                    - generic [ref=e318]:
+                      - generic [ref=e319]: 应用名
+                      - textbox "应用名 当上面没有填写 User-Agent 覆盖时，系统会用它来自动生成 User-Agent。" [ref=e320]:
+                        - /placeholder: 例如：easyStory
+                      - paragraph [ref=e321]: 当上面没有填写 User-Agent 覆盖时，系统会用它来自动生成 User-Agent。
+                    - generic [ref=e322]:
+                      - generic [ref=e323]: 客户端版本
+                      - textbox "客户端版本 可选，用于补到自动生成的 User-Agent 版本段。" [ref=e324]:
+                        - /placeholder: 例如：0.1
+                      - paragraph [ref=e325]: 可选，用于补到自动生成的 User-Agent 版本段。
+                    - generic [ref=e326]:
+                      - generic [ref=e327]: 运行环境
+                      - combobox [ref=e328] [cursor=pointer]:
+                        - generic [ref=e329]:
+                          - generic [ref=e330]:
+                            - textbox
+                            - generic [ref=e331]: 不额外标记
+                          - img [ref=e334]
+                      - paragraph [ref=e336]: 只用于补充自动生成的运行时环境标记，不会改变协议格式。
+                    - generic [ref=e337]:
+                      - generic [ref=e338]: User-Agent 预览
+                      - generic [ref=e339]: 留空时不会发送 User-Agent。
+                      - paragraph [ref=e340]: 当前使用的是应用名/版本/运行环境自动生成的结果。
+                - group [ref=e341]:
+                  - generic "兼容设置大多数情况不用改" [ref=e342] [cursor=pointer]
+                - button "添加连接" [disabled] [ref=e344]

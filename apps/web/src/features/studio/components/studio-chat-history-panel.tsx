@@ -132,7 +132,6 @@ export function StudioChatHistoryPanel({
                       event.preventDefault();
                       event.stopPropagation();
                       onDeleteConversation(conversation.id);
-                      onOpenChange(false);
                     }}
                   />
                 </div>

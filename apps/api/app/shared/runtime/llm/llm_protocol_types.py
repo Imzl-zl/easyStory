@@ -97,6 +97,7 @@ class LLMGenerateRequest:
     tools: list["LLMFunctionToolDefinition"] = field(default_factory=list)
     continuation_items: list[dict[str, Any]] = field(default_factory=list)
     provider_continuation_state: dict[str, Any] | None = None
+    force_tool_call: bool = False
 
 
 @dataclass(frozen=True)

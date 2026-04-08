@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { DocumentTreeNode } from "@/features/studio/components/studio-page-support";
 
@@ -92,11 +92,6 @@ export function AiChatPanel({
   const transcriptRef = useRef<HTMLDivElement>(null);
   const [activeHeaderPanel, setActiveHeaderPanel] = useState<"history" | "skill" | null>(null);
 
-  const flatContexts = useMemo(
-    () => flattenStudioContexts(availableContexts),
-    [availableContexts],
-  );
-
   useEffect(() => {
     const node = transcriptRef.current;
     if (node) {
@@ -177,7 +172,7 @@ export function AiChatPanel({
 
       <StudioChatComposer
         attachments={attachments}
-        availableContexts={flatContexts}
+        availableContexts={availableContexts}
         canChat={canChat}
         composerText={composerText}
         credentialNotice={credentialNotice}
@@ -200,10 +195,6 @@ export function AiChatPanel({
       />
     </aside>
   );
-}
-
-function flattenStudioContexts(nodes: DocumentTreeNode[]) {
-  return nodes.flatMap((node) => (node.children ? [node, ...node.children] : [node]));
 }
 
 function resolveStatusToneClassName(credentialState: AiChatPanelProps["credentialState"]) {

@@ -25,7 +25,6 @@ def parse_generation_response(
     tool_name_aliases: dict[str, str] | None = None,
 ) -> NormalizedLLMResponse:
     dialect = normalize_api_dialect(api_dialect)
-    _raise_if_response_truncated(dialect, payload)
     if dialect == "openai_chat_completions":
         return _parse_openai_chat_response(
             payload,
@@ -42,10 +41,12 @@ def parse_generation_response(
             payload,
             tool_name_aliases=tool_name_aliases or {},
         )
-    return _parse_gemini_generate_content_response(
-        payload,
-        tool_name_aliases=tool_name_aliases or {},
-    )
+    if dialect == "gemini_generate_content":
+        return _parse_gemini_generate_content_response(
+            payload,
+            tool_name_aliases=tool_name_aliases or {},
+        )
+    raise ConfigurationError(f"Unsupported api_dialect for response parsing: {dialect}")
 
 
 def parse_stream_terminal_response(
@@ -56,7 +57,6 @@ def parse_stream_terminal_response(
     tool_name_aliases: dict[str, str] | None = None,
 ) -> NormalizedLLMResponse:
     dialect = normalize_api_dialect(api_dialect)
-    _raise_if_response_truncated(dialect, payload)
     if dialect == "openai_responses":
         capabilities = resolve_interop_capabilities(dialect, interop_profile)
         return _parse_openai_responses_response(
@@ -198,18 +198,14 @@ def _parse_gemini_generate_content_response(
     )
 
 
-def _raise_if_response_truncated(
+def extract_response_truncation_reason(
     api_dialect: str,
     payload: dict[str, Any],
-) -> None:
-    stop_reason = _extract_stop_reason(api_dialect, payload)
+) -> str | None:
+    stop_reason = _extract_stop_reason(normalize_api_dialect(api_dialect), payload)
     if stop_reason not in TRUNCATED_STOP_REASONS:
-        return
-    raise ConfigurationError(
-        "上游在输出尚未完成时提前停止了这次回复，"
-        f"当前只收到部分内容（stop_reason={stop_reason}）。"
-        "请在“模型与连接”里调高单次回复上限，或切换更稳定的连接后重试。"
-    )
+        return None
+    return stop_reason
 
 
 def _extract_stop_reason(api_dialect: str, payload: dict[str, Any]) -> str | None:
@@ -219,7 +215,9 @@ def _extract_stop_reason(api_dialect: str, payload: dict[str, Any]) -> str | Non
         return _extract_openai_responses_stop_reason(payload)
     if api_dialect == "anthropic_messages":
         return _extract_anthropic_stop_reason(payload)
-    return _extract_gemini_stop_reason(payload)
+    if api_dialect == "gemini_generate_content":
+        return _extract_gemini_stop_reason(payload)
+    raise ConfigurationError(f"Unsupported api_dialect for stop reason extraction: {api_dialect}")
 
 
 def _build_gemini_empty_content_message(candidate: dict[str, Any]) -> str:
@@ -525,4 +523,3 @@ def _build_openai_responses_output_items(
                 }
             )
     return items
-

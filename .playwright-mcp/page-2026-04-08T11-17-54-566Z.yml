@@ -1,0 +1,23 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - paragraph [ref=e7]: easyStory
+        - heading "继续创作" [level=2] [ref=e8]
+        - paragraph [ref=e9]: 登录后直接进入书架，继续上次创作。
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: 用户名
+          - textbox "用户名" [ref=e13]:
+            - /placeholder: 输入你的创作身份
+        - generic [ref=e14]:
+          - generic [ref=e15]: 密码
+          - textbox "密码" [ref=e16]:
+            - /placeholder: 至少 8 位
+        - button "进入书架" [ref=e17] [cursor=pointer]
+      - generic [ref=e18]:
+        - generic [ref=e19]: 还没有账号？
+        - link "创建账号" [ref=e20] [cursor=pointer]:
+          - /url: /auth/register
+  - button "Open Next.js Dev Tools" [ref=e26] [cursor=pointer]:
+    - img [ref=e27]

@@ -40,6 +40,26 @@ from .llm_protocol_types import (
     send_json_http_request,
 )
 
+
+def resolve_connection_continuation_support(
+    api_dialect: str | None,
+    interop_profile: str | None = None,
+) -> LLMContinuationSupport:
+    support = resolve_continuation_support(api_dialect)
+    if normalize_api_dialect(api_dialect) != "openai_responses":
+        return support
+    capabilities = resolve_interop_capabilities(
+        api_dialect,
+        interop_profile,
+    )
+    if capabilities.supports_provider_response_continuation:
+        return support
+    return LLMContinuationSupport(
+        continuation_mode="runtime_replay",
+        tolerates_interleaved_tool_results=False,
+        requires_full_replay_after_local_tools=True,
+    )
+
 __all__ = [
     "ANTHROPIC_VERSION",
     "DEFAULT_API_DIALECT",
@@ -75,6 +95,7 @@ __all__ = [
     "resolve_default_interop_profile",
     "resolve_api_key_header_name",
     "resolve_auth_strategy",
+    "resolve_connection_continuation_support",
     "resolve_continuation_support",
     "resolve_interop_capabilities",
     "resolve_model_name",

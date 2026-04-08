@@ -8,7 +8,7 @@ from ...errors import ConfigurationError
 from ..llm_protocol import normalize_http_header_name
 
 
-def _load_json_file(path: Path) -> dict[str, Any]:
+def load_json_file(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise ConfigurationError(f"Provider interop config file not found: {path}")
     try:
@@ -20,23 +20,23 @@ def _load_json_file(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _write_json_file(path: Path, payload: dict[str, Any]) -> None:
+def write_json_file(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def _prune_timestamps(timestamps: list[int], threshold: int) -> list[int]:
+def prune_timestamps(timestamps: list[int], threshold: int) -> list[int]:
     return [timestamp for timestamp in timestamps if timestamp > threshold]
 
 
-def _require_profile_string(payload: dict[str, Any], field_name: str) -> str:
+def require_profile_string(payload: dict[str, Any], field_name: str) -> str:
     value = payload.get(field_name)
     if not isinstance(value, str) or not value.strip():
         raise ConfigurationError(f"provider interop field '{field_name}' must be a non-empty string")
     return value.strip()
 
 
-def _optional_profile_string(value: Any) -> str | None:
+def optional_profile_string(value: Any) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
@@ -45,7 +45,7 @@ def _optional_profile_string(value: Any) -> str | None:
     return normalized or None
 
 
-def _optional_positive_int(value: Any) -> int | None:
+def optional_positive_int(value: Any) -> int | None:
     if value is None:
         return None
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
@@ -53,7 +53,7 @@ def _optional_positive_int(value: Any) -> int | None:
     return value
 
 
-def _optional_profile_headers(value: Any) -> dict[str, str] | None:
+def optional_profile_headers(value: Any) -> dict[str, str] | None:
     if value is None:
         return None
     if not isinstance(value, dict):
@@ -72,5 +72,5 @@ def _optional_profile_headers(value: Any) -> dict[str, str] | None:
     return normalized or None
 
 
-def _to_path(path: str | Path) -> Path:
+def to_path(path: str | Path) -> Path:
     return path if isinstance(path, Path) else Path(path)

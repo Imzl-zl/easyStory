@@ -10,3 +10,4 @@ extract_stream_stop_reason = _normalizer.extract_stream_stop_reason
 extract_stream_terminal_response = _normalizer.extract_stream_terminal_response
 extract_stream_truncation_reason = _normalizer.extract_stream_truncation_reason
 parse_raw_stream_event = _normalizer.parse_raw_stream_event
+synthesize_stream_terminal_response = _normalizer.synthesize_stream_terminal_response
