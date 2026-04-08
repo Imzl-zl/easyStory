@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime, timezone
 
 import pytest
+from sqlalchemy.orm import Session
 
 from app.modules.credential.infrastructure import (
     CredentialCrypto,
@@ -14,6 +15,9 @@ from app.modules.credential.service import (
     CredentialCreateDTO,
     CredentialUpdateDTO,
     create_credential_service,
+)
+from app.modules.credential.service.credential_verification_support import (
+    verify_credential_record,
 )
 from app.modules.observability.models import AuditLog
 from app.shared.runtime.errors import ConflictError, NotFoundError
@@ -373,6 +377,58 @@ def test_verify_credential_keeps_highest_verified_probe_kind(db, monkeypatch) ->
 
     stored = db.query(ModelCredential).filter(ModelCredential.id == credential.id).one()
     assert stored.verified_probe_kind == "tool_continuation_probe"
+
+
+def test_verify_credential_record_does_not_downgrade_stale_verified_probe_kind(
+    db,
+    engine,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    verified_at = datetime.now(timezone.utc).replace(microsecond=0)
+    user = create_user(db)
+    service = create_credential_service(
+        verifier=FakeVerifier(
+            verified_at=verified_at,
+            expected_probe_kind="text_probe",
+        )
+    )
+    created = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(display_name="OpenAI"),
+            actor_user_id=user.id,
+        )
+    )
+    stale_credential = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
+
+    with Session(engine) as concurrent_db:
+        concurrent_credential = concurrent_db.get(ModelCredential, created.id)
+        assert concurrent_credential is not None
+        concurrent_credential.verified_probe_kind = "tool_continuation_probe"
+        concurrent_db.commit()
+
+    assert stale_credential.verified_probe_kind is None
+
+    result = asyncio.run(
+        verify_credential_record(
+            async_db(db),
+            credential=stale_credential,
+            verifier=service.verifier,
+            decrypt_api_key=service.crypto.decrypt,
+            actor_user_id=user.id,
+            event_type="credential_verify",
+            audit_log_service=service.audit_log_service,
+            probe_kind="text_probe",
+        )
+    )
+
+    stored = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
+    audits = db.query(AuditLog).filter(AuditLog.event_type == "credential_verify").all()
+    assert result.probe_kind == "text_probe"
+    assert stored.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
+    assert stored.verified_probe_kind == "tool_continuation_probe"
+    assert audits[-1].details["verified_probe_kind"] == "tool_continuation_probe"
 
 
 def test_update_and_disable_credential(db, monkeypatch) -> None:

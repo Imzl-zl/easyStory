@@ -10,6 +10,7 @@ import httpx
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     ConformanceProbeKind,
+    build_tool_continuation_probe_result_echo,
     build_conformance_probe_request,
     build_tool_continuation_probe_followup_request,
     normalize_conformance_probe_kind,
@@ -183,16 +184,21 @@ class AsyncHttpCredentialVerifier:
         if probe_kind == "tool_call_probe":
             validate_tool_call_probe_response(initial_response)
             return
+        result_echo = build_tool_continuation_probe_result_echo()
         validate_tool_call_probe_response(initial_response)
         followup_response = await self._execute_probe_request(
             build_tool_continuation_probe_followup_request(
                 connection,
                 model_name=model_name,
                 initial_response=initial_response,
+                result_echo=result_echo,
             ),
             api_dialect=api_dialect,
         )
-        validate_tool_continuation_probe_response(followup_response)
+        validate_tool_continuation_probe_response(
+            followup_response,
+            expected_echo=result_echo,
+        )
 
     async def _execute_probe_request(
         self,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, Literal
+from uuid import uuid4
 
 from ...errors import ConfigurationError
 from ..llm_protocol import (
@@ -42,11 +43,19 @@ CONFORMANCE_PROBE_KIND_RANKS: dict[ConformanceProbeKind, int] = {
 PROBE_MAX_TOKENS = 128
 PROBE_TOOL_NAME = "probe.echo_payload"
 PROBE_ECHO_ARGUMENT = "ping"
-TOOL_DEFINITION_PROBE_PROMPT = "这是工具定义探测。请直接回复：工具定义探测成功。不要调用任何工具。"
+TOOL_DEFINITION_PROBE_SUCCESS_TEXT = "工具定义探测成功。"
+TOOL_DEFINITION_PROBE_PROMPT = (
+    f"这是工具定义探测。请直接回复：{TOOL_DEFINITION_PROBE_SUCCESS_TEXT}"
+    "不要调用任何工具。"
+)
 TOOL_DEFINITION_PROBE_SYSTEM_PROMPT = "你正在执行模型工具定义兼容性探测。"
 TOOL_CALL_PROBE_PROMPT = "这是工具调用探测。请调用本轮唯一可用的工具一次，参数对象必须是 {\"echo\":\"ping\"}。在收到工具结果前，不要直接回答。"
 TOOL_CALL_PROBE_SYSTEM_PROMPT = "你正在执行模型工具调用兼容性探测。你必须先调用唯一可用的工具，再等待工具结果。"
-TOOL_CONTINUATION_PROBE_PROMPT = "工具结果已返回。请直接回答：工具续接成功：ping。不要再次调用任何工具。"
+TOOL_CONTINUATION_PROBE_PROMPT = (
+    "工具结果已返回。请读取刚收到的工具结果中的 echoed 字段，"
+    "并严格按格式回答：工具续接成功：<echoed>。"
+    "不要再次调用任何工具，也不要添加其他内容。"
+)
 TOOL_CONTINUATION_PROBE_SYSTEM_PROMPT = "你正在执行模型工具续接兼容性探测。你已经收到工具结果，必须直接给出最终回答。"
 
 PROBE_TOOL_DEFINITION = LLMFunctionToolDefinition(
@@ -140,11 +149,14 @@ def build_tool_continuation_probe_followup_request(
     *,
     model_name: str,
     initial_response: NormalizedLLMResponse,
+    result_echo: str | None = None,
 ) -> PreparedLLMHttpRequest:
     tool_call = validate_tool_call_probe_response(initial_response)
+    resolved_result_echo = result_echo or build_tool_continuation_probe_result_echo()
     continuation_items = _build_tool_probe_continuation_items(
         initial_response=initial_response,
         tool_call=tool_call,
+        result_echo=resolved_result_echo,
     )
     continuation_support = resolve_continuation_support(connection.api_dialect)
     provider_continuation_state = _build_provider_continuation_state(
@@ -171,11 +183,14 @@ def build_tool_continuation_probe_followup_request(
 
 
 def validate_tool_definition_probe_response(response: NormalizedLLMResponse) -> None:
-    if response.content.strip():
-        return
     if response.tool_calls:
-        return
-    raise ConfigurationError("Tool definition probe returned neither text nor tool calls")
+        raise ConfigurationError("Tool definition probe returned unexpected tool calls")
+    content = response.content.strip()
+    if content != TOOL_DEFINITION_PROBE_SUCCESS_TEXT:
+        raise ConfigurationError(
+            "Tool definition probe must return exactly "
+            f"'{TOOL_DEFINITION_PROBE_SUCCESS_TEXT}'"
+        )
 
 
 def validate_tool_call_probe_response(response: NormalizedLLMResponse) -> NormalizedLLMToolCall:
@@ -207,9 +222,11 @@ def validate_tool_continuation_probe_response(
     content = response.content.strip()
     if not content:
         raise ConfigurationError("Tool continuation probe returned empty final content")
-    if expected_echo not in content:
+    expected_text = render_tool_continuation_probe_success_text(expected_echo)
+    if content != expected_text:
         raise ConfigurationError(
-            f"Tool continuation probe final content must mention '{expected_echo}'"
+            "Tool continuation probe final content must equal exactly "
+            f"'{expected_text}'"
         )
 
 
@@ -222,6 +239,14 @@ def serialize_probe_response(response: NormalizedLLMResponse) -> dict[str, Any]:
         "total_tokens": response.total_tokens,
         "provider_response_id": response.provider_response_id,
     }
+
+
+def build_tool_continuation_probe_result_echo() -> str:
+    return f"probe-result-{uuid4().hex[:12]}"
+
+
+def render_tool_continuation_probe_success_text(expected_echo: str) -> str:
+    return f"工具续接成功：{expected_echo}。"
 
 
 def _build_generate_request(
@@ -250,6 +275,7 @@ def _build_tool_probe_continuation_items(
     *,
     initial_response: NormalizedLLMResponse,
     tool_call: NormalizedLLMToolCall,
+    result_echo: str,
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     content = initial_response.content.strip()
@@ -274,7 +300,7 @@ def _build_tool_probe_continuation_items(
         }
     )
     structured_output = {
-        "echoed": tool_call.arguments["echo"],
+        "echoed": result_echo,
         "probe": "tool_continuation_probe",
         "ok": True,
     }

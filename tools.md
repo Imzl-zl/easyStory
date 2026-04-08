@@ -84,7 +84,8 @@
 - LLM 供应商兼容层当前最佳实践入口：`api_dialect` 只决定协议格式与解析；鉴权方式由 `auth_strategy` / `api_key_header_name` 显式 override，不再硬绑在 dialect 上。
 - Credential Center 当前正式支持的高级连接字段：`interop_profile`、`auth_strategy`、`api_key_header_name`、`extra_headers`、`user_agent_override`、`client_name`、`client_version`、`runtime_kind`；这些字段同时作用于保存、验证和运行时请求，其中 `interop_profile` 用于显式表达协议兼容 override，不单独下沉到 assistant 业务层。
 - Credential Center 当前已显式区分 `验证连接` 与 `验证工具`：前者走 `text_probe`，后者走 `tool_continuation_probe`；后端统一入口仍是 `POST /api/v1/credentials/{id}/verify?probe_kind=...`，不要再额外造一套产品级 probe API。
-- `model_credentials.verified_probe_kind` 当前是连接级“最高已证明 capability”真值，不是最后一次验证动作；verifier 成功后按 probe rank promote，较低等级 probe 不会覆盖已证明的更高能力。
+- `model_credentials.verified_probe_kind` 当前是连接级“最高已证明 capability”真值，不是最后一次验证动作；verifier 成功后按 probe rank promote，且 promote 必须基于数据库当前值原子更新，较低等级 probe 不能覆盖已证明的更高能力。
+- provider conformance probe 当前正式契约：`tool_definition_probe` 只接受精确 success token；`tool_continuation_probe` 的最终回答必须携带只存在于 tool result 中的动态 echoed 值，follow-up prompt 不能直接泄漏期望答案。
 - assistant 当前正式门控口径：只要本轮存在 visible `project.*` 工具，就要求凭证先通过 `tool_continuation_probe`；能力不足直接显式报错，不静默隐藏工具，也不自动降级到纯文本。
 - 当前共享 tool schema 编译口径：外部协议默认先走 `portable_subset`，把 required-only `anyOf` 收口为描述性约束；Gemini 再叠加 `gemini_compatible`，继续移除不支持的 schema key。不要再把 schema sanitize 内联回具体 request builder。
 - 当前共享 continuation 编码口径：runtime replay 文本投影、OpenAI Chat / Claude / Gemini continuation projection，以及 OpenAI Responses `function_call_output` 构造，统一走 `tool_continuation_codec.py`；不要再把 continuation helper 堆回 `llm_protocol_requests.py`。

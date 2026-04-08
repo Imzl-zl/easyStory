@@ -655,6 +655,11 @@ adapter 再分别把它们编码成：
 | `tool_call_probe` | 验证模型能真实返回 tool call | 开启只读工具 |
 | `tool_continuation_probe` | 验证 tool result 回传后能继续推理 | 开启完整 tool loop |
 
+当前 probe 契约还需要保持两条硬规则，避免假阳性污染 capability 真值：
+
+- `tool_definition_probe` 必须返回精确 success token，且不允许把任意非空文本或额外 tool call 视为成功
+- `tool_continuation_probe` 的最终回答必须包含只存在于 tool result 中的动态 echoed 值，不能把期望答案直接写进 follow-up prompt
+
 ### 12.2 产品侧能力门控
 
 assistant runtime 不应再把所有已验证连接默认视为“支持 project tools”。
@@ -674,7 +679,7 @@ assistant runtime 不应再把所有已验证连接默认视为“支持 project
 
 - `ModelCredential.verified_probe_kind` 保存“当前最高已证明 capability”，不是“最后一次验证的 probe kind”
 - 连接级关键字段变更（如 `api_key / base_url / default_model / api_dialect / interop_profile / headers / user-agent`）会显式清空 `last_verified_at + verified_probe_kind`
-- verifier 成功后会按 probe 等级做 promote，不会因为再次执行较低等级 probe 而降级
+- verifier 成功后会按 probe 等级做 promote，不会因为再次执行较低等级 probe 而降级；该 promote 需要基于数据库当前值做原子更新，不能只依赖应用层内存对象
 - assistant prepare 阶段在存在 visible tools 时显式要求 `tool_continuation_probe`
 - 能力不足时直接返回显式业务错误，引导用户先执行“验证工具”，不做静默隐藏工具或自动降级到纯文本
 

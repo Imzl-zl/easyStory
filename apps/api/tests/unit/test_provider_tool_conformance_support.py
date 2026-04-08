@@ -5,11 +5,13 @@ import pytest
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     PROBE_TOOL_NAME,
+    TOOL_DEFINITION_PROBE_SUCCESS_TEXT,
     build_conformance_probe_request,
     build_tool_continuation_probe_followup_request,
     conformance_probe_kind_satisfies,
     normalize_conformance_probe_kind,
     promote_conformance_probe_kind,
+    render_tool_continuation_probe_success_text,
     resolve_conformance_probe_kind_rank,
     validate_tool_call_probe_response,
     validate_tool_continuation_probe_response,
@@ -96,6 +98,7 @@ def test_build_tool_continuation_probe_followup_request_uses_provider_continuati
         ),
         model_name="gpt-5.4",
         initial_response=_tool_call_response(provider_response_id="resp_123"),
+        result_echo="probe-result-123",
     )
 
     assert request.json_body["previous_response_id"] == "resp_123"
@@ -103,7 +106,7 @@ def test_build_tool_continuation_probe_followup_request_uses_provider_continuati
         {
             "type": "function_call_output",
             "call_id": "call_123",
-            "output": '{"echoed":"ping","ok":true,"probe":"tool_continuation_probe"}',
+            "output": '{"echoed":"probe-result-123","ok":true,"probe":"tool_continuation_probe"}',
         }
     ]
     assert request.json_body["tools"][0]["name"] == "probe_echo_payload"
@@ -118,6 +121,7 @@ def test_build_tool_continuation_probe_followup_request_replays_for_chat_dialect
         ),
         model_name="gpt-5.4",
         initial_response=_tool_call_response(provider_response_id=None),
+        result_echo="probe-result-456",
     )
 
     assert "previous_response_id" not in request.json_body
@@ -127,8 +131,15 @@ def test_build_tool_continuation_probe_followup_request_replays_for_chat_dialect
     tool_result_message = next(
         item for item in request.json_body["messages"] if item.get("role") == "tool"
     )
+    followup_user_message = next(
+        item
+        for item in reversed(request.json_body["messages"])
+        if item.get("role") == "user"
+    )
     assert assistant_tool_call_message["tool_calls"][0]["function"]["name"] == "probe_echo_payload"
-    assert "probe_echo_payload" in tool_result_message["content"]
+    assert "probe-result-456" in tool_result_message["content"]
+    assert "probe-result-456" not in followup_user_message["content"]
+    assert "ping" not in followup_user_message["content"]
 
 
 def test_build_tool_continuation_probe_followup_request_requires_response_id_for_responses() -> None:
@@ -144,17 +155,26 @@ def test_build_tool_continuation_probe_followup_request_requires_response_id_for
         )
 
 
-def test_validate_tool_definition_probe_response_requires_any_output() -> None:
-    with pytest.raises(ConfigurationError, match="returned neither text nor tool calls"):
+def test_validate_tool_definition_probe_response_requires_exact_success_text() -> None:
+    with pytest.raises(ConfigurationError, match="must return exactly"):
         validate_tool_definition_probe_response(
             NormalizedLLMResponse(
-                content="",
+                content="我不能使用工具。",
                 finish_reason=None,
                 input_tokens=None,
                 output_tokens=None,
                 total_tokens=None,
             )
         )
+    validate_tool_definition_probe_response(
+        NormalizedLLMResponse(
+            content=f"  {TOOL_DEFINITION_PROBE_SUCCESS_TEXT}  ",
+            finish_reason=None,
+            input_tokens=None,
+            output_tokens=None,
+            total_tokens=None,
+        )
+    )
 
 
 def test_validate_tool_call_probe_response_rejects_wrong_arguments() -> None:
@@ -164,17 +184,28 @@ def test_validate_tool_call_probe_response_rejects_wrong_arguments() -> None:
         )
 
 
-def test_validate_tool_continuation_probe_response_requires_expected_echo() -> None:
-    with pytest.raises(ConfigurationError, match="must mention 'ping'"):
+def test_validate_tool_continuation_probe_response_requires_exact_final_text() -> None:
+    with pytest.raises(ConfigurationError, match="must equal exactly"):
         validate_tool_continuation_probe_response(
             NormalizedLLMResponse(
-                content="工具续接成功",
+                content="工具续接成功：ping，但这是猜的。",
                 finish_reason=None,
                 input_tokens=None,
                 output_tokens=None,
                 total_tokens=None,
-            )
+            ),
+            expected_echo="ping",
         )
+    validate_tool_continuation_probe_response(
+        NormalizedLLMResponse(
+            content=render_tool_continuation_probe_success_text("probe-result-789"),
+            finish_reason=None,
+            input_tokens=None,
+            output_tokens=None,
+            total_tokens=None,
+        ),
+        expected_echo="probe-result-789",
+    )
 
 
 def _tool_call_response(

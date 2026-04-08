@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 import httpx
 import pytest
@@ -281,7 +282,16 @@ def test_verify_tool_continuation_probe_replays_followup_request() -> None:
                     )
                 ],
             )
-        return _ok_response("工具续接成功：ping。", input_tokens=6, output_tokens=4, total_tokens=10)
+        output_payload = json.loads(request.json_body["input"][0]["output"])
+        echoed = output_payload["echoed"]
+        assert echoed.startswith("probe-result-")
+        assert echoed != "ping"
+        return _ok_response(
+            f"工具续接成功：{echoed}。",
+            input_tokens=6,
+            output_tokens=4,
+            total_tokens=10,
+        )
 
     verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
 
@@ -300,13 +310,11 @@ def test_verify_tool_continuation_probe_replays_followup_request() -> None:
     assert len(captured_requests) == 2
     assert captured_requests[0].json_body["tools"][0]["name"] == "probe_echo_payload"
     assert captured_requests[1].json_body["previous_response_id"] == "resp_123"
-    assert captured_requests[1].json_body["input"] == [
-        {
-            "type": "function_call_output",
-            "call_id": "call_123",
-            "output": '{"echoed":"ping","ok":true,"probe":"tool_continuation_probe"}',
-        }
-    ]
+    followup_input = captured_requests[1].json_body["input"]
+    assert len(followup_input) == 1
+    assert followup_input[0]["type"] == "function_call_output"
+    assert followup_input[0]["call_id"] == "call_123"
+    assert json.loads(followup_input[0]["output"])["echoed"].startswith("probe-result-")
     assert result.message == "工具调用验证成功"
     assert result.probe_kind == "tool_continuation_probe"
 

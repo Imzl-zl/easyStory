@@ -18,6 +18,7 @@ from app.shared.runtime.llm.interop.provider_interop_stream_support import (
 )
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     SUPPORTED_CONFORMANCE_PROBE_KINDS,
+    build_tool_continuation_probe_result_echo,
     build_conformance_probe_request,
     build_tool_continuation_probe_followup_request,
     normalize_conformance_probe_kind,
@@ -242,7 +243,7 @@ async def _probe_tool_conformance_profile(args: argparse.Namespace, resolved, *,
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
     try:
-        tool_call = validate_tool_call_probe_response(initial_response)
+        validate_tool_call_probe_response(initial_response)
     except ConfigurationError as exc:
         raise ConfigurationError(f"{probe_kind} initial stage failed: {exc}") from exc
     if probe_kind == "tool_call_probe":
@@ -256,12 +257,14 @@ async def _probe_tool_conformance_profile(args: argparse.Namespace, resolved, *,
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
+    result_echo = build_tool_continuation_probe_result_echo()
     try:
         followup_request = _maybe_build_stream_request(
             build_tool_continuation_probe_followup_request(
                 resolved.connection,
                 model_name=resolved.model_name,
                 initial_response=initial_response,
+                result_echo=result_echo,
             ),
             api_dialect=resolved.connection.api_dialect,
             stream=args.stream,
@@ -280,7 +283,7 @@ async def _probe_tool_conformance_profile(args: argparse.Namespace, resolved, *,
         )
         validate_tool_continuation_probe_response(
             followup_response,
-            expected_echo=tool_call.arguments["echo"],
+            expected_echo=result_echo,
         )
     except ConfigurationError as exc:
         raise ConfigurationError(f"{probe_kind} follow-up stage failed: {exc}") from exc
