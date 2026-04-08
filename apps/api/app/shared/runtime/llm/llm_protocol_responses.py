@@ -1,9 +1,17 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from ..errors import ConfigurationError
+from .interop.tool_call_codec import (
+    build_tool_call_payload,
+    extract_anthropic_tool_calls,
+    extract_gemini_tool_calls,
+    extract_openai_chat_tool_calls,
+    extract_openai_responses_tool_calls,
+    parse_tool_arguments,
+    resolve_tool_name,
+)
 from .llm_interop_profiles import resolve_interop_capabilities
 from .llm_protocol_types import NormalizedLLMResponse, NormalizedLLMToolCall, normalize_api_dialect
 
@@ -13,16 +21,31 @@ TRUNCATED_STOP_REASONS = frozenset({"length", "max_tokens", "max_output_tokens",
 def parse_generation_response(
     api_dialect: str,
     payload: dict[str, Any],
+    *,
+    tool_name_aliases: dict[str, str] | None = None,
 ) -> NormalizedLLMResponse:
     dialect = normalize_api_dialect(api_dialect)
     _raise_if_response_truncated(dialect, payload)
     if dialect == "openai_chat_completions":
-        return _parse_openai_chat_response(payload)
+        return _parse_openai_chat_response(
+            payload,
+            tool_name_aliases=tool_name_aliases or {},
+        )
     if dialect == "openai_responses":
-        return _parse_openai_responses_response(payload, allow_empty_output=False)
+        return _parse_openai_responses_response(
+            payload,
+            allow_empty_output=False,
+            tool_name_aliases=tool_name_aliases or {},
+        )
     if dialect == "anthropic_messages":
-        return _parse_anthropic_messages_response(payload)
-    return _parse_gemini_generate_content_response(payload)
+        return _parse_anthropic_messages_response(
+            payload,
+            tool_name_aliases=tool_name_aliases or {},
+        )
+    return _parse_gemini_generate_content_response(
+        payload,
+        tool_name_aliases=tool_name_aliases or {},
+    )
 
 
 def parse_stream_terminal_response(
@@ -30,6 +53,7 @@ def parse_stream_terminal_response(
     payload: dict[str, Any],
     *,
     interop_profile: str | None = None,
+    tool_name_aliases: dict[str, str] | None = None,
 ) -> NormalizedLLMResponse:
     dialect = normalize_api_dialect(api_dialect)
     _raise_if_response_truncated(dialect, payload)
@@ -38,16 +62,28 @@ def parse_stream_terminal_response(
         return _parse_openai_responses_response(
             payload,
             allow_empty_output=capabilities.allows_responses_empty_output_in_stream_terminal,
+            tool_name_aliases=tool_name_aliases or {},
         )
-    return parse_generation_response(dialect, payload)
+    return parse_generation_response(
+        dialect,
+        payload,
+        tool_name_aliases=tool_name_aliases or {},
+    )
 
 
-def _parse_openai_chat_response(payload: dict[str, Any]) -> NormalizedLLMResponse:
+def _parse_openai_chat_response(
+    payload: dict[str, Any],
+    *,
+    tool_name_aliases: dict[str, str],
+) -> NormalizedLLMResponse:
     choices = _require_list(payload.get("choices"), "choices")
     first_choice = _require_dict(choices[0], "choices[0]")
     message = _require_dict(first_choice.get("message"), "choices[0].message")
     content = _stringify_openai_content(message.get("content"))
-    tool_calls = _extract_openai_chat_tool_calls(message)
+    tool_calls = extract_openai_chat_tool_calls(
+        message,
+        tool_name_aliases=tool_name_aliases,
+    )
     usage = _require_dict(payload.get("usage"), "usage", allow_none=True) or {}
     return _build_normalized_response(
         content,
@@ -57,7 +93,10 @@ def _parse_openai_chat_response(payload: dict[str, Any]) -> NormalizedLLMRespons
         "total_tokens",
         finish_reason=_extract_openai_chat_stop_reason(payload),
         tool_calls=tool_calls,
-        provider_output_items=_build_openai_chat_output_items(message),
+        provider_output_items=_build_openai_chat_output_items(
+            message,
+            tool_calls=tool_calls,
+        ),
     )
 
 
@@ -65,15 +104,21 @@ def _parse_openai_responses_response(
     payload: dict[str, Any],
     *,
     allow_empty_output: bool,
+    tool_name_aliases: dict[str, str],
 ) -> NormalizedLLMResponse:
     output_text = payload.get("output_text")
     if isinstance(output_text, str):
         content = output_text
     else:
         content = _extract_responses_text(payload, allow_empty_output=allow_empty_output)
-    tool_calls = _extract_openai_responses_tool_calls(
+    output = _extract_openai_responses_output(
         payload,
-        allow_empty_output=allow_empty_output,
+        allow_none=True,
+        allow_empty=allow_empty_output,
+    ) or []
+    tool_calls = extract_openai_responses_tool_calls(
+        output,
+        tool_name_aliases=tool_name_aliases,
     )
     usage = _require_dict(payload.get("usage"), "usage", allow_none=True) or {}
     return _build_normalized_response(
@@ -88,18 +133,26 @@ def _parse_openai_responses_response(
         provider_output_items=_build_openai_responses_output_items(
             payload,
             allow_empty_output=allow_empty_output,
+            tool_name_aliases=tool_name_aliases,
         ),
     )
 
 
-def _parse_anthropic_messages_response(payload: dict[str, Any]) -> NormalizedLLMResponse:
+def _parse_anthropic_messages_response(
+    payload: dict[str, Any],
+    *,
+    tool_name_aliases: dict[str, str],
+) -> NormalizedLLMResponse:
     blocks = _require_list(payload.get("content"), "content")
     content = "".join(
         block.get("text", "")
         for block in blocks
         if isinstance(block, dict) and isinstance(block.get("text"), str)
     )
-    tool_calls = _extract_anthropic_tool_calls(blocks)
+    tool_calls = extract_anthropic_tool_calls(
+        blocks,
+        tool_name_aliases=tool_name_aliases,
+    )
     usage = _require_dict(payload.get("usage"), "usage", allow_none=True) or {}
     return _build_normalized_response(
         content,
@@ -113,7 +166,11 @@ def _parse_anthropic_messages_response(payload: dict[str, Any]) -> NormalizedLLM
     )
 
 
-def _parse_gemini_generate_content_response(payload: dict[str, Any]) -> NormalizedLLMResponse:
+def _parse_gemini_generate_content_response(
+    payload: dict[str, Any],
+    *,
+    tool_name_aliases: dict[str, str],
+) -> NormalizedLLMResponse:
     candidates = _require_list(payload.get("candidates"), "candidates")
     first_candidate = _require_dict(candidates[0], "candidates[0]")
     content = _require_dict(first_candidate.get("content"), "candidates[0].content")
@@ -125,7 +182,10 @@ def _parse_gemini_generate_content_response(payload: dict[str, Any]) -> Normaliz
         for part in parts
         if isinstance(part, dict) and isinstance(part.get("text"), str)
     )
-    tool_calls = _extract_gemini_tool_calls(parts)
+    tool_calls = extract_gemini_tool_calls(
+        parts,
+        tool_name_aliases=tool_name_aliases,
+    )
     usage = _require_dict(payload.get("usageMetadata"), "usageMetadata", allow_none=True) or {}
     return _build_normalized_response(
         text,
@@ -300,24 +360,11 @@ def _optional_string(value: Any) -> str | None:
     return stripped or None
 
 
-def _extract_openai_chat_tool_calls(message: dict[str, Any]) -> list[NormalizedLLMToolCall]:
-    tool_calls = _require_list(message.get("tool_calls"), "message.tool_calls", allow_none=True) or []
-    items: list[NormalizedLLMToolCall] = []
-    for item in tool_calls:
-        if not isinstance(item, dict):
-            continue
-        function = _require_dict(item.get("function"), "message.tool_calls.function", allow_none=True) or {}
-        items.append(
-            _build_tool_call(
-                tool_call_id=_optional_string(item.get("id")),
-                tool_name=_optional_string(function.get("name")),
-                arguments=_parse_tool_arguments(function.get("arguments")),
-            )
-        )
-    return items
-
-
-def _build_openai_chat_output_items(message: dict[str, Any]) -> list[dict[str, Any]]:
+def _build_openai_chat_output_items(
+    message: dict[str, Any],
+    *,
+    tool_calls: list[NormalizedLLMToolCall],
+) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     content = _stringify_openai_content(message.get("content"))
     if content.strip():
@@ -329,15 +376,14 @@ def _build_openai_chat_output_items(message: dict[str, Any]) -> list[dict[str, A
                 "payload": {"content": content, "phase": "final"},
             }
         )
-    for index, tool_call in enumerate(_extract_openai_chat_tool_calls(message), start=1):
-        payload = {
-            "tool_name": tool_call.tool_name,
-            "arguments": tool_call.arguments,
-            "arguments_text": tool_call.arguments_text,
-            "tool_call_id": tool_call.tool_call_id,
-        }
-        if tool_call.arguments_error is not None:
-            payload["arguments_error"] = tool_call.arguments_error
+    for index, tool_call in enumerate(tool_calls, start=1):
+        payload = build_tool_call_payload(
+            tool_name=tool_call.tool_name,
+            arguments=tool_call.arguments,
+            arguments_text=tool_call.arguments_text,
+            tool_call_id=tool_call.tool_call_id,
+            arguments_error=tool_call.arguments_error,
+        )
         items.append(
             {
                 "item_type": "tool_call",
@@ -371,35 +417,11 @@ def _extract_openai_responses_output(
     return output
 
 
-def _extract_openai_responses_tool_calls(
-    payload: dict[str, Any],
-    *,
-    allow_empty_output: bool,
-) -> list[NormalizedLLMToolCall]:
-    output = _extract_openai_responses_output(
-        payload,
-        allow_none=True,
-        allow_empty=allow_empty_output,
-    ) or []
-    items: list[NormalizedLLMToolCall] = []
-    for item in output:
-        if not isinstance(item, dict) or item.get("type") != "function_call":
-            continue
-        items.append(
-            _build_tool_call(
-                tool_call_id=_optional_string(item.get("call_id")) or _optional_string(item.get("id")),
-                tool_name=_optional_string(item.get("name")),
-                arguments=_parse_tool_arguments(item.get("arguments")),
-                provider_ref=_optional_string(item.get("id")),
-            )
-        )
-    return items
-
-
 def _build_openai_responses_output_items(
     payload: dict[str, Any],
     *,
     allow_empty_output: bool,
+    tool_name_aliases: dict[str, str],
 ) -> list[dict[str, Any]]:
     output = _extract_openai_responses_output(
         payload,
@@ -431,20 +453,25 @@ def _build_openai_responses_output_items(
         provider_ref = _optional_string(item.get("id"))
         if item_type == "function_call":
             tool_call_index += 1
-            arguments, arguments_text, arguments_error = _parse_tool_arguments(
+            arguments, arguments_text, arguments_error = parse_tool_arguments(
                 item.get("arguments")
             )
             call_id = _optional_string(item.get("call_id")) or provider_ref
             if call_id is None:
                 continue
-            payload = {
-                "tool_name": _optional_string(item.get("name")),
-                "arguments": arguments,
-                "arguments_text": arguments_text,
-                "tool_call_id": call_id,
-            }
-            if arguments_error is not None:
-                payload["arguments_error"] = arguments_error
+            tool_name = resolve_tool_name(
+                _optional_string(item.get("name")),
+                tool_name_aliases=tool_name_aliases,
+            )
+            if tool_name is None:
+                continue
+            payload = build_tool_call_payload(
+                tool_name=tool_name,
+                arguments=arguments,
+                arguments_text=arguments_text,
+                tool_call_id=call_id,
+                arguments_error=arguments_error,
+            )
             items.append(
                 {
                     "item_type": "tool_call",
@@ -499,83 +526,3 @@ def _build_openai_responses_output_items(
             )
     return items
 
-
-def _extract_anthropic_tool_calls(blocks: list[Any]) -> list[NormalizedLLMToolCall]:
-    items: list[NormalizedLLMToolCall] = []
-    for block in blocks:
-        if not isinstance(block, dict) or block.get("type") != "tool_use":
-            continue
-        items.append(
-            _build_tool_call(
-                tool_call_id=_optional_string(block.get("id")),
-                tool_name=_optional_string(block.get("name")),
-                arguments=_parse_tool_arguments(block.get("input")),
-            )
-        )
-    return items
-
-
-def _extract_gemini_tool_calls(parts: list[Any]) -> list[NormalizedLLMToolCall]:
-    items: list[NormalizedLLMToolCall] = []
-    for index, part in enumerate(parts, start=1):
-        if not isinstance(part, dict):
-            continue
-        function_call = _require_dict(part.get("functionCall"), "part.functionCall", allow_none=True)
-        if function_call is None:
-            continue
-        items.append(
-            _build_tool_call(
-                tool_call_id=(
-                    _optional_string(function_call.get("id"))
-                    or f"provider:gemini_generate_content:tool_call:{index}"
-                ),
-                tool_name=_optional_string(function_call.get("name")),
-                arguments=_parse_tool_arguments(function_call.get("args")),
-            )
-        )
-    return items
-
-
-def _build_tool_call(
-    *,
-    tool_call_id: str | None,
-    tool_name: str | None,
-    arguments: tuple[dict[str, Any], str | None, str | None],
-    provider_ref: str | None = None,
-) -> NormalizedLLMToolCall:
-    if tool_call_id is None:
-        raise ConfigurationError("Tool call is missing id")
-    if tool_name is None:
-        raise ConfigurationError("Tool call is missing name")
-    parsed_arguments, arguments_text, arguments_error = arguments
-    return NormalizedLLMToolCall(
-        tool_call_id=tool_call_id,
-        tool_name=tool_name,
-        arguments=parsed_arguments,
-        arguments_text=arguments_text,
-        arguments_error=arguments_error,
-        provider_ref=provider_ref,
-    )
-
-
-def _parse_tool_arguments(value: Any) -> tuple[dict[str, Any], str | None, str | None]:
-    if isinstance(value, dict):
-        return (
-            value,
-            json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True),
-            None,
-        )
-    if value is None:
-        return {}, None, None
-    if not isinstance(value, str):
-        return {}, None, "Tool call arguments must be an object or JSON string"
-    text = value.strip()
-    if not text:
-        return {}, None, None
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError:
-        return {}, text, "Tool call arguments JSON is invalid"
-    if not isinstance(parsed, dict):
-        return {}, text, "Tool call arguments JSON must decode to an object"
-    return parsed, text, None

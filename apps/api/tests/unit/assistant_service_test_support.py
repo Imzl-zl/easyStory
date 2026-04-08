@@ -27,6 +27,7 @@ class _FakeCredentialService:
             encrypted_key=f"{provider}-key",
             api_dialect="openai_responses",
             default_model="gpt-4o-mini",
+            verified_probe_kind="tool_continuation_probe",
             is_active=True,
         )
 
@@ -42,6 +43,7 @@ class _AnthropicCredentialService(_FakeCredentialService):
             encrypted_key=f"{provider}-key",
             api_dialect="anthropic_messages",
             default_model="claude-sonnet-4-20250514",
+            verified_probe_kind="tool_continuation_probe",
             is_active=True,
         )
 
@@ -58,6 +60,40 @@ class _CompactingCredentialService(_FakeCredentialService):
             api_dialect="openai_responses",
             default_model="gpt-4o-mini",
             context_window_tokens=280,
+            verified_probe_kind="tool_continuation_probe",
+            is_active=True,
+        )
+
+
+class _InteropProfileCredentialService(_FakeCredentialService):
+    async def resolve_active_credential(self, db, *, provider: str, user_id, project_id=None):
+        del db, user_id, project_id
+        return ModelCredential(
+            owner_type="user",
+            owner_id=uuid.uuid4(),
+            provider=provider,
+            display_name=f"{provider}-interop-test",
+            encrypted_key=f"{provider}-key",
+            api_dialect="openai_chat_completions",
+            default_model="gpt-4o-mini",
+            interop_profile="chat_compat_reasoning_content",
+            verified_probe_kind="tool_continuation_probe",
+            is_active=True,
+        )
+
+
+class _TextOnlyCredentialService(_FakeCredentialService):
+    async def resolve_active_credential(self, db, *, provider: str, user_id, project_id=None):
+        del db, user_id, project_id
+        return ModelCredential(
+            owner_type="user",
+            owner_id=uuid.uuid4(),
+            provider=provider,
+            display_name=f"{provider}-text-only",
+            encrypted_key=f"{provider}-key",
+            api_dialect="openai_responses",
+            default_model="gpt-4o-mini",
+            verified_probe_kind="text_probe",
             is_active=True,
         )
 

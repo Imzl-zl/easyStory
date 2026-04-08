@@ -30,6 +30,7 @@
 - 后端标准验证命令：`cd apps/api && ruff check app tests && pytest -q`
 - provider interop 本地探测：`cd apps/api && ./.venv/bin/python scripts/provider_interop_check.py list`
 - provider interop dry-run：`cd apps/api && ./.venv/bin/python scripts/provider_interop_check.py probe <profile_id> --dry-run --show-request`
+- provider interop conformance probe：`cd apps/api && ./.venv/bin/python scripts/provider_interop_check.py probe <profile_id> --probe-kind tool_call_probe`；支持 `text_probe / tool_definition_probe / tool_call_probe / tool_continuation_probe`
 - 前端 support 单测命令：`pnpm --dir apps/web test:unit`
 - 定向内容模块验证：`cd apps/api && pytest -q tests/unit/test_story_asset_service.py tests/unit/test_chapter_content_service.py tests/unit/test_chapter_content_api.py`
 - Alembic 基线验证：`cd apps/api && ./.venv/bin/alembic -c alembic.ini upgrade head`
@@ -57,9 +58,9 @@
 - provider interop 本地 profile：`apps/api/.runtime/provider-interop.local.json`
 - provider interop 本地 key 文件：`apps/api/.env.provider-interop.local`
 - provider interop 示例：`apps/api/provider-interop.example.json`
-- provider interop 支撑模块（真实实现）：`apps/api/app/shared/runtime/llm/interop/provider_interop_support.py`
+- provider interop 支撑模块（真实实现）：`apps/api/app/shared/runtime/llm/interop/provider_interop_support.py`；后续若扩 `tool_call_probe / tool_continuation_probe`，优先继续落在这条 shared runtime 链，不回写 assistant 业务层
 - provider interop 探测脚本：`apps/api/scripts/provider_interop_check.py`
-- 模型协议兼容层主入口（真实实现）：`apps/api/app/shared/runtime/llm/llm_protocol_requests.py`、`apps/api/app/shared/runtime/llm/llm_protocol_responses.py`、`apps/api/app/shared/runtime/llm/llm_stream_transport.py`、`apps/api/app/shared/runtime/llm/llm_stream_events.py`、`apps/api/app/shared/runtime/llm/llm_terminal_assembly.py`、`apps/api/app/shared/runtime/llm/llm_interop_profiles.py`
+- 模型协议兼容层主入口（真实实现）：`apps/api/app/shared/runtime/llm/llm_protocol_requests.py`、`apps/api/app/shared/runtime/llm/llm_protocol_responses.py`、`apps/api/app/shared/runtime/llm/llm_stream_transport.py`、`apps/api/app/shared/runtime/llm/llm_stream_events.py`、`apps/api/app/shared/runtime/llm/llm_terminal_assembly.py`、`apps/api/app/shared/runtime/llm/llm_interop_profiles.py`；tool name 外发 alias codec 入口是 `apps/api/app/shared/runtime/llm/interop/tool_name_codec.py`，tool schema 编译入口是 `apps/api/app/shared/runtime/llm/interop/tool_schema_compiler.py`，tool call 解析入口是 `apps/api/app/shared/runtime/llm/interop/tool_call_codec.py`，continuation 投影与编码入口是 `apps/api/app/shared/runtime/llm/interop/tool_continuation_codec.py`，stream 协议归一化入口是 `apps/api/app/shared/runtime/llm/interop/stream_event_normalizer.py`，内部 dotted name 继续作为 canonical 真值
 - `apps/api/app/shared/runtime/llm/interop/provider_interop_stream_support.py` 当前是共享 facade：transport / event normalizer / terminal assembly 已拆到独立模块，不要再把新逻辑堆回 facade
 - MCP client 真实实现：`apps/api/app/shared/runtime/mcp/mcp_client.py`
 - 插件 runtime 真实实现：`apps/api/app/shared/runtime/plugins/plugin_registry.py`、`apps/api/app/shared/runtime/plugins/plugin_providers.py`
@@ -81,7 +82,12 @@
 - 新实现优先补服务和测试，再接路由；保持 API 只做装配，不直接写业务规则。
 - 所有业务模块公开面已收敛为 async-only：统一 `Service + create_*_service` 命名，不保留 `Async*` 镜像类或 `create_async_*` 第二导出面。内部若只剩 async 一套实现，把 `*_async` 名称改回业务语义名。
 - LLM 供应商兼容层当前最佳实践入口：`api_dialect` 只决定协议格式与解析；鉴权方式由 `auth_strategy` / `api_key_header_name` 显式 override，不再硬绑在 dialect 上。
-- Credential Center 当前正式支持的高级连接字段：`auth_strategy`、`api_key_header_name`、`extra_headers`、`user_agent_override`、`client_name`、`client_version`、`runtime_kind`；这些字段同时作用于保存、验证和运行时请求，不引入 2API 风格的 prefix / alias / provider 路由复杂度。
+- Credential Center 当前正式支持的高级连接字段：`interop_profile`、`auth_strategy`、`api_key_header_name`、`extra_headers`、`user_agent_override`、`client_name`、`client_version`、`runtime_kind`；这些字段同时作用于保存、验证和运行时请求，其中 `interop_profile` 用于显式表达协议兼容 override，不单独下沉到 assistant 业务层。
+- Credential Center 当前已显式区分 `验证连接` 与 `验证工具`：前者走 `text_probe`，后者走 `tool_continuation_probe`；后端统一入口仍是 `POST /api/v1/credentials/{id}/verify?probe_kind=...`，不要再额外造一套产品级 probe API。
+- `model_credentials.verified_probe_kind` 当前是连接级“最高已证明 capability”真值，不是最后一次验证动作；verifier 成功后按 probe rank promote，较低等级 probe 不会覆盖已证明的更高能力。
+- assistant 当前正式门控口径：只要本轮存在 visible `project.*` 工具，就要求凭证先通过 `tool_continuation_probe`；能力不足直接显式报错，不静默隐藏工具，也不自动降级到纯文本。
+- 当前共享 tool schema 编译口径：外部协议默认先走 `portable_subset`，把 required-only `anyOf` 收口为描述性约束；Gemini 再叠加 `gemini_compatible`，继续移除不支持的 schema key。不要再把 schema sanitize 内联回具体 request builder。
+- 当前共享 continuation 编码口径：runtime replay 文本投影、OpenAI Chat / Claude / Gemini continuation projection，以及 OpenAI Responses `function_call_output` 构造，统一走 `tool_continuation_codec.py`；不要再把 continuation helper 堆回 `llm_protocol_requests.py`。
 - `model_credentials` 当前额外支持两类连接级 token 配置：`context_window_tokens` 只记录模型上下文窗口，不伪造成通用上游请求参数；`default_max_output_tokens` 会作为 runtime 的默认输出预算 fallback。
 - `extra_headers` 只用于非敏感元数据头（如 Referer、租户标识）；鉴权类 header 和 `User-Agent` 不允许塞进这里，必须分别走 `auth_strategy / api_key_header_name` 和 `user_agent_override / client_name / client_version / runtime_kind`。
 - 客户端预设只是帮你把一条常见 `User-Agent` 模板写入 `user_agent_override`；运行时若存在 `user_agent_override` 会优先发送它，不会再拼接下面的应用名/版本/运行环境。
@@ -94,6 +100,7 @@
 - `Studio` 前端当前也已按文件类型分流：`.md` 继续走 Markdown 编辑/预览；`.json` 走 JSON 编辑/预览，其中 `数据层/人物.json`、`势力.json`、`人物关系.json`、`势力关系.json`、`隶属关系.json` 会组合成只读关系图预览，`结构定义.json`、`事件.json` 和其它 JSON 保持格式化预览，不支持手工拖线改图。数据层图预览当前只认固定 collection key 对象：`characters / factions / character_relations / faction_relations / memberships`，不再兼容裸数组或旧关系混合格式。
 - incubator / studio 聊天当前不再做“流式失败自动退回非流”的静默降级；需要让真实上游错误直接暴露，便于定位中转兼容问题。
 - credential verifier 与 `scripts/provider_interop_check.py probe` 当前默认走流式；Gemini verification/probe 会注入最小思考配置，避免默认 thinking 吃掉验证输出预算。
+- 任何会改变连接/tool contract 的凭证字段（如 `api_key / base_url / default_model / api_dialect / interop_profile / auth_strategy / api_key_header_name / extra_headers / user_agent_override / client identity`）更新后，都要同步清空 `last_verified_at + verified_probe_kind`，避免旧验证结果误穿透。
 - credential verifier 当前仍发送普通短聊天提示以压低成本，但成功条件已经放宽为“拿到可用文本回复”；不再要求模型精确复读固定句子，也不在提示词里显式暴露“验证/测试”语义；只对空响应和明显的上游模型错误文本判失败。
 - 受保护 API 统一走 `app.modules.user.entry.http.dependencies.get_current_user`（async 版），不保留 `get_current_user_async` 第二命名入口。
 - 当业务 service 文件超出 300 行时，优先保持公开 `Service + factory` 不变，只把"查询/权限 helper""状态变更 helper""DTO 映射与归一化 helper"下沉到 `*_support.py`；不要用改公开命名来掩盖内部结构问题。

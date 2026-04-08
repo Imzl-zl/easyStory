@@ -8,11 +8,20 @@ from typing import Protocol
 import httpx
 
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
+from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
+    ConformanceProbeKind,
+    build_conformance_probe_request,
+    build_tool_continuation_probe_followup_request,
+    normalize_conformance_probe_kind,
+    validate_tool_call_probe_response,
+    validate_tool_continuation_probe_response,
+    validate_tool_definition_probe_response,
+)
 from app.shared.runtime.llm.llm_protocol import (
     LLMConnection,
     NormalizedLLMResponse,
     PreparedLLMHttpRequest,
-    build_verification_request,
+    resolve_model_name,
 )
 from app.shared.runtime.llm.interop.provider_interop_stream_support import (
     build_stream_probe_request,
@@ -42,6 +51,7 @@ STREAM_HTTP_ERROR_PATTERN = re.compile(
 class CredentialVerificationResult:
     verified_at: datetime
     message: str
+    probe_kind: ConformanceProbeKind
 
 
 class AsyncCredentialVerifier(Protocol):
@@ -53,6 +63,7 @@ class AsyncCredentialVerifier(Protocol):
         base_url: str | None,
         api_dialect: str,
         default_model: str | None,
+        interop_profile: str | None,
         auth_strategy: str | None,
         api_key_header_name: str | None,
         extra_headers: dict[str, str] | None,
@@ -60,6 +71,7 @@ class AsyncCredentialVerifier(Protocol):
         client_name: str | None,
         client_version: str | None,
         runtime_kind: str | None,
+        probe_kind: ConformanceProbeKind | None = None,
     ) -> CredentialVerificationResult: ...
 
 
@@ -88,6 +100,7 @@ class AsyncHttpCredentialVerifier:
         base_url: str | None,
         api_dialect: str,
         default_model: str | None,
+        interop_profile: str | None = None,
         auth_strategy: str | None = None,
         api_key_header_name: str | None = None,
         extra_headers: dict[str, str] | None = None,
@@ -95,42 +108,104 @@ class AsyncHttpCredentialVerifier:
         client_name: str | None = None,
         client_version: str | None = None,
         runtime_kind: str | None = None,
+        probe_kind: ConformanceProbeKind | None = None,
     ) -> CredentialVerificationResult:
+        normalized_probe_kind = normalize_conformance_probe_kind(probe_kind)
+        connection = LLMConnection(
+            api_dialect=api_dialect,
+            api_key=api_key,
+            base_url=base_url,
+            default_model=default_model,
+            interop_profile=interop_profile,
+            auth_strategy=auth_strategy,
+            api_key_header_name=api_key_header_name,
+            extra_headers=extra_headers,
+            user_agent_override=user_agent_override,
+            client_name=client_name,
+            client_version=client_version,
+            runtime_kind=runtime_kind,
+        )
         try:
-            request = build_stream_probe_request(
-                build_verification_request(
-                    LLMConnection(
-                        api_dialect=api_dialect,
-                        api_key=api_key,
-                        base_url=base_url,
-                        default_model=default_model,
-                        auth_strategy=auth_strategy,
-                        api_key_header_name=api_key_header_name,
-                        extra_headers=extra_headers,
-                        user_agent_override=user_agent_override,
-                        client_name=client_name,
-                        client_version=client_version,
-                        runtime_kind=runtime_kind,
-                    )
-                ),
-                api_dialect=api_dialect,
+            model_name = resolve_model_name(
+                requested_model_name=None,
+                default_model=default_model,
+                provider_label="credential verification",
             )
-            normalized = await self.stream_request_sender(
-                request,
+            await self._verify_conformance_probe(
+                provider,
+                connection=connection,
+                model_name=model_name,
                 api_dialect=api_dialect,
+                probe_kind=normalized_probe_kind,
             )
         except ConfigurationError as exc:
-            _raise_stream_http_error(provider, exc)
-            raise BusinessRuleError(str(exc)) from exc
+            _raise_stream_http_error(provider, exc, probe_kind=normalized_probe_kind)
+            if normalized_probe_kind == "text_probe":
+                raise BusinessRuleError(str(exc)) from exc
+            raise BusinessRuleError(
+                _format_probe_failure_message(
+                    provider,
+                    probe_kind=normalized_probe_kind,
+                    detail=str(exc),
+                )
+            ) from exc
         except httpx.RequestError as exc:
             raise BusinessRuleError(f"无法连接到 {provider}") from exc
-        self._validate_probe_response(provider, normalized)
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
-            message="验证成功",
+            message=_resolve_probe_success_message(normalized_probe_kind),
+            probe_kind=normalized_probe_kind,
         )
 
-    def _validate_probe_response(
+    async def _verify_conformance_probe(
+        self,
+        provider: str,
+        *,
+        connection: LLMConnection,
+        model_name: str,
+        api_dialect: str,
+        probe_kind: ConformanceProbeKind,
+    ) -> None:
+        initial_response = await self._execute_probe_request(
+            build_conformance_probe_request(
+                connection,
+                model_name=model_name,
+                probe_kind=probe_kind,
+            ),
+            api_dialect=api_dialect,
+        )
+        if probe_kind == "text_probe":
+            self._validate_text_probe_response(provider, initial_response)
+            return
+        if probe_kind == "tool_definition_probe":
+            validate_tool_definition_probe_response(initial_response)
+            return
+        if probe_kind == "tool_call_probe":
+            validate_tool_call_probe_response(initial_response)
+            return
+        validate_tool_call_probe_response(initial_response)
+        followup_response = await self._execute_probe_request(
+            build_tool_continuation_probe_followup_request(
+                connection,
+                model_name=model_name,
+                initial_response=initial_response,
+            ),
+            api_dialect=api_dialect,
+        )
+        validate_tool_continuation_probe_response(followup_response)
+
+    async def _execute_probe_request(
+        self,
+        request: PreparedLLMHttpRequest,
+        *,
+        api_dialect: str,
+    ) -> NormalizedLLMResponse:
+        return await self.stream_request_sender(
+            build_stream_probe_request(request, api_dialect=api_dialect),
+            api_dialect=api_dialect,
+        )
+
+    def _validate_text_probe_response(
         self,
         provider: str,
         response: NormalizedLLMResponse,
@@ -145,7 +220,12 @@ class AsyncHttpCredentialVerifier:
             raise BusinessRuleError(f"无法验证 {provider} 凭证: {upstream_error}")
 
 
-def _raise_stream_http_error(provider: str, error: ConfigurationError) -> None:
+def _raise_stream_http_error(
+    provider: str,
+    error: ConfigurationError,
+    *,
+    probe_kind: ConformanceProbeKind,
+) -> None:
     detail = str(error).strip()
     match = STREAM_HTTP_ERROR_PATTERN.match(detail)
     if match is None:
@@ -159,7 +239,11 @@ def _raise_stream_http_error(provider: str, error: ConfigurationError) -> None:
     if status_code == 404:
         raise BusinessRuleError(f"{provider} 接口地址无效或接口类型不匹配") from error
     raise BusinessRuleError(
-        f"无法验证 {provider} 凭证: HTTP {status_code} - {error_detail}"
+        _format_probe_failure_message(
+            provider,
+            probe_kind=probe_kind,
+            detail=f"HTTP {status_code} - {error_detail}",
+        )
     ) from error
 
 
@@ -184,3 +268,33 @@ def _normalize_probe_error_message(reply: str) -> str | None:
     if any(marker in lowered_reply for marker in MODEL_CONFIGURATION_ERROR_MARKERS):
         return f"默认模型或接口类型不匹配。上游提示：{normalized_reply}"
     return None
+
+
+def _format_probe_failure_message(
+    provider: str,
+    *,
+    probe_kind: ConformanceProbeKind,
+    detail: str,
+) -> str:
+    label = _resolve_probe_failure_label(probe_kind)
+    if label is None:
+        return f"无法验证 {provider} 凭证: {detail}"
+    return f"无法验证 {provider} 凭证: {label}：{detail}"
+
+
+def _resolve_probe_failure_label(
+    probe_kind: ConformanceProbeKind,
+) -> str | None:
+    if probe_kind == "text_probe":
+        return None
+    if probe_kind == "tool_definition_probe":
+        return "工具定义验证失败"
+    return "工具调用验证失败"
+
+
+def _resolve_probe_success_message(probe_kind: ConformanceProbeKind) -> str:
+    if probe_kind == "text_probe":
+        return "验证成功"
+    if probe_kind == "tool_definition_probe":
+        return "工具定义验证成功"
+    return "工具调用验证成功"

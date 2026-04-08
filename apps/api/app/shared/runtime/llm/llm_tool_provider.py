@@ -73,10 +73,15 @@ class LLMToolProvider(ToolProvider):
         if tool_name != LLM_GENERATE_TOOL:
             raise ConfigurationError(f"Unsupported tool: {tool_name}")
         request = _build_request(params)
-        response = await self.request_sender(prepare_generation_request(_to_generate_request(request)))
+        prepared_request = prepare_generation_request(_to_generate_request(request))
+        response = await self.request_sender(prepared_request)
         if response.status_code >= 400:
             raise ConfigurationError(_build_http_error_message(response))
-        normalized = parse_generation_response(request.connection.api_dialect, response.json_body or {})
+        normalized = parse_generation_response(
+            request.connection.api_dialect,
+            response.json_body or {},
+            tool_name_aliases=prepared_request.tool_name_aliases,
+        )
         return {
             "content": normalized.content,
             "finish_reason": normalized.finish_reason,

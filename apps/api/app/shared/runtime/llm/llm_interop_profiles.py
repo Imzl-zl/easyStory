@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from ..errors import ConfigurationError
+from .interop.tool_schema_compiler import ToolSchemaMode
+from .interop.tool_name_codec import ToolNamePolicy
 from .llm_protocol_types import normalize_api_dialect
 
 LlmInteropProfile = Literal[
@@ -33,6 +35,8 @@ DEFAULT_INTEROP_PROFILE_BY_DIALECT = {
 @dataclass(frozen=True)
 class LLMInteropCapabilities:
     profile: LlmInteropProfile | None
+    tool_name_policy: ToolNamePolicy = "safe_ascii_only"
+    tool_schema_mode: ToolSchemaMode = "portable_subset"
     allows_responses_empty_output_in_stream_terminal: bool = False
     captures_chat_reasoning_content: bool = False
     expects_chat_usage_extra_chunk: bool = False
@@ -49,6 +53,11 @@ def normalize_interop_profile(interop_profile: str | None) -> LlmInteropProfile 
     return normalized  # type: ignore[return-value]
 
 
+def resolve_default_interop_profile(api_dialect: str) -> LlmInteropProfile | None:
+    dialect = normalize_api_dialect(api_dialect)
+    return DEFAULT_INTEROP_PROFILE_BY_DIALECT.get(dialect)
+
+
 def resolve_interop_capabilities(
     api_dialect: str,
     interop_profile: str | None = None,
@@ -56,7 +65,7 @@ def resolve_interop_capabilities(
     dialect = normalize_api_dialect(api_dialect)
     normalized_profile = normalize_interop_profile(interop_profile)
     if normalized_profile is None:
-        normalized_profile = DEFAULT_INTEROP_PROFILE_BY_DIALECT.get(dialect)
+        normalized_profile = resolve_default_interop_profile(dialect)
     if dialect == "openai_responses":
         return _resolve_responses_capabilities(normalized_profile)
     if dialect == "openai_chat_completions":
@@ -65,7 +74,9 @@ def resolve_interop_capabilities(
         raise ConfigurationError(
             f"interop_profile '{normalized_profile}' is not supported for api_dialect '{dialect}'"
         )
-    return LLMInteropCapabilities(profile=None)
+    if dialect == "gemini_generate_content":
+        return LLMInteropCapabilities(profile=None, tool_schema_mode="gemini_compatible")
+    return LLMInteropCapabilities(profile=None, tool_schema_mode="portable_subset")
 
 
 def _resolve_responses_capabilities(

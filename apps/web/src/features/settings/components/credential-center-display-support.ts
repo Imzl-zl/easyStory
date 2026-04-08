@@ -14,3 +14,19 @@ export function formatCredentialTokenSummary(credential: CredentialView) {
   }
   return `上下文窗口：${contextWindow ?? "未填写"} · 回复上限：${maxOutput ?? "未填写"}`;
 }
+
+export function formatCredentialToolCapabilitySummary(credential: CredentialView) {
+  if (credential.verified_probe_kind === "tool_continuation_probe") {
+    return "工具能力：已验证完整工具调用";
+  }
+  if (credential.verified_probe_kind === "tool_call_probe") {
+    return "工具能力：已验证工具调用，未验证结果续接";
+  }
+  if (credential.verified_probe_kind === "tool_definition_probe") {
+    return "工具能力：仅验证工具定义";
+  }
+  if (credential.verified_probe_kind === "text_probe") {
+    return "工具能力：仅验证基础连接";
+  }
+  return "工具能力：未验证";
+}

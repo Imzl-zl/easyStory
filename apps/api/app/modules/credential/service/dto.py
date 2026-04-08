@@ -6,7 +6,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.shared.runtime.llm.llm_protocol import LlmApiDialect, LlmAuthStrategy, LlmRuntimeKind
+from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
+    ConformanceProbeKind,
+)
+from app.shared.runtime.llm.llm_protocol import (
+    LlmApiDialect,
+    LlmAuthStrategy,
+    LlmInteropProfile,
+    LlmRuntimeKind,
+)
 
 CredentialOwnerType = Literal["system", "user", "project"]
 CredentialExtraHeaders = dict[str, str]
@@ -15,6 +23,7 @@ CREDENTIAL_CONTEXT_WINDOW_TOKENS_MAX = 2_000_000
 CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MIN = 128
 CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MAX = 131_072
 CREDENTIAL_USER_AGENT_OVERRIDE_MAX_LENGTH = 300
+CredentialVerifyProbeKind = ConformanceProbeKind
 
 
 class CredentialCreateDTO(BaseModel):
@@ -28,6 +37,7 @@ class CredentialCreateDTO(BaseModel):
     api_key: str = Field(min_length=1, max_length=500)
     base_url: str | None = Field(default=None, max_length=500)
     default_model: str = Field(min_length=1, max_length=100)
+    interop_profile: LlmInteropProfile | None = None
     context_window_tokens: int | None = Field(
         default=None,
         ge=CREDENTIAL_CONTEXT_WINDOW_TOKENS_MIN,
@@ -58,6 +68,7 @@ class CredentialUpdateDTO(BaseModel):
     api_key: str | None = Field(default=None, min_length=1, max_length=500)
     base_url: str | None = Field(default=None, max_length=500)
     default_model: str | None = Field(default=None, min_length=1, max_length=100)
+    interop_profile: LlmInteropProfile | None = None
     context_window_tokens: int | None = Field(
         default=None,
         ge=CREDENTIAL_CONTEXT_WINDOW_TOKENS_MIN,
@@ -90,6 +101,8 @@ class CredentialViewDTO(BaseModel):
     masked_key: str
     base_url: str | None
     default_model: str | None
+    interop_profile: LlmInteropProfile | None
+    verified_probe_kind: CredentialVerifyProbeKind | None
     context_window_tokens: int | None
     default_max_output_tokens: int | None
     auth_strategy: LlmAuthStrategy | None
@@ -106,5 +119,6 @@ class CredentialViewDTO(BaseModel):
 class CredentialVerifyResultDTO(BaseModel):
     credential_id: uuid.UUID
     status: Literal["verified"] = "verified"
+    probe_kind: CredentialVerifyProbeKind
     last_verified_at: datetime
     message: str

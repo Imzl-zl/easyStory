@@ -9,6 +9,7 @@ import {
   AUTH_STRATEGY_OPTIONS,
   getDefaultAuthStrategy,
   getDefaultBaseUrl,
+  sanitizeCredentialInteropProfileSelection,
   type CredentialFormState,
 } from "@/features/settings/components/credential-center-support";
 import type { CredentialApiDialect } from "@/lib/api/types";
@@ -115,6 +116,7 @@ export function updateApiDialectState(
     ...current,
     apiDialect,
     baseUrl: shouldReplaceBaseUrl ? nextDefault : current.baseUrl,
+    interopProfile: sanitizeCredentialInteropProfileSelection(apiDialect, current.interopProfile),
   };
 }
 

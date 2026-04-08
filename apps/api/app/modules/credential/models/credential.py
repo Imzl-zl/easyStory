@@ -18,6 +18,8 @@ class ModelCredential(Base, TimestampMixin, UUIDMixin):
     encrypted_key: Mapped[str] = mapped_column(Text)
     base_url: Mapped[str | None] = mapped_column(String(500))
     default_model: Mapped[str | None] = mapped_column(String(100))
+    interop_profile: Mapped[str | None] = mapped_column(String(80))
+    verified_probe_kind: Mapped[str | None] = mapped_column(String(40))
     context_window_tokens: Mapped[int | None] = mapped_column(Integer)
     default_max_output_tokens: Mapped[int | None] = mapped_column(Integer)
     auth_strategy: Mapped[str | None] = mapped_column(String(50))

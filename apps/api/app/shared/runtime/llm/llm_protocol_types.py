@@ -106,6 +106,7 @@ class PreparedLLMHttpRequest:
     headers: dict[str, str]
     json_body: dict[str, Any]
     interop_profile: str | None = None
+    tool_name_aliases: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

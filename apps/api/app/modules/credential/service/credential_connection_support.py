@@ -8,9 +8,12 @@ from app.shared.runtime.llm.llm_protocol import (
     normalize_api_dialect,
     normalize_auth_strategy,
     normalize_http_header_name,
+    normalize_interop_profile,
     normalize_runtime_kind,
+    resolve_default_interop_profile,
     resolve_api_key_header_name,
     resolve_auth_strategy,
+    resolve_interop_capabilities,
 )
 
 CONTENT_TYPE_HEADER_NAME = "content-type"
@@ -30,6 +33,10 @@ SENSITIVE_EXTRA_HEADER_FRAGMENTS = ("token", "secret", "api-key", "api_key")
 
 
 def normalize_connection_settings(credential: ModelCredential) -> None:
+    credential.interop_profile = normalize_interop_profile_override(
+        credential.api_dialect,
+        credential.interop_profile,
+    )
     credential.auth_strategy = normalize_auth_strategy_override(
         credential.api_dialect,
         credential.auth_strategy,
@@ -63,6 +70,8 @@ def build_runtime_credential_payload(
         "api_dialect": credential.api_dialect,
         "base_url": credential.base_url,
         "default_model": credential.default_model,
+        "interop_profile": credential.interop_profile,
+        "verified_probe_kind": credential.verified_probe_kind,
         "context_window_tokens": credential.context_window_tokens,
         "default_max_output_tokens": credential.default_max_output_tokens,
         "auth_strategy": credential.auth_strategy,
@@ -89,6 +98,19 @@ def normalize_client_identity_settings(
     if normalized_name is None:
         return None, None, None
     return normalized_name, normalized_version, normalized_runtime_kind
+
+
+def normalize_interop_profile_override(
+    api_dialect: str,
+    interop_profile: str | None,
+) -> str | None:
+    normalized = normalize_interop_profile(interop_profile)
+    if normalized is None:
+        return None
+    resolve_interop_capabilities(api_dialect, normalized)
+    if normalized == resolve_default_interop_profile(api_dialect):
+        return None
+    return normalized
 
 
 def normalize_user_agent_override(user_agent_override: str | None) -> str | None:

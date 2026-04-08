@@ -12,10 +12,11 @@ test("resolveCredentialActionFeedback keeps verify success message user-facing",
     credential_id: "credential-1",
     last_verified_at: "2026-03-25T06:08:00Z",
     message: "验证成功",
+    probe_kind: "text_probe",
     status: "verified",
   };
 
-  assert.deepEqual(resolveCredentialActionFeedback(result, "verify"), {
+  assert.deepEqual(resolveCredentialActionFeedback(result, "verify_connection"), {
     message: "模型连接验证成功。",
     tone: "info",
   });
@@ -26,11 +27,27 @@ test("resolveCredentialActionFeedback normalizes backend verify success copy to 
     credential_id: "credential-2",
     last_verified_at: "2026-03-27T14:21:00Z",
     message: "Credential verified",
+    probe_kind: "text_probe",
     status: "verified",
   };
 
-  assert.deepEqual(resolveCredentialActionFeedback(result, "verify"), {
+  assert.deepEqual(resolveCredentialActionFeedback(result, "verify_connection"), {
     message: "模型连接验证成功。",
+    tone: "info",
+  });
+});
+
+test("resolveCredentialActionFeedback keeps tool verify success message user-facing", () => {
+  const result: CredentialVerifyResult = {
+    credential_id: "credential-3",
+    last_verified_at: "2026-04-08T09:15:00Z",
+    message: "工具调用验证成功",
+    probe_kind: "tool_continuation_probe",
+    status: "verified",
+  };
+
+  assert.deepEqual(resolveCredentialActionFeedback(result, "verify_tools"), {
+    message: "工具调用验证成功。",
     tone: "info",
   });
 });
@@ -65,5 +82,15 @@ test("normalizeCredentialActionErrorMessage keeps backend normalized upstream er
       "无法验证 OpenAI 凭证: 当前默认模型已不可用，请换成可用模型后再试。上游提示：Gemini 3 Pro is no longer available. Please switch to Gemini 3.1 Pro.",
     ),
     "连接“OpenAI”验证失败：当前默认模型已不可用，请换成可用模型后再试。上游提示：Gemini 3 Pro is no longer available. Please switch to Gemini 3.1 Pro.",
+  );
+});
+
+test("normalizeCredentialActionErrorMessage rewrites tool call probe failure into user-facing Chinese", () => {
+  assert.equal(
+    normalizeCredentialActionErrorMessage(
+      "无法验证 bwen 凭证: 工具调用验证失败：Tool call probe expected exactly one tool call, got 0",
+      "verify_tools",
+    ),
+    "连接“bwen”工具调用验证失败：模型没有按约定发起工具调用。请检查接口类型、兼容 Profile 或上游工具调用支持。",
   );
 });

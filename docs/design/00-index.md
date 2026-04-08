@@ -5,7 +5,7 @@
 | 文档类型 | 设计索引 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-16 |
-| 更新时间 | 2026-04-07 |
+| 更新时间 | 2026-04-08 |
 
 ---
 
@@ -20,7 +20,7 @@
 
 > `docs/plans/` 默认是实施记录，不替代本目录和 `docs/specs/` 的正式设计真值。
 >
-> assistant runtime 当前正式入口直接看 [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)、[22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[21-assistant-project-document-tools](./21-assistant-project-document-tools.md)；若需要查看 2026-04-07 这轮收口的历史过程，再看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。
+> assistant runtime 当前正式入口直接看 [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)、[22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[23-provider-tool-interop-compatibility-layer](./23-provider-tool-interop-compatibility-layer.md)、[21-assistant-project-document-tools](./21-assistant-project-document-tools.md)；其中 23 已覆盖 shared runtime 的 tool/stream codec、conformance probe、`interop_profile / verified_probe_kind` 与 Credential Center 工具能力验证语义。若需要查看 2026-04-07 这轮收口的历史过程，再看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。
 
 ---
 
@@ -29,11 +29,12 @@
 1. [01-core-workflow](./01-core-workflow.md)
 2. [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)
 3. [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)
-4. [21-assistant-project-document-tools](./21-assistant-project-document-tools.md)
-5. [06-creative-setup](./06-creative-setup.md)
-6. [19-pre-writing-assets](./19-pre-writing-assets.md)
-7. [02-context-injection](./02-context-injection.md)
-8. [03-review-and-fix](./03-review-and-fix.md)
+4. [23-provider-tool-interop-compatibility-layer](./23-provider-tool-interop-compatibility-layer.md)
+5. [21-assistant-project-document-tools](./21-assistant-project-document-tools.md)
+6. [06-creative-setup](./06-creative-setup.md)
+7. [19-pre-writing-assets](./19-pre-writing-assets.md)
+8. [02-context-injection](./02-context-injection.md)
+9. [03-review-and-fix](./03-review-and-fix.md)
 
 ---
 
@@ -63,6 +64,7 @@
 | 20 | Assistant 主路径 | [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md) | 🔴 | 普通聊天、规则、Skill、Agent、MCP 分层 |
 | 21 | Assistant 项目文稿工具 | [21-assistant-project-document-tools](./21-assistant-project-document-tools.md) | 🟡 | 项目内文稿读写工具、统一路径路由、目录/版本/revision 约束 |
 | 22 | Assistant 原生 Tool-Calling Runtime | [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md) | 🔴 | ordinary chat tool loop、provider 适配、run/step 真值与 SSE 语义 |
+| 23 | 模型工具调用兼容层 | [23-provider-tool-interop-compatibility-layer](./23-provider-tool-interop-compatibility-layer.md) | 🔴 | canonical tool contract、协议族适配、gateway profile 与 conformance 验证 |
 
 ---
 
@@ -70,7 +72,7 @@
 
 按主题找文档时，优先这样看：
 
-- Assistant / Studio 聊天：`20 -> 22 -> 21 -> specs/architecture -> specs/config-format`
+- Assistant / Studio 聊天：`20 -> 22 -> 23 -> 21 -> specs/architecture -> specs/config-format`
 - 创作准备链路：`06 -> 19 -> 04 -> 05`
 - Workflow / 审核 / 上下文：`01 -> 02 -> 03 -> 08 -> 09`
 - 凭证 / 用户 / 配置：`10 -> specs/config-format -> specs/database-design`

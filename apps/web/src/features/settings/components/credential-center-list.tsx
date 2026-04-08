@@ -5,6 +5,7 @@ import { useState } from "react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   formatAuditTime,
+  formatCredentialToolCapabilitySummary,
   formatCredentialTokenSummary,
 } from "@/features/settings/components/credential-center-display-support";
 import {
@@ -55,7 +56,7 @@ export function CredentialCenterList({
         <div className="flex flex-wrap items-start justify-between gap-3.5">
           <div className="space-y-1">
             <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">已有连接</h3>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">查看、验证和管理已有连接。</p>
+            <p className="text-sm leading-6 text-[var(--text-secondary)]">查看、验证连接与工具兼容性，并管理已有连接。</p>
           </div>
           {mode === "list" && onStartCreate ? (
             <button
@@ -71,7 +72,16 @@ export function CredentialCenterList({
         {credentials.map((credential) => {
           const overrideInfo = overrideInfoByCredentialId[credential.id];
           const toggleActionType = credential.is_active ? "disable" : "enable";
-          const isVerifyPending = isPendingCredentialAction(pendingAction, "verify", credential.id);
+          const isVerifyConnectionPending = isPendingCredentialAction(
+            pendingAction,
+            "verify_connection",
+            credential.id,
+          );
+          const isVerifyToolsPending = isPendingCredentialAction(
+            pendingAction,
+            "verify_tools",
+            credential.id,
+          );
           const isTogglePending = isPendingCredentialAction(pendingAction, toggleActionType, credential.id);
           const isDeletePending = isPendingCredentialAction(pendingAction, "delete", credential.id);
           return (
@@ -114,6 +124,7 @@ export function CredentialCenterList({
                   默认模型：{credential.default_model ?? "未配置"} · 密钥尾号：{credential.masked_key}
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">{formatCredentialTokenSummary(credential)}</p>
+                <p className="text-sm text-[var(--text-secondary)]">{formatCredentialToolCapabilitySummary(credential)}</p>
                 <p className="text-xs leading-5 text-[var(--text-secondary)]">
                   服务地址：{formatCredentialBaseUrl(credential.api_dialect, credential.base_url)} · 最近验证：
                   {credential.last_verified_at ? formatAuditTime(credential.last_verified_at) : "未验证"}
@@ -140,10 +151,18 @@ export function CredentialCenterList({
                     <button
                       className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"
                       disabled={isPending}
-                      onClick={() => onAction("verify", credential.id)}
+                      onClick={() => onAction("verify_connection", credential.id)}
                       type="button"
                     >
-                      {resolveCredentialActionButtonLabel("verify", isVerifyPending)}
+                      {resolveCredentialActionButtonLabel("verify_connection", isVerifyConnectionPending)}
+                    </button>
+                    <button
+                      className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"
+                      disabled={isPending}
+                      onClick={() => onAction("verify_tools", credential.id)}
+                      type="button"
+                    >
+                      {resolveCredentialActionButtonLabel("verify_tools", isVerifyToolsPending)}
                     </button>
                     <button
                       className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"

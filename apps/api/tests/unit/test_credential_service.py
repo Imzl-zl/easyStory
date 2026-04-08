@@ -26,8 +26,14 @@ OPENAI_MODEL = "gpt-4o-mini"
 
 
 class FakeVerifier:
-    def __init__(self, verified_at: datetime | None = None) -> None:
+    def __init__(
+        self,
+        verified_at: datetime | None = None,
+        *,
+        expected_probe_kind: str = "text_probe",
+    ) -> None:
         self.verified_at = verified_at or datetime.now(timezone.utc)
+        self.expected_probe_kind = expected_probe_kind
 
     async def verify(
         self,
@@ -37,6 +43,7 @@ class FakeVerifier:
         base_url: str | None,
         api_dialect: str,
         default_model: str | None,
+        interop_profile: str | None,
         auth_strategy: str | None,
         api_key_header_name: str | None,
         extra_headers: dict[str, str] | None,
@@ -44,12 +51,14 @@ class FakeVerifier:
         client_name: str | None,
         client_version: str | None,
         runtime_kind: str | None,
+        probe_kind: str | None,
     ) -> CredentialVerificationResult:
         assert provider
         assert api_key
         assert base_url is None
         assert api_dialect == OPENAI_DIALECT
         assert default_model == OPENAI_MODEL
+        assert interop_profile is None
         assert auth_strategy is None
         assert api_key_header_name is None
         assert extra_headers is None
@@ -57,9 +66,11 @@ class FakeVerifier:
         assert client_name is None
         assert client_version is None
         assert runtime_kind is None
+        assert probe_kind == self.expected_probe_kind
         return CredentialVerificationResult(
             verified_at=self.verified_at,
-            message="验证成功",
+            message="工具调用验证成功" if probe_kind == "tool_continuation_probe" else "验证成功",
+            probe_kind=probe_kind or "text_probe",
         )
 
 
@@ -105,6 +116,8 @@ def test_create_user_credential_encrypts_and_audits(db, monkeypatch) -> None:
     assert result.provider == "openai"
     assert result.api_dialect == OPENAI_DIALECT
     assert result.default_model == OPENAI_MODEL
+    assert result.interop_profile is None
+    assert result.verified_probe_kind is None
     assert result.context_window_tokens is None
     assert result.default_max_output_tokens is None
     assert result.auth_strategy is None
@@ -275,8 +288,91 @@ def test_verify_credential_updates_timestamp_and_audits(db, monkeypatch) -> None
     stored = db.query(ModelCredential).filter(ModelCredential.id == credential.id).one()
     audits = db.query(AuditLog).filter(AuditLog.event_type == "credential_verify").all()
     assert result.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
+    assert result.probe_kind == "text_probe"
     assert stored.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
+    assert stored.verified_probe_kind == "text_probe"
     assert audits[-1].details["status"] == "verified"
+    assert audits[-1].details["probe_kind"] == "text_probe"
+
+
+def test_verify_credential_accepts_explicit_tool_probe_kind(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    verified_at = datetime.now(timezone.utc).replace(microsecond=0)
+    user = create_user(db)
+    service = create_credential_service(
+        verifier=FakeVerifier(
+            verified_at=verified_at,
+            expected_probe_kind="tool_continuation_probe",
+        )
+    )
+    credential = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(display_name="OpenAI"),
+            actor_user_id=user.id,
+        )
+    )
+
+    result = asyncio.run(
+        service.verify_credential(
+            async_db(db),
+            credential.id,
+            actor_user_id=user.id,
+            probe_kind="tool_continuation_probe",
+        )
+    )
+
+    audits = db.query(AuditLog).filter(AuditLog.event_type == "credential_verify").all()
+    assert result.probe_kind == "tool_continuation_probe"
+    assert result.message == "工具调用验证成功"
+    assert result.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
+    stored = db.query(ModelCredential).filter(ModelCredential.id == credential.id).one()
+    assert stored.verified_probe_kind == "tool_continuation_probe"
+    assert audits[-1].details["probe_kind"] == "tool_continuation_probe"
+
+
+def test_verify_credential_keeps_highest_verified_probe_kind(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    verified_at = datetime.now(timezone.utc).replace(microsecond=0)
+    user = create_user(db)
+    service = create_credential_service(
+        verifier=FakeVerifier(
+            verified_at=verified_at,
+            expected_probe_kind="tool_continuation_probe",
+        )
+    )
+    credential = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(display_name="OpenAI"),
+            actor_user_id=user.id,
+        )
+    )
+
+    asyncio.run(
+        service.verify_credential(
+            async_db(db),
+            credential.id,
+            actor_user_id=user.id,
+            probe_kind="tool_continuation_probe",
+        )
+    )
+
+    service.verifier = FakeVerifier(
+        verified_at=verified_at,
+        expected_probe_kind="text_probe",
+    )
+    asyncio.run(
+        service.verify_credential(
+            async_db(db),
+            credential.id,
+            actor_user_id=user.id,
+            probe_kind="text_probe",
+        )
+    )
+
+    stored = db.query(ModelCredential).filter(ModelCredential.id == credential.id).one()
+    assert stored.verified_probe_kind == "tool_continuation_probe"
 
 
 def test_update_and_disable_credential(db, monkeypatch) -> None:

@@ -1,6 +1,7 @@
 import { requestJson } from "@/lib/api/client";
 import type {
   CredentialCreatePayload,
+  CredentialVerifyProbeKind,
   CredentialUpdatePayload,
   CredentialVerifyResult,
   CredentialView,
@@ -28,8 +29,9 @@ export function updateCredential(credentialId: string, payload: CredentialUpdate
   });
 }
 
-export function verifyCredential(credentialId: string) {
-  return requestJson<CredentialVerifyResult>(`/api/v1/credentials/${credentialId}/verify`, {
+export function verifyCredential(credentialId: string, probeKind: CredentialVerifyProbeKind = "text_probe") {
+  const search = new URLSearchParams({ probe_kind: probeKind });
+  return requestJson<CredentialVerifyResult>(`/api/v1/credentials/${credentialId}/verify?${search.toString()}`, {
     method: "POST",
   });
 }

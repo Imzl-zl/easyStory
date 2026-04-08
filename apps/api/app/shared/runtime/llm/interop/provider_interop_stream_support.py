@@ -60,6 +60,7 @@ def build_stream_probe_request(
             headers=headers,
             json_body=json_body,
             interop_profile=request.interop_profile,
+            tool_name_aliases=dict(request.tool_name_aliases),
         )
     json_body["stream"] = True
     return PreparedLLMHttpRequest(
@@ -68,6 +69,7 @@ def build_stream_probe_request(
         headers=headers,
         json_body=json_body,
         interop_profile=request.interop_profile,
+        tool_name_aliases=dict(request.tool_name_aliases),
     )
 
 
@@ -137,6 +139,7 @@ async def iterate_stream_request(
             event_name=raw_event.event_name,
             payload=raw_event.payload,
             interop_profile=active_interop_profile,
+            tool_name_aliases=request.tool_name_aliases,
         )
 
 
@@ -146,6 +149,7 @@ def _consume_stream_line(
     buffer: StreamEventBuffer,
     api_dialect: str,
     interop_profile: str | None = None,
+    tool_name_aliases: dict[str, str] | None = None,
 ) -> list[ParsedStreamEvent]:
     return [
         parse_raw_stream_event(
@@ -153,6 +157,7 @@ def _consume_stream_line(
             event_name=raw_event.event_name,
             payload=raw_event.payload,
             interop_profile=interop_profile,
+            tool_name_aliases=tool_name_aliases,
         )
         for raw_event in consume_raw_stream_line(line, buffer=buffer)
     ]
@@ -163,6 +168,7 @@ def _flush_stream_event(
     *,
     api_dialect: str,
     interop_profile: str | None = None,
+    tool_name_aliases: dict[str, str] | None = None,
 ) -> list[ParsedStreamEvent]:
     raw_event = flush_raw_stream_event(buffer)
     if raw_event is None:
@@ -173,6 +179,7 @@ def _flush_stream_event(
             event_name=raw_event.event_name,
             payload=raw_event.payload,
             interop_profile=interop_profile,
+            tool_name_aliases=tool_name_aliases,
         )
     ]
 

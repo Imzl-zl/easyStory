@@ -29,6 +29,8 @@ def to_view(
         masked_key=mask_key(decrypt_api_key(credential.encrypted_key)),
         base_url=credential.base_url,
         default_model=credential.default_model,
+        interop_profile=credential.interop_profile,
+        verified_probe_kind=credential.verified_probe_kind,
         context_window_tokens=credential.context_window_tokens,
         default_max_output_tokens=credential.default_max_output_tokens,
         auth_strategy=credential.auth_strategy,
@@ -49,6 +51,7 @@ def to_verify_result(
 ) -> CredentialVerifyResultDTO:
     return CredentialVerifyResultDTO(
         credential_id=credential.id,
+        probe_kind=result.probe_kind,
         last_verified_at=result.verified_at,
         message=result.message,
     )

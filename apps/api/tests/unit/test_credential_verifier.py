@@ -9,9 +9,11 @@ from app.modules.credential.infrastructure import AsyncHttpCredentialVerifier
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from app.shared.runtime.llm.llm_protocol import (
     NormalizedLLMResponse,
+    PreparedLLMHttpRequest,
     VERIFY_SYSTEM_PROMPT,
     VERIFY_USER_PROMPT,
 )
+from app.shared.runtime.llm.llm_protocol_types import NormalizedLLMToolCall
 from app.shared.settings import (
     ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV,
     ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV,
@@ -51,6 +53,7 @@ def test_verify_credential_uses_generation_probe_request() -> None:
             base_url="https://proxy.example.com",
             api_dialect="openai_chat_completions",
             default_model="gpt-4o-mini",
+            interop_profile="chat_compat_reasoning_content",
             auth_strategy="custom_header",
             api_key_header_name="api-key",
             extra_headers={"X-Trace-Id": "trace-verify"},
@@ -67,12 +70,14 @@ def test_verify_credential_uses_generation_probe_request() -> None:
     assert request.headers["api-key"] == "test-key"
     assert request.headers["X-Trace-Id"] == "trace-verify"
     assert request.headers["User-Agent"] == "easyStory/0.1 (server; python)"
+    assert request.interop_profile == "chat_compat_reasoning_content"
     assert request.json_body["model"] == "gpt-4o-mini"
     assert request.json_body["stream"] is True
     assert request.json_body["messages"][-1]["content"] == VERIFY_USER_PROMPT
     assert request.json_body["messages"][0]["content"] == VERIFY_SYSTEM_PROMPT
     assert captured["api_dialect"] == "openai_chat_completions"
     assert result.message == "验证成功"
+    assert result.probe_kind == "text_probe"
 
 
 def test_verify_credential_accepts_non_exact_probe_reply() -> None:
@@ -212,6 +217,7 @@ def test_verify_openai_responses_uses_input_text_blocks() -> None:
     assert request.headers["User-Agent"] == "codex-cli/0.118.0 (server; node)"
     assert captured["api_dialect"] == "openai_responses"
     assert result.message == "验证成功"
+    assert result.probe_kind == "text_probe"
 
 
 def test_verify_gemini_request_includes_user_role_and_prompt() -> None:
@@ -249,6 +255,60 @@ def test_verify_gemini_request_includes_user_role_and_prompt() -> None:
     assert request.json_body["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
     assert captured["api_dialect"] == "gemini_generate_content"
     assert result.message == "验证成功"
+    assert result.probe_kind == "text_probe"
+
+
+def test_verify_tool_continuation_probe_replays_followup_request() -> None:
+    captured_requests: list[PreparedLLMHttpRequest] = []
+
+    async def stream_request_sender(request, *, api_dialect):
+        captured_requests.append(request)
+        assert api_dialect == "openai_responses"
+        if len(captured_requests) == 1:
+            return NormalizedLLMResponse(
+                content="",
+                finish_reason=None,
+                input_tokens=8,
+                output_tokens=10,
+                total_tokens=18,
+                provider_response_id="resp_123",
+                tool_calls=[
+                    NormalizedLLMToolCall(
+                        tool_call_id="call_123",
+                        tool_name="probe.echo_payload",
+                        arguments={"echo": "ping"},
+                        arguments_text='{"echo":"ping"}',
+                    )
+                ],
+            )
+        return _ok_response("工具续接成功：ping。", input_tokens=6, output_tokens=4, total_tokens=10)
+
+    verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
+
+    result = asyncio.run(
+        verifier.verify(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://proxy.example.com",
+            api_dialect="openai_responses",
+            default_model="gpt-5.4",
+            probe_kind="tool_continuation_probe",
+            client_name="easyStory",
+        )
+    )
+
+    assert len(captured_requests) == 2
+    assert captured_requests[0].json_body["tools"][0]["name"] == "probe_echo_payload"
+    assert captured_requests[1].json_body["previous_response_id"] == "resp_123"
+    assert captured_requests[1].json_body["input"] == [
+        {
+            "type": "function_call_output",
+            "call_id": "call_123",
+            "output": '{"echoed":"ping","ok":true,"probe":"tool_continuation_probe"}',
+        }
+    ]
+    assert result.message == "工具调用验证成功"
+    assert result.probe_kind == "tool_continuation_probe"
 
 
 def test_verify_credential_maps_authentication_error() -> None:

@@ -3,6 +3,7 @@ from .credential_service import CredentialService
 from .dto import (
     CredentialCreateDTO,
     CredentialUpdateDTO,
+    CredentialVerifyProbeKind,
     CredentialVerifyResultDTO,
     CredentialViewDTO,
 )
@@ -13,6 +14,7 @@ __all__ = [
     "CredentialCreateDTO",
     "CredentialService",
     "CredentialUpdateDTO",
+    "CredentialVerifyProbeKind",
     "CredentialVerifyResultDTO",
     "CredentialViewDTO",
     "create_credential_resolution_service",

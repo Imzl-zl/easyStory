@@ -6,7 +6,10 @@ import pytest
 
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm.llm_protocol_requests import prepare_generation_request
-from app.shared.runtime.llm.llm_protocol_responses import parse_generation_response
+from app.shared.runtime.llm.llm_protocol_responses import (
+    parse_generation_response,
+    parse_stream_terminal_response,
+)
 from app.shared.runtime.llm.llm_protocol_types import (
     LLMConnection,
     LLMFunctionToolDefinition,
@@ -78,9 +81,50 @@ def test_prepare_generation_request_includes_openai_responses_tools() -> None:
     )
 
     assert request.json_body["tools"][0]["type"] == "function"
-    assert request.json_body["tools"][0]["name"] == "project.read_documents"
+    assert request.json_body["tools"][0]["name"] == "project_read_documents"
     assert request.json_body["tools"][0]["strict"] is True
     assert request.json_body["parallel_tool_calls"] is False
+    assert request.tool_name_aliases == {"project.read_documents": "project_read_documents"}
+
+
+def test_prepare_generation_request_compiles_portable_tool_schema_for_openai_responses() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="openai_responses",
+                api_key="test-key",
+                base_url="https://api.openai.com",
+            ),
+            model_name="gpt-4o-mini",
+            prompt="检索文稿。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            tools=[
+                LLMFunctionToolDefinition(
+                    name="project.search_documents",
+                    description="检索项目文稿。",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "minLength": 1},
+                            "path_prefix": {"type": "string", "minLength": 1},
+                        },
+                        "anyOf": [
+                            {"required": ["query"]},
+                            {"required": ["path_prefix"]},
+                        ],
+                    },
+                )
+            ],
+        )
+    )
+
+    params = request.json_body["tools"][0]["parameters"]
+    assert "anyOf" not in params
+    assert params["description"] == "Provide at least one of: path_prefix, query."
 
 
 def test_prepare_generation_request_uses_previous_response_id_for_openai_responses_continuation() -> None:
@@ -170,9 +214,49 @@ def test_prepare_generation_request_falls_back_to_runtime_replay_for_anthropic()
     assert "previous_response_id" not in request.json_body
     assert request.json_body["messages"][0]["content"][0]["text"] == "先读一下人物设定。"
     assert request.json_body["messages"][1]["content"][0]["type"] == "tool_use"
-    assert request.json_body["messages"][1]["content"][0]["name"] == "project.read_documents"
+    assert request.json_body["messages"][1]["content"][0]["name"] == "project_read_documents"
     assert request.json_body["messages"][2]["content"][0]["type"] == "tool_result"
     assert "设定/人物.md" in request.json_body["messages"][2]["content"][0]["content"]
+
+
+def test_prepare_generation_request_compiles_portable_tool_schema_for_anthropic() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="anthropic_messages",
+                api_key="test-key",
+                base_url="https://api.anthropic.com",
+            ),
+            model_name="claude-sonnet-4-20250514",
+            prompt="检索文稿。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            tools=[
+                LLMFunctionToolDefinition(
+                    name="project.search_documents",
+                    description="检索项目文稿。",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "minLength": 1},
+                            "path_prefix": {"type": "string", "minLength": 1},
+                        },
+                        "anyOf": [
+                            {"required": ["query"]},
+                            {"required": ["path_prefix"]},
+                        ],
+                    },
+                )
+            ],
+        )
+    )
+
+    params = request.json_body["tools"][0]["input_schema"]
+    assert "anyOf" not in params
+    assert params["description"] == "Provide at least one of: path_prefix, query."
 
 
 def test_prepare_generation_request_falls_back_to_runtime_replay_for_openai_chat_completions() -> None:
@@ -201,7 +285,7 @@ def test_prepare_generation_request_falls_back_to_runtime_replay_for_openai_chat
 
     assert "previous_response_id" not in request.json_body
     assert request.json_body["messages"][1] == {"role": "user", "content": "先读一下人物设定。"}
-    assert request.json_body["messages"][2]["tool_calls"][0]["function"]["name"] == "project.read_documents"
+    assert request.json_body["messages"][2]["tool_calls"][0]["function"]["name"] == "project_read_documents"
     assert request.json_body["messages"][3]["role"] == "tool"
     assert "设定/人物.md" in request.json_body["messages"][3]["content"]
 
@@ -234,11 +318,11 @@ def test_prepare_generation_request_falls_back_to_runtime_replay_for_gemini() ->
     assert request.json_body["contents"][0]["parts"][0]["text"] == "先读一下人物设定。"
     assert (
         request.json_body["contents"][1]["parts"][0]["functionCall"]["name"]
-        == "project.read_documents"
+        == "project_read_documents"
     )
     assert (
         request.json_body["contents"][2]["parts"][0]["functionResponse"]["name"]
-        == "project.read_documents"
+        == "project_read_documents"
     )
     assert "设定/人物.md" in json.dumps(
         request.json_body["contents"][2]["parts"][0]["functionResponse"]["response"],
@@ -429,6 +513,97 @@ def test_parse_openai_responses_response_extracts_function_call() -> None:
     assert normalized.tool_calls[0].tool_name == "project.read_documents"
     assert normalized.tool_calls[0].arguments == {"paths": ["设定/人物.md"]}
     assert normalized.provider_output_items[0]["item_type"] == "tool_call"
+
+
+def test_prepare_generation_request_disambiguates_colliding_external_tool_names() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="openai_chat_completions",
+                api_key="test-key",
+                base_url="https://api.openai.com",
+            ),
+            model_name="gpt-4o-mini",
+            prompt="读一下设定",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            tools=[
+                LLMFunctionToolDefinition(
+                    name="project.read_documents",
+                    description="读取项目文稿。",
+                    parameters={"type": "object", "properties": {}, "required": []},
+                ),
+                LLMFunctionToolDefinition(
+                    name="project_read_documents",
+                    description="另一个工具。",
+                    parameters={"type": "object", "properties": {}, "required": []},
+                ),
+            ],
+        )
+    )
+
+    tool_names = [item["function"]["name"] for item in request.json_body["tools"]]
+    assert tool_names[0] == "project_read_documents"
+    assert tool_names[1].startswith("project_read_documents__")
+    assert len(tool_names[1]) <= 64
+    assert request.tool_name_aliases["project.read_documents"] == "project_read_documents"
+    assert request.tool_name_aliases["project_read_documents"] == tool_names[1]
+
+
+def test_parse_generation_response_decodes_external_tool_name_alias() -> None:
+    normalized = parse_generation_response(
+        "openai_responses",
+        {
+            "id": "resp_123",
+            "output": [
+                {
+                    "id": "fc_123",
+                    "type": "function_call",
+                    "call_id": "call_123",
+                    "name": "project_read_documents",
+                    "arguments": '{"paths":["设定/人物.md"]}',
+                }
+            ],
+        },
+        tool_name_aliases={"project.read_documents": "project_read_documents"},
+    )
+
+    assert normalized.tool_calls[0].tool_name == "project.read_documents"
+    assert normalized.provider_output_items[0]["payload"]["tool_name"] == "project.read_documents"
+
+
+def test_parse_stream_terminal_response_decodes_external_tool_name_alias() -> None:
+    normalized = parse_stream_terminal_response(
+        "gemini_generate_content",
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "functionCall": {
+                                    "name": "project_read_documents",
+                                    "args": {"paths": ["设定/人物.md"]},
+                                }
+                            }
+                        ]
+                    },
+                    "finishReason": "STOP",
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 12,
+                "candidatesTokenCount": 4,
+                "totalTokenCount": 16,
+            },
+        },
+        tool_name_aliases={"project.read_documents": "project_read_documents"},
+    )
+
+    assert normalized.tool_calls[0].tool_name == "project.read_documents"
 
 
 def test_parse_gemini_response_generates_tool_call_id_when_missing() -> None:

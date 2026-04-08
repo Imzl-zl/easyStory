@@ -15,6 +15,8 @@ ALEMBIC_DIR = API_ROOT / "alembic"
 ALEMBIC_INI = API_ROOT / "alembic.ini"
 MODEL_CREDENTIALS_REQUIRED_COLUMNS = {
     "api_dialect",
+    "interop_profile",
+    "verified_probe_kind",
     "context_window_tokens",
     "default_max_output_tokens",
     "default_model",

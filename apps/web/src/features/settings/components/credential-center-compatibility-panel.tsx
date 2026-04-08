@@ -8,7 +8,11 @@ import {
   describeDefaultAuthStrategy,
   FieldInput,
 } from "@/features/settings/components/credential-center-form-fields";
-import type { CredentialFormState } from "@/features/settings/components/credential-center-support";
+import {
+  getInteropProfileOptions,
+  type CredentialFormState,
+  supportsCredentialInteropProfile,
+} from "@/features/settings/components/credential-center-support";
 
 type CredentialCompatibilityPanelProps = {
   formState: CredentialFormState;
@@ -23,6 +27,12 @@ export function CredentialCompatibilityPanel({
 }: Readonly<CredentialCompatibilityPanelProps>) {
   const fieldClassName = layout === "full" ? "xl:col-span-1" : undefined;
   const descriptionClassName = layout === "full" ? "xl:col-span-2" : undefined;
+  const interopProfileOptions = getInteropProfileOptions(formState.apiDialect).map((option) => ({
+    description: option.description,
+    label: option.label,
+    value: option.value,
+  }));
+  const showInteropProfileField = supportsCredentialInteropProfile(formState.apiDialect);
 
   return (
     <details className="rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.56)] p-4">
@@ -32,8 +42,23 @@ export function CredentialCompatibilityPanel({
       </summary>
       <div className={layout === "full" ? "mt-4 grid gap-4 xl:grid-cols-2" : "mt-4 grid gap-4"}>
         <p className={`text-[13px] leading-6 text-[var(--text-secondary)] ${descriptionClassName ?? ""}`}>
-          只有当上游服务要求特殊请求头或特殊密钥位置时，才需要修改这里。
+          只有当上游服务要求特殊请求头、特殊密钥位置，或者工具调用 / 流式协议存在兼容差异时，才需要修改这里。
         </p>
+        {showInteropProfileField ? (
+          <CredentialSelectField
+            className={fieldClassName}
+            description="只在当前服务类型需要额外兼容约束时使用；普通官方接口一般保持默认。"
+            label="协议兼容 Profile"
+            options={interopProfileOptions}
+            value={formState.interopProfile}
+            onChange={(value) =>
+              setFormState((current) => ({
+                ...current,
+                interopProfile: value as typeof current.interopProfile,
+              }))
+            }
+          />
+        ) : null}
         <CredentialSelectField
           className={fieldClassName}
           description={`当前服务类型默认会使用：${describeDefaultAuthStrategy(formState.apiDialect)}。`}

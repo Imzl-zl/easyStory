@@ -12,6 +12,9 @@ from app.modules.credential.models import ModelCredential
 from app.modules.observability.service import AuditLogService
 from app.modules.project.service import ProjectService
 from app.shared.runtime.errors import NotFoundError
+from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
+    ConformanceProbeKind,
+)
 
 from .dto import (
     CredentialCreateDTO,
@@ -105,6 +108,7 @@ class CredentialService:
             encrypted_key=self.crypto.encrypt(payload.api_key),
             base_url=payload.base_url,
             default_model=payload.default_model,
+            interop_profile=payload.interop_profile,
             context_window_tokens=payload.context_window_tokens,
             default_max_output_tokens=payload.default_max_output_tokens,
             auth_strategy=payload.auth_strategy,
@@ -230,6 +234,7 @@ class CredentialService:
         credential_id: uuid.UUID,
         *,
         actor_user_id: uuid.UUID,
+        probe_kind: ConformanceProbeKind = "text_probe",
     ) -> CredentialVerifyResultDTO:
         credential = await require_actor_credential(
             db,
@@ -245,6 +250,7 @@ class CredentialService:
             actor_user_id=actor_user_id,
             event_type=AUDIT_VERIFY,
             audit_log_service=self.audit_log_service,
+            probe_kind=probe_kind,
         )
 
     async def resolve_active_credential(

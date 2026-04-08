@@ -6,6 +6,8 @@ from sqlalchemy.engine import Connection
 MODEL_CREDENTIALS_TABLE = "model_credentials"
 API_DIALECT_COLUMN = "api_dialect"
 DEFAULT_MODEL_COLUMN = "default_model"
+INTEROP_PROFILE_COLUMN = "interop_profile"
+VERIFIED_PROBE_KIND_COLUMN = "verified_probe_kind"
 CONTEXT_WINDOW_TOKENS_COLUMN = "context_window_tokens"
 DEFAULT_MAX_OUTPUT_TOKENS_COLUMN = "default_max_output_tokens"
 CLIENT_NAME_COLUMN = "client_name"
@@ -32,6 +34,8 @@ def _add_missing_model_credential_columns(
 ) -> None:
     _add_missing_column(connection, columns, API_DIALECT_COLUMN, "VARCHAR(50)")
     _add_missing_column(connection, columns, DEFAULT_MODEL_COLUMN, "VARCHAR(100)")
+    _add_missing_column(connection, columns, INTEROP_PROFILE_COLUMN, "VARCHAR(80)")
+    _add_missing_column(connection, columns, VERIFIED_PROBE_KIND_COLUMN, "VARCHAR(40)")
     _add_missing_column(connection, columns, CONTEXT_WINDOW_TOKENS_COLUMN, "INTEGER")
     _add_missing_column(connection, columns, DEFAULT_MAX_OUTPUT_TOKENS_COLUMN, "INTEGER")
     _add_missing_column(connection, columns, CLIENT_NAME_COLUMN, "VARCHAR(100)")

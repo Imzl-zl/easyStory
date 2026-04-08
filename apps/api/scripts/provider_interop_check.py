@@ -16,6 +16,16 @@ from app.shared.runtime.llm.interop.provider_interop_stream_support import (
     build_stream_probe_request,
     execute_stream_probe_request,
 )
+from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
+    SUPPORTED_CONFORMANCE_PROBE_KINDS,
+    build_conformance_probe_request,
+    build_tool_continuation_probe_followup_request,
+    normalize_conformance_probe_kind,
+    serialize_probe_response,
+    validate_tool_call_probe_response,
+    validate_tool_continuation_probe_response,
+    validate_tool_definition_probe_response,
+)
 from app.shared.runtime.llm.interop.provider_interop_support import (
     DEFAULT_PROVIDER_INTEROP_CONFIG_PATH,
     DEFAULT_PROVIDER_INTEROP_ENV_PATH,
@@ -49,6 +59,12 @@ def _add_probe_command(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     parser = subparsers.add_parser("probe", help="Probe one profile with optional overrides.")
     parser.add_argument("profile_id", help="Profile id from provider-interop.local.json")
     _add_shared_paths(parser)
+    parser.add_argument(
+        "--probe-kind",
+        default="text_probe",
+        choices=sorted(SUPPORTED_CONFORMANCE_PROBE_KINDS),
+        help="Probe kind to execute",
+    )
     parser.add_argument("--api-dialect", help="Temporarily override api_dialect")
     parser.add_argument("--base-url", help="Temporarily override base_url")
     parser.add_argument("--model", help="Temporarily override model name")
@@ -142,26 +158,29 @@ async def _probe_profile(args: argparse.Namespace) -> int:
         env_path=Path(args.env_file),
         override=_build_override(args),
     )
+    probe_kind = normalize_conformance_probe_kind(args.probe_kind)
+    if probe_kind == "text_probe":
+        return await _probe_text_profile(args, resolved)
+    _ensure_conformance_probe_args(args, probe_kind)
+    return await _probe_tool_conformance_profile(args, resolved, probe_kind=probe_kind)
+
+
+async def _probe_text_profile(args: argparse.Namespace, resolved) -> int:
     request = build_provider_interop_probe_request(
         resolved,
         prompt=args.prompt,
         system_prompt=_resolve_system_prompt(args),
     )
-    if args.stream:
-        request = build_stream_probe_request(
-            request,
-            api_dialect=resolved.connection.api_dialect,
-        )
+    request = _maybe_build_stream_request(
+        request,
+        api_dialect=resolved.connection.api_dialect,
+        stream=args.stream,
+    )
     if args.show_request or args.dry_run:
-        print(_render_request(request))
+        print(_render_staged_request("initial", request))
     if args.dry_run:
         return 0
-    if not args.skip_rate_limit:
-        enforce_provider_interop_rate_limit(
-            profile_id=resolved.profile_id,
-            max_requests_per_minute=resolved.max_requests_per_minute,
-            rate_limit_path=Path(args.rate_limit_file),
-        )
+    _enforce_rate_limit_if_needed(args, resolved)
     normalized = await _execute_probe_request(
         request,
         api_dialect=resolved.connection.api_dialect,
@@ -174,16 +193,107 @@ async def _probe_profile(args: argparse.Namespace) -> int:
                 "profile_id": resolved.profile_id,
                 "provider": resolved.provider,
                 "model_name": resolved.model_name,
-                "content": normalized.content,
-                "input_tokens": normalized.input_tokens,
-                "output_tokens": normalized.output_tokens,
-                "total_tokens": normalized.total_tokens,
+                "probe_kind": "text_probe",
                 "stream": args.stream,
+                **serialize_probe_response(normalized),
             },
             ensure_ascii=False,
             indent=2,
         )
     )
+    return 0
+
+
+async def _probe_tool_conformance_profile(args: argparse.Namespace, resolved, *, probe_kind: str) -> int:
+    initial_request = _maybe_build_stream_request(
+        build_conformance_probe_request(
+            resolved.connection,
+            model_name=resolved.model_name,
+            probe_kind=probe_kind,
+        ),
+        api_dialect=resolved.connection.api_dialect,
+        stream=args.stream,
+    )
+    if args.show_request or args.dry_run:
+        print(_render_staged_request("initial", initial_request))
+    if args.dry_run:
+        return 0
+    _enforce_rate_limit_if_needed(args, resolved)
+    try:
+        initial_response = await _execute_probe_request(
+            initial_request,
+            api_dialect=resolved.connection.api_dialect,
+            print_response=args.print_response,
+            stream=args.stream,
+        )
+        if probe_kind == "tool_definition_probe":
+            validate_tool_definition_probe_response(initial_response)
+    except ConfigurationError as exc:
+        raise ConfigurationError(f"{probe_kind} initial stage failed: {exc}") from exc
+    if probe_kind == "tool_definition_probe":
+        payload = {
+            "profile_id": resolved.profile_id,
+            "provider": resolved.provider,
+            "model_name": resolved.model_name,
+            "probe_kind": probe_kind,
+            "stream": args.stream,
+            "initial": serialize_probe_response(initial_response),
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    try:
+        tool_call = validate_tool_call_probe_response(initial_response)
+    except ConfigurationError as exc:
+        raise ConfigurationError(f"{probe_kind} initial stage failed: {exc}") from exc
+    if probe_kind == "tool_call_probe":
+        payload = {
+            "profile_id": resolved.profile_id,
+            "provider": resolved.provider,
+            "model_name": resolved.model_name,
+            "probe_kind": probe_kind,
+            "stream": args.stream,
+            "initial": serialize_probe_response(initial_response),
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    try:
+        followup_request = _maybe_build_stream_request(
+            build_tool_continuation_probe_followup_request(
+                resolved.connection,
+                model_name=resolved.model_name,
+                initial_response=initial_response,
+            ),
+            api_dialect=resolved.connection.api_dialect,
+            stream=args.stream,
+        )
+    except ConfigurationError as exc:
+        raise ConfigurationError(f"{probe_kind} follow-up request build failed: {exc}") from exc
+    if args.show_request:
+        print(_render_staged_request("followup", followup_request))
+    _enforce_rate_limit_if_needed(args, resolved)
+    try:
+        followup_response = await _execute_probe_request(
+            followup_request,
+            api_dialect=resolved.connection.api_dialect,
+            print_response=args.print_response,
+            stream=args.stream,
+        )
+        validate_tool_continuation_probe_response(
+            followup_response,
+            expected_echo=tool_call.arguments["echo"],
+        )
+    except ConfigurationError as exc:
+        raise ConfigurationError(f"{probe_kind} follow-up stage failed: {exc}") from exc
+    payload = {
+        "profile_id": resolved.profile_id,
+        "provider": resolved.provider,
+        "model_name": resolved.model_name,
+        "probe_kind": probe_kind,
+        "stream": args.stream,
+        "initial": serialize_probe_response(initial_response),
+        "followup": serialize_probe_response(followup_response),
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -193,6 +303,14 @@ def _render_request(request: Any) -> str:
         "url": request.url,
         "headers": _mask_headers(request.headers),
         "json_body": request.json_body,
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def _render_staged_request(stage: str, request: Any) -> str:
+    payload = {
+        "stage": stage,
+        "request": json.loads(_render_request(request)),
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
@@ -250,11 +368,41 @@ async def _execute_probe_request(
             print(_render_response(response.json_body, response.text))
         if response.status_code >= 400:
             raise ConfigurationError(f"Probe failed with HTTP {response.status_code}")
-        return parse_generation_response(api_dialect, response.json_body or {})
+        return parse_generation_response(
+            api_dialect,
+            response.json_body or {},
+            tool_name_aliases=request.tool_name_aliases,
+        )
     return await execute_stream_probe_request(
         request,
         api_dialect=api_dialect,
         print_response=print_response,
+    )
+
+
+def _ensure_conformance_probe_args(args: argparse.Namespace, probe_kind: str) -> None:
+    if args.prompt is not None or args.system_prompt is not None:
+        raise ConfigurationError(
+            f"--prompt/--system-prompt 只支持 text_probe；当前 probe_kind={probe_kind}"
+        )
+
+
+def _maybe_build_stream_request(request, *, api_dialect: str, stream: bool):
+    if not stream:
+        return request
+    return build_stream_probe_request(
+        request,
+        api_dialect=api_dialect,
+    )
+
+
+def _enforce_rate_limit_if_needed(args: argparse.Namespace, resolved) -> None:
+    if args.skip_rate_limit:
+        return
+    enforce_provider_interop_rate_limit(
+        profile_id=resolved.profile_id,
+        max_requests_per_minute=resolved.max_requests_per_minute,
+        rate_limit_path=Path(args.rate_limit_file),
     )
 
 

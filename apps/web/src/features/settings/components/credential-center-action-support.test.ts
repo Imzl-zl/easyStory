@@ -11,7 +11,7 @@ import {
 test("resolvePendingCredentialAction returns current action only while mutation is pending", () => {
   const pendingAction: PendingCredentialAction = {
     credentialId: "credential-1",
-    type: "verify",
+    type: "verify_connection",
   };
 
   assert.equal(resolvePendingCredentialAction(false, pendingAction), null);
@@ -31,8 +31,10 @@ test("isPendingCredentialAction matches current row and action type", () => {
 });
 
 test("resolveCredentialActionButtonLabel returns explicit pending labels", () => {
-  assert.equal(resolveCredentialActionButtonLabel("verify", false), "验证");
-  assert.equal(resolveCredentialActionButtonLabel("verify", true), "验证中...");
+  assert.equal(resolveCredentialActionButtonLabel("verify_connection", false), "验证连接");
+  assert.equal(resolveCredentialActionButtonLabel("verify_connection", true), "验证中...");
+  assert.equal(resolveCredentialActionButtonLabel("verify_tools", false), "验证工具");
+  assert.equal(resolveCredentialActionButtonLabel("verify_tools", true), "验证中...");
   assert.equal(resolveCredentialActionButtonLabel("enable", true), "启用中...");
   assert.equal(resolveCredentialActionButtonLabel("disable", true), "停用中...");
   assert.equal(resolveCredentialActionButtonLabel("delete", true), "删除中...");

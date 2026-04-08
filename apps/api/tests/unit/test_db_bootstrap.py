@@ -93,6 +93,8 @@ def test_create_session_factory_reconciles_legacy_model_credentials_table(tmp_pa
     columns = {column["name"] for column in inspect(reconciled_engine).get_columns("model_credentials")}
     assert {
         "api_dialect",
+        "interop_profile",
+        "verified_probe_kind",
         "context_window_tokens",
         "default_max_output_tokens",
         "default_model",

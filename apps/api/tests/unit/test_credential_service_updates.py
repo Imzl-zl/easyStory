@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import pytest
 
 from app.modules.credential.infrastructure import CredentialVerificationResult
+from app.modules.credential.models import ModelCredential
 from app.modules.credential.service import (
     CredentialCreateDTO,
     CredentialUpdateDTO,
@@ -30,6 +31,7 @@ class FakeVerifier:
         base_url: str | None,
         api_dialect: str,
         default_model: str | None,
+        interop_profile: str | None,
         auth_strategy: str | None,
         api_key_header_name: str | None,
         extra_headers: dict[str, str] | None,
@@ -37,18 +39,27 @@ class FakeVerifier:
         client_name: str | None,
         client_version: str | None,
         runtime_kind: str | None,
+        probe_kind: str | None,
     ) -> CredentialVerificationResult:
         assert provider
         assert api_key
         assert api_dialect
         assert default_model
+        assert interop_profile is None or interop_profile
         assert user_agent_override is None or user_agent_override
         assert client_name is None or client_name
         assert client_version is None or client_version
         assert runtime_kind is None or runtime_kind
+        assert probe_kind in {
+            "text_probe",
+            "tool_definition_probe",
+            "tool_call_probe",
+            "tool_continuation_probe",
+        }
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
             message="验证成功",
+            probe_kind=probe_kind or "text_probe",
         )
 
 
@@ -101,6 +112,7 @@ def test_update_credential_clears_base_url_when_explicitly_null(db, monkeypatch)
     )
 
     assert updated.base_url is None
+    assert updated.verified_probe_kind is None
 
 
 def test_update_credential_rejects_explicit_null_default_model(db, monkeypatch) -> None:
@@ -147,6 +159,44 @@ def test_create_credential_persists_connection_overrides(db, monkeypatch) -> Non
     assert created.auth_strategy == "custom_header"
     assert created.api_key_header_name == "api-key"
     assert created.extra_headers == {"X-Trace-Id": "story-run"}
+
+
+def test_create_credential_persists_interop_profile_override(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+
+    created = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(
+                api_dialect="openai_chat_completions",
+                interop_profile="chat_compat_reasoning_content",
+            ),
+            actor_user_id=user.id,
+        )
+    )
+
+    assert created.interop_profile == "chat_compat_reasoning_content"
+
+
+def test_create_credential_normalizes_default_interop_profile_to_none(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+
+    created = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(
+                api_dialect="openai_chat_completions",
+                interop_profile="chat_compat_plain",
+            ),
+            actor_user_id=user.id,
+        )
+    )
+
+    assert created.interop_profile is None
 
 
 def test_create_credential_persists_client_identity(db, monkeypatch) -> None:
@@ -317,6 +367,90 @@ def test_update_credential_can_clear_token_limits(db, monkeypatch) -> None:
 
     assert updated.context_window_tokens is None
     assert updated.default_max_output_tokens is None
+
+
+def test_update_credential_can_change_and_clear_interop_profile(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+    credential = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(
+                api_dialect="openai_chat_completions",
+                interop_profile="chat_compat_reasoning_content",
+            ),
+            actor_user_id=user.id,
+        )
+    )
+
+    updated = asyncio.run(
+        service.update_credential(
+            async_db(db),
+            credential.id,
+            CredentialUpdateDTO(interop_profile="chat_compat_usage_extra_chunk"),
+            actor_user_id=user.id,
+        )
+    )
+    cleared = asyncio.run(
+        service.update_credential(
+            async_db(db),
+            credential.id,
+            CredentialUpdateDTO(interop_profile=None),
+            actor_user_id=user.id,
+        )
+    )
+
+    assert updated.interop_profile == "chat_compat_usage_extra_chunk"
+    assert cleared.interop_profile is None
+
+
+def test_update_credential_clears_verified_probe_kind_on_connection_change(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+    credential = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(),
+            actor_user_id=user.id,
+        )
+    )
+    stored = db.query(ModelCredential).filter(ModelCredential.id == credential.id).one()
+    stored.verified_probe_kind = "tool_continuation_probe"
+    stored.last_verified_at = datetime.now(timezone.utc)
+    db.add(stored)
+    db.commit()
+
+    updated = asyncio.run(
+        service.update_credential(
+            async_db(db),
+            credential.id,
+            CredentialUpdateDTO(default_model="gpt-4.1-mini"),
+            actor_user_id=user.id,
+        )
+    )
+
+    assert updated.verified_probe_kind is None
+    assert updated.last_verified_at is None
+
+
+def test_create_credential_rejects_incompatible_interop_profile_for_dialect(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+
+    with pytest.raises(ConfigurationError, match="not supported for api_dialect"):
+        asyncio.run(
+            service.create_credential(
+                async_db(db),
+                _create_payload(
+                    api_dialect="anthropic_messages",
+                    interop_profile="chat_compat_reasoning_content",
+                ),
+                actor_user_id=user.id,
+            )
+        )
 
 
 def test_update_credential_rejects_runtime_managed_extra_headers(db, monkeypatch) -> None:

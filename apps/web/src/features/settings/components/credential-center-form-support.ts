@@ -4,8 +4,10 @@ import {
   getDefaultAuthStrategy,
   normalizeApiKeyHeaderName,
   normalizeCredentialAuthStrategy,
+  normalizeCredentialInteropProfile,
   parseExtraHeadersText,
   type CredentialAuthStrategyValue,
+  type CredentialInteropProfileValue,
 } from "@/features/settings/components/credential-center-compatibility-support";
 import { normalizeCredentialClientIdentity, type CredentialRuntimeKindValue } from "@/features/settings/components/credential-center-client-identity-support";
 import { normalizeCredentialUserAgentOverride } from "@/features/settings/components/credential-center-user-agent-support";
@@ -53,6 +55,7 @@ export type CredentialFormState = {
   apiKey: string;
   baseUrl: string;
   defaultModel: string;
+  interopProfile: CredentialInteropProfileValue;
   contextWindowTokens: string;
   defaultMaxOutputTokens: string;
   authStrategy: CredentialAuthStrategyValue;
@@ -71,6 +74,7 @@ export function createInitialCredentialForm(): CredentialFormState {
     apiKey: "",
     baseUrl: DEFAULT_BASE_URLS.openai_chat_completions,
     defaultModel: "",
+    interopProfile: "",
     contextWindowTokens: "",
     defaultMaxOutputTokens: "",
     authStrategy: "",
@@ -90,6 +94,7 @@ export function createCredentialFormFromView(credential: CredentialView): Creden
     apiKey: "",
     baseUrl: credential.base_url ?? getDefaultBaseUrl(credential.api_dialect),
     defaultModel: credential.default_model ?? "",
+    interopProfile: credential.interop_profile ?? "",
     contextWindowTokens: toCredentialTokenDraft(credential.context_window_tokens),
     defaultMaxOutputTokens: toCredentialTokenDraft(credential.default_max_output_tokens),
     authStrategy: credential.auth_strategy ?? "",
@@ -114,6 +119,7 @@ export function isCredentialFormDirty(
     || formState.apiKey !== initialState.apiKey
     || formState.baseUrl !== initialState.baseUrl
     || formState.defaultModel !== initialState.defaultModel
+    || formState.interopProfile !== initialState.interopProfile
     || formState.contextWindowTokens !== initialState.contextWindowTokens
     || formState.defaultMaxOutputTokens !== initialState.defaultMaxOutputTokens
     || formState.authStrategy !== initialState.authStrategy
@@ -175,7 +181,7 @@ export function buildCredentialCreatePayload(options: {
     clientVersion: formState.clientVersion,
     runtimeKind: formState.runtimeKind,
   });
-  return {
+  const payload: CredentialCreatePayload = {
     owner_type: scope,
     project_id: scope === "project" ? projectId : null,
     provider: formState.provider.trim(),
@@ -198,6 +204,14 @@ export function buildCredentialCreatePayload(options: {
     client_version: clientIdentity.clientVersion,
     runtime_kind: clientIdentity.runtimeKind,
   };
+  const interopProfile = normalizeCredentialInteropProfile(
+    formState.apiDialect,
+    formState.interopProfile,
+  );
+  if (interopProfile !== null) {
+    payload.interop_profile = interopProfile;
+  }
+  return payload;
 }
 
 export function buildCredentialUpdatePayload(
@@ -208,6 +222,10 @@ export function buildCredentialUpdatePayload(
   const displayName = formState.displayName.trim();
   const nextBaseUrl = normalizeCredentialBaseUrl(formState.apiDialect, formState.baseUrl);
   const nextDefaultModel = formState.defaultModel.trim();
+  const nextInteropProfile = normalizeCredentialInteropProfile(
+    formState.apiDialect,
+    formState.interopProfile,
+  );
   const nextContextWindowTokens = parseContextWindowTokensDraft(formState.contextWindowTokens);
   const nextDefaultMaxOutputTokens = parseDefaultMaxOutputTokensDraft(formState.defaultMaxOutputTokens);
   const nextAuthStrategy = normalizeCredentialAuthStrategy(formState.apiDialect, formState.authStrategy);
@@ -237,6 +255,9 @@ export function buildCredentialUpdatePayload(
     payload.base_url = nextBaseUrl;
   }
   appendDefaultModelUpdate(payload, credential.default_model, nextDefaultModel);
+  if (nextInteropProfile !== (credential.interop_profile ?? null)) {
+    payload.interop_profile = nextInteropProfile;
+  }
   if (nextContextWindowTokens !== credential.context_window_tokens) {
     payload.context_window_tokens = nextContextWindowTokens;
   }

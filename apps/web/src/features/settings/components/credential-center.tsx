@@ -207,8 +207,11 @@ export function CredentialCenter({
       type,
       credentialId,
     }: PendingCredentialAction) => {
-      if (type === "verify") {
-        return verifyCredential(credentialId);
+      if (type === "verify_connection") {
+        return verifyCredential(credentialId, "text_probe");
+      }
+      if (type === "verify_tools") {
+        return verifyCredential(credentialId, "tool_continuation_probe");
       }
       if (type === "enable") {
         return enableCredential(credentialId);
@@ -237,8 +240,11 @@ export function CredentialCenter({
       }
       await refresh();
     },
-    onError: (error) => {
-      const nextFeedback = resolveCredentialActionErrorFeedback(error);
+    onError: (error, variables) => {
+      const nextFeedback = resolveCredentialActionErrorFeedback(
+        error,
+        variables.type,
+      );
       setFeedback(nextFeedback);
       if (nextFeedback) {
         showAppNotice({
@@ -350,8 +356,11 @@ export function CredentialCenter({
 }
 
 function resolveCredentialNoticeTitle(type: PendingCredentialAction["type"]) {
-  if (type === "verify") {
+  if (type === "verify_connection") {
     return "模型连接验证";
+  }
+  if (type === "verify_tools") {
+    return "工具调用验证";
   }
   if (type === "enable") {
     return "模型连接状态";

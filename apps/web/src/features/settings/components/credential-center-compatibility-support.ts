@@ -1,6 +1,11 @@
-import type { CredentialApiDialect, CredentialAuthStrategy } from "@/lib/api/types";
+import type {
+  CredentialApiDialect,
+  CredentialAuthStrategy,
+  CredentialInteropProfile,
+} from "@/lib/api/types";
 
 export type CredentialAuthStrategyValue = CredentialAuthStrategy | "";
+export type CredentialInteropProfileValue = CredentialInteropProfile | "";
 
 const CONTENT_TYPE_HEADER_NAME = "content-type";
 const ANTHROPIC_VERSION_HEADER_NAME = "anthropic-version";
@@ -22,6 +27,38 @@ const DEFAULT_AUTH_STRATEGIES: Record<CredentialApiDialect, CredentialAuthStrate
   anthropic_messages: "x_api_key",
   gemini_generate_content: "x_goog_api_key",
 };
+const DEFAULT_INTEROP_PROFILES: Partial<Record<CredentialApiDialect, CredentialInteropProfile>> = {
+  openai_chat_completions: "chat_compat_plain",
+  openai_responses: "responses_delta_first_terminal_empty_output",
+};
+const INTEROP_PROFILE_OPTIONS: Partial<Record<
+  CredentialApiDialect,
+  Array<{
+    value: CredentialInteropProfile;
+    label: string;
+    description: string;
+  }>
+>> = {
+  openai_chat_completions: [
+    {
+      value: "chat_compat_reasoning_content",
+      label: "兼容 reasoning 内容",
+      description: "适合把 reasoning 混入 content 的 OpenAI 兼容网关。",
+    },
+    {
+      value: "chat_compat_usage_extra_chunk",
+      label: "兼容额外 usage 块",
+      description: "适合把 usage 拆到额外 chunk 的 OpenAI 兼容网关。",
+    },
+  ],
+  openai_responses: [
+    {
+      value: "responses_strict",
+      label: "严格终态",
+      description: "要求 Responses 终态完整返回 output，不接受空 output 终态。",
+    },
+  ],
+};
 
 export const AUTH_STRATEGY_OPTIONS: Array<{
   value: CredentialAuthStrategyValue;
@@ -37,6 +74,79 @@ export const AUTH_STRATEGY_OPTIONS: Array<{
 
 export function getDefaultAuthStrategy(apiDialect: CredentialApiDialect) {
   return DEFAULT_AUTH_STRATEGIES[apiDialect];
+}
+
+
+export function supportsCredentialInteropProfile(apiDialect: CredentialApiDialect): boolean {
+  return Boolean(DEFAULT_INTEROP_PROFILES[apiDialect]);
+}
+
+
+export function getDefaultInteropProfile(
+  apiDialect: CredentialApiDialect,
+): CredentialInteropProfile | null {
+  return DEFAULT_INTEROP_PROFILES[apiDialect] ?? null;
+}
+
+
+export function getInteropProfileOptions(
+  apiDialect: CredentialApiDialect,
+): Array<{
+  value: CredentialInteropProfileValue;
+  label: string;
+  description: string;
+}> {
+  if (!supportsCredentialInteropProfile(apiDialect)) {
+    return [];
+  }
+  return [
+    {
+      value: "",
+      label: "跟随默认兼容",
+      description: `当前服务类型默认会使用：${describeDefaultInteropProfile(apiDialect)}。`,
+    },
+    ...(INTEROP_PROFILE_OPTIONS[apiDialect] ?? []),
+  ];
+}
+
+
+export function sanitizeCredentialInteropProfileSelection(
+  apiDialect: CredentialApiDialect,
+  interopProfile: CredentialInteropProfileValue,
+): CredentialInteropProfileValue {
+  if (!interopProfile) {
+    return "";
+  }
+  return isCredentialInteropProfileSupported(apiDialect, interopProfile) ? interopProfile : "";
+}
+
+
+export function normalizeCredentialInteropProfile(
+  apiDialect: CredentialApiDialect,
+  interopProfile: CredentialInteropProfileValue,
+): CredentialInteropProfile | null {
+  if (!interopProfile) {
+    return null;
+  }
+  if (!isCredentialInteropProfileSupported(apiDialect, interopProfile)) {
+    throw new Error("当前服务类型不支持这个兼容 Profile。");
+  }
+  if (interopProfile === getDefaultInteropProfile(apiDialect)) {
+    return null;
+  }
+  return interopProfile;
+}
+
+
+export function describeDefaultInteropProfile(apiDialect: CredentialApiDialect): string {
+  const profile = getDefaultInteropProfile(apiDialect);
+  if (profile === "chat_compat_plain") {
+    return "普通 Chat 兼容";
+  }
+  if (profile === "responses_delta_first_terminal_empty_output") {
+    return "允许空 output 终态";
+  }
+  return "无";
 }
 
 export function normalizeCredentialAuthStrategy(
@@ -199,4 +309,13 @@ function looksLikeSensitiveHeaderName(headerName: string): boolean {
     return true;
   }
   return SENSITIVE_EXTRA_HEADER_FRAGMENTS.some((fragment) => normalized.includes(fragment));
+}
+
+
+function isCredentialInteropProfileSupported(
+  apiDialect: CredentialApiDialect,
+  interopProfile: CredentialInteropProfile,
+): boolean {
+  return (INTEROP_PROFILE_OPTIONS[apiDialect] ?? []).some((option) => option.value === interopProfile)
+    || interopProfile === getDefaultInteropProfile(apiDialect);
 }

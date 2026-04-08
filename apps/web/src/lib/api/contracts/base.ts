@@ -73,7 +73,18 @@ export type CredentialApiDialect =
   | "anthropic_messages"
   | "gemini_generate_content";
 export type CredentialAuthStrategy = "bearer" | "x_api_key" | "x_goog_api_key" | "custom_header";
+export type CredentialInteropProfile =
+  | "responses_strict"
+  | "responses_delta_first_terminal_empty_output"
+  | "chat_compat_plain"
+  | "chat_compat_reasoning_content"
+  | "chat_compat_usage_extra_chunk";
 export type CredentialRuntimeKind = "server-python" | "server-node" | "browser";
+export type CredentialVerifyProbeKind =
+  | "text_probe"
+  | "tool_definition_probe"
+  | "tool_call_probe"
+  | "tool_continuation_probe";
 
 export type CredentialView = {
   id: string;
@@ -85,6 +96,8 @@ export type CredentialView = {
   masked_key: string;
   base_url: string | null;
   default_model: string | null;
+  interop_profile?: CredentialInteropProfile | null;
+  verified_probe_kind?: CredentialVerifyProbeKind | null;
   context_window_tokens: number | null;
   default_max_output_tokens: number | null;
   auth_strategy: CredentialAuthStrategy | null;
@@ -107,6 +120,7 @@ export type CredentialCreatePayload = {
   api_key: string;
   base_url?: string | null;
   default_model: string;
+  interop_profile?: CredentialInteropProfile | null;
   context_window_tokens?: number | null;
   default_max_output_tokens?: number | null;
   auth_strategy?: CredentialAuthStrategy | null;
@@ -124,6 +138,7 @@ export type CredentialUpdatePayload = {
   api_key?: string | null;
   base_url?: string | null;
   default_model?: string | null;
+  interop_profile?: CredentialInteropProfile | null;
   context_window_tokens?: number | null;
   default_max_output_tokens?: number | null;
   auth_strategy?: CredentialAuthStrategy | null;
@@ -137,6 +152,7 @@ export type CredentialUpdatePayload = {
 
 export type CredentialVerifyResult = {
   credential_id: string;
+  probe_kind: CredentialVerifyProbeKind;
   status: "verified";
   last_verified_at: string;
   message: string;

@@ -11,7 +11,12 @@ from app.modules.config_registry.schemas import ModelConfig
 from app.modules.credential.service import CredentialService
 from app.modules.credential.service.credential_connection_support import build_runtime_credential_payload
 from app.shared.runtime import ToolProvider
-from app.shared.runtime.errors import ConfigurationError
+from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
+from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
+    ConformanceProbeKind,
+    conformance_probe_kind_satisfies,
+    normalize_conformance_probe_kind,
+)
 from app.shared.runtime.llm.llm_protocol import (
     LLMContinuationSupport,
     allows_provider_continuation_state,
@@ -26,6 +31,8 @@ from .tooling.assistant_tool_loop import AssistantToolLoopModelStreamEvent
 class ResolvedAssistantLlmRuntime:
     credential_payload: dict[str, Any]
     continuation_support: LLMContinuationSupport
+    credential_display_name: str
+    verified_probe_kind: ConformanceProbeKind | None = None
     context_window_tokens: int | None = None
     default_max_output_tokens: int | None = None
 
@@ -50,6 +57,12 @@ async def resolve_assistant_llm_runtime(
             decrypt_api_key=credential_service.crypto.decrypt,
         ),
         continuation_support=resolve_continuation_support(credential.api_dialect),
+        credential_display_name=credential.display_name,
+        verified_probe_kind=(
+            normalize_conformance_probe_kind(credential.verified_probe_kind)
+            if credential.verified_probe_kind is not None
+            else None
+        ),
         context_window_tokens=credential.context_window_tokens,
         default_max_output_tokens=credential.default_max_output_tokens,
     )
@@ -217,3 +230,21 @@ def resolve_assistant_max_output_tokens(
     if "max_tokens" in model.model_fields_set:
         return model.max_tokens
     return resolved_runtime.default_max_output_tokens
+
+
+def ensure_assistant_runtime_supports_visible_tools(
+    resolved_runtime: ResolvedAssistantLlmRuntime,
+    *,
+    visible_tool_names: tuple[str, ...],
+) -> None:
+    if not visible_tool_names:
+        return
+    if conformance_probe_kind_satisfies(
+        resolved_runtime.verified_probe_kind,
+        required_probe_kind="tool_continuation_probe",
+    ):
+        return
+    raise BusinessRuleError(
+        f"模型连接“{resolved_runtime.credential_display_name}”尚未通过“验证工具”，"
+        "当前不能启用项目工具。请先到模型连接中执行“验证工具”。"
+    )

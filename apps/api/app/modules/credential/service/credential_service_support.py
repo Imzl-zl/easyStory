@@ -13,6 +13,7 @@ from .credential_connection_support import (
     normalize_client_identity_settings,
     normalize_connection_settings,
     normalize_extra_headers,
+    normalize_interop_profile_override,
     normalize_user_agent_override,
 )
 from .credential_token_support import (
@@ -46,6 +47,7 @@ def apply_update_payload(
     update_display_name(credential, payload, changes)
     update_base_url(credential, payload, changes)
     update_default_model(credential, payload, changes)
+    update_interop_profile(credential, payload, changes)
     update_context_window_tokens(credential, payload, changes)
     update_default_max_output_tokens(credential, payload, changes)
     rotate_api_key(credential, payload, encrypt_api_key=encrypt_api_key, changes=changes)
@@ -63,6 +65,7 @@ def build_credential(
     encrypted_key: str,
     base_url: str | None,
     default_model: str,
+    interop_profile: str | None,
     context_window_tokens: int | None,
     default_max_output_tokens: int | None,
     auth_strategy: str | None,
@@ -82,6 +85,8 @@ def build_credential(
         encrypted_key=encrypted_key,
         base_url=normalize_base_url(base_url),
         default_model=normalize_default_model(default_model),
+        interop_profile=interop_profile,
+        verified_probe_kind=None,
         context_window_tokens=normalize_context_window_tokens(context_window_tokens),
         default_max_output_tokens=normalize_default_max_output_tokens(default_max_output_tokens),
         auth_strategy=auth_strategy,
@@ -109,7 +114,7 @@ def update_api_dialect(
     if api_dialect == credential.api_dialect:
         return
     credential.api_dialect = api_dialect
-    credential.last_verified_at = None
+    reset_credential_verification_state(credential)
     changes["api_dialect"] = "updated"
 
 
@@ -124,7 +129,7 @@ def update_auth_strategy(
     if auth_strategy == credential.auth_strategy:
         return
     credential.auth_strategy = auth_strategy
-    credential.last_verified_at = None
+    reset_credential_verification_state(credential)
     changes["auth_strategy"] = "updated"
 
 
@@ -143,7 +148,7 @@ def update_api_key_header_name(
     if header_name == credential.api_key_header_name:
         return
     credential.api_key_header_name = header_name
-    credential.last_verified_at = None
+    reset_credential_verification_state(credential)
     changes["api_key_header_name"] = "updated"
 
 
@@ -163,7 +168,7 @@ def update_extra_headers(
     if extra_headers == credential.extra_headers:
         return
     credential.extra_headers = extra_headers
-    credential.last_verified_at = None
+    reset_credential_verification_state(credential)
     changes["extra_headers"] = "updated"
 
 
@@ -198,7 +203,7 @@ def update_client_identity(
     credential.client_name = client_name
     credential.client_version = client_version
     credential.runtime_kind = runtime_kind
-    credential.last_verified_at = None
+    reset_credential_verification_state(credential)
     changes["client_identity"] = "updated"
 
 def update_user_agent_override(
@@ -212,7 +217,7 @@ def update_user_agent_override(
     if user_agent_override == credential.user_agent_override:
         return
     credential.user_agent_override = user_agent_override
-    credential.last_verified_at = None
+    reset_credential_verification_state(credential)
     changes["user_agent_override"] = "updated"
 
 
@@ -243,7 +248,7 @@ def update_base_url(
     if base_url == credential.base_url:
         return
     credential.base_url = base_url
-    credential.last_verified_at = None
+    reset_credential_verification_state(credential)
     changes["base_url"] = "updated"
 
 
@@ -260,7 +265,7 @@ def update_default_model(
     if default_model == credential.default_model:
         return
     credential.default_model = default_model
-    credential.last_verified_at = None
+    reset_credential_verification_state(credential)
     changes["default_model"] = "updated"
 
 
@@ -275,8 +280,31 @@ def rotate_api_key(
     if payload.api_key is None:
         raise ConfigurationError("api_key cannot be null")
     credential.encrypted_key = encrypt_api_key(payload.api_key)
-    credential.last_verified_at = None
+    reset_credential_verification_state(credential)
     changes["api_key"] = "rotated"
+
+
+def update_interop_profile(
+    credential: ModelCredential,
+    payload: CredentialUpdateDTO,
+    changes: dict[str, str],
+) -> None:
+    if not _field_was_provided(payload, "interop_profile"):
+        return
+    interop_profile = normalize_interop_profile_override(
+        credential.api_dialect,
+        payload.interop_profile,
+    )
+    if interop_profile == credential.interop_profile:
+        return
+    credential.interop_profile = interop_profile
+    reset_credential_verification_state(credential)
+    changes["interop_profile"] = "updated"
+
+
+def reset_credential_verification_state(credential: ModelCredential) -> None:
+    credential.last_verified_at = None
+    credential.verified_probe_kind = None
 
 
 def normalize_provider(provider: str) -> str:

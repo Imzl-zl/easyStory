@@ -6,8 +6,12 @@ import {
 
 export {
   AUTH_STRATEGY_OPTIONS,
+  getInteropProfileOptions,
   getDefaultAuthStrategy,
+  sanitizeCredentialInteropProfileSelection,
+  supportsCredentialInteropProfile,
   type CredentialAuthStrategyValue,
+  type CredentialInteropProfileValue,
 } from "@/features/settings/components/credential-center-compatibility-support";
 export {
   API_DIALECT_OPTIONS,

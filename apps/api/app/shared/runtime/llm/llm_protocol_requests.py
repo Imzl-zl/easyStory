@@ -1,12 +1,26 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 from urllib.parse import quote, urlsplit
 
 from ..errors import ConfigurationError
 from .interop.gemini_probe_support import apply_gemini_probe_thinking_config
+from .interop.tool_continuation_codec import (
+    build_openai_responses_input as codec_build_openai_responses_input,
+    collect_continuation_tool_names as codec_collect_continuation_tool_names,
+    project_continuation_to_anthropic_messages as codec_project_continuation_to_anthropic_messages,
+    project_continuation_to_gemini_contents as codec_project_continuation_to_gemini_contents,
+    project_continuation_to_openai_chat_messages as codec_project_continuation_to_openai_chat_messages,
+    read_latest_continuation_items as codec_read_latest_continuation_items,
+    read_previous_response_id as codec_read_previous_response_id,
+)
+from .interop.tool_schema_compiler import compile_tool_parameters
+from .interop.tool_name_codec import (
+    build_tool_name_aliases,
+    encode_tool_name,
+)
 from .llm_endpoint_policy import normalize_custom_base_url
+from .llm_interop_profiles import LLMInteropCapabilities, resolve_interop_capabilities
 from .llm_protocol_types import (
     ANTHROPIC_VERSION,
     DEFAULT_BASE_URLS,
@@ -24,8 +38,6 @@ from .llm_protocol_types import (
 )
 
 USER_AGENT_HEADER_NAME = "User-Agent"
-GEMINI_UNSUPPORTED_SCHEMA_KEYS = frozenset({"additionalProperties"})
-GEMINI_ANY_OF_NOTE_PREFIX = "Provide at least one of:"
 RUNTIME_KIND_LABELS = {
     "server-python": "server; python",
     "server-node": "server; node",
@@ -35,13 +47,37 @@ RUNTIME_KIND_LABELS = {
 
 def prepare_generation_request(request: LLMGenerateRequest) -> PreparedLLMHttpRequest:
     dialect = normalize_api_dialect(request.connection.api_dialect)
+    capabilities = resolve_interop_capabilities(
+        dialect,
+        request.connection.interop_profile,
+    )
+    tool_name_aliases = build_tool_name_aliases(
+        _collect_request_tool_names(request),
+        policy=capabilities.tool_name_policy,
+    )
     if dialect == "openai_chat_completions":
-        return _build_openai_chat_request(request)
+        return _build_openai_chat_request(
+            request,
+            capabilities=capabilities,
+            tool_name_aliases=tool_name_aliases,
+        )
     if dialect == "openai_responses":
-        return _build_openai_responses_request(request)
+        return _build_openai_responses_request(
+            request,
+            capabilities=capabilities,
+            tool_name_aliases=tool_name_aliases,
+        )
     if dialect == "anthropic_messages":
-        return _build_anthropic_messages_request(request)
-    return _build_gemini_generate_content_request(request)
+        return _build_anthropic_messages_request(
+            request,
+            capabilities=capabilities,
+            tool_name_aliases=tool_name_aliases,
+        )
+    return _build_gemini_generate_content_request(
+        request,
+        capabilities=capabilities,
+        tool_name_aliases=tool_name_aliases,
+    )
 
 
 def build_verification_request(connection: LLMConnection) -> PreparedLLMHttpRequest:
@@ -67,19 +103,32 @@ def build_verification_request(connection: LLMConnection) -> PreparedLLMHttpRequ
     return request
 
 
-def _build_openai_chat_request(request: LLMGenerateRequest) -> PreparedLLMHttpRequest:
+def _build_openai_chat_request(
+    request: LLMGenerateRequest,
+    *,
+    capabilities: LLMInteropCapabilities,
+    tool_name_aliases: dict[str, str],
+) -> PreparedLLMHttpRequest:
     body: dict[str, Any] = {
         "model": request.model_name,
-        "messages": _build_openai_chat_messages(request),
+        "messages": _build_openai_chat_messages(
+            request,
+            tool_name_aliases=tool_name_aliases,
+            tool_name_policy=capabilities.tool_name_policy,
+        ),
     }
     if request.tools:
         body["tools"] = [
             {
                 "type": "function",
                 "function": {
-                    "name": tool.name,
+                    "name": encode_tool_name(
+                        tool.name,
+                        tool_name_aliases=tool_name_aliases,
+                        policy=capabilities.tool_name_policy,
+                    ),
                     "description": tool.description,
-                    "parameters": tool.parameters,
+                    "parameters": _compile_tool_parameters(tool.parameters, capabilities=capabilities),
                     "strict": tool.strict,
                 },
             }
@@ -95,24 +144,38 @@ def _build_openai_chat_request(request: LLMGenerateRequest) -> PreparedLLMHttpRe
         headers=_build_request_headers(request.connection),
         json_body=body,
         interop_profile=request.connection.interop_profile,
+        tool_name_aliases=tool_name_aliases,
     )
 
 
-def _build_openai_responses_request(request: LLMGenerateRequest) -> PreparedLLMHttpRequest:
+def _build_openai_responses_request(
+    request: LLMGenerateRequest,
+    *,
+    capabilities: LLMInteropCapabilities,
+    tool_name_aliases: dict[str, str],
+) -> PreparedLLMHttpRequest:
     body: dict[str, Any] = {
         "model": request.model_name,
-        "input": _build_openai_responses_input(request),
+        "input": _build_openai_responses_input(
+            request,
+            tool_name_aliases=tool_name_aliases,
+            tool_name_policy=capabilities.tool_name_policy,
+        ),
     }
-    previous_response_id = _read_previous_response_id(request.provider_continuation_state)
+    previous_response_id = codec_read_previous_response_id(request.provider_continuation_state)
     if previous_response_id is not None:
         body["previous_response_id"] = previous_response_id
     if request.tools:
         body["tools"] = [
             {
                 "type": "function",
-                "name": tool.name,
+                "name": encode_tool_name(
+                    tool.name,
+                    tool_name_aliases=tool_name_aliases,
+                    policy=capabilities.tool_name_policy,
+                ),
                 "description": tool.description,
-                "parameters": tool.parameters,
+                "parameters": _compile_tool_parameters(tool.parameters, capabilities=capabilities),
                 "strict": tool.strict,
             }
             for tool in request.tools
@@ -129,21 +192,35 @@ def _build_openai_responses_request(request: LLMGenerateRequest) -> PreparedLLMH
         headers=_build_request_headers(request.connection),
         json_body=body,
         interop_profile=request.connection.interop_profile,
+        tool_name_aliases=tool_name_aliases,
     )
 
 
-def _build_anthropic_messages_request(request: LLMGenerateRequest) -> PreparedLLMHttpRequest:
+def _build_anthropic_messages_request(
+    request: LLMGenerateRequest,
+    *,
+    capabilities: LLMInteropCapabilities,
+    tool_name_aliases: dict[str, str],
+) -> PreparedLLMHttpRequest:
     body: dict[str, Any] = {
         "model": request.model_name,
         "max_tokens": request.max_tokens or 1024,
-        "messages": _build_anthropic_messages(request),
+        "messages": _build_anthropic_messages(
+            request,
+            tool_name_aliases=tool_name_aliases,
+            tool_name_policy=capabilities.tool_name_policy,
+        ),
     }
     if request.tools:
         body["tools"] = [
             {
-                "name": tool.name,
+                "name": encode_tool_name(
+                    tool.name,
+                    tool_name_aliases=tool_name_aliases,
+                    policy=capabilities.tool_name_policy,
+                ),
                 "description": tool.description,
-                "input_schema": tool.parameters,
+                "input_schema": _compile_tool_parameters(tool.parameters, capabilities=capabilities),
             }
             for tool in request.tools
         ]
@@ -164,18 +241,36 @@ def _build_anthropic_messages_request(request: LLMGenerateRequest) -> PreparedLL
         ),
         json_body=body,
         interop_profile=request.connection.interop_profile,
+        tool_name_aliases=tool_name_aliases,
     )
 
 
-def _build_gemini_generate_content_request(request: LLMGenerateRequest) -> PreparedLLMHttpRequest:
+def _build_gemini_generate_content_request(
+    request: LLMGenerateRequest,
+    *,
+    capabilities: LLMInteropCapabilities,
+    tool_name_aliases: dict[str, str],
+) -> PreparedLLMHttpRequest:
     body: dict[str, Any] = {
-        "contents": _build_gemini_contents(request),
+        "contents": _build_gemini_contents(
+            request,
+            tool_name_aliases=tool_name_aliases,
+            tool_name_policy=capabilities.tool_name_policy,
+        ),
     }
     generation_config = _build_gemini_generation_config(request)
     if generation_config:
         body["generationConfig"] = generation_config
     if request.tools:
-        body["tools"] = [{"functionDeclarations": _build_gemini_function_declarations(request)}]
+        body["tools"] = [
+            {
+                "functionDeclarations": _build_gemini_function_declarations(
+                    request,
+                    capabilities=capabilities,
+                    tool_name_aliases=tool_name_aliases,
+                )
+            }
+        ]
     if request.system_prompt:
         body["system_instruction"] = {"parts": [{"text": request.system_prompt}]}
     return PreparedLLMHttpRequest(
@@ -184,84 +279,57 @@ def _build_gemini_generate_content_request(request: LLMGenerateRequest) -> Prepa
         headers=_build_request_headers(request.connection),
         json_body=body,
         interop_profile=request.connection.interop_profile,
+        tool_name_aliases=tool_name_aliases,
     )
 
 
 def _build_gemini_function_declarations(
     request: LLMGenerateRequest,
+    *,
+    capabilities: LLMInteropCapabilities,
+    tool_name_aliases: dict[str, str],
 ) -> list[dict[str, Any]]:
     return [
         {
-            "name": tool.name,
+            "name": encode_tool_name(
+                tool.name,
+                tool_name_aliases=tool_name_aliases,
+                policy=capabilities.tool_name_policy,
+            ),
             "description": tool.description,
-            "parameters": _sanitize_gemini_tool_schema(tool.parameters),
+            "parameters": _compile_tool_parameters(tool.parameters, capabilities=capabilities),
         }
         for tool in request.tools
     ]
 
 
-def _sanitize_gemini_tool_schema(value: Any) -> Any:
-    if isinstance(value, dict):
-        cleaned = {
-            key: _sanitize_gemini_tool_schema(item)
-            for key, item in value.items()
-            if key not in GEMINI_UNSUPPORTED_SCHEMA_KEYS
-        }
-        return _simplify_gemini_required_only_any_of(cleaned)
-    if isinstance(value, list):
-        return [_sanitize_gemini_tool_schema(item) for item in value]
-    return value
-
-
-def _simplify_gemini_required_only_any_of(
-    schema: dict[str, Any],
-) -> dict[str, Any]:
-    any_of = schema.get("anyOf")
-    if not _is_required_only_any_of(any_of):
-        return schema
-    fields = sorted({field for entry in any_of for field in entry["required"]})
-    simplified = {key: value for key, value in schema.items() if key != "anyOf"}
-    simplified["description"] = _merge_schema_description(
-        simplified.get("description"),
-        f"{GEMINI_ANY_OF_NOTE_PREFIX} {', '.join(fields)}.",
-    )
-    return simplified
-
-
-def _is_required_only_any_of(value: Any) -> bool:
-    if not isinstance(value, list) or not value:
-        return False
-    for entry in value:
-        if not isinstance(entry, dict):
-            return False
-        keys = set(entry.keys())
-        required = entry.get("required")
-        if keys != {"required"} or not isinstance(required, list) or not required:
-            return False
-        if any(not isinstance(field, str) or not field.strip() for field in required):
-            return False
-    return True
-
-
-def _merge_schema_description(existing: Any, note: str) -> str:
-    if not isinstance(existing, str) or not existing.strip():
-        return note
-    if note in existing:
-        return existing
-    return f"{existing.strip()} {note}"
-
-
-def _build_openai_chat_messages(request: LLMGenerateRequest) -> list[dict[str, Any]]:
+def _build_openai_chat_messages(
+    request: LLMGenerateRequest,
+    *,
+    tool_name_aliases: dict[str, str],
+    tool_name_policy: str,
+) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
     if request.system_prompt:
         messages.append({"role": "system", "content": request.system_prompt})
     if request.prompt.strip():
         messages.append({"role": "user", "content": request.prompt})
-    messages.extend(_project_continuation_to_openai_chat_messages(request.continuation_items))
+    messages.extend(
+        codec_project_continuation_to_openai_chat_messages(
+            request.continuation_items,
+            tool_name_aliases=tool_name_aliases,
+            tool_name_policy=tool_name_policy,
+        )
+    )
     return messages
 
 
-def _build_anthropic_messages(request: LLMGenerateRequest) -> list[dict[str, Any]]:
+def _build_anthropic_messages(
+    request: LLMGenerateRequest,
+    *,
+    tool_name_aliases: dict[str, str],
+    tool_name_policy: str,
+) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
     if request.prompt.strip():
         messages.append(
@@ -270,479 +338,64 @@ def _build_anthropic_messages(request: LLMGenerateRequest) -> list[dict[str, Any
                 "content": [{"type": "text", "text": request.prompt}],
             }
         )
-    messages.extend(_project_continuation_to_anthropic_messages(request.continuation_items))
+    messages.extend(
+        codec_project_continuation_to_anthropic_messages(
+            request.continuation_items,
+            tool_name_aliases=tool_name_aliases,
+            tool_name_policy=tool_name_policy,
+        )
+    )
     return messages
 
 
-def _build_gemini_contents(request: LLMGenerateRequest) -> list[dict[str, Any]]:
+def _build_gemini_contents(
+    request: LLMGenerateRequest,
+    *,
+    tool_name_aliases: dict[str, str],
+    tool_name_policy: str,
+) -> list[dict[str, Any]]:
     contents: list[dict[str, Any]] = []
     if request.prompt.strip():
         contents.append({"role": "user", "parts": [{"text": request.prompt}]})
-    contents.extend(_project_continuation_to_gemini_contents(request.continuation_items))
-    return contents
-
-
-def _build_prompt_with_continuation(request: LLMGenerateRequest) -> str:
-    continuation_projection = _render_continuation_items_as_text(request.continuation_items)
-    if continuation_projection is None:
-        return request.prompt
-    if not request.prompt.strip():
-        return continuation_projection
-    return f"{request.prompt}\n\n{continuation_projection}"
-
-
-def _render_continuation_items_as_text(items: list[dict[str, Any]]) -> str | None:
-    sections: list[str] = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        item_type = item.get("item_type")
-        if item_type == "message":
-            role = item.get("role")
-            content = item.get("content")
-            if isinstance(role, str) and isinstance(content, str) and content.strip():
-                sections.append(f"【上一轮{role}消息】\n{content.strip()}")
-            continue
-        if item_type == "tool_call":
-            payload = item.get("payload")
-            if not isinstance(payload, dict):
-                continue
-            tool_name = payload.get("tool_name")
-            arguments = payload.get("arguments")
-            call_id = payload.get("tool_call_id") or item.get("call_id")
-            if isinstance(tool_name, str) and tool_name.strip():
-                sections.append(
-                    "\n".join(
-                        [
-                            "【工具调用】",
-                            f"名称：{tool_name.strip()}",
-                            f"调用 ID：{call_id}" if isinstance(call_id, str) and call_id.strip() else "",
-                            f"参数：{json.dumps(arguments, ensure_ascii=False, separators=(',', ':'), sort_keys=True)}",
-                        ]
-                    ).strip()
-                )
-            continue
-        if item_type == "tool_result":
-            payload = item.get("payload")
-            if not isinstance(payload, dict):
-                continue
-            status = item.get("status")
-            content_sections = _render_tool_result_payload_as_text(payload)
-            if content_sections:
-                sections.append(
-                    "\n".join(
-                        [
-                            "【工具结果】",
-                            f"状态：{status}" if isinstance(status, str) and status.strip() else "",
-                            content_sections,
-                        ]
-                    ).strip()
-                )
-    normalized = "\n\n".join(section for section in sections if section.strip())
-    return normalized or None
-
-
-def _render_tool_result_payload_as_text(payload: dict[str, Any]) -> str:
-    content_items = payload.get("content_items")
-    lines: list[str] = []
-    if isinstance(content_items, list):
-        for item in content_items:
-            if not isinstance(item, dict):
-                continue
-            text = item.get("text")
-            if isinstance(text, str) and text.strip():
-                lines.append(text.strip())
-    error = payload.get("error")
-    if isinstance(error, dict):
-        code = error.get("code")
-        message = error.get("message")
-        parts: list[str] = []
-        if isinstance(code, str) and code.strip():
-            parts.append(f"code={code.strip()}")
-        if isinstance(message, str) and message.strip():
-            parts.append(message.strip())
-        if parts:
-            lines.append("工具错误：" + " | ".join(parts))
-    structured_output = payload.get("structured_output")
-    if not lines and structured_output is not None:
-        return json.dumps(structured_output, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
-    return "\n\n".join(lines)
-
-
-def _project_continuation_to_openai_chat_messages(
-    items: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    messages: list[dict[str, Any]] = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        item_type = item.get("item_type")
-        if item_type == "message":
-            role = item.get("role")
-            content = item.get("content")
-            if role in {"user", "assistant"} and isinstance(content, str) and content.strip():
-                messages.append({"role": role, "content": content.strip()})
-            continue
-        if item_type == "tool_call":
-            tool_call_message = _build_openai_chat_tool_call_message(item)
-            if tool_call_message is not None:
-                messages.append(tool_call_message)
-            continue
-        if item_type == "tool_result":
-            tool_result_message = _build_openai_chat_tool_result_message(item)
-            if tool_result_message is not None:
-                messages.append(tool_result_message)
-    return messages
-
-
-def _build_openai_chat_tool_call_message(item: dict[str, Any]) -> dict[str, Any] | None:
-    payload = item.get("payload")
-    if not isinstance(payload, dict):
-        return None
-    tool_name = payload.get("tool_name")
-    call_id = payload.get("tool_call_id") or item.get("call_id")
-    if not isinstance(tool_name, str) or not tool_name.strip():
-        return None
-    if not isinstance(call_id, str) or not call_id.strip():
-        return None
-    arguments_text = _serialize_tool_call_arguments(payload)
-    return {
-        "role": "assistant",
-        "content": "",
-        "tool_calls": [
-            {
-                "id": call_id.strip(),
-                "type": "function",
-                "function": {
-                    "name": tool_name.strip(),
-                    "arguments": arguments_text,
-                },
-            }
-        ],
-    }
-
-
-def _build_openai_chat_tool_result_message(item: dict[str, Any]) -> dict[str, Any] | None:
-    call_id = item.get("call_id")
-    payload = item.get("payload")
-    if not isinstance(call_id, str) or not call_id.strip():
-        return None
-    if not isinstance(payload, dict):
-        return None
-    return {
-        "role": "tool",
-        "tool_call_id": call_id.strip(),
-        "content": _serialize_tool_result_payload(item, payload),
-    }
-
-
-def _project_continuation_to_anthropic_messages(
-    items: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    messages: list[dict[str, Any]] = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        item_type = item.get("item_type")
-        if item_type == "message":
-            anthropic_message = _build_anthropic_text_message(item)
-            if anthropic_message is not None:
-                messages.append(anthropic_message)
-            continue
-        if item_type == "tool_call":
-            tool_call_message = _build_anthropic_tool_call_message(item)
-            if tool_call_message is not None:
-                messages.append(tool_call_message)
-            continue
-        if item_type == "tool_result":
-            tool_result_message = _build_anthropic_tool_result_message(item)
-            if tool_result_message is not None:
-                messages.append(tool_result_message)
-    return messages
-
-
-def _build_anthropic_text_message(item: dict[str, Any]) -> dict[str, Any] | None:
-    role = item.get("role")
-    content = item.get("content")
-    if role not in {"user", "assistant"}:
-        return None
-    if not isinstance(content, str) or not content.strip():
-        return None
-    return {
-        "role": role,
-        "content": [{"type": "text", "text": content.strip()}],
-    }
-
-
-def _build_anthropic_tool_call_message(item: dict[str, Any]) -> dict[str, Any] | None:
-    payload = item.get("payload")
-    if not isinstance(payload, dict):
-        return None
-    tool_name = payload.get("tool_name")
-    call_id = payload.get("tool_call_id") or item.get("call_id")
-    arguments = payload.get("arguments")
-    if not isinstance(tool_name, str) or not tool_name.strip():
-        return None
-    if not isinstance(call_id, str) or not call_id.strip():
-        return None
-    return {
-        "role": "assistant",
-        "content": [
-            {
-                "type": "tool_use",
-                "id": call_id.strip(),
-                "name": tool_name.strip(),
-                "input": arguments if isinstance(arguments, dict) else {},
-            }
-        ],
-    }
-
-
-def _build_anthropic_tool_result_message(item: dict[str, Any]) -> dict[str, Any] | None:
-    call_id = item.get("call_id")
-    payload = item.get("payload")
-    if not isinstance(call_id, str) or not call_id.strip():
-        return None
-    if not isinstance(payload, dict):
-        return None
-    return {
-        "role": "user",
-        "content": [
-            {
-                "type": "tool_result",
-                "tool_use_id": call_id.strip(),
-                "is_error": item.get("status") == "errored",
-                "content": _serialize_tool_result_payload(item, payload),
-            }
-        ],
-    }
-
-
-def _project_continuation_to_gemini_contents(
-    items: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    contents: list[dict[str, Any]] = []
-    tool_name_by_call_id: dict[str, str] = {}
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        item_type = item.get("item_type")
-        if item_type == "message":
-            gemini_text_content = _build_gemini_text_content(item)
-            if gemini_text_content is not None:
-                contents.append(gemini_text_content)
-            continue
-        if item_type == "tool_call":
-            tool_call_content, tool_name = _build_gemini_tool_call_content(item)
-            if tool_call_content is None or tool_name is None:
-                continue
-            call_id = item.get("call_id")
-            if isinstance(call_id, str) and call_id.strip():
-                tool_name_by_call_id[call_id.strip()] = tool_name
-            contents.append(tool_call_content)
-            continue
-        if item_type == "tool_result":
-            tool_result_content = _build_gemini_tool_result_content(
-                item,
-                tool_name_by_call_id=tool_name_by_call_id,
-            )
-            if tool_result_content is not None:
-                contents.append(tool_result_content)
-    return contents
-
-
-def _build_gemini_text_content(item: dict[str, Any]) -> dict[str, Any] | None:
-    role = item.get("role")
-    content = item.get("content")
-    if role not in {"user", "assistant"}:
-        return None
-    if not isinstance(content, str) or not content.strip():
-        return None
-    return {
-        "role": "model" if role == "assistant" else "user",
-        "parts": [{"text": content.strip()}],
-    }
-
-
-def _build_gemini_tool_call_content(
-    item: dict[str, Any],
-) -> tuple[dict[str, Any] | None, str | None]:
-    payload = item.get("payload")
-    if not isinstance(payload, dict):
-        return None, None
-    tool_name = payload.get("tool_name")
-    if not isinstance(tool_name, str) or not tool_name.strip():
-        return None, None
-    arguments = payload.get("arguments")
-    return (
-        {
-            "role": "model",
-            "parts": [
-                {
-                    "functionCall": {
-                        "name": tool_name.strip(),
-                        "args": arguments if isinstance(arguments, dict) else {},
-                    }
-                }
-            ],
-        },
-        tool_name.strip(),
+    contents.extend(
+        codec_project_continuation_to_gemini_contents(
+            request.continuation_items,
+            tool_name_aliases=tool_name_aliases,
+            tool_name_policy=tool_name_policy,
+        )
     )
+    return contents
 
 
-def _build_gemini_tool_result_content(
-    item: dict[str, Any],
+def _compile_tool_parameters(
+    parameters: dict[str, Any],
     *,
-    tool_name_by_call_id: dict[str, str],
-) -> dict[str, Any] | None:
-    payload = item.get("payload")
-    call_id = item.get("call_id")
-    if not isinstance(payload, dict):
-        return None
-    if not isinstance(call_id, str) or not call_id.strip():
-        return None
-    tool_name = tool_name_by_call_id.get(call_id.strip())
-    if tool_name is None:
-        tool_name = _read_tool_result_tool_name(item, payload)
-    if tool_name is None:
-        return None
-    return {
-        "role": "user",
-        "parts": [
-            {
-                "functionResponse": {
-                    "name": tool_name,
-                    "response": _build_gemini_tool_result_response(item, payload),
-                }
-            }
-        ],
-    }
-
-
-def _build_gemini_tool_result_response(
-    item: dict[str, Any],
-    payload: dict[str, Any],
+    capabilities: LLMInteropCapabilities,
 ) -> dict[str, Any]:
-    response = dict(payload)
-    response["call_id"] = item.get("call_id")
-    status = item.get("status")
-    if isinstance(status, str) and status.strip():
-        response["status"] = status.strip()
-    return response
-
-
-def _read_tool_result_tool_name(
-    item: dict[str, Any],
-    payload: dict[str, Any],
-) -> str | None:
-    candidates = (item.get("tool_name"), payload.get("tool_name"))
-    for candidate in candidates:
-        if isinstance(candidate, str) and candidate.strip():
-            return candidate.strip()
-    return None
-
-
-def _serialize_tool_call_arguments(payload: dict[str, Any]) -> str:
-    arguments_text = payload.get("arguments_text")
-    if isinstance(arguments_text, str) and arguments_text.strip():
-        return arguments_text
-    return json.dumps(
-        payload.get("arguments") or {},
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
+    return compile_tool_parameters(
+        parameters,
+        mode=capabilities.tool_schema_mode,
     )
 
 
-def _serialize_tool_result_payload(
-    item: dict[str, Any],
-    payload: dict[str, Any],
-) -> str:
-    result_payload = dict(payload)
-    tool_name = _read_tool_result_tool_name(item, payload)
-    if tool_name is not None:
-        result_payload["tool_name"] = tool_name
-    status = item.get("status")
-    if isinstance(status, str) and status.strip():
-        result_payload["status"] = status.strip()
-    return json.dumps(
-        result_payload,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
+def _build_openai_responses_input(
+    request: LLMGenerateRequest,
+    *,
+    tool_name_aliases: dict[str, str],
+    tool_name_policy: str,
+) -> list[dict[str, Any]]:
+    return codec_build_openai_responses_input(
+        request,
+        tool_name_aliases=tool_name_aliases,
+        tool_name_policy=tool_name_policy,
     )
 
 
-def _build_openai_responses_input(request: LLMGenerateRequest) -> list[dict[str, Any]]:
-    previous_response_id = _read_previous_response_id(request.provider_continuation_state)
-    if previous_response_id is not None:
-        return _build_openai_responses_continuation_input(request)
-    prompt = _build_prompt_with_continuation(request)
-    return [
-        {
-            "role": "user",
-            "content": [{"type": "input_text", "text": prompt}],
-        }
-    ]
-
-
-def _read_previous_response_id(state: dict[str, Any] | None) -> str | None:
-    if not isinstance(state, dict):
-        return None
-    value = state.get("previous_response_id")
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    return None
-
-
-def _read_latest_continuation_items(request: LLMGenerateRequest) -> list[dict[str, Any]]:
-    state = request.provider_continuation_state
-    if isinstance(state, dict):
-        latest_items = state.get("latest_items")
-        if isinstance(latest_items, list):
-            return [item for item in latest_items if isinstance(item, dict)]
-    return [item for item in request.continuation_items if isinstance(item, dict)]
-
-
-def _build_openai_responses_continuation_input(request: LLMGenerateRequest) -> list[dict[str, Any]]:
-    continuation_items = _read_latest_continuation_items(request)
-    tool_outputs = _build_openai_responses_function_call_outputs(continuation_items)
-    if tool_outputs:
-        return tool_outputs
-    raise ConfigurationError(
-        "OpenAI responses continuation requires tool_result items with call_id and structured_output "
-        "when previous_response_id is supplied"
-    )
-
-
-def _build_openai_responses_function_call_outputs(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    outputs: list[dict[str, Any]] = []
-    for item in items:
-        if item.get("item_type") != "tool_result":
-            continue
-        payload = item.get("payload")
-        if not isinstance(payload, dict):
-            continue
-        call_id = item.get("call_id")
-        if not isinstance(call_id, str) or not call_id.strip():
-            continue
-        structured_output = payload.get("structured_output")
-        if structured_output is None:
-            continue
-        output_text = json.dumps(
-            structured_output,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        )
-        outputs.append(
-            {
-                "type": "function_call_output",
-                "call_id": call_id.strip(),
-                "output": output_text,
-            }
-        )
-    return outputs
+def _collect_request_tool_names(request: LLMGenerateRequest) -> list[str]:
+    names = [tool.name for tool in request.tools]
+    names.extend(codec_collect_continuation_tool_names(request.continuation_items))
+    names.extend(codec_collect_continuation_tool_names(codec_read_latest_continuation_items(request)))
+    return names
 
 
 def _build_gemini_generation_config(request: LLMGenerateRequest) -> dict[str, Any]:

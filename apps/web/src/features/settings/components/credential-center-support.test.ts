@@ -24,6 +24,7 @@ test("buildCredentialCreatePayload maps project scope and trims default base url
       apiKey: "secret-key",
       baseUrl: "https://api.openai.com",
       defaultModel: " gpt-4o-mini ",
+      interopProfile: "",
       contextWindowTokens: "128000",
       defaultMaxOutputTokens: "8192",
       displayName: " My OpenAI ",
@@ -66,6 +67,7 @@ test("buildCredentialUpdatePayload only sends changed fields and rotates key whe
     apiKey: "rotated-key",
     baseUrl: "https://proxy.example.com",
     defaultModel: "claude-sonnet-4-20250514",
+    interopProfile: "",
     contextWindowTokens: "200000",
     defaultMaxOutputTokens: "12288",
     displayName: "Anthropic Proxy",
@@ -104,6 +106,7 @@ test("buildCredentialUpdatePayload can clear custom base url without sending unc
       apiKey: "",
       baseUrl: "https://api.openai.com",
       defaultModel: "gpt-4o-mini",
+      interopProfile: "",
       contextWindowTokens: "",
       defaultMaxOutputTokens: "",
       displayName: "OpenAI",
@@ -130,6 +133,7 @@ test("buildCredentialUpdatePayload rejects clearing an existing default model", 
         apiKey: "",
         baseUrl: "https://api.openai.com",
         defaultModel: "   ",
+        interopProfile: "",
         contextWindowTokens: "",
         defaultMaxOutputTokens: "",
         displayName: "OpenAI",
@@ -153,6 +157,7 @@ test("buildCredentialCreatePayload parses extra headers json and keeps custom he
       apiKey: "secret-key",
       baseUrl: "https://proxy.example.com",
       defaultModel: "gpt-4o-mini",
+      interopProfile: "",
       contextWindowTokens: "",
       defaultMaxOutputTokens: "",
       displayName: "OpenAI Proxy",
@@ -182,6 +187,7 @@ test("buildCredentialCreatePayload rejects invalid extra headers json", () => {
           apiKey: "secret-key",
           baseUrl: "https://api.openai.com",
           defaultModel: "gpt-4o-mini",
+          interopProfile: "",
           contextWindowTokens: "",
           defaultMaxOutputTokens: "",
           displayName: "OpenAI",
@@ -210,6 +216,7 @@ test("buildCredentialCreatePayload rejects client identity without client name",
           apiKey: "secret-key",
           baseUrl: "https://api.openai.com",
           defaultModel: "gpt-4o-mini",
+          interopProfile: "",
           contextWindowTokens: "",
           defaultMaxOutputTokens: "",
           displayName: "OpenAI",
@@ -238,6 +245,7 @@ test("buildCredentialCreatePayload rejects runtime-managed auth header names", (
           apiKey: "secret-key",
           baseUrl: "https://proxy.example.com",
           defaultModel: "claude-haiku",
+          interopProfile: "",
           contextWindowTokens: "",
           defaultMaxOutputTokens: "",
           displayName: "Anthropic Proxy",
@@ -266,6 +274,7 @@ test("buildCredentialCreatePayload rejects sensitive extra headers even when aut
           apiKey: "secret-key",
           baseUrl: "https://proxy.example.com",
           defaultModel: "gpt-4o-mini",
+          interopProfile: "",
           contextWindowTokens: "",
           defaultMaxOutputTokens: "",
           displayName: "OpenAI Proxy",
@@ -289,6 +298,48 @@ test("normalizeOptionalQueryValue trims blank query params to null", () => {
   assert.equal(normalizeOptionalQueryValue(" credential-1 "), "credential-1");
   assert.equal(normalizeOptionalQueryValue("   "), null);
   assert.equal(normalizeOptionalQueryValue(null), null);
+});
+
+test("buildCredentialCreatePayload includes interop profile when explicitly selected", () => {
+  const payload = buildCredentialCreatePayload({
+    formState: {
+      apiDialect: "openai_chat_completions",
+      apiKey: "secret-key",
+      baseUrl: "https://api.openai.com",
+      defaultModel: "gpt-4o-mini",
+      interopProfile: "chat_compat_reasoning_content",
+      contextWindowTokens: "",
+      defaultMaxOutputTokens: "",
+      displayName: "OpenAI",
+      authStrategy: "",
+      apiKeyHeaderName: "",
+      extraHeadersText: "",
+      userAgentOverride: "",
+      clientName: "",
+      clientVersion: "",
+      runtimeKind: "",
+      provider: "openai",
+    },
+    projectId: null,
+    scope: "user",
+  });
+
+  assert.equal(payload.interop_profile, "chat_compat_reasoning_content");
+});
+
+test("buildCredentialUpdatePayload can clear interop profile", () => {
+  const payload = buildCredentialUpdatePayload(
+    createCredential({ interop_profile: "chat_compat_reasoning_content" }),
+    {
+      ...createCredentialFormFromView(
+        createCredential({ interop_profile: "chat_compat_reasoning_content" }),
+      ),
+      interopProfile: "",
+    },
+  );
+  assert.deepEqual(payload, {
+    interop_profile: null,
+  });
 });
 
 test("isCredentialFormDirty compares current form against initial state", () => {
@@ -404,6 +455,7 @@ function createCredential(overrides: Partial<CredentialView> = {}): CredentialVi
     masked_key: "sk-...1234",
     base_url: null,
     default_model: "gpt-4o-mini",
+    interop_profile: null,
     context_window_tokens: null,
     default_max_output_tokens: null,
     auth_strategy: null,

@@ -1,4 +1,9 @@
-export type CredentialCenterActionType = "verify" | "enable" | "disable" | "delete";
+export type CredentialCenterActionType =
+  | "verify_connection"
+  | "verify_tools"
+  | "enable"
+  | "disable"
+  | "delete";
 
 export type PendingCredentialAction = Readonly<{
   credentialId: string;
@@ -6,14 +11,16 @@ export type PendingCredentialAction = Readonly<{
 }>;
 
 const ACTION_LABELS: Record<CredentialCenterActionType, string> = {
-  verify: "验证",
+  verify_connection: "验证连接",
+  verify_tools: "验证工具",
   enable: "启用",
   disable: "停用",
   delete: "删除",
 };
 
 const ACTION_PENDING_LABELS: Record<CredentialCenterActionType, string> = {
-  verify: "验证中...",
+  verify_connection: "验证中...",
+  verify_tools: "验证中...",
   enable: "启用中...",
   disable: "停用中...",
   delete: "删除中...",

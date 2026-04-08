@@ -10,6 +10,7 @@ from app.modules.credential.service import (
     CredentialCreateDTO,
     CredentialService,
     CredentialUpdateDTO,
+    CredentialVerifyProbeKind,
     CredentialVerifyResultDTO,
     CredentialViewDTO,
     create_credential_service,
@@ -89,6 +90,7 @@ async def delete_credential(
 @router.post("/{credential_id}/verify", response_model=CredentialVerifyResultDTO)
 async def verify_credential(
     credential_id: uuid.UUID,
+    probe_kind: CredentialVerifyProbeKind = Query(default="text_probe"),
     credential_service: CredentialService = Depends(get_credential_service),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db_session),
@@ -97,6 +99,7 @@ async def verify_credential(
         db,
         credential_id,
         actor_user_id=current_user.id,
+        probe_kind=probe_kind,
     )
 
 
