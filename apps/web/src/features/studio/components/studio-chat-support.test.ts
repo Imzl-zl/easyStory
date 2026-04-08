@@ -9,6 +9,7 @@ import {
   createStudioChatMessage,
   finalizeStudioChatToolProgress,
   INITIAL_STUDIO_CHAT_SETTINGS,
+  resolveStudioAssistantMessageActionState,
   resolveStudioFailedReply,
 } from "./studio-chat-support";
 
@@ -257,6 +258,40 @@ test("studio failed reply keeps partial content when stream was interrupted afte
     ),
     "我已经读到了项目说明。\n\n这次回复中断了，你可以重新发送。",
   );
+});
+
+test("studio assistant error message action state uses visible content and disables document actions", () => {
+  const actionState = resolveStudioAssistantMessageActionState({
+    content: "这次回复中断了，你可以重新发送。",
+    rawMarkdown: "# 旧正文",
+    role: "assistant",
+    status: "error",
+  });
+
+  assert.deepEqual(actionState, {
+    actionContent: "这次回复中断了，你可以重新发送。",
+    copyLabel: "复制内容",
+    documentMatchSource: null,
+    showCopyAction: true,
+    showDocumentActions: false,
+  });
+});
+
+test("studio assistant completed message action state keeps markdown document actions", () => {
+  const actionState = resolveStudioAssistantMessageActionState({
+    content: "已整理完成。",
+    rawMarkdown: "# 标题\n\n正文",
+    role: "assistant",
+    status: undefined,
+  });
+
+  assert.deepEqual(actionState, {
+    actionContent: "# 标题\n\n正文",
+    copyLabel: "复制 Markdown",
+    documentMatchSource: "# 标题\n\n正文",
+    showCopyAction: true,
+    showDocumentActions: true,
+  });
 });
 
 test("studio chat tool progress uses friendly labels and updates result state", () => {

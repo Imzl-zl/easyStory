@@ -30,15 +30,15 @@ import {
   buildStudioDocumentCatalogQueryKey,
   buildStudioUserRequestContent,
   createStudioChatMessage,
-  finalizeStudioChatToolProgress,
   INITIAL_STUDIO_CHAT_SETTINGS,
-  replaceStudioChatMessage,
-  resolveStudioFailedReply,
   resolveStudioModelButtonLabel,
   STUDIO_PENDING_REPLY_MESSAGE,
   type StudioChatMessage,
 } from "./studio-chat-support";
-import { buildSucceededStudioConversationSession } from "./studio-chat-turn-support";
+import {
+  buildFailedStudioConversationSession,
+  buildSucceededStudioConversationSession,
+} from "./studio-chat-turn-support";
 import { useStudioChatSkillModel } from "./studio-chat-skill-model";
 import { useStudioChatState } from "./studio-chat-state";
 
@@ -200,15 +200,14 @@ export function useStudioChatModel({
           runId: result.run_id,
         }));
     } catch (error) {
-      state.patchConversationSession(conversationId, (current) => ({
-        ...current,
-        messages: replaceStudioChatMessage(
-          current.messages,
-          assistantMessage.id,
-          buildFailedStudioMessage(assistantMessage.id, current.messages, error),
-        ),
-      }));
-      Message.error(getErrorMessage(error));
+      const errorMessage = getErrorMessage(error);
+      state.patchConversationSession(conversationId, (current) =>
+        buildFailedStudioConversationSession(current, {
+          errorMessage,
+          messageId: assistantMessage.id,
+          terminalReason: resolveStudioToolProgressTerminalReason(error),
+        }));
+      Message.error(errorMessage);
     } finally {
       setIsResponding(false);
     }
@@ -254,29 +253,6 @@ export function useStudioChatModel({
       modelName: state.settings.modelName,
       selectedCredential: credentialModel.selectedCredential,
     }),
-  };
-}
-
-function buildFailedStudioMessage(
-  messageId: string,
-  messages: StudioChatMessage[],
-  error: unknown,
-) {
-  const failedMessage = messages.find((message) => message.id === messageId);
-  const fallbackContent = resolveStudioFailedReply(
-    failedMessage?.content ?? "",
-    getErrorMessage(error),
-  );
-  return {
-    content: fallbackContent ?? getErrorMessage(error),
-    id: messageId,
-    rawMarkdown: failedMessage?.rawMarkdown ?? "",
-    role: "assistant" as const,
-    status: "error" as const,
-    toolProgress: finalizeStudioChatToolProgress(
-      failedMessage?.toolProgress,
-      resolveStudioToolProgressTerminalReason(error),
-    ),
   };
 }
 

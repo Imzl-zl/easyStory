@@ -6,7 +6,11 @@ import { Button } from "@arco-design/web-react";
 import { matchAssistantMarkdownDocument } from "@/features/shared/assistant/assistant-markdown-document-support";
 
 import { formatStudioChatAttachmentSize } from "./studio-chat-attachment-support";
-import type { StudioChatMessage, StudioChatToolProgressTone } from "./studio-chat-support";
+import {
+  resolveStudioAssistantMessageActionState,
+  type StudioChatMessage,
+  type StudioChatToolProgressTone,
+} from "./studio-chat-support";
 
 type StudioChatMessageBubbleProps = {
   message: StudioChatMessage;
@@ -33,10 +37,11 @@ export function StudioChatMessageBubble({
 }: Readonly<StudioChatMessageBubbleProps>) {
   const [showActions, setShowActions] = useState(false);
   const isAssistant = message.role === "assistant";
-  const documentMatch = isAssistant
-    ? matchAssistantMarkdownDocument(message.rawMarkdown || message.content)
+  const actionState = resolveStudioAssistantMessageActionState(message);
+  const documentMatch = isAssistant && actionState.documentMatchSource
+    ? matchAssistantMarkdownDocument(actionState.documentMatchSource)
     : null;
-  const actionContent = documentMatch?.body ?? message.rawMarkdown ?? message.content;
+  const actionContent = documentMatch?.body ?? actionState.actionContent;
 
   return (
     <article
@@ -76,17 +81,21 @@ export function StudioChatMessageBubble({
           ))}
         </div>
       ) : null}
-      {isAssistant && message.status !== "pending" && showActions ? (
+      {isAssistant && actionState.showCopyAction && showActions ? (
         <div className="flex flex-wrap gap-1.5 mt-3">
           <Button size="mini" shape="round" type="secondary" onClick={() => onCopyMarkdown(actionContent)}>
-            复制 Markdown
+            {actionState.copyLabel}
           </Button>
-          <Button size="mini" shape="round" type="secondary" onClick={() => onAppendToDocument(actionContent)}>
-            追加到文档
-          </Button>
-          <Button size="mini" shape="round" type="secondary" onClick={() => onCreateNewDocument(actionContent)}>
-            新建文档
-          </Button>
+          {actionState.showDocumentActions ? (
+            <Button size="mini" shape="round" type="secondary" onClick={() => onAppendToDocument(actionContent)}>
+              追加到文档
+            </Button>
+          ) : null}
+          {actionState.showDocumentActions ? (
+            <Button size="mini" shape="round" type="secondary" onClick={() => onCreateNewDocument(actionContent)}>
+              新建文档
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </article>

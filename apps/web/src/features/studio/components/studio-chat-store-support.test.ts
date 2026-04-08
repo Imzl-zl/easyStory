@@ -58,7 +58,7 @@ test("studio chat store preserves tool progress when persisted pending reply is 
       session: {
         composerText: "",
         conversationSkillId: null,
-        latestCompletedRunId: null,
+        latestCompletedRunId: "run-studio-prev-1",
         messages: [{
           content: STUDIO_PENDING_REPLY_MESSAGE,
           id: "assistant-1",
@@ -87,6 +87,7 @@ test("studio chat store preserves tool progress when persisted pending reply is 
     }],
   });
 
+  assert.equal(normalized.conversations[0]?.session.latestCompletedRunId, null);
   const restoredMessage = normalized.conversations[0]?.session.messages[0];
   assert.equal(restoredMessage?.status, "error");
   assert.equal(restoredMessage?.content, "这次回复中断了，你可以重新发送。");
@@ -97,4 +98,42 @@ test("studio chat store preserves tool progress when persisted pending reply is 
     toolCallId: "call-1",
     tone: "muted",
   }]);
+});
+
+test("studio chat store clears latest completed run id when restored conversation ends with failed reply", () => {
+  const normalized = normalizePersistedStudioChatProjectState({
+    activeConversationId: "conversation-1",
+    conversations: [{
+      id: "conversation-1",
+      session: {
+        composerText: "",
+        conversationSkillId: null,
+        latestCompletedRunId: "run-studio-prev-2",
+        messages: [{
+          content: "继续写第三章",
+          id: "user-1",
+          rawMarkdown: "继续写第三章",
+          role: "user",
+        }, {
+          content: "这次回复中断了，你可以重新发送。",
+          id: "assistant-1",
+          rawMarkdown: "这次回复中断了，你可以重新发送。",
+          role: "assistant",
+          status: "error",
+        }],
+        nextTurnSkillId: null,
+        selectedContextPaths: [],
+        settings: {
+          maxOutputTokens: "",
+          modelName: "",
+          provider: "",
+          streamOutput: true,
+        },
+      },
+      title: "测试",
+      updatedAt: "2026-04-08T12:00:00Z",
+    }],
+  });
+
+  assert.equal(normalized.conversations[0]?.session.latestCompletedRunId, null);
 });

@@ -1,6 +1,9 @@
 import {
+  finalizeStudioChatToolProgress,
   normalizeStudioAssistantReply,
   replaceStudioChatMessage,
+  resolveStudioFailedReply,
+  type StudioChatToolProgressTerminalReason,
 } from "./studio-chat-support";
 import type { StudioChatSession } from "./studio-chat-store-support";
 
@@ -18,15 +21,47 @@ export function buildSucceededStudioConversationSession(
   return {
     ...current,
     ...(options.consumedNextTurnSkillId ? { nextTurnSkillId: null } : {}),
-    latestCompletedRunId: options.runId,
+    latestCompletedRunId: normalized.status === "error" ? null : options.runId,
     messages: replaceStudioChatMessage(current.messages, options.messageId, {
       content: normalized.content,
       id: options.messageId,
-      rawMarkdown: options.content,
-      requestContent: options.content,
+      rawMarkdown: normalized.content,
+      requestContent: normalized.content,
       role: "assistant",
       status: normalized.status,
       toolProgress: currentMessage?.toolProgress,
+    }),
+  };
+}
+
+export function buildFailedStudioConversationSession(
+  current: StudioChatSession,
+  options: {
+    errorMessage: string;
+    messageId: string;
+    terminalReason: StudioChatToolProgressTerminalReason;
+  },
+): StudioChatSession {
+  const currentMessage = current.messages.find((message) => message.id === options.messageId);
+  const failedContent = resolveStudioFailedReply(
+    currentMessage?.content ?? "",
+    options.errorMessage,
+  );
+  const resolvedContent = failedContent ?? options.errorMessage;
+  return {
+    ...current,
+    latestCompletedRunId: null,
+    messages: replaceStudioChatMessage(current.messages, options.messageId, {
+      content: resolvedContent,
+      id: options.messageId,
+      rawMarkdown: resolvedContent,
+      requestContent: resolvedContent,
+      role: "assistant",
+      status: "error",
+      toolProgress: finalizeStudioChatToolProgress(
+        currentMessage?.toolProgress,
+        options.terminalReason,
+      ),
     }),
   };
 }

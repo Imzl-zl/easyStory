@@ -114,13 +114,16 @@ function normalizeIncubatorChatSession(
   session: IncubatorChatSession,
   mode: typeof PERSISTED_MODE | typeof RUNTIME_MODE,
 ): IncubatorChatSession {
+  const messages = normalizeIncubatorMessages(session.messages ?? [], mode);
   return {
     composerText: session.composerText ?? "",
     draft: session.draft ?? null,
     draftFingerprint: session.draftFingerprint ?? null,
     hasCustomProjectName: session.hasCustomProjectName ?? false,
-    latestCompletedRunId: session.latestCompletedRunId ?? null,
-    messages: normalizeIncubatorMessages(session.messages ?? [], mode),
+    latestCompletedRunId: shouldResetIncubatorLatestCompletedRunId(messages, mode)
+      ? null
+      : session.latestCompletedRunId ?? null,
+    messages,
     projectName: session.projectName ?? "",
     settings: { ...INITIAL_INCUBATOR_CHAT_SETTINGS, ...session.settings },
   };
@@ -328,6 +331,17 @@ function normalizeIncubatorMessages(
   return sanitizedMessages.map((message) => message.status !== "pending"
     ? message
     : { ...message, content: buildInterruptedMessageContent(message.content), status: "error" as const });
+}
+
+function shouldResetIncubatorLatestCompletedRunId(
+  messages: IncubatorChatMessage[],
+  mode: typeof PERSISTED_MODE | typeof RUNTIME_MODE,
+) {
+  if (mode !== PERSISTED_MODE) {
+    return false;
+  }
+  const lastMessage = messages.at(-1);
+  return lastMessage?.role === "assistant" && lastMessage.status === "error";
 }
 
 function buildInterruptedMessageContent(content: string) {

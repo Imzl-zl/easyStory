@@ -70,6 +70,14 @@ export type StudioChatSettings = {
   streamOutput: boolean;
 };
 
+export type StudioAssistantMessageActionState = {
+  actionContent: string;
+  copyLabel: string;
+  documentMatchSource: string | null;
+  showCopyAction: boolean;
+  showDocumentActions: boolean;
+};
+
 export type StudioProviderOption = {
   description?: string;
   label: string;
@@ -301,6 +309,37 @@ export function resolveStudioFailedReply(content: string, errorMessage: string) 
     interruptedMessage: STUDIO_INTERRUPTED_REPLY_MESSAGE,
     pendingMessage: STUDIO_PENDING_REPLY_MESSAGE,
   });
+}
+
+export function resolveStudioAssistantMessageActionState(
+  message: Pick<StudioChatMessage, "content" | "rawMarkdown" | "role" | "status">,
+): StudioAssistantMessageActionState {
+  if (message.role !== "assistant" || message.status === "pending") {
+    return {
+      actionContent: message.content,
+      copyLabel: "复制 Markdown",
+      documentMatchSource: null,
+      showCopyAction: false,
+      showDocumentActions: false,
+    };
+  }
+  if (message.status === "error") {
+    return {
+      actionContent: message.content,
+      copyLabel: "复制内容",
+      documentMatchSource: null,
+      showCopyAction: true,
+      showDocumentActions: false,
+    };
+  }
+  const markdownSource = message.rawMarkdown || message.content;
+  return {
+    actionContent: markdownSource,
+    copyLabel: "复制 Markdown",
+    documentMatchSource: markdownSource,
+    showCopyAction: true,
+    showDocumentActions: true,
+  };
 }
 
 export function buildStudioUserRequestContent(options: {

@@ -23,6 +23,7 @@ test("incubator chat store normalizes pending assistant replies on restore", () 
   const session = createEmptyIncubatorChatSession();
   const normalized = normalizePersistedIncubatorChatSession({
     ...session,
+    latestCompletedRunId: "run-incubator-prev-1",
     messages: [
       ...session.messages,
       createIncubatorMessage("user", "给我两个方向"),
@@ -32,6 +33,7 @@ test("incubator chat store normalizes pending assistant replies on restore", () 
 
   const lastMessage = normalized.messages.at(-1);
   assert.ok(lastMessage);
+  assert.equal(normalized.latestCompletedRunId, null);
   assert.equal(lastMessage.status, "error");
   assert.equal(
     lastMessage.content,
@@ -39,6 +41,22 @@ test("incubator chat store normalizes pending assistant replies on restore", () 
 
 ${INCUBATOR_INTERRUPTED_REPLY_MESSAGE}`,
   );
+});
+
+test("incubator chat store clears latest completed run id when restored conversation ends with failed reply", () => {
+  const session = createEmptyIncubatorChatSession();
+  const normalized = normalizePersistedIncubatorChatSession({
+    ...session,
+    latestCompletedRunId: "run-incubator-prev-2",
+    messages: [
+      ...session.messages,
+      createIncubatorMessage("user", "给我两个方向"),
+      createIncubatorMessage("assistant", "这次回复中断了，你可以重新发送。", { status: "error" }),
+    ],
+  });
+
+  assert.equal(normalized.latestCompletedRunId, null);
+  assert.equal(normalized.messages.at(-1)?.status, "error");
 });
 
 test("incubator chat store drops legacy system messages on restore", () => {

@@ -70,7 +70,7 @@ export async function completePromptSubmission(
   const assistantReply = resolveIncubatorAssistantReply(result.content);
   patchConversationSession(submission.conversationId, (current) => ({
     ...current,
-    latestCompletedRunId: result.run_id,
+    latestCompletedRunId: assistantReply.status === "error" ? null : result.run_id,
     messages: replaceIncubatorMessage(
       submission.nextMessages,
       submission.pendingAssistant.id,
@@ -95,6 +95,7 @@ export function handlePromptSubmissionError(
     const failedReply = currentPending ? resolveFailedIncubatorReply(currentPending.content, errorMessage) : null;
     return {
       ...current,
+      latestCompletedRunId: null,
       messages: replaceIncubatorMessage(
         failedReply ? current.messages : submission.nextMessages,
         submission.pendingAssistant.id,

@@ -48,11 +48,14 @@ export function normalizeStudioChatSession(
   mode: "persisted" | "runtime",
 ): StudioChatSession {
   const record = isRecord(value) ? value : {};
+  const messages = normalizeMessages(record.messages, mode);
   return {
     composerText: readStringValue(record.composerText) ?? "",
     conversationSkillId: readOptionalSkillId(record.conversationSkillId),
-    latestCompletedRunId: readOptionalString(record.latestCompletedRunId),
-    messages: normalizeMessages(record.messages, mode),
+    latestCompletedRunId: shouldResetStudioLatestCompletedRunId(messages, mode)
+      ? null
+      : readOptionalString(record.latestCompletedRunId),
+    messages,
     nextTurnSkillId: readOptionalSkillId(record.nextTurnSkillId),
     selectedContextPaths: readStringArray(record.selectedContextPaths),
     settings: { ...INITIAL_STUDIO_CHAT_SETTINGS, ...(isRecord(record.settings) ? record.settings : {}) },
@@ -212,6 +215,17 @@ function buildInterruptedMessageContent(content: string) {
     return STUDIO_INTERRUPTED_REPLY_MESSAGE;
   }
   return `${trimmed}\n\n${STUDIO_INTERRUPTED_REPLY_MESSAGE}`;
+}
+
+function shouldResetStudioLatestCompletedRunId(
+  messages: StudioChatMessage[],
+  mode: "persisted" | "runtime",
+) {
+  if (mode !== "persisted") {
+    return false;
+  }
+  const lastMessage = messages.at(-1);
+  return lastMessage?.role === "assistant" && lastMessage.status === "error";
 }
 
 function readStringArray(value: unknown) {
