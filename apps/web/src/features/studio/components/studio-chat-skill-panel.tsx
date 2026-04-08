@@ -206,17 +206,17 @@ function SkillDrawer({
             正在读取可用 Skill…
           </StateNotice>
         ) : null}
-        {!model.skillsLoading && model.skillOptions.length === 0 ? (
+        {!model.skillErrorMessage && !model.skillsLoading && model.skillOptions.length === 0 ? (
           <StateNotice>
             当前还没有可直接套用的项目或全局 Skill。
           </StateNotice>
         ) : null}
-        {!model.skillsLoading && model.skillOptions.length > 0 && filteredSkillOptions.length === 0 ? (
+        {!model.skillErrorMessage && !model.skillsLoading && model.skillOptions.length > 0 && filteredSkillOptions.length === 0 ? (
           <StateNotice>
             没找到和“{query.trim()}”匹配的 Skill，可以换个关键词再试。
           </StateNotice>
         ) : null}
-        {!model.skillsLoading && filteredSkillOptions.length > 0 ? (
+        {!model.skillErrorMessage && !model.skillsLoading && filteredSkillOptions.length > 0 ? (
           <ul className="space-y-2">
             {filteredSkillOptions.map((option) => (
               <SkillOptionCard

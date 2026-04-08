@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Message } from "@arco-design/web-react";
 
@@ -11,7 +11,7 @@ import {
 } from "@/lib/api/assistant";
 import { getErrorMessage } from "@/lib/api/client";
 import { listProjectDocumentCatalog } from "@/lib/api/projects";
-import type { AssistantActiveBufferState } from "@/lib/api/types";
+import type { AssistantActiveBufferState, ProjectDocumentCatalogEntry } from "@/lib/api/types";
 
 import {
   buildStudioAttachmentOnlyMessage,
@@ -26,21 +26,32 @@ import {
   applyStudioChatToolCallResult,
   applyStudioChatToolCallStart,
   buildNextStudioChatSettingsForProvider,
-  buildStudioAssistantTurnPayload,
-  buildStudioDocumentCatalogQueryKey,
+  resolveStudioPreparedAssistantTurnPayload,
   buildStudioUserRequestContent,
   createStudioChatMessage,
-  INITIAL_STUDIO_CHAT_SETTINGS,
   resolveStudioModelButtonLabel,
   STUDIO_PENDING_REPLY_MESSAGE,
   type StudioChatMessage,
 } from "./studio-chat-support";
+import { buildStudioDocumentCatalogQueryKey } from "./studio-document-catalog-support";
+import { runStudioSendOnce } from "./studio-chat-send-guard-support";
+import {
+  resolveStudioSkillSendBlockReason,
+  resolveStudioSendableSkillSelection,
+  type StudioSkillLookupStatus,
+} from "./studio-chat-skill-support";
 import {
   buildFailedStudioConversationSession,
   buildSucceededStudioConversationSession,
 } from "./studio-chat-turn-support";
 import { useStudioChatSkillModel } from "./studio-chat-skill-model";
 import { useStudioChatState } from "./studio-chat-state";
+import {
+  buildStudioWriteIntentNotice,
+  resolveStudioCurrentWriteTarget,
+  resolveStudioRequestedWriteTargets,
+  resolveStudioWriteSendBlockReason,
+} from "./studio-chat-write-support";
 
 type UseStudioChatModelOptions = {
   activeBufferState: AssistantActiveBufferState | null;
@@ -56,6 +67,8 @@ export function useStudioChatModel({
   const state = useStudioChatState(projectId);
   const [attachments, setAttachments] = useState<StudioChatAttachment[]>([]);
   const [isResponding, setIsResponding] = useState(false);
+  const [writeToCurrentDocument, setWriteToCurrentDocument] = useState(false);
+  const sendInFlightRef = useRef(false);
   const needsDocumentCatalog = Boolean(currentDocumentPath) || state.selectedContextPaths.length > 0;
   const hasUserMessage = useMemo(
     () => state.messages.some((message) => message.role === "user"),
@@ -85,6 +98,53 @@ export function useStudioChatModel({
   useEffect(() => {
     setAttachments([]);
   }, [state.activeConversationId]);
+
+  const documentCatalogErrorMessage = useMemo(
+    () => (documentCatalogQuery.error ? getErrorMessage(documentCatalogQuery.error) : null),
+    [documentCatalogQuery.error],
+  );
+  const currentWriteTarget = useMemo(() => resolveStudioCurrentWriteTarget({
+    activeBufferState,
+    currentDocumentPath,
+    documentCatalogErrorMessage,
+    documentCatalogEntries: documentCatalogQuery.data ?? null,
+  }), [activeBufferState, currentDocumentPath, documentCatalogErrorMessage, documentCatalogQuery.data]);
+
+  const writeIntentNotice = useMemo(
+    () => buildStudioWriteIntentNotice(currentWriteTarget, writeToCurrentDocument),
+    [currentWriteTarget, writeToCurrentDocument],
+  );
+  const skillLookupStatus = useMemo<StudioSkillLookupStatus>(() => {
+    if (skillModel.skillsLoading) {
+      return "loading";
+    }
+    return skillModel.skillErrorMessage ? "error" : "ready";
+  }, [skillModel.skillErrorMessage, skillModel.skillsLoading]);
+  const activeSkillSelection = useMemo(() => resolveStudioSendableSkillSelection({
+    conversationSkillId: state.conversationSkillId,
+    nextTurnSkillId: state.nextTurnSkillId,
+    skillLookupStatus,
+    skillOptions: skillModel.skillOptions,
+  }), [
+    skillModel.skillOptions,
+    skillLookupStatus,
+    state.conversationSkillId,
+    state.nextTurnSkillId,
+  ]);
+  const skillSendBlockReason = useMemo(() => resolveStudioSkillSendBlockReason({
+    conversationSkillId: state.conversationSkillId,
+    nextTurnSkillId: state.nextTurnSkillId,
+    skillLookupStatus,
+    skillOptions: skillModel.skillOptions,
+  }), [skillLookupStatus, skillModel.skillOptions, state.conversationSkillId, state.nextTurnSkillId]);
+  const writeSendBlockReason = useMemo(() => resolveStudioWriteSendBlockReason({
+    enabled: writeToCurrentDocument,
+    writeTarget: currentWriteTarget,
+  }), [currentWriteTarget, writeToCurrentDocument]);
+
+  useEffect(() => {
+    setWriteToCurrentDocument(false);
+  }, [currentDocumentPath, state.activeConversationId]);
 
   const handleToggleContext = useCallback((path: string) => {
     state.setSelectedContextPaths((current) =>
@@ -130,89 +190,114 @@ export function useStudioChatModel({
     setAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId));
   }, []);
 
-  const handleSendMessage = useCallback(async (content: string) => {
-    if (isResponding) {
+  const handleToggleWriteToCurrentDocument = useCallback(() => {
+    if (writeToCurrentDocument) {
+      setWriteToCurrentDocument(false);
       return;
     }
-    if (!credentialModel.canChat) {
-      Message.warning(credentialModel.credentialNotice ?? "当前没有可用模型连接。");
+    if (!currentWriteTarget.available) {
+      if (currentWriteTarget.disabledReason) {
+        Message.warning(currentWriteTarget.disabledReason);
+      }
       return;
     }
-    if (needsDocumentCatalog) {
-      if (documentCatalogQuery.error) {
-        Message.error(getErrorMessage(documentCatalogQuery.error));
-        return;
+    setWriteToCurrentDocument(true);
+  }, [currentWriteTarget, writeToCurrentDocument]);
+
+  const handleSendMessage = useCallback((content: string) => runStudioSendOnce(
+    sendInFlightRef,
+    async () => {
+      if (!ensureStudioChatTurnCanStart({
+        canChat: credentialModel.canChat,
+        credentialNotice: credentialModel.credentialNotice,
+        documentCatalogEntries: documentCatalogQuery.data ?? null,
+        documentCatalogError: documentCatalogQuery.error,
+        isResponding,
+        needsDocumentCatalog,
+        skillSendBlockReason,
+        writeSendBlockReason,
+      })) {
+        return false;
       }
-      if (!documentCatalogQuery.data) {
-        Message.warning("当前文稿目录快照仍在加载，请稍后重试。");
-        return;
+      const requestedWriteTargets = resolveStudioRequestedWriteTargets({
+        enabled: writeToCurrentDocument,
+        writeTarget: currentWriteTarget,
+      });
+      const conversationId = state.activeConversationId;
+      const userMessage = buildStudioUserMessage({
+        attachments,
+        content,
+      });
+
+      const assistantMessage = createStudioChatMessage(
+        "assistant",
+        STUDIO_PENDING_REPLY_MESSAGE,
+        { status: "pending" },
+      );
+      const nextMessages = [...state.messages, userMessage];
+      const consumedNextTurnSkillId = activeSkillSelection.nextTurnSkillId;
+      const activeSkillId = consumedNextTurnSkillId ?? activeSkillSelection.conversationSkillId;
+      const payloadResult = resolveStudioPreparedAssistantTurnPayload({
+        activeBufferState,
+        conversationId,
+        currentDocumentPath,
+        documentCatalogEntries: documentCatalogQuery.data ?? null,
+        latestCompletedRunId: state.latestCompletedRunId,
+        messages: nextMessages,
+        projectId,
+        requestedWriteTargets,
+        selectedContextPaths: state.selectedContextPaths,
+        settings: state.settings,
+        skillId: activeSkillId,
+      });
+      if (!payloadResult.ok) {
+        Message.error(payloadResult.errorMessage);
+        return false;
       }
-    }
-    const conversationId = state.activeConversationId;
-    const userMessage = buildStudioUserMessage({
-      attachments,
-      content,
-    });
+      const payload = payloadResult.payload;
 
-    const assistantMessage = createStudioChatMessage(
-      "assistant",
-      STUDIO_PENDING_REPLY_MESSAGE,
-      { status: "pending" },
-    );
-    const nextMessages = [...state.messages, userMessage];
-    const consumedNextTurnSkillId = state.nextTurnSkillId;
-    const activeSkillId = consumedNextTurnSkillId ?? state.conversationSkillId;
-    const payload = buildStudioAssistantTurnPayload({
-      activeBufferState,
-      conversationId,
-      currentDocumentPath,
-      documentCatalogEntries: documentCatalogQuery.data ?? null,
-      latestCompletedRunId: state.latestCompletedRunId,
-      messages: nextMessages,
-      projectId,
-      selectedContextPaths: state.selectedContextPaths,
-      settings: state.settings,
-      skillId: activeSkillId,
-    });
+      state.patchConversationSession(conversationId, (current) => ({
+        ...current,
+        composerText: "",
+        messages: [...current.messages, userMessage, assistantMessage],
+      }));
+      setAttachments([]);
+      setWriteToCurrentDocument(false);
+      setIsResponding(true);
 
-    state.patchConversationSession(conversationId, (current) => ({
-      ...current,
-      composerText: "",
-      messages: [...current.messages, userMessage, assistantMessage],
-    }));
-    setAttachments([]);
-    setIsResponding(true);
-
-    try {
-      const result = state.settings.streamOutput
-        ? await runStudioChatStream(payload, assistantMessage.id, (updater) => {
-          state.patchConversationSession(conversationId, (current) => ({
-            ...current,
-            messages: updater(current.messages),
+      try {
+        const result = state.settings.streamOutput
+          ? await runStudioChatStream(payload, assistantMessage.id, (updater) => {
+            state.patchConversationSession(conversationId, (current) => ({
+              ...current,
+              messages: updater(current.messages),
+            }));
+          })
+          : await runAssistantTurn(payload);
+        state.patchConversationSession(conversationId, (current) =>
+          buildSucceededStudioConversationSession(current, {
+            consumedNextTurnSkillId,
+            content: result.content,
+            messageId: assistantMessage.id,
+            runId: result.run_id,
           }));
-        })
-        : await runAssistantTurn(payload);
-      state.patchConversationSession(conversationId, (current) =>
-        buildSucceededStudioConversationSession(current, {
-          consumedNextTurnSkillId,
-          content: result.content,
-          messageId: assistantMessage.id,
-          runId: result.run_id,
-        }));
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      state.patchConversationSession(conversationId, (current) =>
-        buildFailedStudioConversationSession(current, {
-          errorMessage,
-          messageId: assistantMessage.id,
-          terminalReason: resolveStudioToolProgressTerminalReason(error),
-        }));
-      Message.error(errorMessage);
-    } finally {
-      setIsResponding(false);
-    }
-  }, [
+      } catch (error) {
+        const errorMessage = getErrorMessage(error);
+        state.patchConversationSession(conversationId, (current) =>
+          buildFailedStudioConversationSession(current, {
+            errorMessage,
+            messageId: assistantMessage.id,
+            terminalReason: resolveStudioToolProgressTerminalReason(error),
+          }));
+        Message.error(errorMessage);
+      } finally {
+        setIsResponding(false);
+      }
+      return true;
+    },
+  ), [
     activeBufferState,
+    currentWriteTarget,
     credentialModel.canChat,
     credentialModel.credentialNotice,
     currentDocumentPath,
@@ -221,8 +306,12 @@ export function useStudioChatModel({
     isResponding,
     needsDocumentCatalog,
     projectId,
+    skillSendBlockReason,
     state,
     attachments,
+    activeSkillSelection,
+    writeSendBlockReason,
+    writeToCurrentDocument,
   ]);
 
   return {
@@ -240,7 +329,9 @@ export function useStudioChatModel({
     handleSendMessage,
     handleStreamOutputChange,
     handleToggleContext,
+    handleToggleWriteToCurrentDocument,
     isResponding,
+    isWriteToCurrentDocumentEnabled: writeToCurrentDocument,
     messages: state.messages,
     remapDocumentPathReferences: state.remapDocumentPathReferences,
     selectConversation: state.selectConversation,
@@ -248,11 +339,14 @@ export function useStudioChatModel({
     selectedCredentialLabel: credentialModel.selectedCredential?.displayLabel ?? null,
     setComposerText: state.setComposerText,
     settings: state.settings,
+    showWriteToCurrentDocument: Boolean(currentWriteTarget.path),
     skillModel,
     visibleModelLabel: resolveStudioModelButtonLabel({
       modelName: state.settings.modelName,
       selectedCredential: credentialModel.selectedCredential,
     }),
+    writeIntentNotice,
+    writeTargetDisabledReason: currentWriteTarget.disabledReason,
   };
 }
 
@@ -297,4 +391,43 @@ function resolveStudioToolProgressTerminalReason(error: unknown) {
   return error instanceof AssistantTurnStreamTerminalError && error.terminalStatus === "cancelled"
     ? "cancelled"
     : "interrupted";
+}
+
+function ensureStudioChatTurnCanStart(options: {
+  canChat: boolean;
+  credentialNotice: string | null;
+  documentCatalogEntries: ProjectDocumentCatalogEntry[] | null;
+  documentCatalogError: unknown;
+  isResponding: boolean;
+  needsDocumentCatalog: boolean;
+  skillSendBlockReason: string | null;
+  writeSendBlockReason: string | null;
+}) {
+  if (options.isResponding) {
+    return false;
+  }
+  if (!options.canChat) {
+    Message.warning(options.credentialNotice ?? "当前没有可用模型连接。");
+    return false;
+  }
+  if (options.skillSendBlockReason) {
+    Message.warning(options.skillSendBlockReason);
+    return false;
+  }
+  if (options.writeSendBlockReason) {
+    Message.warning(options.writeSendBlockReason);
+    return false;
+  }
+  if (!options.needsDocumentCatalog) {
+    return true;
+  }
+  if (options.documentCatalogError) {
+    Message.error(getErrorMessage(options.documentCatalogError));
+    return false;
+  }
+  if (!options.documentCatalogEntries) {
+    Message.warning("当前文稿目录快照仍在加载，请稍后重试。");
+    return false;
+  }
+  return true;
 }

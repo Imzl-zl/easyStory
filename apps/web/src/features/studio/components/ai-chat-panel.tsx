@@ -42,16 +42,21 @@ type AiChatPanelProps = {
   onModelNameChange: (value: string) => void;
   onProviderChange: (provider: string) => void;
   onRemoveAttachment: (attachmentId: string) => void;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string) => boolean | Promise<boolean>;
   onStreamOutputChange: (value: boolean) => void;
   onToggleContext: (path: string) => void;
+  onToggleWriteToCurrentDocument: () => void;
   providerOptions: StudioProviderOption[];
   selectConversation: (conversationId: string) => void;
   selectedContextPaths: string[];
   selectedCredentialLabel: string | null;
   settings: Pick<StudioChatSettings, "modelName" | "provider" | "streamOutput">;
+  showWriteToCurrentDocument: boolean;
   skillModel: StudioChatSkillModel;
   visibleModelLabel: string;
+  writeIntentNotice: string | null;
+  writeTargetDisabledReason: string | null;
+  isWriteToCurrentDocumentEnabled: boolean;
 };
 
 export function AiChatPanel({
@@ -81,13 +86,18 @@ export function AiChatPanel({
   onSendMessage,
   onStreamOutputChange,
   onToggleContext,
+  onToggleWriteToCurrentDocument,
   providerOptions,
   selectConversation,
   selectedContextPaths,
   selectedCredentialLabel,
   settings,
+  showWriteToCurrentDocument,
   skillModel,
   visibleModelLabel,
+  writeIntentNotice,
+  writeTargetDisabledReason,
+  isWriteToCurrentDocumentEnabled,
 }: Readonly<AiChatPanelProps>) {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const [activeHeaderPanel, setActiveHeaderPanel] = useState<"history" | "skill" | null>(null);
@@ -188,10 +198,15 @@ export function AiChatPanel({
         onSendMessage={onSendMessage}
         onStreamOutputChange={onStreamOutputChange}
         onToggleContext={onToggleContext}
+        onToggleWriteToCurrentDocument={onToggleWriteToCurrentDocument}
         providerOptions={providerOptions}
         selectedContextPaths={selectedContextPaths}
         selectedCredentialLabel={selectedCredentialLabel}
         settings={settings}
+        showWriteToCurrentDocument={showWriteToCurrentDocument}
+        writeIntentNotice={writeIntentNotice}
+        writeTargetDisabledReason={writeTargetDisabledReason}
+        isWriteToCurrentDocumentEnabled={isWriteToCurrentDocumentEnabled}
       />
     </aside>
   );

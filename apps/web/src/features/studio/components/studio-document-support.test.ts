@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { QueryClient } from "@tanstack/react-query";
 
 import {
   buildStudioActiveBufferState,
   buildStudioBufferHash,
 } from "./studio-document-buffer-support";
-import { resolveStudioDocumentTarget } from "./studio-document-support";
+import {
+  buildStudioDocumentCatalogQueryKey,
+  buildStudioDocumentCatalogVersion,
+} from "./studio-document-catalog-support";
+import {
+  buildStudioDocumentQueryKey,
+  resolveStudioDocumentTarget,
+  syncStudioDocumentQueries,
+} from "./studio-document-support";
 
 test("resolveStudioDocumentTarget keeps canonical content paths on database-backed targets", () => {
   assert.deepEqual(resolveStudioDocumentTarget("大纲/总大纲.md"), {
@@ -63,5 +72,141 @@ test("buildStudioActiveBufferState produces a stable editor snapshot", () => {
       dirty: true,
       source: "studio_editor",
     },
+  );
+});
+
+test("syncStudioDocumentQueries keeps file document catalog snapshot aligned after save", async () => {
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(
+    buildStudioDocumentCatalogQueryKey("project-1"),
+    [
+      {
+        binding_version: "binding-world",
+        catalog_version: "catalog-v1",
+        content_state: "ready",
+        document_kind: "markdown",
+        document_ref: "file:设定/世界观.md",
+        mime_type: "text/markdown",
+        path: "设定/世界观.md",
+        resource_uri: "project-document://project-1/file%3A%E8%AE%BE%E5%AE%9A%2F%E4%B8%96%E7%95%8C%E8%A7%82.md",
+        schema_id: null,
+        source: "file",
+        title: "世界观",
+        updated_at: "2026-04-08T00:00:00Z",
+        version: "sha256:old-world",
+        writable: true,
+      },
+      {
+        binding_version: "binding-cast",
+        catalog_version: "catalog-v1",
+        content_state: "ready",
+        document_kind: "markdown",
+        document_ref: "file:设定/人物.md",
+        mime_type: "text/markdown",
+        path: "设定/人物.md",
+        resource_uri: "project-document://project-1/file%3A%E8%AE%BE%E5%AE%9A%2F%E4%BA%BA%E7%89%A9.md",
+        schema_id: null,
+        source: "file",
+        title: "人物",
+        updated_at: "2026-04-08T00:00:00Z",
+        version: "sha256:cast",
+        writable: true,
+      },
+    ],
+  );
+
+  const expectedCatalogVersion = await buildStudioDocumentCatalogVersion([
+    {
+      binding_version: "binding-world",
+      catalog_version: "catalog-v1",
+      content_state: "ready",
+      document_kind: "markdown",
+      document_ref: "file:设定/世界观.md",
+      mime_type: "text/markdown",
+      path: "设定/世界观.md",
+      resource_uri: "project-document://project-1/file%3A%E8%AE%BE%E5%AE%9A%2F%E4%B8%96%E7%95%8C%E8%A7%82.md",
+      schema_id: null,
+      source: "file",
+      title: "世界观",
+      updated_at: "2026-04-08T00:00:00Z",
+      version: "sha256:new-world",
+      writable: true,
+    },
+    {
+      binding_version: "binding-cast",
+      catalog_version: "catalog-v1",
+      content_state: "ready",
+      document_kind: "markdown",
+      document_ref: "file:设定/人物.md",
+      mime_type: "text/markdown",
+      path: "设定/人物.md",
+      resource_uri: "project-document://project-1/file%3A%E8%AE%BE%E5%AE%9A%2F%E4%BA%BA%E7%89%A9.md",
+      schema_id: null,
+      source: "file",
+      title: "人物",
+      updated_at: "2026-04-08T00:00:00Z",
+      version: "sha256:cast",
+      writable: true,
+    },
+  ]);
+
+  await syncStudioDocumentQueries(queryClient, "project-1", {
+    content: "新的世界观内容",
+    path: "设定/世界观.md",
+    saveNoun: "文件",
+    storageKind: "file",
+    target: { kind: "file", path: "设定/世界观.md" },
+    title: "世界观",
+    version: "sha256:new-world",
+  });
+
+  assert.deepEqual(
+    queryClient.getQueryData(buildStudioDocumentQueryKey("project-1", "设定/世界观.md")),
+    {
+      content: "新的世界观内容",
+      path: "设定/世界观.md",
+      saveNoun: "文件",
+      storageKind: "file",
+      target: { kind: "file", path: "设定/世界观.md" },
+      title: "世界观",
+      version: "sha256:new-world",
+    },
+  );
+  assert.deepEqual(
+    queryClient.getQueryData(buildStudioDocumentCatalogQueryKey("project-1")),
+    [
+      {
+        binding_version: "binding-world",
+        catalog_version: expectedCatalogVersion,
+        content_state: "ready",
+        document_kind: "markdown",
+        document_ref: "file:设定/世界观.md",
+        mime_type: "text/markdown",
+        path: "设定/世界观.md",
+        resource_uri: "project-document://project-1/file%3A%E8%AE%BE%E5%AE%9A%2F%E4%B8%96%E7%95%8C%E8%A7%82.md",
+        schema_id: null,
+        source: "file",
+        title: "世界观",
+        updated_at: "2026-04-08T00:00:00Z",
+        version: "sha256:new-world",
+        writable: true,
+      },
+      {
+        binding_version: "binding-cast",
+        catalog_version: expectedCatalogVersion,
+        content_state: "ready",
+        document_kind: "markdown",
+        document_ref: "file:设定/人物.md",
+        mime_type: "text/markdown",
+        path: "设定/人物.md",
+        resource_uri: "project-document://project-1/file%3A%E8%AE%BE%E5%AE%9A%2F%E4%BA%BA%E7%89%A9.md",
+        schema_id: null,
+        source: "file",
+        title: "人物",
+        updated_at: "2026-04-08T00:00:00Z",
+        version: "sha256:cast",
+        writable: true,
+      },
+    ],
   );
 });

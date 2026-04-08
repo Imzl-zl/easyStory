@@ -13,6 +13,7 @@ import {
   readStudioChatProjectState,
   remapDocumentPathReferencesInProjectState,
   serializeStudioChatProjectState,
+  type StudioConversationPatchOptions,
   type StudioChatSession,
   type StudioConversationSummary,
 } from "./studio-chat-store-support";
@@ -31,6 +32,7 @@ export type StudioChatState = {
   patchConversationSession: (
     conversationId: string,
     updater: (current: StudioChatSession) => StudioChatSession,
+    options?: StudioConversationPatchOptions,
   ) => void;
   remapDocumentPathReferences: (previousPath: string, nextPath: string | null) => void;
   selectConversation: (conversationId: string) => void;
@@ -105,11 +107,15 @@ export function useStudioChatState(projectId: string): StudioChatState {
     }
     deleteStoredConversation(scopeId, conversationId);
   }, [deleteStoredConversation, scopeId]);
-  const patchConversationSession = useCallback((conversationId: string, updater: (current: StudioChatSession) => StudioChatSession) => {
+  const patchConversationSession = useCallback((
+    conversationId: string,
+    updater: (current: StudioChatSession) => StudioChatSession,
+    options?: StudioConversationPatchOptions,
+  ) => {
     if (!scopeId) {
       return;
     }
-    patchStoredConversation(scopeId, conversationId, updater);
+    patchStoredConversation(scopeId, conversationId, updater, options);
   }, [patchStoredConversation, scopeId]);
   const remapDocumentPathReferences = useCallback((previousPath: string, nextPath: string | null) => {
     if (!scopeId || !storedProjectState) {

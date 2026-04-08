@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createStudioChatMessage } from "./studio-chat-support";
+import {
+  createStudioChatMessage,
+  resolveStudioPreparedAssistantTurnPayload,
+} from "./studio-chat-support";
 import { createEmptyStudioChatSession } from "./studio-chat-store-support";
 import {
   buildFailedStudioConversationSession,
@@ -123,4 +126,53 @@ test("studio chat model does not retain latest completed run id when successful 
   assert.equal(nextSession.messages.at(-1)?.status, "error");
   assert.equal(nextSession.messages.at(-1)?.rawMarkdown, nextSession.messages.at(-1)?.content);
   assert.equal(nextSession.messages.at(-1)?.requestContent, nextSession.messages.at(-1)?.content);
+});
+
+test("studio chat model prepares payload errors as explicit result instead of throwing", () => {
+  const result = resolveStudioPreparedAssistantTurnPayload({
+    activeBufferState: {
+      base_version: "canonical:chapter:001:version:content-1:2",
+      buffer_hash: "fnv1a64:abc123",
+      dirty: false,
+      source: "studio_editor",
+    },
+    conversationId: "conversation-studio-stale-catalog",
+    currentDocumentPath: "正文/第001章.md",
+    latestCompletedRunId: null,
+    messages: [createStudioChatMessage("user", "继续写这一段")],
+    projectId: "project-1",
+    selectedContextPaths: [],
+    settings: {
+      maxOutputTokens: "2000",
+      modelName: "",
+      provider: "",
+      streamOutput: true,
+    },
+  });
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    throw new Error("expected payload preparation to fail");
+  }
+  assert.match(result.errorMessage, /目录快照尚未就绪/);
+});
+
+test("studio chat model payload helper rethrows unexpected preparation errors", () => {
+  assert.throws(
+    () => resolveStudioPreparedAssistantTurnPayload({
+      conversationId: "conversation-studio-invalid-latest-message",
+      currentDocumentPath: null,
+      latestCompletedRunId: null,
+      messages: [createStudioChatMessage("assistant", "我先补一句")],
+      projectId: "project-1",
+      selectedContextPaths: [],
+      settings: {
+        maxOutputTokens: "2000",
+        modelName: "",
+        provider: "",
+        streamOutput: true,
+      },
+    }),
+    /latest user message/,
+  );
 });

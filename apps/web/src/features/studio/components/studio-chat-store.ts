@@ -10,6 +10,7 @@ import {
   patchConversationInProjectState,
   selectConversationForProjectState,
   upsertProjectState,
+  type StudioConversationPatchOptions,
   type StudioChatProjectState,
   type StudioChatSession,
   deleteConversationFromProjectState,
@@ -27,11 +28,13 @@ type StudioChatStoreState = {
   patchActiveConversation: (
     scopeId: string,
     updater: (current: StudioChatSession) => StudioChatSession,
+    options?: StudioConversationPatchOptions,
   ) => void;
   patchConversation: (
     scopeId: string,
     conversationId: string,
     updater: (current: StudioChatSession) => StudioChatSession,
+    options?: StudioConversationPatchOptions,
   ) => void;
   projectStatesByScopeId: Record<string, StudioChatProjectState>;
   replaceProjectState: (scopeId: string, projectState: StudioChatProjectState) => void;
@@ -81,14 +84,14 @@ export const useStudioChatStore = create<StudioChatStoreState>()(
         }),
       hasHydrated: false,
       markHydrated: () => set({ hasHydrated: true }),
-      patchActiveConversation: (scopeId, updater) =>
+      patchActiveConversation: (scopeId, updater, options) =>
         set((state) =>
           upsertProjectState(
             state.projectStatesByScopeId,
             scopeId,
-            patchConversationInProjectState(state.projectStatesByScopeId[scopeId], null, updater),
+            patchConversationInProjectState(state.projectStatesByScopeId[scopeId], null, updater, options),
           )),
-      patchConversation: (scopeId, conversationId, updater) =>
+      patchConversation: (scopeId, conversationId, updater, options) =>
         set((state) =>
           upsertProjectState(
             state.projectStatesByScopeId,
@@ -97,6 +100,7 @@ export const useStudioChatStore = create<StudioChatStoreState>()(
               state.projectStatesByScopeId[scopeId],
               conversationId,
               updater,
+              options,
             ),
           )),
       projectStatesByScopeId: {},

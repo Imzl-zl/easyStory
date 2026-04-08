@@ -11,12 +11,17 @@ import {
   saveOutline,
 } from "@/lib/api/content";
 import { getProjectDocument, saveProjectDocument } from "@/lib/api/projects";
+import type { ProjectDocumentCatalogEntry } from "@/lib/api/types";
 import type {
   ChapterImpactSummary,
   StoryAssetImpactSummary,
 } from "@/lib/api/contracts/project";
 import { invalidateChapterQueries } from "@/features/studio/components/chapter-editor-support";
 import { invalidateStoryAssetQueries } from "@/features/studio/components/story-asset-editor-support";
+import {
+  buildStudioDocumentCatalogQueryKey,
+  buildStudioDocumentCatalogVersion,
+} from "./studio-document-catalog-support";
 
 const OUTLINE_DOCUMENT_PATH = "大纲/总大纲.md";
 const OPENING_PLAN_DOCUMENT_PATH = "大纲/开篇设计.md";
@@ -194,7 +199,7 @@ export async function saveStudioDocument(
   };
 }
 
-export function syncStudioDocumentQueries(
+export async function syncStudioDocumentQueries(
   queryClient: QueryClient,
   projectId: string,
   document: StudioSavedDocument,
@@ -203,6 +208,10 @@ export function syncStudioDocumentQueries(
     buildStudioDocumentQueryKey(projectId, document.path),
     document,
   );
+  if (document.target.kind === "file") {
+    await syncStudioDocumentCatalogEntry(queryClient, projectId, document);
+    return;
+  }
   if (document.target.kind === "outline" || document.target.kind === "opening_plan") {
     invalidateStoryAssetQueries(queryClient, projectId, document.target.kind, document.impact ?? {
       has_impact: false,
@@ -214,6 +223,41 @@ export function syncStudioDocumentQueries(
   if (document.target.kind === "chapter") {
     invalidateChapterQueries(queryClient, projectId, document.target.chapterNumber);
   }
+}
+
+async function syncStudioDocumentCatalogEntry(
+  queryClient: QueryClient,
+  projectId: string,
+  document: StudioSavedDocument & { target: { kind: "file"; path: string } },
+) {
+  const queryKey = buildStudioDocumentCatalogQueryKey(projectId);
+  const currentEntries = queryClient.getQueryData<ProjectDocumentCatalogEntry[] | undefined>(queryKey);
+  if (!currentEntries?.length) {
+    return;
+  }
+  let didChange = false;
+  const nextEntries = currentEntries.map((entry) => {
+    if (entry.path !== document.path || entry.version === document.version) {
+      return entry;
+    }
+    didChange = true;
+    return {
+      ...entry,
+      version: document.version,
+    };
+  });
+  if (!didChange) {
+    return;
+  }
+  const nextCatalogVersion = await buildStudioDocumentCatalogVersion(nextEntries);
+  queryClient.setQueryData<ProjectDocumentCatalogEntry[]>(
+    queryKey,
+    nextEntries.map((entry) => ({
+      ...entry,
+      catalog_version: nextCatalogVersion,
+    })),
+  );
+  void queryClient.invalidateQueries({ queryKey });
 }
 
 function resolveDocumentTitle(documentPath: string) {

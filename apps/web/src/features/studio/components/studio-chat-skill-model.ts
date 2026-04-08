@@ -1,16 +1,20 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { listMyAssistantSkills, listProjectAssistantSkills } from "@/lib/api/assistant";
 import { getErrorMessage } from "@/lib/api/client";
 
 import type { StudioChatState } from "./studio-chat-state";
+import type { StudioConversationPatchOptions } from "./studio-chat-store-support";
 import {
   buildStudioChatSkillOptions,
   normalizeStudioSkillId,
+  normalizeStudioSkillSelection,
   resolveStudioActiveSkillState,
+  type StudioSkillLookupStatus,
+  resolveStudioUsableSkillSelection,
 } from "./studio-chat-skill-support";
 
 export type StudioChatSkillModel = {
@@ -35,6 +39,12 @@ export function useStudioChatSkillModel(
     | "patchConversationSession"
   >,
 ): StudioChatSkillModel {
+  const {
+    activeConversationId,
+    conversationSkillId,
+    nextTurnSkillId,
+    patchConversationSession,
+  } = state;
   const projectSkillsQuery = useQuery({
     queryKey: ["assistant-skills", "project", projectId, "studio-chat"],
     queryFn: () => listProjectAssistantSkills(projectId),
@@ -51,23 +61,91 @@ export function useStudioChatSkillModel(
     [projectSkillsQuery.data, userSkillsQuery.data],
   );
   const skillsLoading = projectSkillsQuery.isLoading || userSkillsQuery.isLoading;
-  const skillState = useMemo(
-    () => resolveStudioActiveSkillState({
-      conversationSkillId: state.conversationSkillId,
-      nextTurnSkillId: state.nextTurnSkillId,
-      skillsLoading,
-      skillOptions,
-    }),
-    [skillOptions, skillsLoading, state.conversationSkillId, state.nextTurnSkillId],
-  );
   const skillErrorMessage = useMemo(() => {
     const skillError = projectSkillsQuery.error ?? userSkillsQuery.error;
     return skillError ? getErrorMessage(skillError) : null;
   }, [projectSkillsQuery.error, userSkillsQuery.error]);
+  const skillLookupStatus = useMemo<StudioSkillLookupStatus>(() => {
+    if (skillsLoading) {
+      return "loading";
+    }
+    return skillErrorMessage ? "error" : "ready";
+  }, [skillErrorMessage, skillsLoading]);
+  const skillState = useMemo(
+    () => resolveStudioActiveSkillState({
+      conversationSkillId,
+      nextTurnSkillId,
+      skillLookupStatus,
+      skillsLoading,
+      skillOptions,
+    }),
+    [conversationSkillId, nextTurnSkillId, skillLookupStatus, skillOptions, skillsLoading],
+  );
+  const skillLookupReady = skillLookupStatus === "ready";
+  const normalizedSelection = useMemo(
+    () => normalizeStudioSkillSelection({
+      conversationSkillId,
+      nextTurnSkillId,
+    }),
+    [conversationSkillId, nextTurnSkillId],
+  );
+  const usableSkillSelection = useMemo(
+    () => resolveStudioUsableSkillSelection({
+      conversationSkillId,
+      nextTurnSkillId,
+      skillLookupReady,
+      skillOptions,
+    }),
+    [
+      conversationSkillId,
+      nextTurnSkillId,
+      skillLookupReady,
+      skillOptions,
+    ],
+  );
 
-  const patchActiveConversation = useCallback((updater: Parameters<StudioChatState["patchConversationSession"]>[1]) => {
-    state.patchConversationSession(state.activeConversationId, updater);
-  }, [state]);
+  const patchActiveConversation = useCallback((
+    updater: Parameters<StudioChatState["patchConversationSession"]>[1],
+    options?: StudioConversationPatchOptions,
+  ) => {
+    patchConversationSession(activeConversationId, updater, options);
+  }, [activeConversationId, patchConversationSession]);
+
+  useEffect(() => {
+    if (!skillLookupReady) {
+      return;
+    }
+    if (
+      usableSkillSelection.conversationSkillId === normalizedSelection.conversationSkillId
+      && usableSkillSelection.nextTurnSkillId === normalizedSelection.nextTurnSkillId
+    ) {
+      return;
+    }
+    patchActiveConversation((current) => {
+      const currentSelection = normalizeStudioSkillSelection({
+        conversationSkillId: current.conversationSkillId,
+        nextTurnSkillId: current.nextTurnSkillId,
+      });
+      if (
+        usableSkillSelection.conversationSkillId === currentSelection.conversationSkillId
+        && usableSkillSelection.nextTurnSkillId === currentSelection.nextTurnSkillId
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        conversationSkillId: usableSkillSelection.conversationSkillId,
+        nextTurnSkillId: usableSkillSelection.nextTurnSkillId,
+      };
+    }, { preserveUpdatedAt: true });
+  }, [
+    normalizedSelection.conversationSkillId,
+    normalizedSelection.nextTurnSkillId,
+    patchActiveConversation,
+    skillLookupReady,
+    usableSkillSelection.conversationSkillId,
+    usableSkillSelection.nextTurnSkillId,
+  ]);
 
   const useSkillForConversation = useCallback((skillId: string) => {
     const normalizedSkillId = normalizeStudioSkillId(skillId);

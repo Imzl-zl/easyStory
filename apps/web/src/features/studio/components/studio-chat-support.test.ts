@@ -176,6 +176,42 @@ test("studio chat payload uses explicitly requested write targets", () => {
   assert.deepEqual(payload.requested_write_targets, ["file:设定/人物.md"]);
 });
 
+test("studio chat payload replays attachment-enriched user messages across turns", () => {
+  const payload = buildStudioAssistantTurnPayload({
+    conversationId: "conversation-studio-attachments",
+    currentDocumentPath: null,
+    latestCompletedRunId: null,
+    messages: [
+      createStudioChatMessage("user", "我附带了旧文件。", {
+        attachments: [{
+          id: "file-old",
+          name: "旧设定.md",
+          size: 12,
+        }],
+        requestContent: "旧文件正文：人物设定 A",
+      }),
+      createStudioChatMessage("assistant", "我先看完旧文件。"),
+      createStudioChatMessage("user", "我附带了新文件。", {
+        attachments: [{
+          id: "file-new",
+          name: "新设定.md",
+          size: 34,
+        }],
+        requestContent: "新文件正文：人物设定 B",
+      }),
+    ],
+    projectId: "project-1",
+    selectedContextPaths: [],
+    settings: INITIAL_STUDIO_CHAT_SETTINGS,
+  });
+
+  assert.deepEqual(payload.messages, [
+    { content: "旧文件正文：人物设定 A", role: "user" },
+    { content: "我先看完旧文件。", role: "assistant" },
+    { content: "新文件正文：人物设定 B", role: "user" },
+  ]);
+});
+
 test("studio user request content only appends attachment context", () => {
   const requestContent = buildStudioUserRequestContent({
     attachments: [

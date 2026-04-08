@@ -17,6 +17,14 @@ export type StudioActiveSkillState = {
   nextTurnSkillLabel: string | null;
 };
 
+export type StudioUsableSkillSelection = {
+  conversationSkillId: string | null;
+  nextTurnSkillId: string | null;
+};
+
+export type StudioSkillLookupStatus = "loading" | "ready" | "error";
+type StudioSkillSelectionIssue = "loading" | "error" | "invalid" | null;
+
 const STUDIO_LOADING_SKILL_LABEL = "正在读取 Skill…";
 
 export function buildStudioChatSkillOptions(options: {
@@ -58,15 +66,135 @@ export function normalizeStudioSkillId(value: string | null | undefined) {
   return normalized || null;
 }
 
+export function normalizeStudioSkillSelection(options: {
+  conversationSkillId?: string | null;
+  nextTurnSkillId?: string | null;
+}): StudioUsableSkillSelection {
+  const conversationSkillId = normalizeStudioSkillId(options.conversationSkillId);
+  const nextTurnSkillId = normalizeStudioSkillId(options.nextTurnSkillId);
+  return {
+    conversationSkillId,
+    nextTurnSkillId: nextTurnSkillId === conversationSkillId ? null : nextTurnSkillId,
+  };
+}
+
+export function hasStudioSelectedSkill(options: {
+  conversationSkillId?: string | null;
+  nextTurnSkillId?: string | null;
+}) {
+  const normalizedSelection = normalizeStudioSkillSelection(options);
+  return Boolean(normalizedSelection.conversationSkillId || normalizedSelection.nextTurnSkillId);
+}
+
+export function resolveStudioSkillSendBlockReason(options: {
+  conversationSkillId?: string | null;
+  nextTurnSkillId?: string | null;
+  skillLookupStatus: StudioSkillLookupStatus;
+  skillOptions: ReadonlyArray<StudioChatSkillOption>;
+}) {
+  const issue = resolveStudioSkillSelectionIssue(options);
+  if (issue === "loading") {
+    return "当前 Skill 仍在确认中，确认完成后才能发送。";
+  }
+  if (issue === "error") {
+    return "当前已选 Skill 暂时不可用，请稍后重试，或先切回普通对话。";
+  }
+  if (issue === "invalid") {
+    return "当前已选 Skill 已失效，请重新选择或切回普通对话。";
+  }
+  return null;
+}
+
+export function resolveStudioUsableSkillSelection(options: {
+  conversationSkillId?: string | null;
+  nextTurnSkillId?: string | null;
+  skillLookupReady?: boolean;
+  skillOptions: ReadonlyArray<StudioChatSkillOption>;
+}): StudioUsableSkillSelection {
+  const normalizedSelection = normalizeStudioSkillSelection(options);
+  if (!options.skillLookupReady) {
+    return normalizedSelection;
+  }
+  const conversationSkillId = resolveStudioUsableSkillId(
+    normalizedSelection.conversationSkillId,
+    options.skillOptions,
+  );
+  const nextTurnSkillId = resolveStudioUsableSkillId(
+    normalizedSelection.nextTurnSkillId,
+    options.skillOptions,
+  );
+  return {
+    conversationSkillId,
+    nextTurnSkillId: nextTurnSkillId === conversationSkillId ? null : nextTurnSkillId,
+  };
+}
+
+export function resolveStudioSendableSkillSelection(options: {
+  conversationSkillId?: string | null;
+  nextTurnSkillId?: string | null;
+  skillLookupStatus: StudioSkillLookupStatus;
+  skillOptions: ReadonlyArray<StudioChatSkillOption>;
+}): StudioUsableSkillSelection {
+  if (resolveStudioSkillSendBlockReason(options)) {
+    return {
+      conversationSkillId: null,
+      nextTurnSkillId: null,
+    };
+  }
+  return resolveStudioUsableSkillSelection({
+    conversationSkillId: options.conversationSkillId,
+    nextTurnSkillId: options.nextTurnSkillId,
+    skillLookupReady: options.skillLookupStatus === "ready",
+    skillOptions: options.skillOptions,
+  });
+}
+
 export function resolveStudioActiveSkillState(options: {
   conversationSkillId?: string | null;
   nextTurnSkillId?: string | null;
+  skillLookupStatus?: StudioSkillLookupStatus;
   skillsLoading?: boolean;
   skillOptions: ReadonlyArray<StudioChatSkillOption>;
 }): StudioActiveSkillState {
-  const conversationSkillId = normalizeStudioSkillId(options.conversationSkillId);
-  const nextTurnSkillId = normalizeStudioSkillId(options.nextTurnSkillId);
-  const normalizedNextTurnSkillId = nextTurnSkillId === conversationSkillId ? null : nextTurnSkillId;
+  const normalizedSelection = normalizeStudioSkillSelection(options);
+  const conversationSkillId = normalizedSelection.conversationSkillId;
+  const normalizedNextTurnSkillId = normalizedSelection.nextTurnSkillId;
+  const selectionIssue = resolveStudioSkillSelectionIssue({
+    conversationSkillId,
+    nextTurnSkillId: normalizedNextTurnSkillId,
+    skillLookupStatus: options.skillLookupStatus ?? (options.skillsLoading ? "loading" : "ready"),
+    skillOptions: options.skillOptions,
+  });
+  if (selectionIssue === "loading") {
+    return {
+      conversationSkillId,
+      conversationSkillLabel: null,
+      detail: "Skill 列表仍在读取，确认完成后才会按当前 Skill 发送。",
+      headline: "Skill 待确认",
+      nextTurnSkillId: normalizedNextTurnSkillId,
+      nextTurnSkillLabel: null,
+    };
+  }
+  if (selectionIssue === "error") {
+    return {
+      conversationSkillId,
+      conversationSkillLabel: null,
+      detail: "当前已选 Skill 暂时无法确认，请稍后重试，或先切回普通对话。",
+      headline: "Skill 暂不可用",
+      nextTurnSkillId: normalizedNextTurnSkillId,
+      nextTurnSkillLabel: null,
+    };
+  }
+  if (selectionIssue === "invalid") {
+    return {
+      conversationSkillId,
+      conversationSkillLabel: null,
+      detail: "当前已选 Skill 已失效，请重新选择或切回普通对话。",
+      headline: "Skill 已失效",
+      nextTurnSkillId: normalizedNextTurnSkillId,
+      nextTurnSkillLabel: null,
+    };
+  }
   const conversationSkillLabel = resolveStudioSkillLabel(options.skillOptions, conversationSkillId, {
     skillsLoading: options.skillsLoading,
   });
@@ -153,4 +281,44 @@ function buildSkillSearchText(option: StudioChatSkillOption) {
     option.description,
     option.scopeLabel,
   ].filter(Boolean).join(" ").toLocaleLowerCase();
+}
+
+function resolveStudioUsableSkillId(
+  skillId: string | null | undefined,
+  skillOptions: ReadonlyArray<StudioChatSkillOption>,
+) {
+  if (!skillId) {
+    return null;
+  }
+  return skillOptions.some((option) => option.value === skillId)
+    ? skillId
+    : null;
+}
+
+function resolveStudioSkillSelectionIssue(options: {
+  conversationSkillId?: string | null;
+  nextTurnSkillId?: string | null;
+  skillLookupStatus: StudioSkillLookupStatus;
+  skillOptions: ReadonlyArray<StudioChatSkillOption>;
+}): StudioSkillSelectionIssue {
+  const normalizedSelection = normalizeStudioSkillSelection(options);
+  if (!hasStudioSelectedSkill(normalizedSelection)) {
+    return null;
+  }
+  if (options.skillLookupStatus === "loading") {
+    return "loading";
+  }
+  if (options.skillLookupStatus === "error") {
+    return "error";
+  }
+  const usableSelection = resolveStudioUsableSkillSelection({
+    conversationSkillId: normalizedSelection.conversationSkillId,
+    nextTurnSkillId: normalizedSelection.nextTurnSkillId,
+    skillLookupReady: true,
+    skillOptions: options.skillOptions,
+  });
+  return usableSelection.conversationSkillId === normalizedSelection.conversationSkillId
+    && usableSelection.nextTurnSkillId === normalizedSelection.nextTurnSkillId
+    ? null
+    : "invalid";
 }

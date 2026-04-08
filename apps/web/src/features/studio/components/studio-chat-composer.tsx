@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
-import { Button, Input, Radio } from "@arco-design/web-react";
+import { Button, Input, Message, Radio } from "@arco-design/web-react";
 
 import type { DocumentTreeNode } from "@/features/studio/components/studio-page-support";
+import { getErrorMessage } from "@/lib/api/client";
 
 import { STUDIO_ATTACHMENT_ACCEPT, type StudioChatAttachmentMeta } from "./studio-chat-attachment-support";
+import { submitStudioComposerMessage } from "./studio-chat-composer-support";
 import { StudioChatContextSelectorContent } from "./studio-chat-context-selector";
 import { renderStudioFloatingPanel, useFloatingPanelStyle } from "./studio-chat-floating-panel-support";
 import type { StudioChatSettings, StudioProviderOption } from "./studio-chat-support";
+import { resolveStudioWriteToggleDisabled } from "./studio-chat-write-support";
 
 type StudioChatComposerProps = {
   attachments: StudioChatAttachmentMeta[];
@@ -27,13 +30,18 @@ type StudioChatComposerProps = {
   onModelNameChange: (value: string) => void;
   onProviderChange: (provider: string) => void;
   onRemoveAttachment: (attachmentId: string) => void;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string) => boolean | Promise<boolean>;
   onStreamOutputChange: (value: boolean) => void;
   onToggleContext: (path: string) => void;
+  onToggleWriteToCurrentDocument: () => void;
   providerOptions: StudioProviderOption[];
   selectedContextPaths: string[];
   selectedCredentialLabel: string | null;
   settings: Pick<StudioChatSettings, "modelName" | "provider" | "streamOutput">;
+  showWriteToCurrentDocument: boolean;
+  writeIntentNotice: string | null;
+  writeTargetDisabledReason: string | null;
+  isWriteToCurrentDocumentEnabled: boolean;
 };
 
 const MODEL_PICKER_PANEL_CLASS =
@@ -59,10 +67,15 @@ export function StudioChatComposer({
   onSendMessage,
   onStreamOutputChange,
   onToggleContext,
+  onToggleWriteToCurrentDocument,
   providerOptions,
   selectedContextPaths,
   selectedCredentialLabel,
   settings,
+  showWriteToCurrentDocument,
+  writeIntentNotice,
+  writeTargetDisabledReason,
+  isWriteToCurrentDocumentEnabled,
 }: Readonly<StudioChatComposerProps>) {
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showProviderList, setShowProviderList] = useState(false);
@@ -141,12 +154,20 @@ export function StudioChatComposer({
     onProviderChange(provider);
   }, [onProviderChange]);
 
+  const handleUnexpectedSendError = useCallback((error: unknown) => {
+    console.error("Studio chat composer send failed unexpectedly.", error);
+    Message.error(getErrorMessage(error));
+  }, []);
+
   const handleSubmit = useCallback(() => {
-    const trimmed = composerText.trim();
-    if (!trimmed || isResponding || !canChat) return;
-    onSendMessage(trimmed);
-    onComposerTextChange("");
-  }, [canChat, composerText, isResponding, onComposerTextChange, onSendMessage]);
+    submitStudioComposerMessage({
+      canChat,
+      composerText,
+      isResponding,
+      onSendMessage,
+      onUnexpectedError: handleUnexpectedSendError,
+    });
+  }, [canChat, composerText, handleUnexpectedSendError, isResponding, onSendMessage]);
 
   const handleComposerKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -321,6 +342,21 @@ export function StudioChatComposer({
                 </div>,
               ) : null}
             </div>
+
+            {showWriteToCurrentDocument ? (
+              <ToolbarToggleButton
+                active={isWriteToCurrentDocumentEnabled}
+                disabled={resolveStudioWriteToggleDisabled({
+                  enabled: isWriteToCurrentDocumentEnabled,
+                  writeTargetDisabledReason,
+                })}
+                label={isWriteToCurrentDocumentEnabled ? "本轮改当前稿" : "改当前稿"}
+                title={writeTargetDisabledReason ?? "显式开启后，助手本轮才可改写当前文稿。"}
+                onClick={onToggleWriteToCurrentDocument}
+              >
+                <WriteIcon />
+              </ToolbarToggleButton>
+            ) : null}
           </div>
 
           <Button
@@ -333,6 +369,12 @@ export function StudioChatComposer({
             发送
           </Button>
         </div>
+
+        {writeIntentNotice ? (
+          <p className={`mt-1.5 px-1 text-[11px] leading-4 ${isWriteToCurrentDocumentEnabled ? "text-[var(--accent-primary)]" : "text-[var(--text-muted)]"}`}>
+            {writeIntentNotice}
+          </p>
+        ) : null}
 
         <input
           accept={STUDIO_ATTACHMENT_ACCEPT}
@@ -390,6 +432,42 @@ function ToolbarChipButton({
   );
 }
 
+function ToolbarToggleButton({
+  active = false,
+  children,
+  disabled = false,
+  label,
+  onClick,
+  title,
+}: {
+  active?: boolean;
+  children: ReactNode;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      aria-pressed={active}
+      className={`inline-flex h-[26px] items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium transition-colors ${
+        disabled
+          ? "cursor-not-allowed bg-[rgba(44,36,22,0.04)] text-[rgba(44,36,22,0.35)]"
+          : active
+            ? "bg-[rgba(107,143,113,0.16)] text-[var(--accent-primary)]"
+            : "bg-[rgba(44,36,22,0.05)] text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.1)]"
+      }`}
+      disabled={disabled}
+      title={title}
+      type="button"
+      onClick={onClick}
+    >
+      <span className="opacity-70">{children}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
 function PaperclipIcon() {
   return <ComposerIcon path="M9.5 18.5 15.4 12.6a3 3 0 0 0-4.2-4.2l-6.3 6.3a4.5 4.5 0 0 0 6.4 6.4l6.7-6.7" />;
 }
@@ -400,6 +478,10 @@ function ContextIcon() {
 
 function SparkIcon() {
   return <ComposerIcon path="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3Zm6 11 .7 2.3L21 17l-2.3.7L18 20l-.7-2.3L15 17l2.3-.7L18 14Z" />;
+}
+
+function WriteIcon() {
+  return <ComposerIcon path="M5 19.2 5.7 15l8.9-8.9a1.8 1.8 0 0 1 2.5 0l1 1a1.8 1.8 0 0 1 0 2.5L9.2 18.5 5 19.2Zm7.1-11.4 3.7 3.7" />;
 }
 
 function ComposerIcon({ path }: { path: string }) {

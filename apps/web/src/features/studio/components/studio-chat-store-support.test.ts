@@ -5,6 +5,7 @@ import { STUDIO_PENDING_REPLY_MESSAGE } from "./studio-chat-support";
 import {
   createConversationForProjectState,
   normalizePersistedStudioChatProjectState,
+  patchConversationInProjectState,
 } from "./studio-chat-store-support";
 
 test("studio chat store keeps provider settings when creating a new conversation", () => {
@@ -136,4 +137,74 @@ test("studio chat store clears latest completed run id when restored conversatio
   });
 
   assert.equal(normalized.conversations[0]?.session.latestCompletedRunId, null);
+});
+
+test("studio chat store can patch session without refreshing updatedAt ordering", () => {
+  const projectState = {
+    activeConversationId: "conversation-old",
+    conversations: [{
+      id: "conversation-new",
+      session: {
+        composerText: "",
+        conversationSkillId: null,
+        latestCompletedRunId: null,
+        messages: [{
+          content: "最近一条",
+          id: "user-new",
+          rawMarkdown: "最近一条",
+          role: "user" as const,
+        }],
+        nextTurnSkillId: null,
+        selectedContextPaths: [],
+        settings: {
+          maxOutputTokens: "",
+          modelName: "",
+          provider: "",
+          streamOutput: true,
+        },
+      },
+      title: "最近会话",
+      updatedAt: "2026-04-08T12:00:00Z",
+    }, {
+      id: "conversation-old",
+      session: {
+        composerText: "",
+        conversationSkillId: "skill.user.missing-helper",
+        latestCompletedRunId: null,
+        messages: [{
+          content: "旧会话",
+          id: "user-old",
+          rawMarkdown: "旧会话",
+          role: "user" as const,
+        }],
+        nextTurnSkillId: null,
+        selectedContextPaths: [],
+        settings: {
+          maxOutputTokens: "",
+          modelName: "",
+          provider: "",
+          streamOutput: true,
+        },
+      },
+      title: "旧会话",
+      updatedAt: "2026-04-08T10:00:00Z",
+    }],
+  };
+
+  const nextState = patchConversationInProjectState(
+    projectState,
+    "conversation-old",
+    (current) => ({
+      ...current,
+      conversationSkillId: null,
+    }),
+    { preserveUpdatedAt: true },
+  );
+
+  assert.deepEqual(nextState.conversations.map((item) => item.id), [
+    "conversation-new",
+    "conversation-old",
+  ]);
+  assert.equal(nextState.conversations[1]?.updatedAt, "2026-04-08T10:00:00.000Z");
+  assert.equal(nextState.conversations[1]?.session.conversationSkillId, null);
 });

@@ -61,8 +61,8 @@ export function useStudioDocumentModel({
       }
       return saveStudioDocument(projectId, documentQuery.data, content);
     },
-    onSuccess: (savedDocument) => {
-      syncStudioDocumentQueries(queryClient, projectId, savedDocument);
+    onSuccess: async (savedDocument) => {
+      await syncStudioDocumentQueries(queryClient, projectId, savedDocument);
       setDraftContent((currentDraft) =>
         dirtyPathRef.current === savedDocument.path ? "" : currentDraft,
       );

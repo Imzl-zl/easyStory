@@ -40,6 +40,10 @@ export type StudioChatProjectState = {
   conversations: StudioConversationRecord[];
 };
 
+export type StudioConversationPatchOptions = {
+  preserveUpdatedAt?: boolean;
+};
+
 export type PersistedStudioChatStoreState = {
   projectStatesByScopeId?: Record<string, StudioChatProjectState>;
 };
@@ -167,6 +171,7 @@ export function patchConversationInProjectState(
   projectState: StudioChatProjectState | undefined,
   conversationId: string | null,
   updater: (current: StudioChatSession) => StudioChatSession,
+  options: StudioConversationPatchOptions = {},
 ): StudioChatProjectState {
   const currentProjectState = ensureStudioChatProjectState(projectState);
   const targetConversationId = resolveTargetConversationId(currentProjectState, conversationId);
@@ -184,7 +189,7 @@ export function patchConversationInProjectState(
         return item;
       }
       didChange = true;
-      return buildConversationRecord(nextSession, item.id);
+      return buildPatchedConversationRecord(item, nextSession, options);
     })
     .sort(compareStudioConversationByUpdatedAt);
   if (!didChange) {
@@ -268,6 +273,22 @@ function buildConversationRecord(
     title: buildStudioConversationTitle(normalizedSession),
     updatedAt: new Date().toISOString(),
   };
+}
+
+function buildPatchedConversationRecord(
+  current: StudioConversationRecord,
+  nextSession: StudioChatSession,
+  options: StudioConversationPatchOptions,
+): StudioConversationRecord {
+  const normalizedSession = normalizeStudioChatSession(nextSession, "runtime");
+  if (options.preserveUpdatedAt) {
+    return {
+      ...current,
+      session: normalizedSession,
+      title: buildStudioConversationTitle(normalizedSession),
+    };
+  }
+  return buildConversationRecord(normalizedSession, current.id);
 }
 
 function readActiveConversation(projectState: StudioChatProjectState | null) {

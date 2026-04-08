@@ -5,6 +5,7 @@ import type {
   ProjectDocumentCatalogEntry,
   AssistantTurnPayload,
 } from "@/lib/api/types";
+import { getErrorMessage } from "@/lib/api/client";
 import {
   buildAssistantModelOverride,
   resolveFailedAssistantReply,
@@ -25,6 +26,12 @@ import {
 import { normalizeStudioSkillId } from "./studio-chat-skill-support";
 
 const STUDIO_CONTEXT_SELECTION_MAX_COUNT = 8;
+class StudioAssistantTurnPayloadPreparationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StudioAssistantTurnPayloadPreparationError";
+  }
+}
 
 export const STUDIO_PENDING_REPLY_MESSAGE = "正在贴合当前文稿整理思路…";
 const STUDIO_INTERRUPTED_REPLY_MESSAGE = "这次回复中断了，你可以重新发送。";
@@ -35,10 +42,6 @@ const STUDIO_TOOL_LABELS: Record<string, string> = {
   "project.search_documents": "检索文稿",
   "project.write_document": "写入文稿",
 };
-
-export function buildStudioDocumentCatalogQueryKey(projectId: string) {
-  return ["project-document-catalog", projectId] as const;
-}
 
 export type StudioChatToolProgressTone = "running" | "success" | "danger" | "muted";
 
@@ -251,6 +254,28 @@ export function buildStudioAssistantTurnPayload(options: {
     ...(requestedWriteTargets ? { requested_write_targets: requestedWriteTargets } : {}),
     ...(skillId ? { skill_id: skillId } : {}),
   };
+}
+
+export function resolveStudioPreparedAssistantTurnPayload(
+  options: Parameters<typeof buildStudioAssistantTurnPayload>[0],
+): { ok: true; payload: ReturnType<typeof buildStudioAssistantTurnPayload> } | {
+  errorMessage: string;
+  ok: false;
+} {
+  try {
+    return {
+      ok: true,
+      payload: buildStudioAssistantTurnPayload(options),
+    };
+  } catch (error) {
+    if (!(error instanceof StudioAssistantTurnPayloadPreparationError)) {
+      throw error;
+    }
+    return {
+      errorMessage: getErrorMessage(error),
+      ok: false,
+    };
+  }
 }
 
 export function buildStudioProviderOptions(
@@ -545,7 +570,7 @@ function requireStudioDocumentCatalogEntries(
   documentCatalogEntries: ProjectDocumentCatalogEntry[] | null | undefined,
 ) {
   if (!documentCatalogEntries || documentCatalogEntries.length === 0) {
-    throw new Error("当前文稿目录快照尚未就绪，请稍后重试。");
+    throw new StudioAssistantTurnPayloadPreparationError("当前文稿目录快照尚未就绪，请稍后重试。");
   }
   return documentCatalogEntries;
 }
@@ -558,16 +583,37 @@ function requireStudioDocumentCatalogEntry(
   if (entry) {
     return entry;
   }
-  throw new Error(`当前文稿目录快照已过期，请刷新后重试：${path}`);
+  throw new StudioAssistantTurnPayloadPreparationError(`当前文稿目录快照已过期，请刷新后重试：${path}`);
 }
 
 function buildStudioPayloadMessages(messages: StudioChatMessage[]) {
-  return messages
-    .filter((message) => message.status !== "pending" && message.status !== "error")
-    .map((message) => ({
-      content: message.requestContent ?? message.content,
-      role: message.role,
-    }));
+  const stableMessages = messages.filter(
+    (message) => message.status !== "pending" && message.status !== "error",
+  );
+  const latestMessageIndex = stableMessages.length - 1;
+  return stableMessages.map((message, index) => ({
+    content: resolveStudioPayloadMessageContent(message, {
+      isLatestMessage: index === latestMessageIndex,
+    }),
+    role: message.role,
+  }));
+}
+
+function resolveStudioPayloadMessageContent(
+  message: StudioChatMessage,
+  options: { isLatestMessage: boolean },
+) {
+  if (!message.requestContent) {
+    return message.content;
+  }
+  if (options.isLatestMessage || shouldReplayStudioAttachmentRequestContent(message)) {
+    return message.requestContent;
+  }
+  return message.content;
+}
+
+function shouldReplayStudioAttachmentRequestContent(message: StudioChatMessage) {
+  return message.role === "user" && Boolean(message.attachments?.length);
 }
 
 function resolveStudioSelectedContextPaths(

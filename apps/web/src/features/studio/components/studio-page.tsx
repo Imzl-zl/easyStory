@@ -12,7 +12,7 @@ import { StudioDocumentTreeDialog } from "@/features/studio/components/studio-do
 import { AiChatPanel } from "@/features/studio/components/ai-chat-panel";
 import { useStudioDocumentModel } from "@/features/studio/components/studio-document-model";
 import { useStudioChatModel } from "@/features/studio/components/studio-chat-model";
-import { buildStudioDocumentCatalogQueryKey } from "@/features/studio/components/studio-chat-support";
+import { buildStudioDocumentCatalogQueryKey } from "@/features/studio/components/studio-document-catalog-support";
 import {
   buildStudioDocumentEntryPath,
   buildStudioDocumentTree,
@@ -497,13 +497,18 @@ export function StudioPage({ projectId }: StudioPageProps) {
                 onSendMessage={chatModel.handleSendMessage}
                 onStreamOutputChange={chatModel.handleStreamOutputChange}
                 onToggleContext={chatModel.handleToggleContext}
+                onToggleWriteToCurrentDocument={chatModel.handleToggleWriteToCurrentDocument}
                 providerOptions={chatModel.credentialModel.providerOptions}
                 selectConversation={chatModel.selectConversation}
                 selectedContextPaths={chatModel.selectedContextPaths}
                 selectedCredentialLabel={chatModel.selectedCredentialLabel}
                 settings={chatModel.settings}
+                showWriteToCurrentDocument={chatModel.showWriteToCurrentDocument}
                 skillModel={chatModel.skillModel}
                 visibleModelLabel={chatModel.visibleModelLabel}
+                writeIntentNotice={chatModel.writeIntentNotice}
+                writeTargetDisabledReason={chatModel.writeTargetDisabledReason}
+                isWriteToCurrentDocumentEnabled={chatModel.isWriteToCurrentDocumentEnabled}
               />
             </aside>
           ) : null}
