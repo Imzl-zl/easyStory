@@ -1,4 +1,4 @@
-import { RecycleBinPage } from "@/features/lobby/components/recycle-bin-page";
+import { RecycleBinPage } from "@/features/lobby/components/recycle-bin/recycle-bin-page";
 
 export const dynamic = "force-dynamic";
 

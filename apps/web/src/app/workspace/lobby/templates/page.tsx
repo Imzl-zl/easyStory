@@ -1,4 +1,4 @@
-import { TemplateLibraryPage } from "@/features/lobby/components/template-library-page";
+import { TemplateLibraryPage } from "@/features/lobby/components/templates/template-library-page";
 
 export const dynamic = "force-dynamic";
 

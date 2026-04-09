@@ -69,12 +69,12 @@ apps/web/src/app/workspace/project/[projectId]/settings/page.tsx
 
 ```text
 apps/web/src/features/workspace/components/workspace-shell.tsx
-apps/web/src/features/lobby/components/lobby-page.tsx
-apps/web/src/features/lobby/components/incubator-page.tsx
-apps/web/src/features/lobby/components/lobby-settings-page.tsx
-apps/web/src/features/lobby/components/template-library-page.tsx
-apps/web/src/features/lobby/components/recycle-bin-page.tsx
-apps/web/src/features/studio/components/studio-page.tsx
+apps/web/src/features/lobby/components/projects/lobby-page.tsx
+apps/web/src/features/lobby/components/incubator/incubator-page.tsx
+apps/web/src/features/lobby/components/settings/lobby-settings-page.tsx
+apps/web/src/features/lobby/components/templates/template-library-page.tsx
+apps/web/src/features/lobby/components/recycle-bin/recycle-bin-page.tsx
+apps/web/src/features/studio/components/page/studio-page.tsx
 apps/web/src/features/engine/components/engine-page.tsx
 apps/web/src/features/lab/components/lab-page.tsx
 apps/web/src/features/project-settings/components/project-settings-page.tsx
@@ -129,9 +129,9 @@ apps/web/src/lib/utils/cn.ts
 **路由 / 实现：**
 
 - `apps/web/src/app/workspace/lobby/page.tsx`
-- `apps/web/src/features/lobby/components/lobby-page.tsx`
-- `apps/web/src/features/lobby/components/lobby-project-shelf.tsx`
-- `apps/web/src/features/lobby/components/lobby-entry-card.tsx`
+- `apps/web/src/features/lobby/components/projects/lobby-page.tsx`
+- `apps/web/src/features/lobby/components/projects/lobby-project-shelf.tsx`
+- `apps/web/src/features/lobby/components/projects/lobby-entry-card.tsx`
 
 **文档挂钩：**
 
@@ -151,10 +151,10 @@ apps/web/src/lib/utils/cn.ts
 **路由 / 实现：**
 
 - `apps/web/src/app/workspace/lobby/new/page.tsx`
-- `apps/web/src/features/lobby/components/incubator-page.tsx`
-- `apps/web/src/features/lobby/components/incubator-chat-panel.tsx`
-- `apps/web/src/features/lobby/components/incubator-panels.tsx`
-- `apps/web/src/features/lobby/components/incubator-page-model.ts`
+- `apps/web/src/features/lobby/components/incubator/incubator-page.tsx`
+- `apps/web/src/features/lobby/components/incubator/incubator-chat-panel.tsx`
+- `apps/web/src/features/lobby/components/incubator/incubator-panels.tsx`
+- `apps/web/src/features/lobby/components/incubator/incubator-page-model.ts`
 
 **业务参考：**
 
@@ -180,15 +180,15 @@ apps/web/src/lib/utils/cn.ts
 **路由 / 实现：**
 
 - `apps/web/src/app/workspace/project/[projectId]/studio/page.tsx`
-- `apps/web/src/features/studio/components/studio-page.tsx`
-- `apps/web/src/features/studio/components/document-tree.tsx`
-- `apps/web/src/features/studio/components/markdown-document-editor.tsx`
-- `apps/web/src/features/studio/components/ai-chat-panel.tsx`
-- `apps/web/src/features/studio/components/studio-chat-composer.tsx`
+- `apps/web/src/features/studio/components/page/studio-page.tsx`
+- `apps/web/src/features/studio/components/tree/document-tree.tsx`
+- `apps/web/src/features/studio/components/document/markdown-document-editor.tsx`
+- `apps/web/src/features/studio/components/chat/ai-chat-panel.tsx`
+- `apps/web/src/features/studio/components/chat/studio-chat-composer.tsx`
 
 **业务参考：**
 
-- `apps/web/src/features/studio/components/studio-page-support.ts`
+- `apps/web/src/features/studio/components/page/studio-page-support.ts`
 
 **文档挂钩：**
 
@@ -266,7 +266,7 @@ apps/web/src/lib/utils/cn.ts
 - `apps/web/src/app/workspace/project/[projectId]/settings/page.tsx`
 - `apps/web/src/features/project-settings/components/project-settings-page.tsx`
 - `apps/web/src/app/workspace/lobby/settings/page.tsx`
-- `apps/web/src/features/lobby/components/lobby-settings-page.tsx`
+- `apps/web/src/features/lobby/components/settings/lobby-settings-page.tsx`
 - `apps/web/src/features/settings/components/**`
 
 **文档挂钩：**
@@ -288,9 +288,9 @@ apps/web/src/lib/utils/cn.ts
 **路由 / 实现：**
 
 - `apps/web/src/app/workspace/lobby/templates/page.tsx`
-- `apps/web/src/features/lobby/components/template-library-page.tsx`
+- `apps/web/src/features/lobby/components/templates/template-library-page.tsx`
 - `apps/web/src/app/workspace/lobby/recycle-bin/page.tsx`
-- `apps/web/src/features/lobby/components/recycle-bin-page.tsx`
+- `apps/web/src/features/lobby/components/recycle-bin/recycle-bin-page.tsx`
 - `apps/web/src/app/workspace/lobby/config-registry/page.tsx`
 - `apps/web/src/features/config-registry/components/config-registry-page.tsx`
 
@@ -389,9 +389,9 @@ apps/web/src/lib/utils/cn.ts
 ### 6.3 关键源码参考
 
 - `apps/web/src/features/workspace/components/workspace-shell.tsx`
-- `apps/web/src/features/lobby/components/lobby-page.tsx`
-- `apps/web/src/features/lobby/components/incubator-page.tsx`
-- `apps/web/src/features/studio/components/studio-page.tsx`
+- `apps/web/src/features/lobby/components/projects/lobby-page.tsx`
+- `apps/web/src/features/lobby/components/incubator/incubator-page.tsx`
+- `apps/web/src/features/studio/components/page/studio-page.tsx`
 - `apps/web/src/features/engine/components/engine-page.tsx`
 - `apps/web/src/features/lab/components/lab-page.tsx`
 - `apps/web/src/features/project-settings/components/project-settings-page.tsx`

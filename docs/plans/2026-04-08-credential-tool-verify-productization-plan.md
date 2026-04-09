@@ -57,7 +57,7 @@ cd apps/api && ./.venv/bin/pytest -q \
   tests/unit/test_credential_api.py
 
 pnpm --dir apps/web test:unit -- --runInBand \
-  src/features/settings/components/credential-center-action-support.test.ts \
-  src/features/settings/components/credential-center-feedback.test.ts \
-  src/features/settings/components/credential-center-support.test.ts
+  src/features/settings/components/credential/credential-center-action-support.test.ts \
+  src/features/settings/components/credential/credential-center-feedback.test.ts \
+  src/features/settings/components/credential/credential-center-support.test.ts
 ```

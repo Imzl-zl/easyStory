@@ -3,10 +3,10 @@
 import { ProjectAuditPanel } from "@/features/project-settings/components/project-audit-panel";
 import { ProjectSettingSummaryPanel } from "@/features/project-settings/components/project-setting-summary-panel";
 import type { ProjectSettingsTab } from "@/features/project-settings/components/project-settings-support";
-import { AssistantMcpPanel } from "@/features/settings/components/assistant-mcp-panel";
-import { AssistantPreferencesPanel } from "@/features/settings/components/assistant-preferences-panel";
-import { AssistantRulesEditor } from "@/features/settings/components/assistant-rules-editor";
-import { AssistantSkillsPanel } from "@/features/settings/components/assistant-skills-panel";
+import { AssistantMcpPanel } from "@/features/settings/components/assistant/mcp/assistant-mcp-panel";
+import { AssistantPreferencesPanel } from "@/features/settings/components/assistant/preferences/assistant-preferences-panel";
+import { AssistantRulesEditor } from "@/features/settings/components/assistant/rules/assistant-rules-editor";
+import { AssistantSkillsPanel } from "@/features/settings/components/assistant/skills/assistant-skills-panel";
 import { getErrorMessage } from "@/lib/api/client";
 import { checkProjectSetting, getProject } from "@/lib/api/projects";
 

@@ -91,5 +91,5 @@
 
 ```bash
 cd apps/api && ./.venv/bin/pytest -q tests/unit/test_credential_service.py tests/unit/test_credential_service_updates.py tests/unit/test_credential_api.py tests/unit/test_credential_verifier.py tests/unit/test_assistant_service.py tests/unit/test_alembic_baseline.py tests/unit/test_db_bootstrap.py tests/unit/test_llm_tool_provider.py
-pnpm --dir apps/web test:unit -- --runInBand src/features/settings/components/credential-center-support.test.ts
+pnpm --dir apps/web test:unit -- --runInBand src/features/settings/components/credential/credential-center-support.test.ts
 ```

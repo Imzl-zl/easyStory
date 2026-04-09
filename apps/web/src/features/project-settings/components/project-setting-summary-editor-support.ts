@@ -11,7 +11,7 @@ import type {
   AssistantPreferences,
   ProjectSettingImpactSummary,
 } from "@/lib/api/types";
-import { buildIncubatorCredentialOptions } from "@/features/lobby/components/incubator-chat-credential-support";
+import { buildIncubatorCredentialOptions } from "@/features/shared/assistant/assistant-credential-support";
 
 export type ProjectSettingSummaryEditorResources = {
   credentialOptions: ReturnType<typeof buildIncubatorCredentialOptions>;

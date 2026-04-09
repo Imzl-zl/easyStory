@@ -1,4 +1,4 @@
-import { StudioPage } from "@/features/studio/components/studio-page";
+import { StudioPage } from "@/features/studio/components/page/studio-page";
 
 type StudioRouteProps = {
   params: Promise<{ projectId: string }>;

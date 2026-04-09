@@ -1,4 +1,4 @@
-import { LobbySettingsPage } from "@/features/lobby/components/lobby-settings-page";
+import { LobbySettingsPage } from "@/features/lobby/components/settings/lobby-settings-page";
 
 export const dynamic = "force-dynamic";
 

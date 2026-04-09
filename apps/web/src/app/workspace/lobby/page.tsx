@@ -1,4 +1,4 @@
-import { LobbyPage } from "@/features/lobby/components/lobby-page";
+import { LobbyPage } from "@/features/lobby/components/projects/lobby-page";
 
 export const dynamic = "force-dynamic";
 

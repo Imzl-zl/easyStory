@@ -9,7 +9,7 @@ import { AppSelect } from "@/components/ui/app-select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   pickIncubatorCredentialOption,
-} from "@/features/lobby/components/incubator-chat-credential-support";
+} from "@/features/shared/assistant/assistant-credential-support";
 import {
   buildProjectSettingConversationSeed,
 } from "@/features/project/components/project-setting-summary-support";
