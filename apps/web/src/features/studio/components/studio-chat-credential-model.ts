@@ -11,6 +11,7 @@ import {
 import { getErrorMessage } from "@/lib/api/client";
 import { listCredentials } from "@/lib/api/credential";
 import {
+  buildCredentialToolCapabilityNotice,
   buildIncubatorCredentialNotice,
   buildIncubatorCredentialOptions,
   resolveHydratedIncubatorChatSettings,
@@ -72,6 +73,13 @@ export function useStudioChatCredentialModel(
     errorMessage: credentialErrorMessage,
     isLoading: credentialsQuery.isLoading,
   });
+  const toolCapabilityNotice = useMemo(
+    () => buildCredentialToolCapabilityNotice({
+      credential: selectedCredential,
+      streamOutput: settings.streamOutput,
+    }),
+    [selectedCredential, settings.streamOutput],
+  );
 
   useEffect(() => {
     if (
@@ -100,7 +108,7 @@ export function useStudioChatCredentialModel(
 
   return {
     canChat: credentialState === "ready" && settings.provider.trim().length > 0,
-    credentialNotice: buildIncubatorCredentialNotice({
+    credentialNotice: toolCapabilityNotice ?? buildIncubatorCredentialNotice({
       credentialOptions,
       errorMessage: credentialErrorMessage,
       isLoading: credentialsQuery.isLoading,
@@ -114,5 +122,6 @@ export function useStudioChatCredentialModel(
       || userPreferencesQuery.isLoading,
     providerOptions: buildStudioProviderOptions(credentialOptions),
     selectedCredential,
+    toolCapabilityNotice,
   };
 }

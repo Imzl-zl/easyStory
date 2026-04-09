@@ -18,6 +18,7 @@ from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
 
 from .dto import (
     CredentialCreateDTO,
+    CredentialVerifyTransportMode,
     CredentialUpdateDTO,
     CredentialVerifyResultDTO,
     CredentialViewDTO,
@@ -235,6 +236,7 @@ class CredentialService:
         *,
         actor_user_id: uuid.UUID,
         probe_kind: ConformanceProbeKind = "text_probe",
+        transport_mode: CredentialVerifyTransportMode | None = None,
     ) -> CredentialVerifyResultDTO:
         credential = await require_actor_credential(
             db,
@@ -251,6 +253,7 @@ class CredentialService:
             event_type=AUDIT_VERIFY,
             audit_log_service=self.audit_log_service,
             probe_kind=probe_kind,
+            transport_mode=transport_mode,
         )
 
     async def resolve_active_credential(

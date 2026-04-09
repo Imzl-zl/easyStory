@@ -36,9 +36,11 @@ class FakeVerifier:
         verified_at: datetime | None = None,
         *,
         expected_probe_kind: str = "text_probe",
+        expected_transport_mode: str | None = None,
     ) -> None:
         self.verified_at = verified_at or datetime.now(timezone.utc)
         self.expected_probe_kind = expected_probe_kind
+        self.expected_transport_mode = expected_transport_mode
 
     async def verify(
         self,
@@ -57,6 +59,7 @@ class FakeVerifier:
         client_version: str | None,
         runtime_kind: str | None,
         probe_kind: str | None,
+        transport_mode: str | None,
     ) -> CredentialVerificationResult:
         assert provider
         assert api_key
@@ -72,10 +75,12 @@ class FakeVerifier:
         assert client_version is None
         assert runtime_kind is None
         assert probe_kind == self.expected_probe_kind
+        assert transport_mode == self.expected_transport_mode
         return CredentialVerificationResult(
             verified_at=self.verified_at,
             message="工具调用验证成功" if probe_kind == "tool_continuation_probe" else "验证成功",
             probe_kind=probe_kind or "text_probe",
+            transport_mode=transport_mode,
         )
 
 
@@ -153,7 +158,8 @@ def test_create_user_credential_encrypts_and_audits(db, monkeypatch) -> None:
     assert result.api_dialect == OPENAI_DIALECT
     assert result.default_model == OPENAI_MODEL
     assert result.interop_profile is None
-    assert result.verified_probe_kind is None
+    assert result.stream_tool_verified_probe_kind is None
+    assert result.buffered_tool_verified_probe_kind is None
     assert result.context_window_tokens is None
     assert result.default_max_output_tokens is None
     assert result.auth_strategy is None
@@ -326,7 +332,8 @@ def test_verify_credential_updates_timestamp_and_audits(db, monkeypatch) -> None
     assert result.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
     assert result.probe_kind == "text_probe"
     assert stored.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
-    assert stored.verified_probe_kind == "text_probe"
+    assert stored.stream_tool_verified_probe_kind is None
+    assert stored.buffered_tool_verified_probe_kind is None
     assert audits[-1].details["status"] == "verified"
     assert audits[-1].details["probe_kind"] == "text_probe"
 
@@ -339,6 +346,7 @@ def test_verify_credential_accepts_explicit_tool_probe_kind(db, monkeypatch) -> 
         verifier=FakeVerifier(
             verified_at=verified_at,
             expected_probe_kind="tool_continuation_probe",
+            expected_transport_mode="stream",
         )
     )
     credential = asyncio.run(
@@ -355,19 +363,27 @@ def test_verify_credential_accepts_explicit_tool_probe_kind(db, monkeypatch) -> 
             credential.id,
             actor_user_id=user.id,
             probe_kind="tool_continuation_probe",
+            transport_mode="stream",
         )
     )
 
     audits = db.query(AuditLog).filter(AuditLog.event_type == "credential_verify").all()
     assert result.probe_kind == "tool_continuation_probe"
+    assert result.transport_mode == "stream"
     assert result.message == "工具调用验证成功"
     assert result.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
     stored = db.query(ModelCredential).filter(ModelCredential.id == credential.id).one()
-    assert stored.verified_probe_kind == "tool_continuation_probe"
+    assert stored.stream_tool_verified_probe_kind == "tool_continuation_probe"
+    assert stored.stream_tool_last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
+    assert stored.buffered_tool_verified_probe_kind is None
     assert audits[-1].details["probe_kind"] == "tool_continuation_probe"
+    assert audits[-1].details["transport_mode"] == "stream"
 
 
-def test_verify_credential_keeps_highest_verified_probe_kind(db, monkeypatch) -> None:
+def test_verify_credential_keeps_stream_tool_verification_after_connection_recheck(
+    db,
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
     verified_at = datetime.now(timezone.utc).replace(microsecond=0)
     user = create_user(db)
@@ -375,6 +391,7 @@ def test_verify_credential_keeps_highest_verified_probe_kind(db, monkeypatch) ->
         verifier=FakeVerifier(
             verified_at=verified_at,
             expected_probe_kind="tool_continuation_probe",
+            expected_transport_mode="stream",
         )
     )
     credential = asyncio.run(
@@ -384,6 +401,9 @@ def test_verify_credential_keeps_highest_verified_probe_kind(db, monkeypatch) ->
             actor_user_id=user.id,
         )
     )
+    stored = db.query(ModelCredential).filter(ModelCredential.id == credential.id).one()
+    stored.verified_probe_kind = "tool_continuation_probe"
+    db.commit()
 
     asyncio.run(
         service.verify_credential(
@@ -391,6 +411,7 @@ def test_verify_credential_keeps_highest_verified_probe_kind(db, monkeypatch) ->
             credential.id,
             actor_user_id=user.id,
             probe_kind="tool_continuation_probe",
+            transport_mode="stream",
         )
     )
 
@@ -408,10 +429,10 @@ def test_verify_credential_keeps_highest_verified_probe_kind(db, monkeypatch) ->
     )
 
     stored = db.query(ModelCredential).filter(ModelCredential.id == credential.id).one()
-    assert stored.verified_probe_kind == "tool_continuation_probe"
+    assert stored.verified_probe_kind is None
+    assert stored.stream_tool_verified_probe_kind == "tool_continuation_probe"
 
-
-def test_verify_credential_record_does_not_downgrade_stale_verified_probe_kind(
+def test_verify_credential_record_does_not_downgrade_stale_stream_tool_verification(
     db,
     engine,
     monkeypatch,
@@ -437,10 +458,11 @@ def test_verify_credential_record_does_not_downgrade_stale_verified_probe_kind(
     with Session(engine) as concurrent_db:
         concurrent_credential = concurrent_db.get(ModelCredential, created.id)
         assert concurrent_credential is not None
-        concurrent_credential.verified_probe_kind = "tool_continuation_probe"
+        concurrent_credential.stream_tool_verified_probe_kind = "tool_continuation_probe"
+        concurrent_credential.stream_tool_last_verified_at = verified_at
         concurrent_db.commit()
 
-    assert stale_credential.verified_probe_kind is None
+    assert stale_credential.stream_tool_verified_probe_kind is None
 
     result = asyncio.run(
         verify_credential_record(
@@ -452,6 +474,7 @@ def test_verify_credential_record_does_not_downgrade_stale_verified_probe_kind(
             event_type="credential_verify",
             audit_log_service=service.audit_log_service,
             probe_kind="text_probe",
+            transport_mode=None,
         )
     )
 
@@ -459,11 +482,10 @@ def test_verify_credential_record_does_not_downgrade_stale_verified_probe_kind(
     audits = db.query(AuditLog).filter(AuditLog.event_type == "credential_verify").all()
     assert result.probe_kind == "text_probe"
     assert stored.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
-    assert stored.verified_probe_kind == "tool_continuation_probe"
-    assert audits[-1].details["verified_probe_kind"] == "tool_continuation_probe"
+    assert stored.stream_tool_verified_probe_kind == "tool_continuation_probe"
+    assert audits[-1].details["stream_tool_verified_probe_kind"] == "tool_continuation_probe"
 
-
-def test_verify_credential_failed_tool_probe_clears_stale_verified_probe_kind(
+def test_verify_credential_failed_stream_tool_probe_clears_stale_stream_tool_verification(
     db,
     monkeypatch,
 ) -> None:
@@ -481,6 +503,11 @@ def test_verify_credential_failed_tool_probe_clears_stale_verified_probe_kind(
     stored = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
     stored.verified_probe_kind = "tool_continuation_probe"
     stored.last_verified_at = verified_at
+    stored.stream_tool_verified_probe_kind = "tool_continuation_probe"
+    stored.stream_tool_last_verified_at = verified_at
+    stored.buffered_tool_verified_probe_kind = "tool_call_probe"
+    stored.buffered_tool_last_verified_at = verified_at
+    stored.last_verified_at = verified_at
     db.commit()
 
     with pytest.raises(BusinessRuleError, match="当前探测失败"):
@@ -494,18 +521,22 @@ def test_verify_credential_failed_tool_probe_clears_stale_verified_probe_kind(
                 event_type="credential_verify",
                 audit_log_service=service.audit_log_service,
                 probe_kind="tool_continuation_probe",
+                transport_mode="stream",
             )
         )
 
     refreshed = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
     audits = db.query(AuditLog).filter(AuditLog.event_type == "credential_verify").all()
     assert refreshed.verified_probe_kind is None
-    assert refreshed.last_verified_at is None
+    assert refreshed.stream_tool_verified_probe_kind is None
+    assert refreshed.stream_tool_last_verified_at is None
+    assert refreshed.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
+    assert refreshed.buffered_tool_verified_probe_kind == "tool_call_probe"
     assert audits[-1].details["status"] == "failed"
-    assert audits[-1].details["verified_probe_kind"] is None
+    assert audits[-1].details["stream_tool_verified_probe_kind"] is None
 
 
-def test_verify_credential_failed_higher_probe_preserves_lower_verified_probe_kind(
+def test_verify_credential_failed_higher_stream_probe_preserves_lower_stream_probe_kind(
     db,
     monkeypatch,
 ) -> None:
@@ -521,8 +552,8 @@ def test_verify_credential_failed_higher_probe_preserves_lower_verified_probe_ki
         )
     )
     stored = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
-    stored.verified_probe_kind = "text_probe"
-    stored.last_verified_at = verified_at
+    stored.stream_tool_verified_probe_kind = "tool_definition_probe"
+    stored.stream_tool_last_verified_at = verified_at
     db.commit()
 
     with pytest.raises(BusinessRuleError, match="当前探测失败"):
@@ -536,12 +567,66 @@ def test_verify_credential_failed_higher_probe_preserves_lower_verified_probe_ki
                 event_type="credential_verify",
                 audit_log_service=service.audit_log_service,
                 probe_kind="tool_continuation_probe",
+                transport_mode="stream",
             )
         )
 
     refreshed = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
-    assert refreshed.verified_probe_kind == "text_probe"
-    assert refreshed.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
+    assert refreshed.stream_tool_verified_probe_kind == "tool_definition_probe"
+    assert refreshed.stream_tool_last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
+
+
+def test_verify_credential_failed_text_probe_clears_connection_and_tool_verification_state(
+    db,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    verified_at = datetime.now(timezone.utc).replace(microsecond=0)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier(verified_at=verified_at))
+    created = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(display_name="OpenAI"),
+            actor_user_id=user.id,
+        )
+    )
+    stored = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
+    stored.verified_probe_kind = "tool_continuation_probe"
+    stored.last_verified_at = verified_at
+    stored.stream_tool_verified_probe_kind = "tool_continuation_probe"
+    stored.stream_tool_last_verified_at = verified_at
+    stored.buffered_tool_verified_probe_kind = "tool_call_probe"
+    stored.buffered_tool_last_verified_at = verified_at
+    db.commit()
+
+    with pytest.raises(BusinessRuleError, match="当前探测失败"):
+        asyncio.run(
+            verify_credential_record(
+                async_db(db),
+                credential=stored,
+                verifier=FailingVerifier("当前探测失败"),
+                decrypt_api_key=service.crypto.decrypt,
+                actor_user_id=user.id,
+                event_type="credential_verify",
+                audit_log_service=service.audit_log_service,
+                probe_kind="text_probe",
+                transport_mode=None,
+            )
+        )
+
+    refreshed = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
+    audits = db.query(AuditLog).filter(AuditLog.event_type == "credential_verify").all()
+    assert refreshed.last_verified_at is None
+    assert refreshed.verified_probe_kind is None
+    assert refreshed.stream_tool_verified_probe_kind is None
+    assert refreshed.stream_tool_last_verified_at is None
+    assert refreshed.buffered_tool_verified_probe_kind is None
+    assert refreshed.buffered_tool_last_verified_at is None
+    assert audits[-1].details["status"] == "failed"
+    assert audits[-1].details["last_verified_at"] is None
+    assert audits[-1].details["stream_tool_verified_probe_kind"] is None
+    assert audits[-1].details["buffered_tool_verified_probe_kind"] is None
 
 
 def test_update_and_disable_credential(db, monkeypatch) -> None:

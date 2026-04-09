@@ -17,7 +17,10 @@ function createCredential(overrides: Partial<CredentialView> = {}): CredentialVi
     base_url: null,
     default_model: "gpt-4o-mini",
     interop_profile: null,
-    verified_probe_kind: null,
+    stream_tool_verified_probe_kind: null,
+    stream_tool_last_verified_at: null,
+    buffered_tool_verified_probe_kind: null,
+    buffered_tool_last_verified_at: null,
     context_window_tokens: null,
     default_max_output_tokens: null,
     auth_strategy: null,
@@ -36,30 +39,37 @@ function createCredential(overrides: Partial<CredentialView> = {}): CredentialVi
 test("formatCredentialToolCapabilitySummary reports explicit tool verification levels", () => {
   assert.equal(
     formatCredentialToolCapabilitySummary(
-      createCredential({ verified_probe_kind: "tool_continuation_probe" }),
+      createCredential({ stream_tool_verified_probe_kind: "tool_continuation_probe" }),
+      "stream",
     ),
-    "工具能力：已验证完整工具调用",
+    "流式工具：已验证完整工具调用",
   );
   assert.equal(
     formatCredentialToolCapabilitySummary(
-      createCredential({ verified_probe_kind: "tool_call_probe" }),
+      createCredential({ buffered_tool_verified_probe_kind: "tool_call_probe" }),
+      "buffered",
     ),
-    "工具能力：已验证工具调用，未验证结果续接",
+    "非流工具：已验证工具调用，未验证结果续接",
   );
   assert.equal(
     formatCredentialToolCapabilitySummary(
-      createCredential({ verified_probe_kind: "tool_definition_probe" }),
+      createCredential({ stream_tool_verified_probe_kind: "tool_definition_probe" }),
+      "stream",
     ),
-    "工具能力：仅验证工具定义",
+    "流式工具：仅验证工具定义",
   );
   assert.equal(
     formatCredentialToolCapabilitySummary(
-      createCredential({ verified_probe_kind: "text_probe" }),
+      createCredential({ buffered_tool_verified_probe_kind: "text_probe" }),
+      "buffered",
     ),
-    "工具能力：仅验证基础连接",
+    "非流工具：仅验证基础连接",
   );
   assert.equal(
-    formatCredentialToolCapabilitySummary(createCredential()),
-    "工具能力：未验证",
+    formatCredentialToolCapabilitySummary(
+      createCredential(),
+      "stream",
+    ),
+    "流式工具：未验证",
   );
 });

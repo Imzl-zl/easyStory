@@ -39,7 +39,6 @@ class RuntimeCredentialPayload(TypedDict):
     base_url: str | None
     default_model: str | None
     interop_profile: str | None
-    verified_probe_kind: str | None
     context_window_tokens: int | None
     default_max_output_tokens: int | None
     auth_strategy: str | None
@@ -90,7 +89,6 @@ def build_runtime_credential_payload(
         "base_url": credential.base_url,
         "default_model": credential.default_model,
         "interop_profile": credential.interop_profile,
-        "verified_probe_kind": credential.verified_probe_kind,
         "context_window_tokens": credential.context_window_tokens,
         "default_max_output_tokens": credential.default_max_output_tokens,
         "auth_strategy": credential.auth_strategy,

@@ -371,6 +371,7 @@ def test_verify_credential_surfaces_empty_tool_response_protocol_error() -> None
                 api_dialect="openai_chat_completions",
                 default_model="gpt-4o-mini",
                 probe_kind="tool_continuation_probe",
+                transport_mode="stream",
                 user_agent_override=None,
                 client_name="easyStory",
             )
@@ -497,6 +498,7 @@ def test_verify_tool_continuation_probe_replays_followup_request() -> None:
             api_dialect="openai_responses",
             default_model="gpt-5.4",
             probe_kind="tool_continuation_probe",
+            transport_mode="stream",
             client_name="easyStory",
         )
     )
@@ -509,8 +511,129 @@ def test_verify_tool_continuation_probe_replays_followup_request() -> None:
     assert followup_input[0]["role"] == "user"
     prompt_text = followup_input[0]["content"][0]["text"]
     assert "probe-result-" in prompt_text
-    assert result.message == "工具调用验证成功"
+    assert result.message == "流式工具调用验证成功"
     assert result.probe_kind == "tool_continuation_probe"
+    assert result.transport_mode == "stream"
+
+
+def test_verify_tool_probe_requires_transport_mode() -> None:
+    verifier = AsyncHttpCredentialVerifier()
+
+    with pytest.raises(BusinessRuleError, match="工具验证必须显式指定 transport_mode"):
+        asyncio.run(
+            verifier.verify(
+                provider="openai",
+                api_key="test-key",
+                base_url=None,
+                api_dialect="openai_responses",
+                default_model="gpt-5.4",
+                probe_kind="tool_continuation_probe",
+            )
+        )
+
+
+def test_verify_text_probe_rejects_transport_mode() -> None:
+    verifier = AsyncHttpCredentialVerifier()
+
+    with pytest.raises(BusinessRuleError, match="验证连接时不支持 transport_mode"):
+        asyncio.run(
+            verifier.verify(
+                provider="openai",
+                api_key="test-key",
+                base_url=None,
+                api_dialect="openai_chat_completions",
+                default_model="gpt-4o-mini",
+                transport_mode="stream",
+            )
+        )
+
+
+def test_verify_buffered_tool_probe_uses_json_request_sender(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_requests: list[PreparedLLMHttpRequest] = []
+
+    async def fake_send_json_http_request(request, *, timeout_seconds):
+        captured_requests.append(request)
+        assert timeout_seconds == verifier_module.VERIFY_TIMEOUT_SECONDS
+        if len(captured_requests) == 1:
+            return HttpJsonResponse(
+                status_code=200,
+                json_body={
+                    "id": "resp_1",
+                    "output": [
+                        {
+                            "type": "function_call",
+                            "id": "fc_1",
+                            "call_id": "call_123",
+                            "name": "probe_echo_payload",
+                            "arguments": '{"echo":"ping"}',
+                        }
+                    ],
+                    "usage": {"input_tokens": 8, "output_tokens": 10, "total_tokens": 18},
+                },
+                text='{"id":"resp_1"}',
+            )
+        prompt_text = request.json_body["input"][0]["content"][0]["text"]
+        matched = re.search(r'"echoed":"(probe-result-[^"]+)"', prompt_text)
+        assert matched is not None
+        echoed = matched.group(1)
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "id": "resp_2",
+                "output": [
+                    {
+                        "id": "msg_1",
+                        "type": "message",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": f"工具续接成功：{echoed}。",
+                            }
+                        ],
+                    }
+                ],
+                "usage": {"input_tokens": 6, "output_tokens": 4, "total_tokens": 10},
+            },
+            text='{"id":"resp_2"}',
+        )
+
+    async def unexpected_iterate_stream_request(*_args, **_kwargs):
+        raise AssertionError("buffered tool probe should not use stream transport")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(
+        verifier_module,
+        "send_json_http_request",
+        fake_send_json_http_request,
+    )
+    monkeypatch.setattr(
+        verifier_module,
+        "iterate_stream_request",
+        unexpected_iterate_stream_request,
+    )
+
+    verifier = AsyncHttpCredentialVerifier()
+    result = asyncio.run(
+        verifier.verify(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://proxy.example.com",
+            api_dialect="openai_responses",
+            default_model="gpt-5.4",
+            probe_kind="tool_continuation_probe",
+            transport_mode="buffered",
+            client_name="easyStory",
+        )
+    )
+
+    assert len(captured_requests) == 2
+    assert captured_requests[0].json_body.get("stream") in {None, False}
+    assert captured_requests[1].json_body.get("stream") in {None, False}
+    assert result.message == "非流工具调用验证成功"
+    assert result.probe_kind == "tool_continuation_probe"
+    assert result.transport_mode == "buffered"
 
 
 def test_verify_credential_maps_authentication_error() -> None:

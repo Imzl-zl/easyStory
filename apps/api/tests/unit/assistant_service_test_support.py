@@ -28,7 +28,8 @@ class _FakeCredentialService:
             api_dialect="openai_responses",
             default_model="gpt-4o-mini",
             interop_profile="responses_strict",
-            verified_probe_kind="tool_continuation_probe",
+            stream_tool_verified_probe_kind="tool_continuation_probe",
+            buffered_tool_verified_probe_kind="tool_continuation_probe",
             is_active=True,
         )
 
@@ -44,7 +45,8 @@ class _AnthropicCredentialService(_FakeCredentialService):
             encrypted_key=f"{provider}-key",
             api_dialect="anthropic_messages",
             default_model="claude-sonnet-4-20250514",
-            verified_probe_kind="tool_continuation_probe",
+            stream_tool_verified_probe_kind="tool_continuation_probe",
+            buffered_tool_verified_probe_kind="tool_continuation_probe",
             is_active=True,
         )
 
@@ -62,7 +64,8 @@ class _CompactingCredentialService(_FakeCredentialService):
             default_model="gpt-4o-mini",
             interop_profile="responses_strict",
             context_window_tokens=280,
-            verified_probe_kind="tool_continuation_probe",
+            stream_tool_verified_probe_kind="tool_continuation_probe",
+            buffered_tool_verified_probe_kind="tool_continuation_probe",
             is_active=True,
         )
 
@@ -79,7 +82,8 @@ class _InteropProfileCredentialService(_FakeCredentialService):
             api_dialect="openai_chat_completions",
             default_model="gpt-4o-mini",
             interop_profile="chat_compat_reasoning_content",
-            verified_probe_kind="tool_continuation_probe",
+            stream_tool_verified_probe_kind="tool_continuation_probe",
+            buffered_tool_verified_probe_kind="tool_continuation_probe",
             is_active=True,
         )
 
@@ -96,7 +100,6 @@ class _TextOnlyCredentialService(_FakeCredentialService):
             api_dialect="openai_responses",
             default_model="gpt-4o-mini",
             interop_profile="responses_strict",
-            verified_probe_kind="text_probe",
             is_active=True,
         )
 

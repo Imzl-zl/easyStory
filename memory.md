@@ -1,23 +1,21 @@
 # easyStory 项目状态
-
-> 本文件是当前状态快照 + 最近活跃窗口，允许覆盖更新。
-> 完整历史归档见 `memory/archive/`，稳定规律见 `tools.md`。
+> 本文件是当前状态快照 + 最近活跃窗口，允许覆盖更新；完整历史归档见 `memory/archive/`，稳定规律见 `tools.md`。
 
 ## 当前基线
 
 - 后端测试：最近一次已知全量 `cd apps/api && ruff check app tests && pytest -q` 通过（记录日期：2026-03-23）
 - 前端检查：最近一次已知 `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-04-04）
-- 最后更新：2026-04-08
+- 最后更新：2026-04-09
 ## 已完成能力
 
 - 凭证与模型连接闭环：安全存储、endpoint policy、`api_dialect` 路由、`interop_profile` / auth strategy override、公网 http 显式测试开关、本地 provider interop probe、旧库 schema reconcile，以及连接级 `context_window_tokens / default_max_output_tokens`
 - provider interop conformance probe 第二阶段已落地：shared runtime 现已支持 `text_probe / tool_definition_probe / tool_call_probe / tool_continuation_probe`，`provider_interop_check.py` 已新增 `--probe-kind`；当前 dry-run 正常，但真实 `gpt` profile 的 tool probes 仍显式暴露上游 `HTTP 502 / output=[]`，说明 profile 本身的 tool contract 还不稳定
 - provider interop 深化闭环：本地 probe 已支持 `prompt/system_prompt/extra_headers/stream`，并对 Gemini probe 注入最小思考配置，避免默认 thinking 吞掉输出预算
 - assistant / provider interop 流式口径已收口：assistant turn 后端默认 `stream=true`，前端非流 JSON 调用显式传 `stream=false`；credential verifier 与 provider interop probe 默认走流式；incubator / studio 聊天已移除“流式失败自动退回非流”；模型工具调用现已在 shared runtime 引入 canonical dotted name -> external safe alias 边界，以及共享 `tool_schema_compiler / tool_call_codec / tool_continuation_codec / stream_event_normalizer`，避免 OpenAI-compatible tool name / schema / tool call parse / continuation / stream parse 漂移再次打断 assistant tool loop
-- Credential Center 高级兼容设置与能力真值闭环：凭证现正式支持 `interop_profile / auth_strategy / api_key_header_name / extra_headers / verified_probe_kind`，且保存、验证、assistant runtime 与前端配置入口已对齐；其中 `extra_headers` 已收口为仅允许非敏感元数据头，`interop_profile` 已按 `api_dialect` 做显式约束，`verified_probe_kind` 记录当前最高已证明 capability
-- Credential Center 显式验证语义与 assistant 门控已收口：产品面现已区分 `验证连接(text_probe)` 与 `验证工具调用(tool_continuation_probe)`；共享 verifier 已复用 conformance probe 主链，assistant 在 visible `project.*` 工具存在时会显式要求 `tool_continuation_probe`，避免再出现“验证成功但 tool loop 实际不可用”的单一 verify 假象
-- 2026-04-08 review remediation 已完成：`tool_definition_probe` 现仅接受精确 success token；`tool_continuation_probe` follow-up 改为校验只存在于 tool result 中的动态 echoed 值，不再把期望答案写进 prompt；`verified_probe_kind` 写回已改为数据库当前值参与的原子 promote，避免并发低等级验证覆盖高等级 capability 真值
-- 2026-04-08 晚间继续收口了工具能力真值与空工具响应语义：若显式工具验证失败，当前库里同级或更高的 `verified_probe_kind` 会被清掉；同时 shared runtime 与 verifier 现已统一把“tools 打开后上游返回空 assistant 响应（无文本、无 tool_calls）”识别为明确协议错误。最新本地实测：`薄荷codex` 仍通过 `tool_continuation_probe`；`bwen` 当前只保留 `text_probe`；`ice` 当前 tool probe 失败且旧 `tool_continuation_probe` 真值已清空。
+- Credential Center 高级兼容设置与能力真值闭环：凭证现正式支持 `interop_profile / auth_strategy / api_key_header_name / extra_headers`，工具能力真值已按传输模式拆成 `stream_tool_* / buffered_tool_*`，且保存、验证、assistant runtime 与前端配置入口已对齐；其中 `extra_headers` 已收口为仅允许非敏感元数据头，`interop_profile` 已按 `api_dialect` 做显式约束
+- Credential Center 显式验证语义与 assistant 门控已收口：产品面现已区分 `验证连接(text_probe)`、`验证流式工具(tool_continuation_probe + stream)`、`验证非流工具(tool_continuation_probe + buffered)`；共享 verifier 已复用 conformance probe 主链，assistant 在 visible `project.*` 工具存在时会按本轮 `stream` 模式显式要求对应的工具能力真值，避免再出现“流式验证通过但非流 tool loop 实际不可用”的单一 verify 假象
+- 2026-04-08 review remediation 已完成：`tool_definition_probe` 现仅接受精确 success token；`tool_continuation_probe` follow-up 改为校验只存在于 tool result 中的动态 echoed 值，不再把期望答案写进 prompt；同模式下的工具能力写回已改为数据库当前值参与的原子 promote，避免并发低等级验证覆盖高等级 capability 真值
+- 2026-04-09 继续收口了工具能力真值与传输模式语义：若显式工具验证失败，只会清掉对应模式里同级或更高的工具能力真值；shared runtime 与 verifier 现已明确区分流式 / 非流工具链，并把“工具验证通过”改成带模式的能力结论。任何成功/失败验证现在都会清空 legacy `verified_probe_kind`，避免启动 reconcile 再从旧字段回灌流式能力；`openai_responses` 非流解析也只在 `output_text` 非空时才允许 `output=[]`，空字符串不再被静默放过。最新本地实测：`Gemini` 的流式和非流工具链都可用，而两条 OpenAI-compatible 连接在非流工具路径上仍会显式暴露上游空响应 / `output=[]`。
 - 项目与前置资产闭环：project CRUD、结构化摘要提示（原 setting completeness）、story asset generation / confirm
 - 内容主链路闭环：outline / opening_plan / chapter / content version、章节确认与 stale 传播
 - 工作流闭环：control plane、runtime、auto-review / fix、workflow logs / prompt replay / audit
@@ -119,4 +117,4 @@
 - 2026-04-06：修正 `Incubator` store 边角语义：空会话判定已把 `latestCompletedRunId` 纳入非空条件，与 `Studio` 保持一致；相关 `Incubator` store/request/submit` 定向测试与 `eslint` 已通过。
 - 2026-04-06：继续强化共享 stream client 的协议异常暴露：malformed SSE payload 不再向上冒原始 `SyntaxError`，而是统一转成 `stream_payload_invalid` 结构化终止错误；中途修正了“误把正常 `error` 事件也包成 payload invalid”的实现错误，相关定向测试与 `eslint` 已通过。
 - 2026-04-06：assistant 文稿工具继续稳步推进到 `v1B`：补齐 `project.search_documents` 契约、continuity-first 搜索排序、长历史 compaction/budget、tool-loop continuation 预算，以及 `project.write_document` 的显式 `approval_grant` 骨架；当前 grant 已进入 policy decision、execution context、tool step snapshot 与 turn run snapshot，定向后端回归已通过。
-- 2026-04-07 ~ 2026-04-08：assistant runtime context governance、模型工具兼容层与凭证能力真值主线已收口：tool name alias codec、`tool_schema_compiler / tool_call_codec / tool_continuation_codec / stream_event_normalizer`、conformance probes、`interop_profile` 与 `verified_probe_kind` 已打通 verifier -> assistant runtime -> Credential Center；assistant 在 visible `project.*` 工具存在时显式要求 `tool_continuation_probe`，连接关键字段变更会清空验证状态，且 Credential Center 已区分 `验证连接 / 验证工具` 并展示当前工具能力摘要；随后 review remediation 又补齐了 probe 假阳性与 `verified_probe_kind` 并发真值覆盖问题，相关定向后端回归 `114 passed`。
+- 2026-04-07 ~ 2026-04-09：assistant runtime context governance、模型工具兼容层与凭证能力真值主线已收口：tool name alias codec、`tool_schema_compiler / tool_call_codec / tool_continuation_codec / stream_event_normalizer`、conformance probes、`interop_profile` 与分模式 `stream_tool_* / buffered_tool_*` 已打通 verifier -> assistant runtime -> Credential Center；assistant 在 visible `project.*` 工具存在时会按本轮 `stream` 模式要求对应能力，连接关键字段变更会清空验证状态，且 Credential Center 已区分 `验证连接 / 验证流式工具 / 验证非流工具` 并展示双模式工具能力摘要；相关定向后端回归 `147 passed`，设置页相关前端单测 `3 passed`。

@@ -210,8 +210,11 @@ export function CredentialCenter({
       if (type === "verify_connection") {
         return verifyCredential(credentialId, "text_probe");
       }
-      if (type === "verify_tools") {
-        return verifyCredential(credentialId, "tool_continuation_probe");
+      if (type === "verify_stream_tools") {
+        return verifyCredential(credentialId, "tool_continuation_probe", "stream");
+      }
+      if (type === "verify_buffered_tools") {
+        return verifyCredential(credentialId, "tool_continuation_probe", "buffered");
       }
       if (type === "enable") {
         return enableCredential(credentialId);
@@ -359,8 +362,11 @@ function resolveCredentialNoticeTitle(type: PendingCredentialAction["type"]) {
   if (type === "verify_connection") {
     return "模型连接验证";
   }
-  if (type === "verify_tools") {
-    return "工具调用验证";
+  if (type === "verify_stream_tools") {
+    return "流式工具验证";
+  }
+  if (type === "verify_buffered_tools") {
+    return "非流工具验证";
   }
   if (type === "enable") {
     return "模型连接状态";

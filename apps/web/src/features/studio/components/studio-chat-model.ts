@@ -215,6 +215,7 @@ export function useStudioChatModel({
         isResponding,
         needsDocumentCatalog,
         skillSendBlockReason,
+        toolCapabilityNotice: credentialModel.toolCapabilityNotice,
         writeSendBlockReason,
       })) {
         return false;
@@ -401,6 +402,7 @@ function ensureStudioChatTurnCanStart(options: {
   isResponding: boolean;
   needsDocumentCatalog: boolean;
   skillSendBlockReason: string | null;
+  toolCapabilityNotice: string | null;
   writeSendBlockReason: string | null;
 }) {
   if (options.isResponding) {
@@ -412,6 +414,10 @@ function ensureStudioChatTurnCanStart(options: {
   }
   if (options.skillSendBlockReason) {
     Message.warning(options.skillSendBlockReason);
+    return false;
+  }
+  if (options.toolCapabilityNotice) {
+    Message.warning(options.toolCapabilityNotice);
     return false;
   }
   if (options.writeSendBlockReason) {

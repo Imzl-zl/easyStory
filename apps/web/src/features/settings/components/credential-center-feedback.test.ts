@@ -41,13 +41,21 @@ test("resolveCredentialActionFeedback keeps tool verify success message user-fac
   const result: CredentialVerifyResult = {
     credential_id: "credential-3",
     last_verified_at: "2026-04-08T09:15:00Z",
-    message: "工具调用验证成功",
+    message: "流式工具调用验证成功",
     probe_kind: "tool_continuation_probe",
     status: "verified",
+    transport_mode: "stream",
   };
 
-  assert.deepEqual(resolveCredentialActionFeedback(result, "verify_tools"), {
-    message: "工具调用验证成功。",
+  assert.deepEqual(resolveCredentialActionFeedback(result, "verify_stream_tools"), {
+    message: "流式工具调用验证成功。",
+    tone: "info",
+  });
+  assert.deepEqual(resolveCredentialActionFeedback(
+    { ...result, transport_mode: "buffered", message: "非流工具调用验证成功" },
+    "verify_buffered_tools",
+  ), {
+    message: "非流工具调用验证成功。",
     tone: "info",
   });
 });
@@ -88,9 +96,9 @@ test("normalizeCredentialActionErrorMessage keeps backend normalized upstream er
 test("normalizeCredentialActionErrorMessage rewrites tool call probe failure into user-facing Chinese", () => {
   assert.equal(
     normalizeCredentialActionErrorMessage(
-      "无法验证 bwen 凭证: 工具调用验证失败：Tool call probe expected exactly one tool call, got 0",
-      "verify_tools",
+      "无法验证 bwen 凭证: 流式工具调用验证失败：Tool call probe expected exactly one tool call, got 0",
+      "verify_stream_tools",
     ),
-    "连接“bwen”工具调用验证失败：模型没有按约定发起工具调用。请检查接口类型、兼容 Profile 或上游工具调用支持。",
+    "连接“bwen”流式工具调用验证失败：模型没有按约定发起工具调用。请检查接口类型、兼容 Profile 或上游工具调用支持。",
   );
 });

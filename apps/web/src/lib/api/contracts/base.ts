@@ -85,6 +85,7 @@ export type CredentialVerifyProbeKind =
   | "tool_definition_probe"
   | "tool_call_probe"
   | "tool_continuation_probe";
+export type CredentialVerifyTransportMode = "stream" | "buffered";
 
 export type CredentialView = {
   id: string;
@@ -97,7 +98,10 @@ export type CredentialView = {
   base_url: string | null;
   default_model: string | null;
   interop_profile?: CredentialInteropProfile | null;
-  verified_probe_kind?: CredentialVerifyProbeKind | null;
+  stream_tool_verified_probe_kind?: CredentialVerifyProbeKind | null;
+  stream_tool_last_verified_at?: string | null;
+  buffered_tool_verified_probe_kind?: CredentialVerifyProbeKind | null;
+  buffered_tool_last_verified_at?: string | null;
   context_window_tokens: number | null;
   default_max_output_tokens: number | null;
   auth_strategy: CredentialAuthStrategy | null;
@@ -153,6 +157,7 @@ export type CredentialUpdatePayload = {
 export type CredentialVerifyResult = {
   credential_id: string;
   probe_kind: CredentialVerifyProbeKind;
+  transport_mode?: CredentialVerifyTransportMode | null;
   status: "verified";
   last_verified_at: string;
   message: string;

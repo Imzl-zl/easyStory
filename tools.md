@@ -83,14 +83,14 @@
 - 所有业务模块公开面已收敛为 async-only：统一 `Service + create_*_service` 命名，不保留 `Async*` 镜像类或 `create_async_*` 第二导出面。内部若只剩 async 一套实现，把 `*_async` 名称改回业务语义名。
 - LLM 供应商兼容层当前最佳实践入口：`api_dialect` 只决定协议格式与解析；鉴权方式由 `auth_strategy` / `api_key_header_name` 显式 override，不再硬绑在 dialect 上。
 - Credential Center 当前正式支持的高级连接字段：`interop_profile`、`auth_strategy`、`api_key_header_name`、`extra_headers`、`user_agent_override`、`client_name`、`client_version`、`runtime_kind`；这些字段同时作用于保存、验证和运行时请求，其中 `interop_profile` 用于显式表达协议兼容 override，不单独下沉到 assistant 业务层。
-- Credential Center 当前已显式区分 `验证连接` 与 `验证工具`：前者走 `text_probe`，后者走 `tool_continuation_probe`；后端统一入口仍是 `POST /api/v1/credentials/{id}/verify?probe_kind=...`，不要再额外造一套产品级 probe API。
-- `model_credentials.verified_probe_kind` 当前是连接级“最高已证明 capability”真值，不是最后一次验证动作；verifier 成功后按 probe rank promote，且 promote 必须基于数据库当前值原子更新，较低等级 probe 不能覆盖已证明的更高能力。
-- `model_credentials.verified_probe_kind` 现在还带失败失效语义：若显式验证某个 probe kind 失败，且数据库里当前记录的 capability rank 大于等于本次失败 probe，就会清空对应 `verified_probe_kind + last_verified_at`；若失败的是更高等级 probe，而库里只证明过更低等级能力（例如 `text_probe`），则保留较低等级真值不动。
+- Credential Center 当前已显式区分 `验证连接`、`验证流式工具`、`验证非流工具`；后端统一入口仍是 `POST /api/v1/credentials/{id}/verify?probe_kind=...&transport_mode=...`，不要再额外造一套产品级 probe API。
+- `model_credentials` 当前的工具能力真值已按传输模式拆开：`stream_tool_verified_probe_kind + stream_tool_last_verified_at` 只代表流式工具链，`buffered_tool_verified_probe_kind + buffered_tool_last_verified_at` 只代表非流工具链；`last_verified_at` 只代表基础连接验证时间，不再承载工具能力语义。
+- 工具能力 promote / failure invalidation 现在都按模式独立进行：流式 probe 只影响 `stream_tool_*`，非流 probe 只影响 `buffered_tool_*`；较低等级 probe 不能覆盖同模式下已证明的更高能力，失败也只清同模式里同级或更高的工具能力真值。
 - provider conformance probe 当前正式契约：`tool_definition_probe` 只接受精确 success token；`tool_continuation_probe` 的最终回答必须携带只存在于 tool result 中的动态 echoed 值，follow-up prompt 不能直接泄漏期望答案。
 - shared runtime 现在把“启用 tools 后上游返回空 assistant 响应（无文本、无 tool_calls）”统一视为明确协议错误，而不是普通中断；`LLMToolProvider` 主链和 credential verifier 的 stream probe 都会抛同一条 `空工具响应` 错误语义。
 - 2026-04-08 本地实测：`ice(openai_chat_completions/gpt-5.4)` 与 `bwen(openai_responses/gpt-5.4)` 当前真实 tool probe 都失败，失败形态都是“启用工具时返回空响应”；其中 `ice` 的旧 `tool_continuation_probe` 真值已清掉，`bwen` 仍只保留 `text_probe`。不要把旧的成功验证结果继续当成当前工具能力真值。
 - Gemini tool continuation / conformance probe 当前稳定口径：runtime replay 仍以“当前 prompt 在前、tool_call/tool_result replay 在后”为时序；Gemini 2.5 probe 必须显式 `thinkingBudget: 0`，且任何 probe request 调整都必须保留 `PreparedLLMHttpRequest.tool_name_aliases`，否则流式 tool call 会停留在 external alias，无法还原回 canonical dotted name。
-- assistant 当前正式门控口径：只要本轮存在 visible `project.*` 工具，就要求凭证先通过 `tool_continuation_probe`；能力不足直接显式报错，不静默隐藏工具，也不自动降级到纯文本。
+- assistant 当前正式门控口径：只要本轮存在 visible `project.*` 工具，就按 `payload.stream` 选择门控目标；`stream=true` 要求 `stream_tool_verified_probe_kind >= tool_continuation_probe`，`stream=false` 要求 `buffered_tool_verified_probe_kind >= tool_continuation_probe`；能力不足直接显式报错，不静默隐藏工具，也不自动切换传输模式。
 - 当前共享 tool schema 编译口径：外部协议默认先走 `portable_subset`，把 required-only `anyOf` 收口为描述性约束；Gemini 再叠加 `gemini_compatible`，继续移除不支持的 schema key。不要再把 schema sanitize 内联回具体 request builder。
 - 当前共享 continuation 编码口径：runtime replay 文本投影、OpenAI Chat / Claude / Gemini continuation projection，以及 OpenAI Responses `function_call_output` 构造，统一走 `tool_continuation_codec.py`；不要再把 continuation helper 堆回 `llm_protocol_requests.py`。
 - `model_credentials` 当前额外支持两类连接级 token 配置：`context_window_tokens` 只记录模型上下文窗口，不伪造成通用上游请求参数；`default_max_output_tokens` 会作为 runtime 的默认输出预算 fallback。
@@ -104,8 +104,8 @@
 - `Studio` 当前已补齐项目文稿文件读写：`GET/PUT /api/v1/projects/{project_id}/documents?path=...`，文件默认落在 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；文件层现在支持 `.md + .json`，并采用“一次性默认模板 + 用户可编辑工作台”模式：默认会在新建项目时生成 `项目说明`、设定细分文稿、`数据层/*.json`、章节规划、时间轴、附录、校验、导出等空模板文件/目录，但这些模板项后续允许用户重命名、删除和扩展；正式 `大纲 / 开篇设计 / 正文章节` 继续走 `contents + content_versions` 真值链，不写入项目文件目录。`正文` 现在允许创建卷目录和章节路径占位文件；章节正文仍只通过 content 保存链更新。文稿模板只在项目创建时显式写入；读文稿/读树接口不再做隐式补模板或迁移。
 - `Studio` 前端当前也已按文件类型分流：`.md` 继续走 Markdown 编辑/预览；`.json` 走 JSON 编辑/预览，其中 `数据层/人物.json`、`势力.json`、`人物关系.json`、`势力关系.json`、`隶属关系.json` 会组合成只读关系图预览，`结构定义.json`、`事件.json` 和其它 JSON 保持格式化预览，不支持手工拖线改图。数据层图预览当前只认固定 collection key 对象：`characters / factions / character_relations / faction_relations / memberships`，不再兼容裸数组或旧关系混合格式。
 - incubator / studio 聊天当前不再做“流式失败自动退回非流”的静默降级；需要让真实上游错误直接暴露，便于定位中转兼容问题。
-- credential verifier 与 `scripts/provider_interop_check.py probe` 当前默认走流式；Gemini verification/probe 会注入最小思考配置，避免默认 thinking 吃掉验证输出预算。
-- 任何会改变连接/tool contract 的凭证字段（如 `api_key / base_url / default_model / api_dialect / interop_profile / auth_strategy / api_key_header_name / extra_headers / user_agent_override / client identity`）更新后，都要同步清空 `last_verified_at + verified_probe_kind`，避免旧验证结果误穿透。
+- credential verifier 当前已支持 `transport_mode=stream|buffered` 两条真实链路；设置页的工具验证必须明确携带模式，Gemini verification/probe 仍会注入最小思考配置，避免默认 thinking 吃掉验证输出预算。
+- 任何会改变连接/tool contract 的凭证字段（如 `api_key / base_url / default_model / api_dialect / interop_profile / auth_strategy / api_key_header_name / extra_headers / user_agent_override / client identity`）更新后，都要同步清空 `last_verified_at + stream_tool_* + buffered_tool_*`，避免旧验证结果误穿透。
 - credential verifier 当前仍发送普通短聊天提示以压低成本，但成功条件已经放宽为“拿到可用文本回复”；不再要求模型精确复读固定句子，也不在提示词里显式暴露“验证/测试”语义；只对空响应和明显的上游模型错误文本判失败。
 - 受保护 API 统一走 `app.modules.user.entry.http.dependencies.get_current_user`（async 版），不保留 `get_current_user_async` 第二命名入口。
 - 当业务 service 文件超出 300 行时，优先保持公开 `Service + factory` 不变，只把"查询/权限 helper""状态变更 helper""DTO 映射与归一化 helper"下沉到 `*_support.py`；不要用改公开命名来掩盖内部结构问题。

@@ -1,15 +1,23 @@
-import type { AssistantPreferences, CredentialView } from "@/lib/api/types";
+import type {
+  AssistantPreferences,
+  CredentialVerifyProbeKind,
+  CredentialView,
+} from "@/lib/api/types";
 import { DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS } from "@/features/shared/assistant/assistant-output-token-support";
 
 import type { IncubatorChatSettings } from "./incubator-chat-support";
 
+export type CredentialToolTransportMode = "stream" | "buffered";
+
 export type IncubatorCredentialOption = {
   apiDialect: string;
   baseUrl: string | null;
+  bufferedToolVerifiedProbeKind: CredentialVerifyProbeKind | null;
   defaultModel: string;
   defaultMaxOutputTokens: number | null;
   displayLabel: string;
   provider: string;
+  streamToolVerifiedProbeKind: CredentialVerifyProbeKind | null;
 };
 
 export type IncubatorCredentialState = "empty" | "error" | "loading" | "ready";
@@ -29,6 +37,7 @@ export function buildIncubatorCredentialOptions(
     optionByProvider.set(credential.provider, {
       apiDialect: credential.api_dialect,
       baseUrl: credential.base_url,
+      bufferedToolVerifiedProbeKind: credential.buffered_tool_verified_probe_kind ?? null,
       defaultModel: credential.default_model?.trim() ?? "",
       defaultMaxOutputTokens: credential.default_max_output_tokens,
       displayLabel: buildCredentialDisplayLabel(
@@ -36,6 +45,7 @@ export function buildIncubatorCredentialOptions(
         credential.default_model,
       ),
       provider: credential.provider,
+      streamToolVerifiedProbeKind: credential.stream_tool_verified_probe_kind ?? null,
     });
   }
 
@@ -157,6 +167,68 @@ export function resolveHydratedIncubatorChatSettings(
 
 export function prefersBufferedOutput(_option: IncubatorCredentialOption | null) {
   return false;
+}
+
+export function resolveCredentialToolTransportMode(
+  streamOutput: boolean,
+): CredentialToolTransportMode {
+  return streamOutput ? "stream" : "buffered";
+}
+
+export function supportsCredentialToolTransportMode(
+  credential: Pick<IncubatorCredentialOption, "bufferedToolVerifiedProbeKind" | "streamToolVerifiedProbeKind"> | null,
+  transportMode: CredentialToolTransportMode,
+) {
+  return resolveConformanceProbeRank(
+    resolveCredentialToolVerifiedProbeKind(credential, transportMode),
+  ) >= resolveConformanceProbeRank("tool_continuation_probe");
+}
+
+export function buildCredentialToolCapabilityNotice(options: {
+  credential: Pick<IncubatorCredentialOption, "bufferedToolVerifiedProbeKind" | "displayLabel" | "streamToolVerifiedProbeKind"> | null;
+  streamOutput: boolean;
+}) {
+  if (!options.credential) {
+    return null;
+  }
+  const transportMode = resolveCredentialToolTransportMode(options.streamOutput);
+  if (supportsCredentialToolTransportMode(options.credential, transportMode)) {
+    return null;
+  }
+  const modeLabel = transportMode === "stream" ? "边写边显示" : "生成后整体显示";
+  const verifyLabel = transportMode === "stream" ? "验证流式工具" : "验证非流工具";
+  return `当前连接“${options.credential.displayLabel}”尚未通过“${verifyLabel}”，不能在“${modeLabel}”模式下启用项目工具。`;
+}
+
+function resolveCredentialToolVerifiedProbeKind(
+  credential: Pick<IncubatorCredentialOption, "bufferedToolVerifiedProbeKind" | "streamToolVerifiedProbeKind"> | null,
+  transportMode: CredentialToolTransportMode,
+) {
+  if (!credential) {
+    return null;
+  }
+  if (transportMode === "buffered") {
+    return credential.bufferedToolVerifiedProbeKind;
+  }
+  return credential.streamToolVerifiedProbeKind;
+}
+
+function resolveConformanceProbeRank(
+  probeKind: CredentialVerifyProbeKind | null | undefined,
+) {
+  if (probeKind === "tool_continuation_probe") {
+    return 3;
+  }
+  if (probeKind === "tool_call_probe") {
+    return 2;
+  }
+  if (probeKind === "tool_definition_probe") {
+    return 1;
+  }
+  if (probeKind === "text_probe") {
+    return 0;
+  }
+  return -1;
 }
 
 function compareIncubatorCredentialOptions(

@@ -40,6 +40,7 @@ class FakeVerifier:
         client_version: str | None,
         runtime_kind: str | None,
         probe_kind: str | None,
+        transport_mode: str | None,
     ) -> CredentialVerificationResult:
         assert provider == "openai"
         assert api_key == "sk-secret-1234"
@@ -55,10 +56,12 @@ class FakeVerifier:
         assert client_version == "0.1"
         assert runtime_kind == "server-python"
         assert probe_kind == "tool_continuation_probe"
+        assert transport_mode == "stream"
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
             message="工具调用验证成功",
             probe_kind="tool_continuation_probe",
+            transport_mode="stream",
         )
 
 
@@ -108,7 +111,8 @@ async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> 
             assert payload["api_dialect"] == OPENAI_DIALECT
             assert payload["default_model"] == OPENAI_MODEL
             assert payload["interop_profile"] == "chat_compat_reasoning_content"
-            assert payload["verified_probe_kind"] is None
+            assert payload["stream_tool_verified_probe_kind"] is None
+            assert payload["buffered_tool_verified_probe_kind"] is None
             assert payload["context_window_tokens"] == 128000
             assert payload["default_max_output_tokens"] == 8192
             assert payload["auth_strategy"] == "custom_header"
@@ -125,13 +129,17 @@ async def test_credentials_api_create_list_and_verify(monkeypatch, tmp_path) -> 
             assert len(list_response.json()) == 1
 
             verify_response = await client.post(
-                f"/api/v1/credentials/{payload['id']}/verify?probe_kind=tool_continuation_probe",
+                (
+                    f"/api/v1/credentials/{payload['id']}/verify"
+                    "?probe_kind=tool_continuation_probe&transport_mode=stream"
+                ),
                 headers=headers,
             )
 
         assert verify_response.status_code == 200
         assert verify_response.json()["message"] == "工具调用验证成功"
         assert verify_response.json()["probe_kind"] == "tool_continuation_probe"
+        assert verify_response.json()["transport_mode"] == "stream"
     finally:
         clear_settings_cache()
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)

@@ -24,6 +24,7 @@ CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MIN = 128
 CREDENTIAL_DEFAULT_MAX_OUTPUT_TOKENS_MAX = 131_072
 CREDENTIAL_USER_AGENT_OVERRIDE_MAX_LENGTH = 300
 CredentialVerifyProbeKind = ConformanceProbeKind
+CredentialVerifyTransportMode = Literal["stream", "buffered"]
 
 
 class CredentialCreateDTO(BaseModel):
@@ -102,7 +103,10 @@ class CredentialViewDTO(BaseModel):
     base_url: str | None
     default_model: str | None
     interop_profile: LlmInteropProfile | None
-    verified_probe_kind: CredentialVerifyProbeKind | None
+    stream_tool_verified_probe_kind: CredentialVerifyProbeKind | None
+    stream_tool_last_verified_at: datetime | None
+    buffered_tool_verified_probe_kind: CredentialVerifyProbeKind | None
+    buffered_tool_last_verified_at: datetime | None
     context_window_tokens: int | None
     default_max_output_tokens: int | None
     auth_strategy: LlmAuthStrategy | None
@@ -120,5 +124,6 @@ class CredentialVerifyResultDTO(BaseModel):
     credential_id: uuid.UUID
     status: Literal["verified"] = "verified"
     probe_kind: CredentialVerifyProbeKind
+    transport_mode: CredentialVerifyTransportMode | None = None
     last_verified_at: datetime
     message: str

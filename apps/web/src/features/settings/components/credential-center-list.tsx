@@ -77,9 +77,14 @@ export function CredentialCenterList({
             "verify_connection",
             credential.id,
           );
-          const isVerifyToolsPending = isPendingCredentialAction(
+          const isVerifyStreamToolsPending = isPendingCredentialAction(
             pendingAction,
-            "verify_tools",
+            "verify_stream_tools",
+            credential.id,
+          );
+          const isVerifyBufferedToolsPending = isPendingCredentialAction(
+            pendingAction,
+            "verify_buffered_tools",
             credential.id,
           );
           const isTogglePending = isPendingCredentialAction(pendingAction, toggleActionType, credential.id);
@@ -124,9 +129,14 @@ export function CredentialCenterList({
                   默认模型：{credential.default_model ?? "未配置"} · 密钥尾号：{credential.masked_key}
                 </p>
                 <p className="text-sm text-[var(--text-secondary)]">{formatCredentialTokenSummary(credential)}</p>
-                <p className="text-sm text-[var(--text-secondary)]">{formatCredentialToolCapabilitySummary(credential)}</p>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  {formatCredentialToolCapabilitySummary(credential, "stream")}
+                </p>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  {formatCredentialToolCapabilitySummary(credential, "buffered")}
+                </p>
                 <p className="text-xs leading-5 text-[var(--text-secondary)]">
-                  服务地址：{formatCredentialBaseUrl(credential.api_dialect, credential.base_url)} · 最近验证：
+                  服务地址：{formatCredentialBaseUrl(credential.api_dialect, credential.base_url)} · 最近连接验证：
                   {credential.last_verified_at ? formatAuditTime(credential.last_verified_at) : "未验证"}
                 </p>
                 {overrideInfo ? (
@@ -159,10 +169,18 @@ export function CredentialCenterList({
                     <button
                       className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"
                       disabled={isPending}
-                      onClick={() => onAction("verify_tools", credential.id)}
+                      onClick={() => onAction("verify_stream_tools", credential.id)}
                       type="button"
                     >
-                      {resolveCredentialActionButtonLabel("verify_tools", isVerifyToolsPending)}
+                      {resolveCredentialActionButtonLabel("verify_stream_tools", isVerifyStreamToolsPending)}
+                    </button>
+                    <button
+                      className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"
+                      disabled={isPending}
+                      onClick={() => onAction("verify_buffered_tools", credential.id)}
+                      type="button"
+                    >
+                      {resolveCredentialActionButtonLabel("verify_buffered_tools", isVerifyBufferedToolsPending)}
                     </button>
                     <button
                       className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"

@@ -161,6 +161,7 @@ async def prepare_assistant_turn(
     ensure_assistant_runtime_supports_visible_tools(
         resolved_llm_runtime,
         visible_tool_names=tuple(item.name for item in visible_tool_descriptors),
+        stream_output=normalized_payload.stream,
     )
     tool_schemas = resolve_assistant_tool_schemas(
         assistant_tool_loop=assistant_tool_loop,

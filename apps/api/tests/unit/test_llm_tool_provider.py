@@ -137,6 +137,40 @@ def test_execute_rejects_empty_tool_response_when_tools_enabled() -> None:
         )
 
 
+def test_execute_rejects_openai_responses_empty_output_text_without_output_items() -> None:
+    async def request_sender(_request):
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "output_text": "",
+                "output": [],
+                "usage": {
+                    "input_tokens": 12,
+                    "output_tokens": 4,
+                    "total_tokens": 16,
+                },
+            },
+            text="",
+        )
+
+    provider = LLMToolProvider(request_sender=request_sender)
+
+    with pytest.raises(ConfigurationError, match="output must be a non-empty list"):
+        asyncio.run(
+            provider.execute(
+                "llm.generate",
+                {
+                    "prompt": "测试提示词",
+                    "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_responses",
+                    },
+                },
+            )
+        )
+
+
 def test_execute_falls_back_to_credential_default_max_output_tokens() -> None:
     captured = {}
 

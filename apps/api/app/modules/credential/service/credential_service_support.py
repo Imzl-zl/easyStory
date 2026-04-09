@@ -87,6 +87,10 @@ def build_credential(
         default_model=normalize_default_model(default_model),
         interop_profile=interop_profile,
         verified_probe_kind=None,
+        stream_tool_verified_probe_kind=None,
+        stream_tool_last_verified_at=None,
+        buffered_tool_verified_probe_kind=None,
+        buffered_tool_last_verified_at=None,
         context_window_tokens=normalize_context_window_tokens(context_window_tokens),
         default_max_output_tokens=normalize_default_max_output_tokens(default_max_output_tokens),
         auth_strategy=auth_strategy,
@@ -305,6 +309,10 @@ def update_interop_profile(
 def reset_credential_verification_state(credential: ModelCredential) -> None:
     credential.last_verified_at = None
     credential.verified_probe_kind = None
+    credential.stream_tool_verified_probe_kind = None
+    credential.stream_tool_last_verified_at = None
+    credential.buffered_tool_verified_probe_kind = None
+    credential.buffered_tool_last_verified_at = None
 
 
 def normalize_provider(provider: str) -> str:

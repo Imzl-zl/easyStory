@@ -481,7 +481,8 @@ class _ToolLoopCompactingCredentialService(_FakeCredentialService):
             default_model="gpt-4o-mini",
             interop_profile="responses_strict",
             context_window_tokens=1600,
-            verified_probe_kind="tool_continuation_probe",
+            stream_tool_verified_probe_kind="tool_continuation_probe",
+            buffered_tool_verified_probe_kind="tool_continuation_probe",
             is_active=True,
         )
 
@@ -1208,7 +1209,7 @@ async def test_assistant_service_requires_tool_verified_credential_for_project_t
         messages=[AssistantMessageDTO(role="user", content="先读一下人物设定，再给我一个悬疑开场方向。")],
     )
 
-    with pytest.raises(BusinessRuleError, match="尚未通过“验证工具”"):
+    with pytest.raises(BusinessRuleError, match="尚未通过“验证流式工具”"):
         await service.turn(async_db(db), payload, owner_id=owner.id)
 
     assert tool_provider.requests == []

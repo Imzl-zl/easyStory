@@ -107,14 +107,15 @@ def _parse_openai_responses_response(
     tool_name_aliases: dict[str, str],
 ) -> NormalizedLLMResponse:
     output_text = payload.get("output_text")
-    if isinstance(output_text, str):
+    has_output_text = isinstance(output_text, str) and bool(output_text.strip())
+    if has_output_text:
         content = output_text
     else:
         content = _extract_responses_text(payload, allow_empty_output=allow_empty_output)
     output = _extract_openai_responses_output(
         payload,
         allow_none=True,
-        allow_empty=allow_empty_output,
+        allow_empty=has_output_text or allow_empty_output,
     ) or []
     tool_calls = extract_openai_responses_tool_calls(
         output,
@@ -132,7 +133,6 @@ def _parse_openai_responses_response(
         provider_response_id=_optional_string(payload.get("id")),
         provider_output_items=_build_openai_responses_output_items(
             payload,
-            allow_empty_output=allow_empty_output,
             tool_name_aliases=tool_name_aliases,
         ),
     )
@@ -418,13 +418,12 @@ def _extract_openai_responses_output(
 def _build_openai_responses_output_items(
     payload: dict[str, Any],
     *,
-    allow_empty_output: bool,
     tool_name_aliases: dict[str, str],
 ) -> list[dict[str, Any]]:
     output = _extract_openai_responses_output(
         payload,
         allow_none=True,
-        allow_empty=allow_empty_output,
+        allow_empty=True,
     )
     items: list[dict[str, Any]] = []
     text_index = 0

@@ -6,6 +6,7 @@ from .dto import (
     CredentialUpdateDTO,
     CredentialVerifyProbeKind,
     CredentialVerifyResultDTO,
+    CredentialVerifyTransportMode,
     CredentialViewDTO,
 )
 from .factory import create_credential_resolution_service, create_credential_service
@@ -17,6 +18,7 @@ __all__ = [
     "CredentialUpdateDTO",
     "CredentialVerifyProbeKind",
     "CredentialVerifyResultDTO",
+    "CredentialVerifyTransportMode",
     "CredentialViewDTO",
     "RuntimeCredentialPayload",
     "build_runtime_credential_payload",

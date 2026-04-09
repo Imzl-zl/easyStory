@@ -39,6 +39,7 @@ class _UnsupportedCredentialVerifier:
         client_version: str | None = None,
         runtime_kind: str | None = None,
         probe_kind: str | None = None,
+        transport_mode: str | None = None,
     ) -> CredentialVerificationResult:
         del (
             provider,
@@ -55,6 +56,7 @@ class _UnsupportedCredentialVerifier:
             client_version,
             runtime_kind,
             probe_kind,
+            transport_mode,
         )
         raise RuntimeError("Credential resolution service does not support verification")
 

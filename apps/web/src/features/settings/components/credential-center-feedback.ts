@@ -24,9 +24,15 @@ export function resolveCredentialActionFeedback(
       tone: "info",
     };
   }
-  if (type === "verify_tools" && result && "message" in result) {
+  if (type === "verify_stream_tools" && result && "message" in result) {
     return {
-      message: "工具调用验证成功。",
+      message: "流式工具调用验证成功。",
+      tone: "info",
+    };
+  }
+  if (type === "verify_buffered_tools" && result && "message" in result) {
+    return {
+      message: "非流工具调用验证成功。",
       tone: "info",
     };
   }
@@ -60,8 +66,11 @@ export function normalizeCredentialActionErrorMessage(
   if (!trimmed) {
     return "模型连接操作失败，请稍后重试。";
   }
-  if (actionType === "verify_tools") {
-    return normalizeToolVerificationErrorMessage(trimmed);
+  if (actionType === "verify_stream_tools") {
+    return normalizeToolVerificationErrorMessage(trimmed, "流式工具");
+  }
+  if (actionType === "verify_buffered_tools") {
+    return normalizeToolVerificationErrorMessage(trimmed, "非流工具");
   }
   const subject = resolveVerifySubject(trimmed);
   if (trimmed.includes(VERIFY_EMPTY_CONTENT_MARKER)) {
@@ -81,22 +90,25 @@ function resolveVerifySubject(message: string) {
 }
 
 
-function normalizeToolVerificationErrorMessage(message: string) {
+function normalizeToolVerificationErrorMessage(
+  message: string,
+  toolLabel: "流式工具" | "非流工具",
+) {
   const subject = resolveVerifySubject(message);
   if (message.includes(TOOL_CALL_PROBE_ZERO_CALLS_MARKER)) {
-    return `${subject}工具调用验证失败：模型没有按约定发起工具调用。请检查接口类型、兼容 Profile 或上游工具调用支持。`;
+    return `${subject}${toolLabel}调用验证失败：模型没有按约定发起工具调用。请检查接口类型、兼容 Profile 或上游工具调用支持。`;
   }
   if (message.includes(TOOL_CALL_PROBE_RESPONSE_ID_MARKER)) {
-    return `${subject}工具调用验证失败：上游没有返回可用于续接的响应标识，当前接口不具备稳定的工具续接能力。`;
+    return `${subject}${toolLabel}调用验证失败：上游没有返回可用于续接的响应标识，当前接口不具备稳定的工具续接能力。`;
   }
   if (
     message.includes(TOOL_CONTINUATION_EMPTY_MARKER)
     || message.includes(TOOL_CONTINUATION_FOLLOWUP_MARKER)
   ) {
-    return `${subject}工具调用验证失败：模型没有完成工具结果续接。请检查上游的 tool continuation 兼容性。`;
+    return `${subject}${toolLabel}调用验证失败：模型没有完成工具结果续接。请检查上游的 tool continuation 兼容性。`;
   }
   return message
-    .replace(VERIFY_SUBJECT_PATTERN, `${subject}工具调用验证失败：`)
-    .replace("工具调用验证失败：工具调用验证失败：", "工具调用验证失败：")
+    .replace(VERIFY_SUBJECT_PATTERN, `${subject}${toolLabel}调用验证失败：`)
+    .replace(`${toolLabel}调用验证失败：${toolLabel}调用验证失败：`, `${toolLabel}调用验证失败：`)
     .replaceAll("凭证", "连接");
 }

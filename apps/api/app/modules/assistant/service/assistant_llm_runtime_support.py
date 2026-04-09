@@ -39,7 +39,8 @@ class ResolvedAssistantLlmRuntime:
     credential_payload: RuntimeCredentialPayload
     continuation_support: LLMContinuationSupport
     credential_display_name: str
-    verified_probe_kind: ConformanceProbeKind | None = None
+    stream_tool_verified_probe_kind: ConformanceProbeKind | None = None
+    buffered_tool_verified_probe_kind: ConformanceProbeKind | None = None
     context_window_tokens: int | None = None
     default_max_output_tokens: int | None = None
 
@@ -69,9 +70,14 @@ async def resolve_assistant_llm_runtime(
             credential.interop_profile,
         ),
         credential_display_name=credential.display_name,
-        verified_probe_kind=(
-            normalize_conformance_probe_kind(credential.verified_probe_kind)
-            if credential.verified_probe_kind is not None
+        stream_tool_verified_probe_kind=(
+            normalize_conformance_probe_kind(credential.stream_tool_verified_probe_kind)
+            if credential.stream_tool_verified_probe_kind is not None
+            else None
+        ),
+        buffered_tool_verified_probe_kind=(
+            normalize_conformance_probe_kind(credential.buffered_tool_verified_probe_kind)
+            if credential.buffered_tool_verified_probe_kind is not None
             else None
         ),
         context_window_tokens=credential.context_window_tokens,
@@ -247,15 +253,31 @@ def ensure_assistant_runtime_supports_visible_tools(
     resolved_runtime: ResolvedAssistantLlmRuntime,
     *,
     visible_tool_names: tuple[str, ...],
+    stream_output: bool,
 ) -> None:
     if not visible_tool_names:
         return
     if conformance_probe_kind_satisfies(
-        resolved_runtime.verified_probe_kind,
+        _resolve_verified_tool_probe_kind(
+            resolved_runtime,
+            stream_output=stream_output,
+        ),
         required_probe_kind="tool_continuation_probe",
     ):
         return
+    mode_label = "边写边显示" if stream_output else "生成后整体显示"
+    verify_label = "验证流式工具" if stream_output else "验证非流工具"
     raise BusinessRuleError(
-        f"模型连接“{resolved_runtime.credential_display_name}”尚未通过“验证工具”，"
-        "当前不能启用项目工具。请先到模型连接中执行“验证工具”。"
+        f"模型连接“{resolved_runtime.credential_display_name}”尚未通过“{verify_label}”，"
+        f"当前不能在“{mode_label}”模式下启用项目工具。"
     )
+
+
+def _resolve_verified_tool_probe_kind(
+    resolved_runtime: ResolvedAssistantLlmRuntime,
+    *,
+    stream_output: bool,
+) -> ConformanceProbeKind | None:
+    if stream_output:
+        return resolved_runtime.stream_tool_verified_probe_kind
+    return resolved_runtime.buffered_tool_verified_probe_kind

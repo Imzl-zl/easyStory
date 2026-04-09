@@ -30,7 +30,10 @@ def to_view(
         base_url=credential.base_url,
         default_model=credential.default_model,
         interop_profile=credential.interop_profile,
-        verified_probe_kind=credential.verified_probe_kind,
+        stream_tool_verified_probe_kind=credential.stream_tool_verified_probe_kind,
+        stream_tool_last_verified_at=credential.stream_tool_last_verified_at,
+        buffered_tool_verified_probe_kind=credential.buffered_tool_verified_probe_kind,
+        buffered_tool_last_verified_at=credential.buffered_tool_last_verified_at,
         context_window_tokens=credential.context_window_tokens,
         default_max_output_tokens=credential.default_max_output_tokens,
         auth_strategy=credential.auth_strategy,
@@ -52,6 +55,7 @@ def to_verify_result(
     return CredentialVerifyResultDTO(
         credential_id=credential.id,
         probe_kind=result.probe_kind,
+        transport_mode=result.transport_mode,
         last_verified_at=result.verified_at,
         message=result.message,
     )

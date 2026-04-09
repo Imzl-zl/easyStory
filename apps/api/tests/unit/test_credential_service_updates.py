@@ -40,6 +40,7 @@ class FakeVerifier:
         client_version: str | None,
         runtime_kind: str | None,
         probe_kind: str | None,
+        transport_mode: str | None,
     ) -> CredentialVerificationResult:
         assert provider
         assert api_key
@@ -56,10 +57,12 @@ class FakeVerifier:
             "tool_call_probe",
             "tool_continuation_probe",
         }
+        assert transport_mode in {None, "stream", "buffered"}
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
             message="验证成功",
             probe_kind=probe_kind or "text_probe",
+            transport_mode=transport_mode,
         )
 
 
@@ -112,7 +115,9 @@ def test_update_credential_clears_base_url_when_explicitly_null(db, monkeypatch)
     )
 
     assert updated.base_url is None
-    assert updated.verified_probe_kind is None
+    assert updated.last_verified_at is None
+    assert updated.stream_tool_verified_probe_kind is None
+    assert updated.buffered_tool_verified_probe_kind is None
 
 
 def test_update_credential_rejects_explicit_null_default_model(db, monkeypatch) -> None:
@@ -405,7 +410,7 @@ def test_update_credential_can_change_and_clear_interop_profile(db, monkeypatch)
     assert cleared.interop_profile is None
 
 
-def test_update_credential_clears_verified_probe_kind_on_connection_change(db, monkeypatch) -> None:
+def test_update_credential_clears_verification_state_on_connection_change(db, monkeypatch) -> None:
     monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
     user = create_user(db)
     service = create_credential_service(verifier=FakeVerifier())
@@ -417,8 +422,11 @@ def test_update_credential_clears_verified_probe_kind_on_connection_change(db, m
         )
     )
     stored = db.query(ModelCredential).filter(ModelCredential.id == credential.id).one()
-    stored.verified_probe_kind = "tool_continuation_probe"
     stored.last_verified_at = datetime.now(timezone.utc)
+    stored.stream_tool_verified_probe_kind = "tool_continuation_probe"
+    stored.stream_tool_last_verified_at = stored.last_verified_at
+    stored.buffered_tool_verified_probe_kind = "tool_call_probe"
+    stored.buffered_tool_last_verified_at = stored.last_verified_at
     db.add(stored)
     db.commit()
 
@@ -431,8 +439,11 @@ def test_update_credential_clears_verified_probe_kind_on_connection_change(db, m
         )
     )
 
-    assert updated.verified_probe_kind is None
     assert updated.last_verified_at is None
+    assert updated.stream_tool_verified_probe_kind is None
+    assert updated.stream_tool_last_verified_at is None
+    assert updated.buffered_tool_verified_probe_kind is None
+    assert updated.buffered_tool_last_verified_at is None
 
 
 def test_create_credential_rejects_incompatible_interop_profile_for_dialect(db, monkeypatch) -> None:

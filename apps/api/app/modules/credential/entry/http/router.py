@@ -11,6 +11,7 @@ from app.modules.credential.service import (
     CredentialService,
     CredentialUpdateDTO,
     CredentialVerifyProbeKind,
+    CredentialVerifyTransportMode,
     CredentialVerifyResultDTO,
     CredentialViewDTO,
     create_credential_service,
@@ -91,6 +92,7 @@ async def delete_credential(
 async def verify_credential(
     credential_id: uuid.UUID,
     probe_kind: CredentialVerifyProbeKind = Query(default="text_probe"),
+    transport_mode: CredentialVerifyTransportMode | None = Query(default=None),
     credential_service: CredentialService = Depends(get_credential_service),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db_session),
@@ -100,6 +102,7 @@ async def verify_credential(
         credential_id,
         actor_user_id=current_user.id,
         probe_kind=probe_kind,
+        transport_mode=transport_mode,
     )
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import re
-from typing import Protocol
+from typing import Literal, Protocol
 
 import httpx
 
@@ -26,7 +26,10 @@ from app.shared.runtime.llm.llm_protocol import (
     resolve_model_name,
     send_json_http_request,
 )
-from app.shared.runtime.llm.llm_response_validation import raise_if_truncated_response
+from app.shared.runtime.llm.llm_response_validation import (
+    raise_if_empty_tool_response,
+    raise_if_truncated_response,
+)
 from app.shared.runtime.llm.interop.provider_interop_stream_support import (
     build_stream_completion,
     build_stream_probe_request,
@@ -57,6 +60,7 @@ STREAM_HTTP_ERROR_PATTERN = re.compile(
 REQUEST_HTTP_ERROR_PATTERN = re.compile(
     r"^LLM request failed: HTTP (?P<status>\d{3})(?: - (?P<detail>.*))?$"
 )
+CredentialVerifyTransportMode = Literal["stream", "buffered"]
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,7 @@ class CredentialVerificationResult:
     verified_at: datetime
     message: str
     probe_kind: ConformanceProbeKind
+    transport_mode: CredentialVerifyTransportMode | None = None
 
 
 class AsyncCredentialVerifier(Protocol):
@@ -84,6 +89,7 @@ class AsyncCredentialVerifier(Protocol):
         client_version: str | None,
         runtime_kind: str | None,
         probe_kind: ConformanceProbeKind | None = None,
+        transport_mode: CredentialVerifyTransportMode | None = None,
     ) -> CredentialVerificationResult: ...
 
 
@@ -121,8 +127,13 @@ class AsyncHttpCredentialVerifier:
         client_version: str | None = None,
         runtime_kind: str | None = None,
         probe_kind: ConformanceProbeKind | None = None,
+        transport_mode: CredentialVerifyTransportMode | None = None,
     ) -> CredentialVerificationResult:
         normalized_probe_kind = normalize_conformance_probe_kind(probe_kind)
+        normalized_transport_mode = _normalize_probe_transport_mode(
+            probe_kind=normalized_probe_kind,
+            transport_mode=transport_mode,
+        )
         connection = LLMConnection(
             api_dialect=api_dialect,
             api_key=api_key,
@@ -149,15 +160,22 @@ class AsyncHttpCredentialVerifier:
                 model_name=model_name,
                 api_dialect=api_dialect,
                 probe_kind=normalized_probe_kind,
+                transport_mode=normalized_transport_mode,
             )
         except ConfigurationError as exc:
-            _raise_stream_http_error(provider, exc, probe_kind=normalized_probe_kind)
+            _raise_stream_http_error(
+                provider,
+                exc,
+                probe_kind=normalized_probe_kind,
+                transport_mode=normalized_transport_mode,
+            )
             if normalized_probe_kind == "text_probe":
                 raise BusinessRuleError(str(exc)) from exc
             raise BusinessRuleError(
                 _format_probe_failure_message(
                     provider,
                     probe_kind=normalized_probe_kind,
+                    transport_mode=normalized_transport_mode,
                     detail=str(exc),
                 )
             ) from exc
@@ -165,8 +183,12 @@ class AsyncHttpCredentialVerifier:
             raise BusinessRuleError(f"无法连接到 {provider}") from exc
         return CredentialVerificationResult(
             verified_at=datetime.now(timezone.utc),
-            message=_resolve_probe_success_message(normalized_probe_kind),
+            message=_resolve_probe_success_message(
+                normalized_probe_kind,
+                transport_mode=normalized_transport_mode,
+            ),
             probe_kind=normalized_probe_kind,
+            transport_mode=normalized_transport_mode,
         )
 
     async def _verify_conformance_probe(
@@ -177,6 +199,7 @@ class AsyncHttpCredentialVerifier:
         model_name: str,
         api_dialect: str,
         probe_kind: ConformanceProbeKind,
+        transport_mode: CredentialVerifyTransportMode | None,
     ) -> None:
         initial_response = await self._execute_probe_request(
             build_conformance_probe_request(
@@ -186,6 +209,7 @@ class AsyncHttpCredentialVerifier:
             ),
             api_dialect=api_dialect,
             probe_kind=probe_kind,
+            transport_mode=transport_mode,
         )
         if probe_kind == "text_probe":
             self._validate_text_probe_response(provider, initial_response)
@@ -207,6 +231,7 @@ class AsyncHttpCredentialVerifier:
             ),
             api_dialect=api_dialect,
             probe_kind=probe_kind,
+            transport_mode=transport_mode,
         )
         validate_tool_continuation_probe_response(
             followup_response,
@@ -219,6 +244,7 @@ class AsyncHttpCredentialVerifier:
         *,
         api_dialect: str,
         probe_kind: ConformanceProbeKind,
+        transport_mode: CredentialVerifyTransportMode | None,
     ) -> NormalizedLLMResponse:
         if probe_kind == "text_probe" and self.stream_request_sender is None:
             if api_dialect in TEXT_PROBE_JSON_DIALECTS:
@@ -228,6 +254,11 @@ class AsyncHttpCredentialVerifier:
                 )
             return await _default_text_probe_request_sender(
                 build_stream_probe_request(request, api_dialect=api_dialect),
+                api_dialect=api_dialect,
+            )
+        if transport_mode == "buffered":
+            return await _default_buffered_probe_request_sender(
+                request,
                 api_dialect=api_dialect,
             )
         streamed_request = build_stream_probe_request(request, api_dialect=api_dialect)
@@ -254,6 +285,7 @@ def _raise_stream_http_error(
     error: ConfigurationError,
     *,
     probe_kind: ConformanceProbeKind,
+    transport_mode: CredentialVerifyTransportMode | None,
 ) -> None:
     detail = str(error).strip()
     match = STREAM_HTTP_ERROR_PATTERN.match(detail) or REQUEST_HTTP_ERROR_PATTERN.match(detail)
@@ -271,6 +303,7 @@ def _raise_stream_http_error(
         _format_probe_failure_message(
             provider,
             probe_kind=probe_kind,
+            transport_mode=transport_mode,
             detail=f"HTTP {status_code} - {error_detail}",
         )
     ) from error
@@ -364,6 +397,51 @@ async def _default_text_probe_json_request_sender(
     )
 
 
+async def _default_buffered_probe_request_sender(
+    request: PreparedLLMHttpRequest,
+    *,
+    api_dialect: str,
+) -> NormalizedLLMResponse:
+    response = await send_json_http_request(
+        request,
+        timeout_seconds=VERIFY_TIMEOUT_SECONDS,
+    )
+    if response.status_code >= 400:
+        raise ConfigurationError(_build_request_http_error_message(response))
+    raise_if_truncated_response(
+        api_dialect=api_dialect,
+        payload=response.json_body or {},
+    )
+    normalized = parse_generation_response(
+        api_dialect,
+        response.json_body or {},
+        tool_name_aliases=request.tool_name_aliases,
+    )
+    json_body = request.json_body if isinstance(request.json_body, dict) else {}
+    raise_if_empty_tool_response(
+        has_tools=bool(json_body.get("tools")),
+        content=normalized.content,
+        tool_calls=normalized.tool_calls,
+    )
+    return normalized
+
+
+def _normalize_probe_transport_mode(
+    *,
+    probe_kind: ConformanceProbeKind,
+    transport_mode: CredentialVerifyTransportMode | None,
+) -> CredentialVerifyTransportMode | None:
+    if probe_kind == "text_probe":
+        if transport_mode is not None:
+            raise BusinessRuleError("验证连接时不支持 transport_mode。")
+        return None
+    if transport_mode is None:
+        raise BusinessRuleError("工具验证必须显式指定 transport_mode。")
+    if transport_mode not in {"stream", "buffered"}:
+        raise BusinessRuleError("transport_mode 仅支持 stream 或 buffered。")
+    return transport_mode
+
+
 def _normalize_probe_error_message(reply: str) -> str | None:
     normalized_reply = reply.strip()
     lowered_reply = normalized_reply.lower()
@@ -391,9 +469,13 @@ def _format_probe_failure_message(
     provider: str,
     *,
     probe_kind: ConformanceProbeKind,
+    transport_mode: CredentialVerifyTransportMode | None,
     detail: str,
 ) -> str:
-    label = _resolve_probe_failure_label(probe_kind)
+    label = _resolve_probe_failure_label(
+        probe_kind,
+        transport_mode=transport_mode,
+    )
     if label is None:
         return f"无法验证 {provider} 凭证: {detail}"
     return f"无法验证 {provider} 凭证: {label}：{detail}"
@@ -401,17 +483,31 @@ def _format_probe_failure_message(
 
 def _resolve_probe_failure_label(
     probe_kind: ConformanceProbeKind,
+    *,
+    transport_mode: CredentialVerifyTransportMode | None,
 ) -> str | None:
     if probe_kind == "text_probe":
         return None
     if probe_kind == "tool_definition_probe":
-        return "工具定义验证失败"
-    return "工具调用验证失败"
+        return f"{_resolve_transport_mode_label(transport_mode)}工具定义验证失败"
+    return f"{_resolve_transport_mode_label(transport_mode)}工具调用验证失败"
 
 
-def _resolve_probe_success_message(probe_kind: ConformanceProbeKind) -> str:
+def _resolve_probe_success_message(
+    probe_kind: ConformanceProbeKind,
+    *,
+    transport_mode: CredentialVerifyTransportMode | None,
+) -> str:
     if probe_kind == "text_probe":
         return "验证成功"
     if probe_kind == "tool_definition_probe":
-        return "工具定义验证成功"
-    return "工具调用验证成功"
+        return f"{_resolve_transport_mode_label(transport_mode)}工具定义验证成功"
+    return f"{_resolve_transport_mode_label(transport_mode)}工具调用验证成功"
+
+
+def _resolve_transport_mode_label(
+    transport_mode: CredentialVerifyTransportMode | None,
+) -> str:
+    if transport_mode == "buffered":
+        return "非流"
+    return "流式"
