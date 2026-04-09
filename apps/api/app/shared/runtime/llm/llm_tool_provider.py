@@ -236,6 +236,8 @@ def _serialize_tool_call(tool_call: Any) -> dict[str, Any]:
     payload = dict(tool_call.__dict__)
     if payload.get("arguments_error") is None:
         payload.pop("arguments_error", None)
+    if payload.get("provider_payload") is None:
+        payload.pop("provider_payload", None)
     return payload
 
 

@@ -77,6 +77,7 @@ def test_extract_gemini_tool_calls_generates_fallback_tool_call_id() -> None:
     tool_calls = extract_gemini_tool_calls(
         [
             {
+                "thoughtSignature": "sig_123",
                 "functionCall": {
                     "name": "project_read_documents",
                     "args": {"paths": ["设定/人物.md"]},
@@ -88,6 +89,13 @@ def test_extract_gemini_tool_calls_generates_fallback_tool_call_id() -> None:
 
     assert tool_calls[0].tool_call_id == "provider:gemini_generate_content:tool_call:1"
     assert tool_calls[0].tool_name == "project.read_documents"
+    assert tool_calls[0].provider_payload == {
+        "thoughtSignature": "sig_123",
+        "functionCall": {
+            "name": "project_read_documents",
+            "args": {"paths": ["设定/人物.md"]},
+        },
+    }
 
 
 @pytest.mark.parametrize(

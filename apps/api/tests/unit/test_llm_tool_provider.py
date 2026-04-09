@@ -1395,6 +1395,306 @@ def test_execute_stream_recovers_openai_responses_tool_calls_from_output_item_ev
     ]
 
 
+def test_execute_stream_recovers_openai_responses_tool_calls_from_argument_events(
+    monkeypatch,
+) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.function_call_arguments.delta"
+            yield 'data: {"type":"response.function_call_arguments.delta","item_id":"fc_123","output_index":0,"delta":"{\\"paths\\":["}'
+            yield ""
+            yield "event: response.function_call_arguments.done"
+            yield (
+                'data: {"type":"response.function_call_arguments.done","item_id":"fc_123","output_index":0,'
+                '"call_id":"call_123","name":"project_read_documents","arguments":"{\\"paths\\":[\\"设定/人物.md\\"]}"}'
+            )
+            yield ""
+            yield "event: response.completed"
+            yield (
+                'data: {"type":"response.completed","response":{"id":"resp_tool_delta_args","output":[],'
+                '"usage":{"input_tokens":8,"output_tokens":10,"total_tokens":18}}}'
+            )
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    provider = LLMToolProvider()
+
+    async def collect_events():
+        return [
+            event
+            async for event in provider.execute_stream(
+                "llm.generate",
+                {
+                    "prompt": "读一下人物设定",
+                    "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_responses",
+                    },
+                    "tools": [
+                        {
+                            "name": "project.read_documents",
+                            "description": "读取文稿。",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {"paths": {"type": "array"}},
+                                "required": ["paths"],
+                            },
+                        }
+                    ],
+                },
+            )
+        ]
+
+    events = asyncio.run(collect_events())
+
+    assert len(events) == 1
+    response = events[0].response
+    assert response is not None
+    assert response["provider_response_id"] == "resp_tool_delta_args"
+    assert response["tool_calls"] == [
+        {
+            "tool_call_id": "call_123",
+            "tool_name": "project.read_documents",
+            "arguments": {"paths": ["设定/人物.md"]},
+            "arguments_text": '{"paths":["设定/人物.md"]}',
+            "provider_ref": "fc_123",
+        }
+    ]
+
+
+def test_execute_stream_deduplicates_openai_responses_tool_calls_across_call_id_and_item_id(
+    monkeypatch,
+) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.function_call_arguments.done"
+            yield (
+                'data: {"type":"response.function_call_arguments.done","call_id":"call_123","name":"project_read_documents",'
+                '"arguments":"{\\"paths\\":[\\"设定/人物.md\\"]}","output_index":0}'
+            )
+            yield ""
+            yield "event: response.output_item.done"
+            yield (
+                'data: {"type":"response.output_item.done","output_index":0,"item":{"id":"fc_123","type":"function_call",'
+                '"call_id":"call_123","name":"project_read_documents","arguments":"{\\"paths\\":[\\"设定/人物.md\\"]}"}}'
+            )
+            yield ""
+            yield "event: response.completed"
+            yield (
+                'data: {"type":"response.completed","response":{"id":"resp_tool_mixed_keys","output":[{"id":"rs_1","type":"reasoning","summary":[]}],'
+                '"usage":{"input_tokens":8,"output_tokens":10,"total_tokens":18}}}'
+            )
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    provider = LLMToolProvider()
+
+    async def collect_events():
+        return [
+            event
+            async for event in provider.execute_stream(
+                "llm.generate",
+                {
+                    "prompt": "读一下人物设定",
+                    "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_responses",
+                    },
+                    "tools": [
+                        {
+                            "name": "project.read_documents",
+                            "description": "读取文稿。",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {"paths": {"type": "array"}},
+                                "required": ["paths"],
+                            },
+                        }
+                    ],
+                },
+            )
+        ]
+
+    events = asyncio.run(collect_events())
+
+    assert len(events) == 1
+    response = events[0].response
+    assert response is not None
+    assert response["provider_response_id"] == "resp_tool_mixed_keys"
+    assert len(response["tool_calls"]) == 1
+    assert response["tool_calls"][0] == {
+        "tool_call_id": "call_123",
+        "tool_name": "project.read_documents",
+        "arguments": {"paths": ["设定/人物.md"]},
+        "arguments_text": '{"paths":["设定/人物.md"]}',
+        "provider_ref": "fc_123",
+    }
+    assert [item["item_type"] for item in response["output_items"]] == [
+        "tool_call",
+        "reasoning",
+    ]
+
+
+def test_execute_stream_preserves_openai_responses_output_order_for_multiple_missing_tool_calls(
+    monkeypatch,
+) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.function_call_arguments.done"
+            yield (
+                'data: {"type":"response.function_call_arguments.done","item_id":"fc_1","call_id":"call_1",'
+                '"name":"project_read_documents","arguments":"{\\"paths\\":[\\"设定/人物-1.md\\"]}","output_index":0}'
+            )
+            yield ""
+            yield "event: response.function_call_arguments.done"
+            yield (
+                'data: {"type":"response.function_call_arguments.done","item_id":"fc_2","call_id":"call_2",'
+                '"name":"project_read_documents","arguments":"{\\"paths\\":[\\"设定/人物-2.md\\"]}","output_index":2}'
+            )
+            yield ""
+            yield "event: response.completed"
+            yield (
+                'data: {"type":"response.completed","response":{"id":"resp_tool_ordered","output":[{"id":"msg_1","type":"message","role":"assistant",'
+                '"content":[{"type":"output_text","text":"先看第一份，再补第二份。"}]},{"id":"rs_1","type":"reasoning","summary":[]}],'
+                '"usage":{"input_tokens":8,"output_tokens":10,"total_tokens":18}}}'
+            )
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    provider = LLMToolProvider()
+
+    async def collect_events():
+        return [
+            event
+            async for event in provider.execute_stream(
+                "llm.generate",
+                {
+                    "prompt": "先后读取两份人物设定",
+                    "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_responses",
+                    },
+                    "tools": [
+                        {
+                            "name": "project.read_documents",
+                            "description": "读取文稿。",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {"paths": {"type": "array"}},
+                                "required": ["paths"],
+                            },
+                        }
+                    ],
+                },
+            )
+        ]
+
+    events = asyncio.run(collect_events())
+
+    assert len(events) == 1
+    response = events[0].response
+    assert response is not None
+    assert response["provider_response_id"] == "resp_tool_ordered"
+    assert [item["item_type"] for item in response["output_items"]] == [
+        "tool_call",
+        "text",
+        "tool_call",
+        "reasoning",
+    ]
+    assert [
+        item.get("provider_ref")
+        for item in response["output_items"]
+        if item["item_type"] == "tool_call"
+    ] == ["fc_1", "fc_2"]
+
+
 def test_execute_stream_recovers_openai_chat_tool_calls_from_delta_events(monkeypatch) -> None:
     class FakeResponse:
         status_code = 200
@@ -1774,15 +2074,21 @@ def test_execute_stream_accepts_gemini_terminal_payload_with_tool_calls_and_no_t
                 "input_tokens": 8,
                 "output_tokens": 10,
                 "total_tokens": 18,
-                "tool_calls": [
-                    {
-                        "tool_call_id": "provider:gemini_generate_content:tool_call:1",
-                        "tool_name": "project.read_documents",
-                        "arguments": {"paths": ["设定/人物.md"]},
-                        "arguments_text": '{"paths":["设定/人物.md"]}',
-                        "provider_ref": None,
-                    }
-                ],
+                    "tool_calls": [
+                        {
+                            "tool_call_id": "provider:gemini_generate_content:tool_call:1",
+                            "tool_name": "project.read_documents",
+                            "arguments": {"paths": ["设定/人物.md"]},
+                            "arguments_text": '{"paths":["设定/人物.md"]}',
+                            "provider_ref": None,
+                            "provider_payload": {
+                                "functionCall": {
+                                    "name": "project.read_documents",
+                                    "args": {"paths": ["设定/人物.md"]},
+                                }
+                            },
+                        }
+                    ],
                 "provider_response_id": None,
                 "output_items": [],
             }

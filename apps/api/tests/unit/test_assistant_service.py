@@ -1282,7 +1282,7 @@ async def test_assistant_service_persists_continuation_compaction_snapshot_for_t
     )
     assert run_record.continuation_compaction_snapshot is not None
     assert run_record.continuation_compaction_snapshot["phase"] == "tool_loop_continuation"
-    assert run_record.continuation_compaction_snapshot["level"] == "soft"
+    assert run_record.continuation_compaction_snapshot["level"] == "hard"
     assert run_record.continuation_compaction_snapshot["estimated_tokens_before"] > (
         run_record.continuation_compaction_snapshot["estimated_tokens_after"]
     )
@@ -1318,6 +1318,7 @@ async def test_assistant_service_persists_continuation_compaction_snapshot_for_t
         != run_record.continuation_compaction_snapshot["projected_items_digest"]
     )
     assert run_record.continuation_compaction_snapshot["trimmed_text_slot_count"] >= 1
+    assert run_record.continuation_compaction_snapshot["dropped_content_item_count"] >= 1
     assert run_record.continuation_request_snapshot == {
         "continuation_items": tool_provider.requests[1]["continuation_items"],
         "provider_continuation_state": tool_provider.requests[1]["provider_continuation_state"],

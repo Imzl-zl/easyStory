@@ -197,6 +197,33 @@ def test_build_tool_continuation_probe_followup_request_exposes_echoed_value_for
     assert request.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
 
 
+def test_build_tool_continuation_probe_followup_request_preserves_gemini_provider_metadata() -> None:
+    request = build_tool_continuation_probe_followup_request(
+        LLMConnection(
+            api_dialect="gemini_generate_content",
+            api_key="test-key",
+            base_url="https://generativelanguage.googleapis.com",
+        ),
+        model_name="gemini-2.5-flash",
+        initial_response=_tool_call_response(
+            provider_response_id=None,
+            provider_payload={
+                "thoughtSignature": "sig_123",
+                "functionCall": {
+                    "id": "fn_123",
+                    "name": "probe_echo_payload",
+                    "args": {"echo": "ping"},
+                },
+            },
+        ),
+        result_echo="probe-result-gemini",
+    )
+
+    assert request.json_body["contents"][1]["parts"][0]["thoughtSignature"] == "sig_123"
+    assert request.json_body["contents"][1]["parts"][0]["functionCall"]["id"] == "fn_123"
+    assert request.json_body["contents"][2]["parts"][0]["functionResponse"]["id"] == "fn_123"
+
+
 def test_build_tool_continuation_probe_followup_request_uses_provider_continuation_for_responses_strict() -> None:
     request = build_tool_continuation_probe_followup_request(
         LLMConnection(
@@ -291,6 +318,7 @@ def _tool_call_response(
     *,
     provider_response_id: str | None = "resp_123",
     arguments: dict[str, object] | None = None,
+    provider_payload: dict[str, object] | None = None,
 ) -> NormalizedLLMResponse:
     return NormalizedLLMResponse(
         content="",
@@ -305,6 +333,7 @@ def _tool_call_response(
                 tool_name=PROBE_TOOL_NAME,
                 arguments=arguments or {"echo": "ping"},
                 arguments_text='{"echo":"ping"}',
+                provider_payload=provider_payload,
             )
         ],
     )

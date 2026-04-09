@@ -323,6 +323,7 @@ class AssistantToolLoop:
         pending_output_already_streamed = False
         iteration = 0
         step_index = 0
+        tool_cycle_index = 0
         while True:
             iteration += 1
             if iteration > self.max_iterations:
@@ -499,6 +500,7 @@ class AssistantToolLoop:
                 raw_output=raw_output,
                 tool_calls=tool_calls,
                 tool_results=tool_results,
+                tool_cycle_index=tool_cycle_index,
             )
             continuation_items.extend(cycle_continuation_items)
             provider_continuation_state = _resolve_provider_continuation_state(
@@ -515,6 +517,7 @@ class AssistantToolLoop:
                 continuation_compaction_snapshot=continuation_compaction_snapshot,
                 write_effective=write_effective,
             )
+            tool_cycle_index += 1
 
     async def _execute_single_tool_call(
         self,
@@ -665,6 +668,7 @@ def _read_tool_calls(raw_output: dict[str, Any]) -> list[dict[str, Any]]:
                 "arguments_text": _read_optional_tool_call_string(item.get("arguments_text")),
                 "arguments_error": _read_optional_tool_call_string(item.get("arguments_error")),
                 "provider_ref": item.get("provider_ref"),
+                "provider_payload": _read_optional_record(item.get("provider_payload")),
             }
         )
     return normalized

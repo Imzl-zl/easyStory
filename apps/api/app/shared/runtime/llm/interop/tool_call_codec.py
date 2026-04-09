@@ -100,6 +100,7 @@ def extract_gemini_tool_calls(
                     tool_name_aliases=tool_name_aliases,
                 ),
                 arguments=parse_tool_arguments(function_call.get("args")),
+                provider_payload=_copy_provider_payload(part),
             )
         )
     return items
@@ -111,6 +112,7 @@ def build_tool_call(
     tool_name: str | None,
     arguments: tuple[dict[str, Any], str | None, str | None],
     provider_ref: str | None = None,
+    provider_payload: dict[str, Any] | None = None,
 ) -> NormalizedLLMToolCall:
     if tool_call_id is None:
         raise ConfigurationError("Tool call is missing id")
@@ -124,6 +126,7 @@ def build_tool_call(
         arguments_text=arguments_text,
         arguments_error=arguments_error,
         provider_ref=provider_ref,
+        provider_payload=provider_payload,
     )
 
 
@@ -170,6 +173,7 @@ def build_tool_call_payload(
     arguments_text: str | None,
     tool_call_id: str,
     arguments_error: str | None = None,
+    provider_payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     payload = {
         "tool_name": tool_name,
@@ -179,6 +183,8 @@ def build_tool_call_payload(
     }
     if arguments_error is not None:
         payload["arguments_error"] = arguments_error
+    if provider_payload is not None:
+        payload["provider_payload"] = provider_payload
     return payload
 
 
@@ -203,3 +209,9 @@ def _optional_string(value: Any) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _copy_provider_payload(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    return dict(value)

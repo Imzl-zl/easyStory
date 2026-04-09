@@ -134,14 +134,14 @@ def _compact_continuation_items(
             return compacted
         slot_path = _find_largest_text_slot(compacted, token_counter=token_counter)
         if slot_path is None:
-            reduced = _drop_redundant_content_items(compacted)
+            reduced = _reduce_compacted_items(compacted)
             if reduced == compacted:
                 return compacted
             compacted = reduced
             continue
         current_text = _read_path(compacted, slot_path)
         if not isinstance(current_text, str) or not current_text.strip():
-            reduced = _drop_redundant_content_items(compacted)
+            reduced = _reduce_compacted_items(compacted)
             if reduced == compacted:
                 return compacted
             compacted = reduced
@@ -154,7 +154,7 @@ def _compact_continuation_items(
             token_counter=token_counter,
         )
         if trimmed_text == current_text:
-            reduced = _drop_redundant_content_items(compacted)
+            reduced = _reduce_compacted_items(compacted)
             if reduced == compacted:
                 return compacted
             compacted = reduced
@@ -302,6 +302,72 @@ def _drop_redundant_content_items(items: list[dict[str, Any]]) -> list[dict[str,
     return updated if changed else items
 
 
+def _reduce_compacted_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    reduced = _drop_redundant_content_items(items)
+    if reduced != items:
+        return reduced
+    return _drop_oldest_continuation_block(items)
+
+
+def _drop_oldest_continuation_block(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if len(items) <= 1:
+        return items
+    block_end = _resolve_continuation_block_end(items, 0)
+    if block_end >= len(items):
+        return items
+    return list(items[block_end:])
+
+
+def _resolve_continuation_block_end(items: list[dict[str, Any]], start_index: int) -> int:
+    if start_index >= len(items):
+        return start_index
+    item = items[start_index]
+    if not isinstance(item, dict):
+        return start_index + 1
+    cycle_index = _read_continuation_cycle_index(item)
+    if cycle_index is not None:
+        return _consume_same_cycle(items, start_index, cycle_index)
+    if item.get("item_type") != "message":
+        return start_index + 1
+    next_index = start_index + 1
+    if next_index >= len(items):
+        return next_index
+    next_item = items[next_index]
+    if not isinstance(next_item, dict):
+        return next_index
+    next_cycle_index = _read_continuation_cycle_index(next_item)
+    if next_cycle_index is None:
+        return next_index
+    return _consume_same_cycle(items, next_index, next_cycle_index)
+
+
+def _consume_same_cycle(items: list[dict[str, Any]], start_index: int, cycle_index: int) -> int:
+    index = start_index
+    while index < len(items):
+        item = items[index]
+        if not isinstance(item, dict):
+            break
+        if item.get("item_type") not in {"tool_call", "tool_result"}:
+            break
+        if _read_continuation_cycle_index(item) != cycle_index:
+            break
+        index += 1
+    return index
+
+
+def _read_continuation_cycle_index(item: dict[str, Any]) -> int | None:
+    value = item.get("tool_cycle_index")
+    if isinstance(value, int) and value >= 0:
+        return value
+    payload = item.get("payload")
+    if not isinstance(payload, dict):
+        return None
+    legacy_value = payload.get("tool_cycle_index")
+    if isinstance(legacy_value, int) and legacy_value >= 0:
+        return legacy_value
+    return None
+
+
 def _find_largest_text_slot(
     items: list[dict[str, Any]],
     *,
@@ -371,14 +437,24 @@ def _build_continuation_compaction_snapshot(
     estimated_tokens_after: int,
     token_counter: TokenCounter,
 ) -> dict[str, Any]:
-    compacted_source_items = _collect_compacted_source_items(original_items, compacted_items)
+    prefix_drop_count = _resolve_prefix_drop_count(original_items, compacted_items)
+    compacted_source_items = _collect_compacted_source_items(
+        original_items,
+        compacted_items,
+        prefix_drop_count=prefix_drop_count,
+    )
     compacted_item_count = len(compacted_source_items)
     trimmed_text_slot_count = _count_trimmed_text_slots(
         original_items,
         compacted_items,
         token_counter=token_counter,
+        prefix_drop_count=prefix_drop_count,
     )
-    dropped_content_item_count = _count_dropped_content_items(original_items, compacted_items)
+    dropped_content_item_count = _count_dropped_content_items(
+        original_items,
+        compacted_items,
+        prefix_drop_count=prefix_drop_count,
+    )
     snapshot = AssistantContinuationCompactionSnapshotDTO(
         trigger_reason="max_input_tokens_exceeded",
         phase="tool_loop_continuation",
@@ -398,55 +474,48 @@ def _build_continuation_compaction_snapshot(
             else None
         ),
         projected_items_digest=build_structured_items_digest(compacted_items),
-        compacted_tool_names=_collect_compacted_tool_names(original_items, compacted_items),
-        compacted_document_refs=_collect_compacted_document_refs(original_items, compacted_items),
-        compacted_document_versions=_collect_compacted_document_versions(
-            original_items, compacted_items
-        ),
-        compacted_catalog_versions=_collect_compacted_catalog_versions(
-            original_items, compacted_items
-        ),
+        compacted_tool_names=_collect_compacted_tool_names(compacted_source_items),
+        compacted_document_refs=_collect_compacted_document_refs(compacted_source_items),
+        compacted_document_versions=_collect_compacted_document_versions(compacted_source_items),
+        compacted_catalog_versions=_collect_compacted_catalog_versions(compacted_source_items),
         trimmed_text_slot_count=trimmed_text_slot_count,
         dropped_content_item_count=dropped_content_item_count,
     )
     return snapshot.model_dump(mode="json")
 
 
-def _count_compacted_items(
+def _resolve_prefix_drop_count(
     original_items: list[dict[str, Any]],
     compacted_items: list[dict[str, Any]],
 ) -> int:
-    return len(_collect_compacted_source_items(original_items, compacted_items))
+    # Current hard compaction only deletes the oldest prefix block and never reorders items.
+    return max(0, len(original_items) - len(compacted_items))
 
 
 def _collect_compacted_source_items(
     original_items: list[dict[str, Any]],
     compacted_items: list[dict[str, Any]],
+    *,
+    prefix_drop_count: int,
 ) -> list[dict[str, Any]]:
-    source_items: list[dict[str, Any]] = []
-    for index, original in enumerate(original_items):
-        if index >= len(compacted_items) or compacted_items[index] != original:
+    source_items = list(original_items[:prefix_drop_count])
+    for original, compacted in _iter_retained_compaction_pairs(
+        original_items,
+        compacted_items,
+        prefix_drop_count=prefix_drop_count,
+    ):
+        if original != compacted:
             source_items.append(original)
     return source_items
 
 
 def _collect_compacted_tool_names(
-    original_items: list[dict[str, Any]],
-    compacted_items: list[dict[str, Any]],
+    compacted_source_items: list[dict[str, Any]],
 ) -> list[str]:
     tool_names: list[str] = []
     seen: set[str] = set()
-    for index, item in enumerate(compacted_items):
-        original = original_items[index] if index < len(original_items) else None
-        if not isinstance(original, dict) or item == original:
-            continue
-        tool_name = _read_compaction_tool_name(item) or _read_compaction_tool_name(original)
-        if tool_name is None or tool_name in seen:
-            continue
-        seen.add(tool_name)
-        tool_names.append(tool_name)
-    for original in original_items[len(compacted_items) :]:
-        tool_name = _read_compaction_tool_name(original)
+    for item in compacted_source_items:
+        tool_name = _read_compaction_tool_name(item)
         if tool_name is None or tool_name in seen:
             continue
         seen.add(tool_name)
@@ -455,23 +524,12 @@ def _collect_compacted_tool_names(
 
 
 def _collect_compacted_document_refs(
-    original_items: list[dict[str, Any]],
-    compacted_items: list[dict[str, Any]],
+    compacted_source_items: list[dict[str, Any]],
 ) -> list[str]:
     refs: list[str] = []
     seen: set[str] = set()
-    for index, item in enumerate(compacted_items):
-        original = original_items[index] if index < len(original_items) else None
-        if not isinstance(original, dict) or item == original:
-            continue
-        for candidate in (original, item):
-            for document_ref in _iter_compaction_document_refs(candidate):
-                if document_ref in seen:
-                    continue
-                seen.add(document_ref)
-                refs.append(document_ref)
-    for original in original_items[len(compacted_items) :]:
-        for document_ref in _iter_compaction_document_refs(original):
+    for item in compacted_source_items:
+        for document_ref in _iter_compaction_document_refs(item):
             if document_ref in seen:
                 continue
             seen.add(document_ref)
@@ -480,44 +538,44 @@ def _collect_compacted_document_refs(
 
 
 def _collect_compacted_document_versions(
-    original_items: list[dict[str, Any]],
-    compacted_items: list[dict[str, Any]],
+    compacted_source_items: list[dict[str, Any]],
 ) -> dict[str, str]:
     versions: dict[str, str] = {}
-    for index, item in enumerate(compacted_items):
-        original = original_items[index] if index < len(original_items) else None
-        if not isinstance(original, dict) or item == original:
-            continue
-        _merge_compaction_document_versions(versions, original)
+    for item in compacted_source_items:
         _merge_compaction_document_versions(versions, item)
-    for original in original_items[len(compacted_items) :]:
-        _merge_compaction_document_versions(versions, original)
     return dict(sorted(versions.items()))
 
 
 def _collect_compacted_catalog_versions(
-    original_items: list[dict[str, Any]],
-    compacted_items: list[dict[str, Any]],
+    compacted_source_items: list[dict[str, Any]],
 ) -> list[str]:
     versions: list[str] = []
     seen: set[str] = set()
-    for index, item in enumerate(compacted_items):
-        original = original_items[index] if index < len(original_items) else None
-        if not isinstance(original, dict) or item == original:
-            continue
-        for candidate in (original, item):
-            catalog_version = _read_compaction_catalog_version(candidate)
-            if catalog_version is None or catalog_version in seen:
-                continue
-            seen.add(catalog_version)
-            versions.append(catalog_version)
-    for original in original_items[len(compacted_items) :]:
-        catalog_version = _read_compaction_catalog_version(original)
+    for item in compacted_source_items:
+        catalog_version = _read_compaction_catalog_version(item)
         if catalog_version is None or catalog_version in seen:
             continue
         seen.add(catalog_version)
         versions.append(catalog_version)
     return versions
+
+
+def _iter_retained_compaction_pairs(
+    original_items: list[dict[str, Any]],
+    compacted_items: list[dict[str, Any]],
+    *,
+    prefix_drop_count: int,
+) -> tuple[tuple[dict[str, Any], dict[str, Any]], ...]:
+    pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for index, compacted in enumerate(compacted_items):
+        original_index = prefix_drop_count + index
+        if original_index >= len(original_items):
+            break
+        original = original_items[original_index]
+        if not isinstance(original, dict) or not isinstance(compacted, dict):
+            continue
+        pairs.append((original, compacted))
+    return tuple(pairs)
 
 
 def _read_compaction_tool_name(item: dict[str, Any]) -> str | None:
@@ -604,28 +662,41 @@ def _count_trimmed_text_slots(
     compacted_items: list[dict[str, Any]],
     *,
     token_counter: TokenCounter,
+    prefix_drop_count: int,
 ) -> int:
-    original_slots = {path: value for path, value in _iter_text_slots(original_items)}
-    compacted_slots = {path: value for path, value in _iter_text_slots(compacted_items)}
-    return sum(
-        1
-        for path, value in compacted_slots.items()
-        if path in original_slots
-        and value != original_slots[path]
-        and token_counter.count(value, "default") <= token_counter.count(original_slots[path], "default")
-    )
+    trimmed = 0
+    for original, compacted in _iter_retained_compaction_pairs(
+        original_items,
+        compacted_items,
+        prefix_drop_count=prefix_drop_count,
+    ):
+        original_slots = {path: value for path, value in _iter_text_slots(original)}
+        compacted_slots = {path: value for path, value in _iter_text_slots(compacted)}
+        trimmed += sum(
+            1
+            for path, value in compacted_slots.items()
+            if path in original_slots
+            and value != original_slots[path]
+            and token_counter.count(value, "default")
+            <= token_counter.count(original_slots[path], "default")
+        )
+    return trimmed
 
 
 def _count_dropped_content_items(
     original_items: list[dict[str, Any]],
     compacted_items: list[dict[str, Any]],
+    *,
+    prefix_drop_count: int,
 ) -> int:
     dropped = 0
-    for index, item in enumerate(compacted_items):
-        if index >= len(original_items):
-            continue
-        original_payload = original_items[index].get("payload")
-        compacted_payload = item.get("payload")
+    for original, compacted in _iter_retained_compaction_pairs(
+        original_items,
+        compacted_items,
+        prefix_drop_count=prefix_drop_count,
+    ):
+        original_payload = original.get("payload")
+        compacted_payload = compacted.get("payload")
         if not isinstance(original_payload, dict) or not isinstance(compacted_payload, dict):
             continue
         original_content_items = original_payload.get("content_items")

@@ -428,6 +428,165 @@ def test_execute_stream_probe_request_recovers_openai_responses_tool_calls_from_
     assert normalized.tool_calls[0].arguments == {"paths": ["设定/人物.md"]}
 
 
+def test_execute_stream_probe_request_deduplicates_openai_responses_function_call_keys_and_keeps_output_order(
+    monkeypatch,
+) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://proxy.example.com/v1/responses",
+        headers={"Accept": "text/event-stream"},
+        json_body={"model": "gpt-5.2-codex", "stream": True},
+        tool_name_aliases={"project.read_documents": "project_read_documents"},
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.function_call_arguments.done"
+            yield (
+                'data: {"type":"response.function_call_arguments.done","call_id":"call_123","name":"project_read_documents",'
+                '"arguments":"{\\"paths\\":[\\"设定/人物.md\\"]}","output_index":0}'
+            )
+            yield ""
+            yield "event: response.output_item.done"
+            yield (
+                'data: {"type":"response.output_item.done","output_index":0,"item":{"id":"fc_123","type":"function_call",'
+                '"call_id":"call_123","name":"project_read_documents","arguments":"{\\"paths\\":[\\"设定/人物.md\\"]}"}}'
+            )
+            yield ""
+            yield "event: response.completed"
+            yield (
+                'data: {"type":"response.completed","response":{"id":"resp_123","output":[{"id":"rs_1","type":"reasoning","summary":[]}],'
+                '"usage":{"input_tokens":8,"output_tokens":10,"total_tokens":18}}}'
+            )
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+
+    normalized = asyncio.run(
+        stream_support.execute_stream_probe_request(
+            request,
+            api_dialect="openai_responses",
+            print_response=False,
+        )
+    )
+
+    assert len(normalized.tool_calls) == 1
+    assert normalized.tool_calls[0].tool_call_id == "call_123"
+    assert normalized.tool_calls[0].provider_ref == "fc_123"
+    assert [item["item_type"] for item in normalized.provider_output_items] == [
+        "tool_call",
+        "reasoning",
+    ]
+
+
+def test_execute_stream_probe_request_preserves_openai_responses_output_order_for_multiple_missing_tool_calls(
+    monkeypatch,
+) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://proxy.example.com/v1/responses",
+        headers={"Accept": "text/event-stream"},
+        json_body={"model": "gpt-5.4", "stream": True},
+        tool_name_aliases={"project.read_documents": "project_read_documents"},
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: response.function_call_arguments.done"
+            yield (
+                'data: {"type":"response.function_call_arguments.done","item_id":"fc_1","call_id":"call_1",'
+                '"name":"project_read_documents","arguments":"{\\"paths\\":[\\"设定/人物-1.md\\"]}","output_index":0}'
+            )
+            yield ""
+            yield "event: response.function_call_arguments.done"
+            yield (
+                'data: {"type":"response.function_call_arguments.done","item_id":"fc_2","call_id":"call_2",'
+                '"name":"project_read_documents","arguments":"{\\"paths\\":[\\"设定/人物-2.md\\"]}","output_index":2}'
+            )
+            yield ""
+            yield "event: response.completed"
+            yield (
+                'data: {"type":"response.completed","response":{"id":"resp_456","output":[{"id":"msg_1","type":"message","role":"assistant",'
+                '"content":[{"type":"output_text","text":"先看第一份，再补第二份。"}]},{"id":"rs_1","type":"reasoning","summary":[]}],'
+                '"usage":{"input_tokens":8,"output_tokens":10,"total_tokens":18}}}'
+            )
+            yield ""
+            yield "data: [DONE]"
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+
+    normalized = asyncio.run(
+        stream_support.execute_stream_probe_request(
+            request,
+            api_dialect="openai_responses",
+            print_response=False,
+        )
+    )
+
+    assert [item["item_type"] for item in normalized.provider_output_items] == [
+        "tool_call",
+        "text",
+        "tool_call",
+        "reasoning",
+    ]
+    assert [
+        item.get("provider_ref")
+        for item in normalized.provider_output_items
+        if item["item_type"] == "tool_call"
+    ] == ["fc_1", "fc_2"]
+
+
 def test_execute_stream_probe_request_recovers_openai_chat_tool_calls_from_delta_events(
     monkeypatch,
 ) -> None:

@@ -133,6 +133,7 @@ class NormalizedLLMToolCall:
     arguments_text: str | None = None
     arguments_error: str | None = None
     provider_ref: str | None = None
+    provider_payload: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

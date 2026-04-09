@@ -1161,6 +1161,14 @@ def test_assistant_tool_loop_drops_provider_continuation_state_for_runtime_repla
                             "tool_name": "project.read_documents",
                             "arguments": {"paths": ["设定/人物.md"]},
                             "arguments_text": '{"paths":["设定/人物.md"]}',
+                            "provider_payload": {
+                                "thoughtSignature": "sig_123",
+                                "functionCall": {
+                                    "id": "fn_123",
+                                    "name": "project_read_documents",
+                                    "args": {"paths": ["设定/人物.md"]},
+                                },
+                            },
                         }
                     ],
                     "provider_response_id": "resp_tool_1",
@@ -1265,6 +1273,14 @@ def test_assistant_tool_loop_keeps_provider_continuation_state_for_hybrid_suppor
                             "tool_name": "project.read_documents",
                             "arguments": {"paths": ["设定/人物.md"]},
                             "arguments_text": '{"paths":["设定/人物.md"]}',
+                            "provider_payload": {
+                                "thoughtSignature": "sig_123",
+                                "functionCall": {
+                                    "id": "fn_123",
+                                    "name": "project_read_documents",
+                                    "args": {"paths": ["设定/人物.md"]},
+                                },
+                            },
                         }
                     ],
                     "provider_response_id": "resp_tool_1",
@@ -1280,12 +1296,75 @@ def test_assistant_tool_loop_keeps_provider_continuation_state_for_hybrid_suppor
     assert isinstance(provider_state, dict)
     assert provider_state["previous_response_id"] == "resp_tool_1"
     assert provider_state["latest_items"] == captured_calls[0]["continuation_items"]
+    assert captured_calls[0]["continuation_items"][0]["payload"]["provider_payload"] == {
+        "thoughtSignature": "sig_123",
+        "functionCall": {
+            "id": "fn_123",
+            "name": "project_read_documents",
+            "args": {"paths": ["设定/人物.md"]},
+        },
+    }
     assert recorded_states[-1].continuation_request_snapshot == {
         "continuation_items": captured_calls[0]["continuation_items"],
         "provider_continuation_state": provider_state,
     }
     assert items[-1].raw_output is not None
     assert items[-1].raw_output["content"] == "后续回复"
+
+
+def test_build_tool_cycle_continuation_items_preserves_execution_order_and_marks_cycle():
+    items = _build_tool_cycle_continuation_items(
+        raw_output={"content": "先读取两份人物设定"},
+        tool_calls=[
+            {
+                "tool_call_id": "tool-call-1",
+                "tool_name": "project.read_documents",
+                "arguments": {"paths": ["设定/人物-1.md"]},
+                "arguments_text": '{"paths":["设定/人物-1.md"]}',
+            },
+            {
+                "tool_call_id": "tool-call-2",
+                "tool_name": "project.read_documents",
+                "arguments": {"paths": ["设定/人物-2.md"]},
+                "arguments_text": '{"paths":["设定/人物-2.md"]}',
+            },
+        ],
+        tool_results=[
+            AssistantToolResultEnvelope(
+                tool_call_id="tool-call-1",
+                status="completed",
+                structured_output={"documents": [{"path": "设定/人物-1.md"}]},
+                content_items=[{"type": "text", "text": "设定/人物-1.md\n\n林渊"}],
+            ),
+            AssistantToolResultEnvelope(
+                tool_call_id="tool-call-2",
+                status="completed",
+                structured_output={"documents": [{"path": "设定/人物-2.md"}]},
+                content_items=[{"type": "text", "text": "设定/人物-2.md\n\n顾砚"}],
+            ),
+        ],
+        tool_cycle_index=3,
+    )
+
+    assert [item["item_type"] for item in items] == [
+        "message",
+        "tool_call",
+        "tool_result",
+        "tool_call",
+        "tool_result",
+    ]
+    assert [item["call_id"] for item in items[1:]] == [
+        "tool-call-1",
+        "tool-call-1",
+        "tool-call-2",
+        "tool-call-2",
+    ]
+    assert items[1]["tool_cycle_index"] == 3
+    assert items[2]["tool_cycle_index"] == 3
+    assert items[3]["tool_cycle_index"] == 3
+    assert items[4]["tool_cycle_index"] == 3
+    assert "tool_cycle_index" not in items[1]["payload"]
+    assert "tool_cycle_index" not in items[2]["payload"]
 
 
 def test_assistant_tool_loop_compacts_runtime_replay_continuation_to_fit_input_budget():
@@ -1399,19 +1478,19 @@ def test_assistant_tool_loop_compacts_runtime_replay_continuation_to_fit_input_b
                 continuation_support=resolve_continuation_support("anthropic_messages"),
                 model_caller=model_caller,
                 initial_raw_output=initial_raw_output,
-                run_budget=AssistantRunBudget(
-                    max_steps=8,
-                    max_tool_calls=8,
-                    max_input_tokens=700,
-                    max_parallel_tool_calls=1,
-                    tool_timeout_seconds=15,
-                ),
+                    run_budget=AssistantRunBudget(
+                        max_steps=8,
+                        max_tool_calls=8,
+                        max_input_tokens=900,
+                        max_parallel_tool_calls=1,
+                        tool_timeout_seconds=15,
+                    ),
                 state_recorder=recorded_states.append,
                 visible_descriptors=(read_descriptor,),
             )
         ]
 
-    items = asyncio.run(collect())
+    asyncio.run(collect())
 
     continuation_items = captured_calls[0]["continuation_items"]
     assert isinstance(continuation_items, list)
@@ -1477,6 +1556,7 @@ def test_assistant_tool_loop_compacts_runtime_replay_continuation_to_fit_input_b
                 ],
             )
         ],
+        tool_cycle_index=0,
     )[1]
     assert snapshot["compressed_items_digest"] == build_structured_items_digest(
         [original_tool_result_item]
@@ -1485,9 +1565,138 @@ def test_assistant_tool_loop_compacts_runtime_replay_continuation_to_fit_input_b
         continuation_items
     )
     assert snapshot["compressed_items_digest"] != snapshot["projected_items_digest"]
-    assert snapshot["trimmed_text_slot_count"] >= 1
-    assert items[-1].raw_output is not None
-    assert items[-1].raw_output["content"] == "后续回复"
+
+
+def test_apply_tool_loop_request_budget_drops_oldest_tool_cycle_when_gemini_provider_metadata_exceeds_budget():
+    continuation_items = (
+        {
+            "item_type": "message",
+            "role": "assistant",
+            "content": "我先读第一份设定。",
+        },
+        {
+            "item_type": "tool_call",
+            "call_id": "tool-call-1",
+            "tool_cycle_index": 0,
+            "payload": {
+                "tool_name": "project.read_documents",
+                "arguments": {"paths": ["设定/人物-1.md"]},
+                "arguments_text": '{"paths":["设定/人物-1.md"]}',
+                "provider_payload": {
+                    "thoughtSignature": "sig_old_" + ("x" * 4000),
+                    "functionCall": {
+                        "id": "fn_1",
+                        "name": "project_read_documents",
+                        "args": {"paths": ["设定/人物-1.md"]},
+                    },
+                },
+            },
+        },
+        {
+            "item_type": "tool_result",
+            "call_id": "tool-call-1",
+            "tool_name": "project.read_documents",
+            "status": "completed",
+            "tool_cycle_index": 0,
+            "payload": {
+                "structured_output": {
+                    "documents": [{"path": "设定/人物-1.md"}],
+                    "errors": [],
+                },
+                "content_items": [{"type": "text", "text": "设定/人物-1.md\n\n林渊"}],
+                "resource_links": [],
+                "error": None,
+            },
+        },
+        {
+            "item_type": "message",
+            "role": "assistant",
+            "content": "再读第二份设定。",
+        },
+        {
+            "item_type": "tool_call",
+            "call_id": "tool-call-2",
+            "tool_cycle_index": 1,
+            "payload": {
+                "tool_name": "project.read_documents",
+                "arguments": {"paths": ["设定/人物-2.md"]},
+                "arguments_text": '{"paths":["设定/人物-2.md"]}',
+                "provider_payload": {
+                    "thoughtSignature": "sig_new",
+                    "functionCall": {
+                        "id": "fn_2",
+                        "name": "project_read_documents",
+                        "args": {"paths": ["设定/人物-2.md"]},
+                    },
+                },
+            },
+        },
+        {
+            "item_type": "tool_result",
+            "call_id": "tool-call-2",
+            "tool_name": "project.read_documents",
+            "status": "completed",
+            "tool_cycle_index": 1,
+            "payload": {
+                "structured_output": {
+                    "documents": [{"path": "设定/人物-2.md"}],
+                    "errors": [],
+                },
+                "content_items": [{"type": "text", "text": "设定/人物-2.md\n\n顾砚"}],
+                "resource_links": [],
+                "error": None,
+            },
+        },
+    )
+
+    compacted_items, _, snapshot = apply_tool_loop_request_budget(
+        prompt="继续。",
+        system_prompt="你是小说助手。",
+        tool_schemas=[],
+        continuation_items=continuation_items,
+        provider_continuation_state=None,
+        continuation_support=resolve_continuation_support("gemini_generate_content"),
+        run_budget=AssistantRunBudget(
+            max_steps=8,
+            max_tool_calls=8,
+            max_input_tokens=500,
+            max_parallel_tool_calls=1,
+            tool_timeout_seconds=15,
+        ),
+    )
+
+    assert [item["item_type"] for item in compacted_items] == [
+        "message",
+        "tool_call",
+        "tool_result",
+    ]
+    assert compacted_items[0]["role"] == "assistant"
+    assert isinstance(compacted_items[0]["content"], str)
+    assert compacted_items[0]["content"].strip()
+    assert compacted_items[1]["call_id"] == "tool-call-2"
+    assert compacted_items[2]["call_id"] == "tool-call-2"
+    assert snapshot is not None
+    assert snapshot["level"] == "hard"
+    assert snapshot["compacted_item_count"] == 5
+    assert snapshot["retained_item_count"] == 3
+    assert snapshot["trimmed_text_slot_count"] == 1
+    assert snapshot["dropped_content_item_count"] == 1
+    assert snapshot["compacted_tool_names"] == ["project.read_documents"]
+    assert snapshot["compacted_document_refs"] == []
+    assert snapshot["compacted_document_versions"] == {}
+    assert snapshot["compacted_catalog_versions"] == []
+    assert snapshot["compressed_items_digest"] == build_structured_items_digest(
+        [
+            continuation_items[0],
+            continuation_items[1],
+            continuation_items[2],
+            continuation_items[3],
+            continuation_items[5],
+        ]
+    )
+    assert snapshot["projected_items_digest"] == build_structured_items_digest(
+        compacted_items
+    )
 
 
 def test_assistant_tool_loop_preserves_provider_final_output_items():

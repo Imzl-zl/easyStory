@@ -71,14 +71,7 @@ def _build_tool_cycle_output_items(
                 "item_id": f"{turn_context.run_id}:tool_result:{current_index}",
                 "status": tool_result.status,
                 "call_id": tool_result.tool_call_id,
-                "payload": {
-                    "tool_name": tool_call["tool_name"],
-                    "structured_output": tool_result.structured_output,
-                    "content_items": tool_result.content_items,
-                    "resource_links": tool_result.resource_links,
-                    "error": tool_result.error,
-                    "audit": tool_result.audit,
-                },
+                "payload": _build_output_tool_result_payload(tool_call, tool_result),
             }
         )
         current_index += 1
@@ -90,6 +83,7 @@ def _build_tool_cycle_continuation_items(
     raw_output: dict[str, Any],
     tool_calls: list[dict[str, Any]],
     tool_results: list[AssistantToolResultEnvelope],
+    tool_cycle_index: int,
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     content = raw_output.get("content")
@@ -108,6 +102,7 @@ def _build_tool_cycle_continuation_items(
             {
                 "item_type": "tool_call",
                 "call_id": tool_call["tool_call_id"],
+                "tool_cycle_index": tool_cycle_index,
                 "payload": tool_call_payload,
             }
         )
@@ -117,13 +112,8 @@ def _build_tool_cycle_continuation_items(
                 "status": tool_result.status,
                 "call_id": tool_result.tool_call_id,
                 "tool_name": tool_call["tool_name"],
-                "payload": {
-                    "tool_name": tool_call["tool_name"],
-                    "structured_output": tool_result.structured_output,
-                    "content_items": tool_result.content_items,
-                    "resource_links": tool_result.resource_links,
-                    "error": tool_result.error,
-                },
+                "tool_cycle_index": tool_cycle_index,
+                "payload": _build_continuation_tool_result_payload(tool_result),
             }
         )
     return items
@@ -158,16 +148,7 @@ def _build_tool_cycle_normalized_input_items(
         items.append(
             AssistantNormalizedInputItemDTO(
                 item_type="tool_result",
-                payload={
-                    "tool_call_id": tool_result.tool_call_id,
-                    "tool_name": tool_call["tool_name"],
-                    "status": tool_result.status,
-                    "structured_output": tool_result.structured_output,
-                    "content_items": tool_result.content_items,
-                    "resource_links": tool_result.resource_links,
-                    "error": tool_result.error,
-                    "audit": tool_result.audit,
-                },
+                payload=_build_normalized_input_tool_result_payload(tool_call, tool_result),
             )
         )
     return [item.model_dump(mode="json", exclude_none=True) for item in items]
@@ -182,7 +163,52 @@ def _build_runtime_tool_call_payload(tool_call: dict[str, Any]) -> dict[str, Any
     arguments_error = tool_call.get("arguments_error")
     if isinstance(arguments_error, str) and arguments_error.strip():
         payload["arguments_error"] = arguments_error.strip()
+    provider_payload = tool_call.get("provider_payload")
+    if isinstance(provider_payload, dict):
+        payload["provider_payload"] = provider_payload
     return payload
+
+
+def _build_output_tool_result_payload(
+    tool_call: dict[str, Any],
+    tool_result: AssistantToolResultEnvelope,
+) -> dict[str, Any]:
+    payload = {
+        "tool_name": tool_call["tool_name"],
+        "structured_output": tool_result.structured_output,
+        "content_items": tool_result.content_items,
+        "resource_links": tool_result.resource_links,
+        "error": tool_result.error,
+        "audit": tool_result.audit,
+    }
+    return payload
+
+
+def _build_normalized_input_tool_result_payload(
+    tool_call: dict[str, Any],
+    tool_result: AssistantToolResultEnvelope,
+) -> dict[str, Any]:
+    return {
+        "tool_call_id": tool_result.tool_call_id,
+        "tool_name": tool_call["tool_name"],
+        "status": tool_result.status,
+        "structured_output": tool_result.structured_output,
+        "content_items": tool_result.content_items,
+        "resource_links": tool_result.resource_links,
+        "error": tool_result.error,
+        "audit": tool_result.audit,
+    }
+
+
+def _build_continuation_tool_result_payload(
+    tool_result: AssistantToolResultEnvelope,
+) -> dict[str, Any]:
+    return {
+        "structured_output": tool_result.structured_output,
+        "content_items": tool_result.content_items,
+        "resource_links": tool_result.resource_links,
+        "error": tool_result.error,
+    }
 
 
 def _build_final_response_normalized_input_items(

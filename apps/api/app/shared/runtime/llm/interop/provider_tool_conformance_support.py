@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from ...errors import ConfigurationError
 from .gemini_probe_support import apply_gemini_probe_thinking_config
+from .tool_call_codec import build_tool_call_payload
 from ..llm_protocol import (
     LLMConnection,
     LLMFunctionToolDefinition,
@@ -320,12 +321,14 @@ def _build_tool_probe_continuation_items(
         {
             "item_type": "tool_call",
             "call_id": tool_call.tool_call_id,
-            "payload": {
-                "tool_name": tool_call.tool_name,
-                "arguments": dict(tool_call.arguments),
-                "arguments_text": tool_call.arguments_text,
-                "tool_call_id": tool_call.tool_call_id,
-            },
+            "payload": build_tool_call_payload(
+                tool_name=tool_call.tool_name,
+                arguments=dict(tool_call.arguments),
+                arguments_text=tool_call.arguments_text,
+                tool_call_id=tool_call.tool_call_id,
+                arguments_error=tool_call.arguments_error,
+                provider_payload=tool_call.provider_payload,
+            ),
         }
     )
     structured_output = {
@@ -386,6 +389,8 @@ def _serialize_tool_call(tool_call: NormalizedLLMToolCall) -> dict[str, Any]:
     payload = dict(tool_call.__dict__)
     if payload.get("arguments_error") is None:
         payload.pop("arguments_error", None)
+    if payload.get("provider_payload") is None:
+        payload.pop("provider_payload", None)
     return payload
 
 
