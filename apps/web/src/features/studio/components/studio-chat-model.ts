@@ -12,6 +12,12 @@ import {
 import { getErrorMessage } from "@/lib/api/client";
 import { listProjectDocumentCatalog } from "@/lib/api/projects";
 import type { AssistantActiveBufferState, ProjectDocumentCatalogEntry } from "@/lib/api/types";
+import {
+  normalizeAssistantReasoningDraft,
+  resolveAssistantReasoningModelName,
+  resolveAssistantReasoningControl,
+} from "@/features/shared/assistant/assistant-reasoning-support";
+import { buildIncubatorReasoningDraftFields } from "@/features/lobby/components/incubator-chat-support";
 
 import {
   buildStudioAttachmentOnlyMessage,
@@ -164,8 +170,101 @@ export function useStudioChatModel({
   }, [credentialModel.credentialOptions, state]);
 
   const handleModelNameChange = useCallback((value: string) => {
-    state.setSettings((current) => ({ ...current, modelName: value }));
-  }, [state]);
+    state.setSettings((current) => {
+      const normalized = normalizeAssistantReasoningDraft(
+        buildIncubatorReasoningDraftFields(current),
+        resolveAssistantReasoningControl({
+          apiDialect: credentialModel.selectedCredential?.apiDialect ?? null,
+          modelName: resolveAssistantReasoningModelName(
+            value,
+            credentialModel.selectedCredential?.defaultModel ?? null,
+          ),
+        }),
+      );
+      return {
+        ...current,
+        modelName: value,
+        reasoningEffort: normalized.reasoningEffort,
+        thinkingBudget: normalized.thinkingBudget,
+        thinkingLevel: normalized.thinkingLevel,
+      };
+    });
+  }, [credentialModel.selectedCredential?.apiDialect, credentialModel.selectedCredential?.defaultModel, state]);
+
+  const handleReasoningEffortChange = useCallback((value: string) => {
+    state.setSettings((current) => {
+      const normalized = normalizeAssistantReasoningDraft(
+        {
+          reasoningEffort: value,
+          thinkingBudget: current.thinkingBudget,
+          thinkingLevel: current.thinkingLevel,
+        },
+        resolveAssistantReasoningControl({
+          apiDialect: credentialModel.selectedCredential?.apiDialect ?? null,
+          modelName: resolveAssistantReasoningModelName(
+            current.modelName,
+            credentialModel.selectedCredential?.defaultModel ?? null,
+          ),
+        }),
+      );
+      return {
+        ...current,
+        reasoningEffort: normalized.reasoningEffort,
+        thinkingBudget: normalized.thinkingBudget,
+        thinkingLevel: normalized.thinkingLevel,
+      };
+    });
+  }, [credentialModel.selectedCredential?.apiDialect, credentialModel.selectedCredential?.defaultModel, state]);
+
+  const handleThinkingLevelChange = useCallback((value: string) => {
+    state.setSettings((current) => {
+      const normalized = normalizeAssistantReasoningDraft(
+        {
+          reasoningEffort: current.reasoningEffort,
+          thinkingBudget: current.thinkingBudget,
+          thinkingLevel: value,
+        },
+        resolveAssistantReasoningControl({
+          apiDialect: credentialModel.selectedCredential?.apiDialect ?? null,
+          modelName: resolveAssistantReasoningModelName(
+            current.modelName,
+            credentialModel.selectedCredential?.defaultModel ?? null,
+          ),
+        }),
+      );
+      return {
+        ...current,
+        reasoningEffort: normalized.reasoningEffort,
+        thinkingBudget: normalized.thinkingBudget,
+        thinkingLevel: normalized.thinkingLevel,
+      };
+    });
+  }, [credentialModel.selectedCredential?.apiDialect, credentialModel.selectedCredential?.defaultModel, state]);
+
+  const handleThinkingBudgetChange = useCallback((value: string) => {
+    state.setSettings((current) => {
+      const normalized = normalizeAssistantReasoningDraft(
+        {
+          reasoningEffort: current.reasoningEffort,
+          thinkingBudget: value,
+          thinkingLevel: current.thinkingLevel,
+        },
+        resolveAssistantReasoningControl({
+          apiDialect: credentialModel.selectedCredential?.apiDialect ?? null,
+          modelName: resolveAssistantReasoningModelName(
+            current.modelName,
+            credentialModel.selectedCredential?.defaultModel ?? null,
+          ),
+        }),
+      );
+      return {
+        ...current,
+        reasoningEffort: normalized.reasoningEffort,
+        thinkingBudget: normalized.thinkingBudget,
+        thinkingLevel: normalized.thinkingLevel,
+      };
+    });
+  }, [credentialModel.selectedCredential?.apiDialect, credentialModel.selectedCredential?.defaultModel, state]);
 
   const handleStreamOutputChange = useCallback((value: boolean) => {
     state.setSettings((current) => ({ ...current, streamOutput: value }));
@@ -240,8 +339,10 @@ export function useStudioChatModel({
       const activeSkillId = consumedNextTurnSkillId ?? activeSkillSelection.conversationSkillId;
       const payloadResult = resolveStudioPreparedAssistantTurnPayload({
         activeBufferState,
+        apiDialect: credentialModel.selectedCredential?.apiDialect ?? null,
         conversationId,
         currentDocumentPath,
+        defaultModelName: credentialModel.selectedCredential?.defaultModel ?? null,
         documentCatalogEntries: documentCatalogQuery.data ?? null,
         latestCompletedRunId: state.latestCompletedRunId,
         messages: nextMessages,
@@ -307,6 +408,9 @@ export function useStudioChatModel({
     isResponding,
     needsDocumentCatalog,
     projectId,
+    credentialModel.selectedCredential?.apiDialect,
+    credentialModel.selectedCredential?.defaultModel,
+    credentialModel.toolCapabilityNotice,
     skillSendBlockReason,
     state,
     attachments,
@@ -326,9 +430,12 @@ export function useStudioChatModel({
     handleAttachFiles,
     handleModelNameChange,
     handleProviderChange,
+    handleReasoningEffortChange,
     handleRemoveAttachment,
     handleSendMessage,
     handleStreamOutputChange,
+    handleThinkingBudgetChange,
+    handleThinkingLevelChange,
     handleToggleContext,
     handleToggleWriteToCurrentDocument,
     isResponding,

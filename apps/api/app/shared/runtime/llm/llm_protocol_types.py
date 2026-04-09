@@ -17,6 +17,8 @@ LlmApiDialect = Literal[
 LlmAuthStrategy = Literal["bearer", "x_api_key", "x_goog_api_key", "custom_header"]
 LlmRuntimeKind = Literal["server-python", "server-node", "browser"]
 LlmContinuationMode = Literal["provider_continuation", "runtime_replay", "hybrid"]
+OpenAIReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
+GeminiThinkingLevel = Literal["minimal", "low", "medium", "high"]
 
 DEFAULT_API_DIALECT: LlmApiDialect = "openai_chat_completions"
 DEFAULT_AUTH_STRATEGY_BY_DIALECT: dict[LlmApiDialect, LlmAuthStrategy] = {
@@ -55,7 +57,10 @@ VERIFY_USER_PROMPT = (
 VERIFY_SYSTEM_PROMPT = (
     "请像日常聊天一样，用一句简短中文直接回答用户问题，不要使用 Markdown。"
 )
-VERIFY_MAX_TOKENS = 32
+# Verification requests should not use tiny output budgets. Reasoning-capable
+# models may spend part of the allowance before producing visible output, which
+# turns credential checks into false negatives.
+VERIFY_MAX_TOKENS = 256
 JSON_OBJECT_RESPONSE_FORMAT = "json_object"
 HTTP_HEADER_TOKEN_PATTERN = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
 
@@ -81,6 +86,7 @@ class LLMConnection:
     client_version: str | None = None
     runtime_kind: LlmRuntimeKind | None = None
     interop_profile: str | None = None
+    provider: str | None = None
 
 
 @dataclass(frozen=True)
@@ -93,6 +99,9 @@ class LLMGenerateRequest:
     temperature: float | None
     max_tokens: int | None
     top_p: float | None
+    reasoning_effort: OpenAIReasoningEffort | None = None
+    thinking_level: GeminiThinkingLevel | None = None
+    thinking_budget: int | None = None
     stop: list[str] | None = None
     tools: list["LLMFunctionToolDefinition"] = field(default_factory=list)
     continuation_items: list[dict[str, Any]] = field(default_factory=list)

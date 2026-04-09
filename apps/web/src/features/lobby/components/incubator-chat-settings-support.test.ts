@@ -15,9 +15,9 @@ test("incubator chat settings support keeps summary compact when using connectio
   const items = buildChatSettingsSummaryItems({
     credentialOptions: [{
       apiDialect: "openai_responses",
-      defaultModel: "gpt-4.1",
+      defaultModel: "gpt-5.4",
       defaultMaxOutputTokens: 8192,
-      displayLabel: "OpenAI 主账号 · gpt-4.1",
+      displayLabel: "OpenAI 主账号 · gpt-5.4",
       provider: "openai",
     }],
     credentialState: "ready",
@@ -28,8 +28,11 @@ test("incubator chat settings support keeps summary compact when using connectio
       maxOutputTokens: "8192",
       modelName: "",
       provider: "openai",
+      reasoningEffort: "",
       skillId: "",
       streamOutput: true,
+      thinkingBudget: "",
+      thinkingLevel: "",
     },
   } as never);
 
@@ -40,9 +43,9 @@ test("incubator chat settings support shows only changed summary items", () => {
   const items = buildChatSettingsSummaryItems({
     credentialOptions: [{
       apiDialect: "openai_responses",
-      defaultModel: "gpt-4.1",
+      defaultModel: "gpt-5.4",
       defaultMaxOutputTokens: 8192,
-      displayLabel: "OpenAI 主账号 · gpt-4.1",
+      displayLabel: "OpenAI 主账号 · gpt-5.4",
       provider: "openai",
     }],
     credentialState: "ready",
@@ -51,16 +54,19 @@ test("incubator chat settings support shows only changed summary items", () => {
       allowSystemCredentialPool: false,
       hookIds: [],
       maxOutputTokens: "12000",
-      modelName: "gpt-4.1-mini",
+      modelName: "gpt-5.4",
       provider: "openai",
+      reasoningEffort: "high",
       skillId: "",
       streamOutput: false,
+      thinkingBudget: "",
+      thinkingLevel: "",
     },
   } as never);
 
   assert.deepEqual(items, [
     "OpenAI 主账号",
-    "gpt-4.1-mini",
+    "思考 高",
     "上限 12000",
     "生成后整体显示",
   ]);
@@ -72,19 +78,22 @@ test("incubator chat settings support syncs token limit when switching to a new 
     allowSystemCredentialPool: false,
     hookIds: [],
     maxOutputTokens: "4096",
-    modelName: "gpt-4.1",
+    modelName: "gpt-5.4",
     provider: "openai",
+    reasoningEffort: "high",
     skillId: "",
     streamOutput: true,
+    thinkingBudget: "",
+    thinkingLevel: "",
   };
   let nextSettings: typeof initialSettings | null = null;
   const model = {
     credentialOptions: [
       {
         apiDialect: "openai_responses",
-        defaultModel: "gpt-4.1",
+        defaultModel: "gpt-5.4",
         defaultMaxOutputTokens: 4096,
-        displayLabel: "OpenAI 主账号 · gpt-4.1",
+        displayLabel: "OpenAI 主账号 · gpt-5.4",
         provider: "openai",
       },
       {
@@ -110,7 +119,10 @@ test("incubator chat settings support syncs token limit when switching to a new 
     maxOutputTokens: "12288",
     modelName: "claude-sonnet-4",
     provider: "anthropic",
+    reasoningEffort: "",
     skillId: "",
     streamOutput: true,
+    thinkingBudget: "",
+    thinkingLevel: "",
   });
 });

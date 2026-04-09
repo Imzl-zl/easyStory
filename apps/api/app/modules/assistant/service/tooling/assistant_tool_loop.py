@@ -635,12 +635,12 @@ class AssistantToolLoop:
         self.step_store.append_step(record)
 
 
-def _serialize_tool_schema(descriptor: Any) -> dict[str, Any]:
+def _serialize_tool_schema(descriptor: AssistantToolDescriptor) -> dict[str, Any]:
     return {
         "name": descriptor.name,
         "description": descriptor.description,
         "parameters": descriptor.input_schema,
-        "strict": True,
+        "strict": descriptor.strict,
     }
 
 

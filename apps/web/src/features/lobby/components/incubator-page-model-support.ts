@@ -142,11 +142,15 @@ export function useIncubatorAssistantMutation(
   settings: IncubatorChatSettings,
   latestCompletedRunId: string | null,
   patchConversationSession: SubmitPromptParams["patchConversationSession"],
+  selectedCredentialApiDialect: string | null,
+  selectedCredentialDefaultModel: string | null,
 ) {
   return useMutation({
     mutationFn: async (submission: PromptSubmission) => {
       const payload = buildIncubatorAssistantTurnPayload({
+        apiDialect: selectedCredentialApiDialect,
         conversationId: submission.conversationId,
+        defaultModelName: selectedCredentialDefaultModel,
         latestCompletedRunId,
         messages: submission.submittedMessages,
         settings,

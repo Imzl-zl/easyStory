@@ -47,6 +47,10 @@ type StudioSavedDocument = StudioLoadedDocument & {
   impact?: ChapterImpactSummary | StoryAssetImpactSummary;
 };
 
+type StudioFileSavedDocument = StudioSavedDocument & {
+  target: { kind: "file"; path: string };
+};
+
 export function resolveStudioDocumentTarget(documentPath: string | null): StudioDocumentTarget | null {
   if (!documentPath) {
     return null;
@@ -208,7 +212,7 @@ export async function syncStudioDocumentQueries(
     buildStudioDocumentQueryKey(projectId, document.path),
     document,
   );
-  if (document.target.kind === "file") {
+  if (isStudioFileSavedDocument(document)) {
     await syncStudioDocumentCatalogEntry(queryClient, projectId, document);
     return;
   }
@@ -228,7 +232,7 @@ export async function syncStudioDocumentQueries(
 async function syncStudioDocumentCatalogEntry(
   queryClient: QueryClient,
   projectId: string,
-  document: StudioSavedDocument & { target: { kind: "file"; path: string } },
+  document: StudioFileSavedDocument,
 ) {
   const queryKey = buildStudioDocumentCatalogQueryKey(projectId);
   const currentEntries = queryClient.getQueryData<ProjectDocumentCatalogEntry[] | undefined>(queryKey);
@@ -258,6 +262,10 @@ async function syncStudioDocumentCatalogEntry(
     })),
   );
   void queryClient.invalidateQueries({ queryKey });
+}
+
+function isStudioFileSavedDocument(document: StudioSavedDocument): document is StudioFileSavedDocument {
+  return document.target.kind === "file";
 }
 
 function resolveDocumentTitle(documentPath: string) {

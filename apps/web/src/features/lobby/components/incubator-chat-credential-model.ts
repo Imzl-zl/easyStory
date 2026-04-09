@@ -77,5 +77,6 @@ export function useIncubatorChatCredentialModel(
     credentialSettingsHref: INCUBATOR_CREDENTIAL_SETTINGS_HREF,
     credentialState,
     isCredentialLoading: credentialQuery.isLoading || preferencesQuery.isLoading,
+    selectedCredential,
   };
 }

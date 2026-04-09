@@ -23,6 +23,9 @@ const EMPTY_PREFERENCES: AssistantPreferences = {
   default_max_output_tokens: null,
   default_model_name: null,
   default_provider: null,
+  default_reasoning_effort: null,
+  default_thinking_level: null,
+  default_thinking_budget: null,
 };
 
 export function buildProjectSettingSummarySaveFeedback(impact: ProjectSettingImpactSummary) {

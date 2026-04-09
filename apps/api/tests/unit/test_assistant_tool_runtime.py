@@ -347,6 +347,34 @@ def test_assistant_tool_loop_resolves_minimal_run_budget_from_existing_boundarie
     assert write_budget.tool_timeout_seconds is None
 
 
+def test_assistant_tool_loop_serializes_descriptor_strict_flag() -> None:
+    registry = AssistantToolDescriptorRegistry()
+    policy = AssistantToolExposurePolicy(registry=registry)
+    read_descriptor = registry.get_descriptor("project.read_documents")
+    assert read_descriptor is not None
+    loop = AssistantToolLoop(
+        exposure_policy=policy,
+        executor=AssistantToolExecutor(project_document_capability_service=object()),
+    )
+
+    tool_schemas = loop.resolve_tool_schemas(
+        turn_context=None,
+        project_id=uuid.uuid4(),
+        visible_descriptors=(
+            dataclasses.replace(read_descriptor, strict=False),
+        ),
+    )
+
+    assert tool_schemas == [
+        {
+            "name": "project.read_documents",
+            "description": "读取当前项目目录中的一批文稿。",
+            "parameters": read_descriptor.input_schema,
+            "strict": False,
+        }
+    ]
+
+
 def test_assistant_tool_loop_resolves_policy_bundle_with_budget_snapshot():
     class _RecordingResolver(AssistantToolPolicyResolver):
         def __init__(self) -> None:

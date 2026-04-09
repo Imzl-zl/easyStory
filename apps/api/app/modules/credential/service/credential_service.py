@@ -80,7 +80,10 @@ class CredentialService:
             project_id=project_id,
             project_service=self.project_service,
         )
-        statement = scope_statement(scope).order_by(ModelCredential.created_at.desc())
+        statement = scope_statement(scope).order_by(
+            ModelCredential.updated_at.desc(),
+            ModelCredential.created_at.desc(),
+        )
         credentials = (await db.scalars(statement)).all()
         return [to_view(item, decrypt_api_key=self.crypto.decrypt) for item in credentials]
 

@@ -13,7 +13,9 @@ import {
 } from "./incubator-chat-support";
 
 export function buildIncubatorAssistantTurnPayload(options: {
+  apiDialect?: string | null;
   conversationId: string;
+  defaultModelName?: string | null;
   latestCompletedRunId: string | null;
   settings: IncubatorChatSettings;
   messages: IncubatorChatMessage[];
@@ -29,7 +31,10 @@ export function buildIncubatorAssistantTurnPayload(options: {
     client_turn_id: currentUserMessage.id,
     hook_ids: resolveIncubatorHookIds(options.settings.hookIds),
     messages: buildAssistantTurnMessages(options.messages),
-    model: buildAssistantModelOverride(options.settings),
+    model: buildAssistantModelOverride(options.settings, {
+      apiDialect: options.apiDialect,
+      defaultModelName: options.defaultModelName,
+    }),
     ...(options.latestCompletedRunId
       ? {
         continuation_anchor: {

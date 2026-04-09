@@ -205,7 +205,33 @@ def test_execute_falls_back_to_credential_default_max_output_tokens() -> None:
         )
     )
 
-    assert captured["request"].json_body["max_tokens"] == 2048
+    assert captured["request"].json_body["max_completion_tokens"] == 2048
+
+
+def test_execute_rejects_invalid_provider_native_reasoning_for_runtime_request() -> None:
+    provider = LLMToolProvider()
+
+    with pytest.raises(
+        ConfigurationError,
+        match="thinking_level and thinking_budget are only valid for Gemini native requests",
+    ):
+        asyncio.run(
+            provider.execute(
+                "llm.generate",
+                {
+                    "prompt": "测试提示词",
+                    "model": {
+                        "provider": "openai",
+                        "name": "gpt-5.4",
+                        "thinking_budget": 0,
+                    },
+                    "credential": {
+                        "api_key": "test-key",
+                        "api_dialect": "openai_chat_completions",
+                    },
+                },
+            )
+        )
 
 
 def test_execute_builds_openai_responses_request() -> None:

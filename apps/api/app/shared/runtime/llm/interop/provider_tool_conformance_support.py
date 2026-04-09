@@ -5,7 +5,6 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from ...errors import ConfigurationError
-from .gemini_probe_support import apply_gemini_probe_thinking_config
 from .tool_call_codec import build_tool_call_payload
 from ..llm_protocol import (
     LLMConnection,
@@ -42,7 +41,9 @@ CONFORMANCE_PROBE_KIND_RANKS: dict[ConformanceProbeKind, int] = {
     "tool_continuation_probe": 3,
 }
 
-PROBE_MAX_TOKENS = 128
+# Tool conformance probes must leave enough output budget for reasoning-capable
+# models to emit the tool call or final answer without tripping a false failure.
+PROBE_MAX_TOKENS = 256
 PROBE_TOOL_NAME = "probe.echo_payload"
 PROBE_ECHO_ARGUMENT = "ping"
 TOOL_DEFINITION_PROBE_SUCCESS_TEXT = "工具定义探测成功。"
@@ -130,26 +131,18 @@ def build_conformance_probe_request(
     if probe_kind == "text_probe":
         return build_verification_request(connection)
     if probe_kind == "tool_definition_probe":
-        return _apply_probe_request_adjustments(
+        return _build_generate_request(
             connection,
-            _build_generate_request(
-                connection,
-                model_name=model_name,
-                prompt=TOOL_DEFINITION_PROBE_PROMPT,
-                system_prompt=TOOL_DEFINITION_PROBE_SYSTEM_PROMPT,
-            ),
             model_name=model_name,
+            prompt=TOOL_DEFINITION_PROBE_PROMPT,
+            system_prompt=TOOL_DEFINITION_PROBE_SYSTEM_PROMPT,
         )
     if probe_kind in {"tool_call_probe", "tool_continuation_probe"}:
-        return _apply_probe_request_adjustments(
+        return _build_generate_request(
             connection,
-            _build_generate_request(
-                connection,
-                model_name=model_name,
-                prompt=TOOL_CALL_PROBE_PROMPT,
-                system_prompt=TOOL_CALL_PROBE_SYSTEM_PROMPT,
-            ),
             model_name=model_name,
+            prompt=TOOL_CALL_PROBE_PROMPT,
+            system_prompt=TOOL_CALL_PROBE_SYSTEM_PROMPT,
         )
     raise ConfigurationError(f"Unsupported conformance probe kind: {probe_kind}")
 
@@ -194,11 +187,7 @@ def build_tool_continuation_probe_followup_request(
             force_tool_call=False,
         )
     )
-    return _apply_probe_request_adjustments(
-        connection,
-        request,
-        model_name=model_name,
-    )
+    return request
 
 
 def validate_tool_definition_probe_response(response: NormalizedLLMResponse) -> None:
@@ -289,16 +278,6 @@ def _build_generate_request(
         )
     )
 
-
-def _apply_probe_request_adjustments(
-    connection: LLMConnection,
-    request: PreparedLLMHttpRequest,
-    *,
-    model_name: str,
-) -> PreparedLLMHttpRequest:
-    if connection.api_dialect == "gemini_generate_content":
-        return apply_gemini_probe_thinking_config(request, model_name)
-    return request
 
 
 def _build_tool_probe_continuation_items(

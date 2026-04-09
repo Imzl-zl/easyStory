@@ -97,6 +97,8 @@
 兼容层接入时必须额外注意：
 
 - Gemini 虽兼容 OpenAI SDK，但 `reasoning_effort` 与 Gemini 原生 `thinkingLevel/thinkingBudget` 不是一一等价透传。
+- OpenAI 官方 `chat/completions` 现在优先使用 `max_completion_tokens`；很多第三方兼容网关仍只接受 `max_tokens`，实现时要区分“官方 OpenAI 标准”和“兼容网关互通”。
+- 如果产品层为了兼容性向用户暴露更宽的 reasoning/thinking 选项集合，文案必须明确这是“协议族级兼容集合”，不能冒充官方逐模型支持表。
 - DeepSeek 看起来最像 OpenAI Chat Completions，但 thinking 模式下很多 OpenAI 采样参数会失效或报错。
 - Kimi K2.5 虽然走 Chat Completions 外壳，但多个采样参数是固定值，不是任意可配。
 - MiniMax OpenAI 兼容层会忽略部分 OpenAI 参数，不能假设“传了就生效”。
@@ -166,6 +168,7 @@
 注意事项：
 
 - OpenAI 官方当前明确推荐新项目优先使用 Responses API，但 Chat Completions 仍受支持，并且可以渐进迁移。
+- 若仍使用官方 `chat/completions`，最大输出字段应优先使用 `max_completion_tokens`；仅在第三方 OpenAI-compatible 网关兼容场景下，才保留 `max_tokens` 这类兼容写法。
 - 如果要做 reasoning / agentic / Codex-like runtime，优先实现 `openai_responses` 方言，不要只做 `chat/completions`。
 - `gpt-5.4` 官方模型页给出的上下文窗口是 `1,050,000`；其中超过 `272K` 输入 token 的会话会有额外定价规则，不要把它写成“只有特定配置才支持 1M”。
 - `max_output_tokens` 太小会直接把预算耗在 reasoning 上，最后返回 `status=incomplete`。
@@ -262,6 +265,7 @@
 注意事项：
 
 - Gemini 3 推荐 `thinkingLevel`，Gemini 2.5 推荐 `thinkingBudget`；两套参数不要混用。
+- easyStory 本地只做“字段互斥 + 协议族边界”校验，不按具体 Gemini / GPT 子型号做保存阶段硬拦；具体模型是否支持，以上游显式报错为准。
 - 官方当前 thinking 文档里，`Gemini 3 Pro` 已列出 `low/medium/high`；但部分旧 preview 代理或 OpenAI 兼容层对 Pro 的 `medium` 仍可能不稳定，工程上应把“官方 REST 能力”和“代理兼容性”分开记录。
 - `gemini-3-pro-preview` 不能关闭 thinking；不指定时会使用默认动态高思考。
 - `gemini-3-flash-preview` 的 `minimal` 不等于绝对关闭 thinking。

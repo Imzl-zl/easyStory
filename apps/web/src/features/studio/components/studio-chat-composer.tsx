@@ -5,8 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { Button, Input, Message, Radio } from "@arco-design/web-react";
 
+import { AppSelect } from "@/components/ui/app-select";
 import type { DocumentTreeNode } from "@/features/studio/components/studio-page-support";
 import { getErrorMessage } from "@/lib/api/client";
+import {
+  normalizeAssistantThinkingBudgetInput,
+  resolveAssistantReasoningControl,
+} from "@/features/shared/assistant/assistant-reasoning-support";
 
 import { STUDIO_ATTACHMENT_ACCEPT, type StudioChatAttachmentMeta } from "./studio-chat-attachment-support";
 import { submitStudioComposerMessage } from "./studio-chat-composer-support";
@@ -29,15 +34,22 @@ type StudioChatComposerProps = {
   onComposerTextChange: (value: string) => void;
   onModelNameChange: (value: string) => void;
   onProviderChange: (provider: string) => void;
+  onReasoningEffortChange: (value: string) => void;
   onRemoveAttachment: (attachmentId: string) => void;
   onSendMessage: (message: string) => boolean | Promise<boolean>;
   onStreamOutputChange: (value: boolean) => void;
+  onThinkingBudgetChange: (value: string) => void;
+  onThinkingLevelChange: (value: string) => void;
   onToggleContext: (path: string) => void;
   onToggleWriteToCurrentDocument: () => void;
   providerOptions: StudioProviderOption[];
   selectedContextPaths: string[];
+  selectedCredentialApiDialect: string | null;
   selectedCredentialLabel: string | null;
-  settings: Pick<StudioChatSettings, "modelName" | "provider" | "streamOutput">;
+  settings: Pick<
+    StudioChatSettings,
+    "modelName" | "provider" | "reasoningEffort" | "streamOutput" | "thinkingBudget" | "thinkingLevel"
+  >;
   showWriteToCurrentDocument: boolean;
   writeIntentNotice: string | null;
   writeTargetDisabledReason: string | null;
@@ -63,13 +75,17 @@ export function StudioChatComposer({
   onComposerTextChange,
   onModelNameChange,
   onProviderChange,
+  onReasoningEffortChange,
   onRemoveAttachment,
   onSendMessage,
   onStreamOutputChange,
+  onThinkingBudgetChange,
+  onThinkingLevelChange,
   onToggleContext,
   onToggleWriteToCurrentDocument,
   providerOptions,
   selectedContextPaths,
+  selectedCredentialApiDialect,
   selectedCredentialLabel,
   settings,
   showWriteToCurrentDocument,
@@ -102,6 +118,14 @@ export function StudioChatComposer({
       ?? providerOptions[0]
       ?? null,
     [providerOptions, settings.provider],
+  );
+  const reasoningControl = useMemo(
+    () =>
+      resolveAssistantReasoningControl({
+        apiDialect: selectedCredentialApiDialect,
+        modelName: settings.modelName || currentProviderOption?.defaultModel,
+      }),
+    [currentProviderOption?.defaultModel, selectedCredentialApiDialect, settings.modelName],
   );
 
   useEffect(() => {
@@ -321,6 +345,57 @@ export function StudioChatComposer({
                     />
                   </label>
                   <div className="mt-3 rounded-[14px] border border-[rgba(44,36,22,0.08)] bg-[rgba(249,247,243,0.92)] px-3 py-2.5">
+                    <p className="m-0 text-[12px] font-medium text-[var(--text-primary)]">{reasoningControl.title}</p>
+                    <p className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">{reasoningControl.description}</p>
+                    {reasoningControl.kind === "gemini_budget" ? (
+                      <div className="mt-2.5 space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          <ReasoningChipButton
+                            active={settings.thinkingBudget === ""}
+                            label="跟随默认"
+                            onClick={() => onThinkingBudgetChange("")}
+                          />
+                          {reasoningControl.allowDisable ? (
+                            <ReasoningChipButton
+                              active={settings.thinkingBudget === "0"}
+                              label="关闭思考"
+                              onClick={() => onThinkingBudgetChange("0")}
+                            />
+                          ) : null}
+                          {reasoningControl.allowDynamic ? (
+                            <ReasoningChipButton
+                              active={settings.thinkingBudget === "-1"}
+                              label="动态思考"
+                              onClick={() => onThinkingBudgetChange("-1")}
+                            />
+                          ) : null}
+                        </div>
+                        <Input
+                          allowClear
+                          autoComplete="off"
+                          inputMode="numeric"
+                          placeholder={reasoningControl.placeholder}
+                          spellCheck={false}
+                          value={settings.thinkingBudget}
+                          onChange={(value) => onThinkingBudgetChange(normalizeAssistantThinkingBudgetInput(value))}
+                        />
+                      </div>
+                    ) : reasoningControl.kind === "none" ? null : (
+                      <div className="mt-2.5">
+                        <AppSelect
+                          ariaLabel={reasoningControl.title}
+                          className="min-w-0"
+                          options={reasoningControl.options}
+                          value={reasoningControl.kind === "openai" ? settings.reasoningEffort : settings.thinkingLevel}
+                          onChange={(value) =>
+                            reasoningControl.kind === "openai"
+                              ? onReasoningEffortChange(value)
+                              : onThinkingLevelChange(value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3 rounded-[14px] border border-[rgba(44,36,22,0.08)] bg-[rgba(249,247,243,0.92)] px-3 py-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="m-0 text-[12px] font-medium text-[var(--text-primary)]">回复显示方式</p>
@@ -386,6 +461,30 @@ export function StudioChatComposer({
         />
       </div>
     </div>
+  );
+}
+
+function ReasoningChipButton({
+  active,
+  label,
+  onClick,
+}: Readonly<{
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}>) {
+  return (
+    <button
+      className={`rounded-full border px-3 py-1 text-[11px] transition ${
+        active
+          ? "border-[rgba(107,143,113,0.28)] bg-[rgba(107,143,113,0.12)] text-[var(--accent-primary)]"
+          : "border-[rgba(44,36,22,0.1)] bg-white/92 text-[var(--text-secondary)] hover:border-[rgba(107,143,113,0.24)]"
+      }`}
+      type="button"
+      onClick={onClick}
+    >
+      {label}
+    </button>
   );
 }
 

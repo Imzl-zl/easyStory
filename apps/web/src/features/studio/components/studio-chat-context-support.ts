@@ -4,7 +4,9 @@ export function countStudioContextFiles(nodes: readonly DocumentTreeNode[]): num
   return nodes.reduce((count, node) => count + countStudioContextFilesForNode(node), 0);
 }
 
-export function buildStudioContextFileCountMap(nodes: readonly DocumentTreeNode[]) {
+export function buildStudioContextFileCountMap(
+  nodes: readonly DocumentTreeNode[],
+): Map<string, number> {
   const fileCountByPath = new Map<string, number>();
   nodes.forEach((node) => {
     collectStudioContextFileCount(node, fileCountByPath);
@@ -61,7 +63,7 @@ function matchesStudioContextNode(
 function collectStudioContextFileCount(
   node: Readonly<DocumentTreeNode>,
   fileCountByPath: Map<string, number>,
-) {
+): number {
   const count = node.type === "file"
     ? 1
     : (node.children ?? []).reduce(

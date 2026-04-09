@@ -276,6 +276,44 @@ def test_resolve_credential_prefers_project_then_user_then_system(db, monkeypatc
     assert resolved.id == system_credential.id
 
 
+def test_list_credentials_prefers_latest_updated_record_order(db, monkeypatch) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier())
+    older = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(provider="openai", display_name="较早创建", api_key="sk-openai-1234"),
+            actor_user_id=user.id,
+        )
+    )
+    newer = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(provider="gemini", display_name="较晚创建", api_key="sk-gemini-1234"),
+            actor_user_id=user.id,
+        )
+    )
+    asyncio.run(
+        service.update_credential(
+            async_db(db),
+            older.id,
+            CredentialUpdateDTO(display_name="最近更新"),
+            actor_user_id=user.id,
+        )
+    )
+
+    listed = asyncio.run(
+        service.list_credentials(
+            async_db(db),
+            actor_user_id=user.id,
+            owner_type="user",
+        )
+    )
+
+    assert [item.id for item in listed] == [older.id, newer.id]
+
+
 def test_system_pool_is_blocked_when_project_disallows(db, monkeypatch) -> None:
     monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
     crypto = CredentialCrypto()

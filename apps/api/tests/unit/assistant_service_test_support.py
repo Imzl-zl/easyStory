@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 import uuid
 
@@ -13,24 +14,61 @@ class _FakeCrypto:
         return value
 
 
+@dataclass(frozen=True)
+class _ResolvedCredentialModel:
+    credential: ModelCredential
+    model_name: str
+
+
 class _FakeCredentialService:
     def __init__(self) -> None:
         self.crypto = _FakeCrypto()
 
     async def resolve_active_credential(self, db, *, provider: str, user_id, project_id=None):
         del db, user_id, project_id
+        api_dialect = "openai_responses"
+        default_model = "gpt-4o-mini"
+        interop_profile = "responses_strict"
+        if provider == "gemini":
+            api_dialect = "gemini_generate_content"
+            default_model = "gemini-2.5-flash"
+            interop_profile = None
+        elif provider == "anthropic":
+            api_dialect = "anthropic_messages"
+            default_model = "claude-sonnet-4-20250514"
+            interop_profile = None
         return ModelCredential(
             owner_type="user",
             owner_id=uuid.uuid4(),
             provider=provider,
             display_name=f"{provider}-test",
             encrypted_key=f"{provider}-key",
-            api_dialect="openai_responses",
-            default_model="gpt-4o-mini",
-            interop_profile="responses_strict",
+            api_dialect=api_dialect,
+            default_model=default_model,
+            interop_profile=interop_profile,
             stream_tool_verified_probe_kind="tool_continuation_probe",
             buffered_tool_verified_probe_kind="tool_continuation_probe",
             is_active=True,
+        )
+
+    async def resolve_active_credential_model(
+        self,
+        db,
+        *,
+        provider: str,
+        requested_model_name: str | None,
+        user_id,
+        project_id=None,
+    ):
+        credential = await self.resolve_active_credential(
+            db,
+            provider=provider,
+            user_id=user_id,
+            project_id=project_id,
+        )
+        return _ResolvedCredentialModel(
+            credential=credential,
+            model_name=requested_model_name or credential.default_model or "",
         )
 
 

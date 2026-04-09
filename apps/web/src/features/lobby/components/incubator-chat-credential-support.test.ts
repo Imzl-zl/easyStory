@@ -84,10 +84,12 @@ test("incubator chat credential support keeps only active unique providers", () 
     {
       apiDialect: "openai_responses",
       baseUrl: null,
+      bufferedToolVerifiedProbeKind: null,
       defaultModel: "gpt-4.1-mini",
       defaultMaxOutputTokens: null,
       displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
       provider: "openai",
+      streamToolVerifiedProbeKind: null,
     },
   ]);
   const selectedOption = pickIncubatorCredentialOption(options, "");
@@ -131,10 +133,12 @@ test("incubator chat credential support distinguishes loading error empty and re
     credentialOptions: [{
       apiDialect: "openai_responses",
       baseUrl: null,
+      bufferedToolVerifiedProbeKind: null,
       defaultModel: "gpt-4.1-mini",
       defaultMaxOutputTokens: null,
       displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
       provider: "openai",
+      streamToolVerifiedProbeKind: null,
     }],
     errorMessage: null,
     isLoading: false,
@@ -155,54 +159,66 @@ test("incubator chat credential support builds readable notice for query failure
 test("incubator chat credential support hydrates defaults after recovery and fixes stale provider", () => {
   assert.deepEqual(
     resolveHydratedIncubatorChatSettings(
-      { maxOutputTokens: "", modelName: "", provider: "", streamOutput: true },
+      { maxOutputTokens: "", modelName: "", provider: "", reasoningEffort: "", streamOutput: true, thinkingBudget: "", thinkingLevel: "" },
       {
         apiDialect: "openai_responses",
         baseUrl: null,
+        bufferedToolVerifiedProbeKind: null,
         defaultModel: "gpt-4.1-mini",
         defaultMaxOutputTokens: null,
         displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
         provider: "openai",
+        streamToolVerifiedProbeKind: null,
       },
     ),
     {
       maxOutputTokens: "4096",
       modelName: "gpt-4.1-mini",
       provider: "openai",
+      reasoningEffort: "",
       streamOutput: true,
+      thinkingBudget: "",
+      thinkingLevel: "",
     },
   );
 
   assert.deepEqual(
     resolveHydratedIncubatorChatSettings(
-      { maxOutputTokens: "", modelName: "old-model", provider: "legacy-provider", streamOutput: true },
+      { maxOutputTokens: "", modelName: "old-model", provider: "legacy-provider", reasoningEffort: "", streamOutput: true, thinkingBudget: "", thinkingLevel: "" },
       {
         apiDialect: "openai_responses",
         baseUrl: null,
+        bufferedToolVerifiedProbeKind: null,
         defaultModel: "gpt-4.1-mini",
         defaultMaxOutputTokens: null,
         displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
         provider: "openai",
+        streamToolVerifiedProbeKind: null,
       },
     ),
     {
       maxOutputTokens: "4096",
       modelName: "gpt-4.1-mini",
       provider: "openai",
+      reasoningEffort: "",
       streamOutput: true,
+      thinkingBudget: "",
+      thinkingLevel: "",
     },
   );
 
   assert.equal(
     resolveHydratedIncubatorChatSettings(
-      { maxOutputTokens: "4096", modelName: "gpt-4.1", provider: "openai", streamOutput: true },
+      { maxOutputTokens: "4096", modelName: "gpt-4.1", provider: "openai", reasoningEffort: "", streamOutput: true, thinkingBudget: "", thinkingLevel: "" },
       {
         apiDialect: "openai_responses",
         baseUrl: null,
+        bufferedToolVerifiedProbeKind: null,
         defaultModel: "gpt-4.1-mini",
         defaultMaxOutputTokens: null,
         displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
         provider: "openai",
+        streamToolVerifiedProbeKind: null,
       },
     ),
     null,
@@ -212,26 +228,139 @@ test("incubator chat credential support hydrates defaults after recovery and fix
 test("incubator chat credential support prefers saved assistant preference before fallback", () => {
   assert.deepEqual(
     resolveHydratedIncubatorChatSettings(
-      { maxOutputTokens: "", modelName: "", provider: "", streamOutput: true },
+      { maxOutputTokens: "", modelName: "", provider: "", reasoningEffort: "", streamOutput: true, thinkingBudget: "", thinkingLevel: "" },
       {
         apiDialect: "anthropic_messages",
         baseUrl: null,
+        bufferedToolVerifiedProbeKind: null,
         defaultModel: "claude-3-7-sonnet",
         defaultMaxOutputTokens: 12288,
         displayLabel: "Anthropic · claude-3-7-sonnet",
         provider: "anthropic",
+        streamToolVerifiedProbeKind: null,
       },
       {
         default_max_output_tokens: 8192,
         default_model_name: "claude-sonnet-4",
         default_provider: "anthropic",
+        default_reasoning_effort: null,
+        default_thinking_budget: null,
+        default_thinking_level: null,
       },
     ),
     {
       maxOutputTokens: "8192",
       modelName: "claude-sonnet-4",
       provider: "anthropic",
+      reasoningEffort: "",
       streamOutput: true,
+      thinkingBudget: "",
+      thinkingLevel: "",
+    },
+  );
+});
+
+test("incubator chat credential support applies provider-agnostic model and reasoning defaults", () => {
+  assert.deepEqual(
+    resolveHydratedIncubatorChatSettings(
+      { maxOutputTokens: "", modelName: "", provider: "", reasoningEffort: "", streamOutput: true, thinkingBudget: "", thinkingLevel: "" },
+      {
+        apiDialect: "openai_responses",
+        baseUrl: null,
+        bufferedToolVerifiedProbeKind: null,
+        defaultModel: "gpt-4.1-mini",
+        defaultMaxOutputTokens: 8192,
+        displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
+        provider: "openai",
+        streamToolVerifiedProbeKind: null,
+      },
+      {
+        default_max_output_tokens: 4096,
+        default_model_name: "gpt-5.4",
+        default_provider: null,
+        default_reasoning_effort: "high",
+        default_thinking_budget: null,
+        default_thinking_level: null,
+      },
+    ),
+    {
+      maxOutputTokens: "4096",
+      modelName: "gpt-5.4",
+      provider: "openai",
+      reasoningEffort: "high",
+      streamOutput: true,
+      thinkingBudget: "",
+      thinkingLevel: "",
+    },
+  );
+});
+
+test("incubator chat credential support does not apply provider-agnostic openai defaults onto anthropic credentials", () => {
+  assert.deepEqual(
+    resolveHydratedIncubatorChatSettings(
+      { maxOutputTokens: "", modelName: "", provider: "", reasoningEffort: "", streamOutput: true, thinkingBudget: "", thinkingLevel: "" },
+      {
+        apiDialect: "anthropic_messages",
+        baseUrl: null,
+        bufferedToolVerifiedProbeKind: null,
+        defaultModel: "claude-sonnet-4",
+        defaultMaxOutputTokens: 8192,
+        displayLabel: "Anthropic · claude-sonnet-4",
+        provider: "anthropic",
+        streamToolVerifiedProbeKind: null,
+      },
+      {
+        default_max_output_tokens: 4096,
+        default_model_name: "gpt-5.4",
+        default_provider: null,
+        default_reasoning_effort: "high",
+        default_thinking_budget: null,
+        default_thinking_level: null,
+      },
+    ),
+    {
+      maxOutputTokens: "4096",
+      modelName: "claude-sonnet-4",
+      provider: "anthropic",
+      reasoningEffort: "",
+      streamOutput: true,
+      thinkingBudget: "",
+      thinkingLevel: "",
+    },
+  );
+});
+
+test("incubator chat credential support keeps provider-agnostic custom openai-compatible models flexible", () => {
+  assert.deepEqual(
+    resolveHydratedIncubatorChatSettings(
+      { maxOutputTokens: "", modelName: "", provider: "", reasoningEffort: "", streamOutput: true, thinkingBudget: "", thinkingLevel: "" },
+      {
+        apiDialect: "openai_chat_completions",
+        baseUrl: null,
+        bufferedToolVerifiedProbeKind: null,
+        defaultModel: "gpt-4.1-mini",
+        defaultMaxOutputTokens: 8192,
+        displayLabel: "OpenAI 兼容 · gpt-4.1-mini",
+        provider: "new_api",
+        streamToolVerifiedProbeKind: null,
+      },
+      {
+        default_max_output_tokens: 4096,
+        default_model_name: "deepseek-reasoner",
+        default_provider: null,
+        default_reasoning_effort: "high",
+        default_thinking_budget: null,
+        default_thinking_level: null,
+      },
+    ),
+    {
+      maxOutputTokens: "4096",
+      modelName: "deepseek-reasoner",
+      provider: "new_api",
+      reasoningEffort: "high",
+      streamOutput: true,
+      thinkingBudget: "",
+      thinkingLevel: "",
     },
   );
 });
@@ -239,21 +368,26 @@ test("incubator chat credential support prefers saved assistant preference befor
 test("incubator chat credential support keeps gemini connections on stream output by default", () => {
   assert.deepEqual(
     resolveHydratedIncubatorChatSettings(
-      { maxOutputTokens: "", modelName: "", provider: "", streamOutput: true },
+      { maxOutputTokens: "", modelName: "", provider: "", reasoningEffort: "", streamOutput: true, thinkingBudget: "", thinkingLevel: "" },
       {
         apiDialect: "gemini_generate_content",
         baseUrl: "https://x666.me",
+        bufferedToolVerifiedProbeKind: null,
         defaultModel: "gemini-2.5-flash",
         defaultMaxOutputTokens: null,
         displayLabel: "薄荷codex · gemini-2.5-flash",
         provider: "薄荷",
+        streamToolVerifiedProbeKind: null,
       },
     ),
     {
       maxOutputTokens: "4096",
       modelName: "gemini-2.5-flash",
       provider: "薄荷",
+      reasoningEffort: "",
       streamOutput: true,
+      thinkingBudget: "",
+      thinkingLevel: "",
     },
   );
 });
@@ -315,18 +449,22 @@ test("incubator chat credential support replaces blocked public http default for
     {
       apiDialect: "openai_chat_completions",
       baseUrl: "http://49.234.21.84:3000",
+      bufferedToolVerifiedProbeKind: null,
       defaultModel: "gpt-5.2",
       defaultMaxOutputTokens: null,
       displayLabel: "my_new · gpt-5.2",
       provider: "new_api",
+      streamToolVerifiedProbeKind: null,
     },
     {
       apiDialect: "gemini_generate_content",
       baseUrl: "https://x666.me",
+      bufferedToolVerifiedProbeKind: null,
       defaultModel: "gemini-2.5-flash",
       defaultMaxOutputTokens: null,
       displayLabel: "薄荷codex · gemini-2.5-flash",
       provider: "薄荷",
+      streamToolVerifiedProbeKind: null,
     },
   ];
 
@@ -353,21 +491,26 @@ test("incubator chat credential support replaces blocked public http default for
 test("incubator chat credential support falls back to credential token limit when no assistant preference is set", () => {
   assert.deepEqual(
     resolveHydratedIncubatorChatSettings(
-      { maxOutputTokens: "", modelName: "", provider: "", streamOutput: true },
+      { maxOutputTokens: "", modelName: "", provider: "", reasoningEffort: "", streamOutput: true, thinkingBudget: "", thinkingLevel: "" },
       {
         apiDialect: "openai_responses",
         baseUrl: null,
+        bufferedToolVerifiedProbeKind: null,
         defaultModel: "gpt-4.1-mini",
         defaultMaxOutputTokens: 16384,
         displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
         provider: "openai",
+        streamToolVerifiedProbeKind: null,
       },
     ),
     {
       maxOutputTokens: "16384",
       modelName: "gpt-4.1-mini",
       provider: "openai",
+      reasoningEffort: "",
       streamOutput: true,
+      thinkingBudget: "",
+      thinkingLevel: "",
     },
   );
 });

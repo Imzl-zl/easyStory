@@ -71,6 +71,7 @@ export type IncubatorChatModel = {
   setProjectName: (value: string) => void;
   settings: IncubatorChatSettings;
   setSettings: Dispatch<SetStateAction<IncubatorChatSettings>>;
+  selectedCredential: IncubatorCredentialOption | null;
   submitPrompt: (prompt: string) => Promise<void>;
   syncDraft: () => Promise<void>;
 };
@@ -103,6 +104,8 @@ export function useIncubatorChatModel(
     state.settings,
     state.latestCompletedRunId,
     state.patchConversationSession,
+    credentialModel.selectedCredential?.apiDialect ?? null,
+    credentialModel.selectedCredential?.defaultModel ?? null,
   );
   const baseSubmitPrompt = useIncubatorPromptSubmit({
     activeConversationId: state.activeConversationId,
@@ -204,6 +207,7 @@ export function useIncubatorChatModel(
     setProjectName: useProjectNameSetter(state.setHasCustomProjectName, state.setProjectNameState),
     settings: state.settings,
     setSettings: state.setSettings,
+    selectedCredential: credentialModel.selectedCredential,
     submitPrompt: async (prompt: string) => {
       if (!credentialModel.canChat || credentialModel.isCredentialLoading) {
         return;

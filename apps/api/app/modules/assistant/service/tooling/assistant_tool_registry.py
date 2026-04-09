@@ -154,6 +154,7 @@ PROJECT_LIST_DOCUMENTS_DESCRIPTOR = AssistantToolDescriptor(
     approval_mode="none",
     idempotency_class="safe_read",
     timeout_seconds=15,
+    strict=True,
 )
 
 PROJECT_SEARCH_DOCUMENTS_DESCRIPTOR = AssistantToolDescriptor(
@@ -218,6 +219,7 @@ PROJECT_SEARCH_DOCUMENTS_DESCRIPTOR = AssistantToolDescriptor(
     approval_mode="none",
     idempotency_class="safe_read",
     timeout_seconds=15,
+    strict=True,
 )
 
 PROJECT_READ_DOCUMENTS_DESCRIPTOR = AssistantToolDescriptor(
@@ -263,6 +265,7 @@ PROJECT_READ_DOCUMENTS_DESCRIPTOR = AssistantToolDescriptor(
     approval_mode="none",
     idempotency_class="safe_read",
     timeout_seconds=15,
+    strict=True,
 )
 
 PROJECT_WRITE_DOCUMENT_DESCRIPTOR = AssistantToolDescriptor(
@@ -312,6 +315,7 @@ PROJECT_WRITE_DOCUMENT_DESCRIPTOR = AssistantToolDescriptor(
     approval_mode="grant_bound",
     idempotency_class="conditional_write",
     timeout_seconds=30,
+    strict=True,
 )
 
 

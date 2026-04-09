@@ -4,7 +4,6 @@ from typing import Any
 from urllib.parse import quote, urlsplit
 
 from ..errors import ConfigurationError
-from .interop.gemini_probe_support import apply_gemini_probe_thinking_config
 from .interop.tool_continuation_codec import (
     build_openai_responses_input as codec_build_openai_responses_input,
     collect_continuation_tool_names as codec_collect_continuation_tool_names,
@@ -21,6 +20,7 @@ from .interop.tool_name_codec import (
 )
 from .llm_endpoint_policy import normalize_custom_base_url
 from .llm_interop_profiles import LLMInteropCapabilities, resolve_interop_capabilities
+from .llm_reasoning_validation import build_provider_native_reasoning_error
 from .llm_protocol_types import (
     ANTHROPIC_VERSION,
     DEFAULT_BASE_URLS,
@@ -47,6 +47,15 @@ RUNTIME_KIND_LABELS = {
 
 def prepare_generation_request(request: LLMGenerateRequest) -> PreparedLLMHttpRequest:
     dialect = normalize_api_dialect(request.connection.api_dialect)
+    reasoning_error = build_provider_native_reasoning_error(
+        provider=None,
+        api_dialect=dialect,
+        reasoning_effort=request.reasoning_effort,
+        thinking_level=request.thinking_level,
+        thinking_budget=request.thinking_budget,
+    )
+    if reasoning_error is not None:
+        raise ConfigurationError(reasoning_error)
     capabilities = resolve_interop_capabilities(
         dialect,
         request.connection.interop_profile,
@@ -100,8 +109,9 @@ def build_verification_request(connection: LLMConnection) -> PreparedLLMHttpRequ
             top_p=1.0,
         )
     )
-    if normalize_api_dialect(connection.api_dialect) == "gemini_generate_content":
-        return apply_gemini_probe_thinking_config(request, model_name)
+    # Verification must reuse the same provider request shape as runtime calls.
+    # Provider-native thinking/reasoning fields are only sent when they are
+    # explicitly modeled on LLMGenerateRequest, never as probe-only heuristics.
     return request
 
 
@@ -136,10 +146,18 @@ def _build_openai_chat_request(
             }
             for tool in request.tools
         ]
-        body["parallel_tool_calls"] = False
+        body["parallel_tool_calls"] = capabilities.supports_parallel_tool_calls
         if request.force_tool_call:
             body["tool_choice"] = "required"
-    _merge_generation_params(body, request)
+    if request.reasoning_effort is not None:
+        body["reasoning_effort"] = request.reasoning_effort
+    # Official OpenAI Chat Completions uses max_completion_tokens, while many
+    # third-party OpenAI-compatible gateways still only accept max_tokens.
+    _merge_generation_params(
+        body,
+        request,
+        max_tokens_field=_resolve_openai_chat_max_tokens_field(request.connection),
+    )
     if request.response_format == JSON_OBJECT_RESPONSE_FORMAT:
         body["response_format"] = {"type": "json_object"}
     return PreparedLLMHttpRequest(
@@ -184,9 +202,11 @@ def _build_openai_responses_request(
             }
             for tool in request.tools
         ]
-        body["parallel_tool_calls"] = False
+        body["parallel_tool_calls"] = capabilities.supports_parallel_tool_calls
         if request.force_tool_call:
             body["tool_choice"] = "required"
+    if request.reasoning_effort is not None:
+        body["reasoning"] = {"effort": request.reasoning_effort}
     if request.system_prompt:
         body["instructions"] = request.system_prompt
     _merge_generation_params(body, request, max_tokens_field="max_output_tokens")
@@ -449,7 +469,18 @@ def _build_gemini_generation_config(request: LLMGenerateRequest) -> dict[str, An
         config["stopSequences"] = request.stop
     if request.response_format == JSON_OBJECT_RESPONSE_FORMAT:
         config["responseMimeType"] = "application/json"
+    thinking_config = _build_gemini_thinking_config(request)
+    if thinking_config is not None:
+        config["thinkingConfig"] = thinking_config
     return config
+
+
+def _build_gemini_thinking_config(request: LLMGenerateRequest) -> dict[str, Any] | None:
+    if request.thinking_level is not None:
+        return {"thinkingLevel": request.thinking_level}
+    if request.thinking_budget is not None:
+        return {"thinkingBudget": request.thinking_budget}
+    return None
 
 
 def _merge_generation_params(
@@ -466,6 +497,13 @@ def _merge_generation_params(
         body["top_p"] = request.top_p
     if request.stop:
         body["stop"] = request.stop
+
+
+def _resolve_openai_chat_max_tokens_field(connection: LLMConnection) -> str:
+    hostname = (urlsplit(_resolve_base_url(connection)).hostname or "").lower()
+    if hostname == "api.openai.com":
+        return "max_completion_tokens"
+    return "max_tokens"
 
 
 def _join_endpoint(connection: LLMConnection, endpoint: str) -> str:

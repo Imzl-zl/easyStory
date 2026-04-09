@@ -12,6 +12,7 @@ from app.modules.config_registry.infrastructure.config_loader import (
 from app.modules.config_registry.schemas.config_schemas import (
     ContextInjectionItem,
     HookConfig,
+    ModelConfig,
     SkillConfig,
 )
 
@@ -240,3 +241,44 @@ def test_context_injection_item_accepts_style_reference() -> None:
 def test_context_injection_item_validates_style_reference_shape(payload) -> None:
     with pytest.raises(ValidationError):
         ContextInjectionItem.model_validate(payload)
+
+
+def test_model_config_allows_openai_reasoning_without_model_specific_matrix() -> None:
+    model = ModelConfig.model_validate(
+        {
+            "provider": "openai",
+            "name": "gpt-5.1",
+            "reasoning_effort": "minimal",
+        }
+    )
+
+    assert model.reasoning_effort == "minimal"
+
+
+def test_model_config_rejects_openai_family_thinking_fields() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="thinking_level and thinking_budget are only valid for Gemini native requests",
+    ):
+        ModelConfig.model_validate(
+            {
+                "provider": "openai",
+                "name": "gpt-4.1",
+                "thinking_level": "low",
+            }
+        )
+
+
+def test_model_config_rejects_cross_vendor_reasoning_fields() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="reasoning_effort cannot be combined with thinking_level or thinking_budget",
+    ):
+        ModelConfig.model_validate(
+            {
+                "provider": "openai",
+                "name": "gpt-5.4",
+                "reasoning_effort": "high",
+                "thinking_budget": 0,
+            }
+        )

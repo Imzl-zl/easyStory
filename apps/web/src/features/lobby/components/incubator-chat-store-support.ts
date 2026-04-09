@@ -444,8 +444,11 @@ function areIncubatorSettingsEqual(left: IncubatorChatSettings, right: Incubator
     && left.maxOutputTokens === right.maxOutputTokens
     && left.modelName === right.modelName
     && left.provider === right.provider
+    && left.reasoningEffort === right.reasoningEffort
     && left.skillId === right.skillId
-    && left.streamOutput === right.streamOutput;
+    && left.streamOutput === right.streamOutput
+    && left.thinkingBudget === right.thinkingBudget
+    && left.thinkingLevel === right.thinkingLevel;
 }
 
 function mapUserStates(userStatesByUserId: Record<string, IncubatorChatUserState>) {

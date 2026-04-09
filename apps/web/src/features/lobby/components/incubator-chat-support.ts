@@ -8,6 +8,12 @@ import type {
 import {
   resolveAssistantMaxOutputTokens,
 } from "@/features/shared/assistant/assistant-output-token-support";
+import {
+  buildAssistantReasoningPayload,
+  resolveAssistantReasoningModelName,
+  type AssistantReasoningDraftFields,
+  resolveAssistantReasoningControl,
+} from "@/features/shared/assistant/assistant-reasoning-support";
 
 export const INCUBATOR_DEFAULT_PROVIDER = "";
 export const INCUBATOR_DEFAULT_MODEL_NAME = "";
@@ -44,8 +50,11 @@ export type IncubatorChatSettings = {
   maxOutputTokens: string;
   modelName: string;
   provider: string;
+  reasoningEffort: string;
   skillId: string;
   streamOutput: boolean;
+  thinkingBudget: string;
+  thinkingLevel: string;
 };
 
 export const INITIAL_INCUBATOR_CHAT_SETTINGS: IncubatorChatSettings = {
@@ -55,8 +64,11 @@ export const INITIAL_INCUBATOR_CHAT_SETTINGS: IncubatorChatSettings = {
   maxOutputTokens: "",
   modelName: INCUBATOR_DEFAULT_MODEL_NAME,
   provider: INCUBATOR_DEFAULT_PROVIDER,
+  reasoningEffort: "",
   skillId: INCUBATOR_NO_SKILL_ID,
   streamOutput: true,
+  thinkingBudget: "",
+  thinkingLevel: "",
 };
 
 const INCUBATOR_WELCOME_MESSAGE = [
@@ -151,7 +163,10 @@ export function buildIncubatorConversationText(
 
 export function buildIncubatorConversationFingerprint(
   messages: IncubatorChatMessage[],
-  settings: Pick<IncubatorChatSettings, "agentId" | "hookIds" | "modelName" | "provider" | "skillId">,
+  settings: Pick<
+    IncubatorChatSettings,
+    "agentId" | "hookIds" | "modelName" | "provider" | "reasoningEffort" | "skillId" | "thinkingBudget" | "thinkingLevel"
+  >,
 ): string {
   return JSON.stringify({
     agentId: resolveIncubatorAgentId(settings.agentId),
@@ -159,22 +174,58 @@ export function buildIncubatorConversationFingerprint(
     hookIds: resolveIncubatorHookIds(settings.hookIds),
     modelName: resolveIncubatorModelName(settings.modelName),
     provider: resolveIncubatorProvider(settings.provider),
+    reasoningEffort: settings.reasoningEffort.trim(),
     skillId: resolveIncubatorSkillId(settings.skillId),
+    thinkingBudget: settings.thinkingBudget.trim(),
+    thinkingLevel: settings.thinkingLevel.trim(),
   });
 }
 
 export function buildAssistantModelOverride(
-  settings: Pick<IncubatorChatSettings, "maxOutputTokens" | "modelName" | "provider">,
+  settings: Pick<
+    IncubatorChatSettings,
+    "maxOutputTokens" | "modelName" | "provider" | "reasoningEffort" | "thinkingBudget" | "thinkingLevel"
+  >,
+  options: {
+    apiDialect?: string | null;
+    defaultModelName?: string | null;
+  } = {},
 ): AssistantModelConfig | undefined {
   const provider = resolveIncubatorProvider(settings.provider);
   const modelName = resolveIncubatorModelName(settings.modelName);
+  const resolvedReasoningModelName = resolveAssistantReasoningModelName(
+    modelName,
+    options.defaultModelName,
+  );
   if (!provider) {
     return undefined;
   }
+  const reasoningPayload = buildAssistantReasoningPayload(
+    {
+      reasoningEffort: settings.reasoningEffort,
+      thinkingBudget: settings.thinkingBudget,
+      thinkingLevel: settings.thinkingLevel,
+    },
+    resolveAssistantReasoningControl({
+      apiDialect: options.apiDialect,
+      modelName: resolvedReasoningModelName,
+    }),
+  );
   return {
     max_tokens: resolveAssistantMaxOutputTokens(settings.maxOutputTokens),
     provider,
     name: modelName || undefined,
+    ...reasoningPayload,
+  };
+}
+
+export function buildIncubatorReasoningDraftFields(
+  settings: Pick<IncubatorChatSettings, "reasoningEffort" | "thinkingBudget" | "thinkingLevel">,
+): AssistantReasoningDraftFields {
+  return {
+    reasoningEffort: settings.reasoningEffort,
+    thinkingBudget: settings.thinkingBudget,
+    thinkingLevel: settings.thinkingLevel,
   };
 }
 

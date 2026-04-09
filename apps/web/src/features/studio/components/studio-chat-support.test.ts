@@ -212,6 +212,31 @@ test("studio chat payload replays attachment-enriched user messages across turns
   ]);
 });
 
+test("studio chat payload keeps reasoning when following credential default model", () => {
+  const payload = buildStudioAssistantTurnPayload({
+    apiDialect: "openai_responses",
+    conversationId: "conversation-studio-default-model",
+    currentDocumentPath: null,
+    defaultModelName: "gpt-5.4",
+    latestCompletedRunId: null,
+    messages: [createStudioChatMessage("user", "继续写这一段")],
+    projectId: "project-1",
+    selectedContextPaths: [],
+    settings: {
+      ...INITIAL_STUDIO_CHAT_SETTINGS,
+      provider: "openai",
+      reasoningEffort: "high",
+    },
+  });
+
+  assert.deepEqual(payload.model, {
+    max_tokens: 4096,
+    name: undefined,
+    provider: "openai",
+    reasoning_effort: "high",
+  });
+});
+
 test("studio user request content only appends attachment context", () => {
   const requestContent = buildStudioUserRequestContent({
     attachments: [

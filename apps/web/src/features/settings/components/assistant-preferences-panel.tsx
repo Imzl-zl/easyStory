@@ -16,7 +16,6 @@ import type { AssistantPreferences, AssistantPreferencesUpdatePayload, Credentia
 import { getErrorMessage } from "@/lib/api/client";
 
 import {
-  buildAssistantPreferencesPayload,
   buildAssistantPreferencesFormKey,
   buildAssistantProviderOptions,
   type AssistantPreferencesScope,
@@ -112,7 +111,7 @@ export function AssistantPreferencesPanel({
             providerOptions={providerOptions}
             showCredentialEmptyState={showCredentialEmptyState}
             onDirtyChange={onDirtyChange}
-            onSubmit={(draft) => mutation.mutate(buildAssistantPreferencesPayload(draft))}
+            onSubmit={(payload) => mutation.mutate(payload)}
           />
         ) : null}
       </div>
@@ -125,7 +124,7 @@ function buildAssistantPreferencesCopy(scope: AssistantPreferencesScope) {
     return {
       cardDescription: "只影响当前项目里的聊天默认方式；留空时继续跟随个人 AI 偏好。",
       emptyStateText: "当前项目和个人账号里都还没有可用连接。可以先去“模型连接”页添加或启用。",
-      formDescription: "项目层只负责覆盖这个项目的默认连接、默认模型和单次回复上限，不会改动你的个人聊天习惯。",
+      formDescription: "项目层会覆盖这个项目默认使用的连接、模型、回复上限和官方思考参数，不会改动你的个人聊天习惯。",
       loadingText: "正在加载项目 AI 偏好...",
       maxOutputPlaceholder: "留空则跟随个人设置",
       title: "项目 AI 偏好",
@@ -134,7 +133,7 @@ function buildAssistantPreferencesCopy(scope: AssistantPreferencesScope) {
   return {
     cardDescription: "新聊天会优先使用默认连接和模型，临时切换只影响当前对话。",
     emptyStateText: "你还没有启用可用连接。可以先去“模型连接”页添加或启用，再回来设置默认聊天方式。",
-    formDescription: "保存当前账号的新聊天默认值。这里只控制默认连接、默认模型和单次回复上限；输入容量仍由模型本身决定。",
+    formDescription: "保存当前账号的新聊天默认值。这里会同时记录默认连接、模型、回复上限和官方思考参数；输入容量仍由模型本身决定。",
     loadingText: "正在加载 AI 偏好...",
     maxOutputPlaceholder: "4096",
     title: "AI 偏好",

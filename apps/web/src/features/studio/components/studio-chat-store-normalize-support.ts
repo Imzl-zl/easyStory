@@ -99,7 +99,10 @@ export function areStudioChatSettingsEqual(left: StudioChatSettings, right: Stud
   return left.maxOutputTokens === right.maxOutputTokens
     && left.modelName === right.modelName
     && left.provider === right.provider
-    && left.streamOutput === right.streamOutput;
+    && left.reasoningEffort === right.reasoningEffort
+    && left.streamOutput === right.streamOutput
+    && left.thinkingBudget === right.thinkingBudget
+    && left.thinkingLevel === right.thinkingLevel;
 }
 
 function createFallbackProjectState(): StudioChatProjectState {

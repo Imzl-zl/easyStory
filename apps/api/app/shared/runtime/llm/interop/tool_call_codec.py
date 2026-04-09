@@ -5,6 +5,11 @@ from typing import Any
 
 from ...errors import ConfigurationError
 from ..llm_protocol_types import NormalizedLLMToolCall
+from .codec_value_helpers import (
+    optional_string as _optional_string,
+    require_dict as _require_dict,
+    require_list as _require_list,
+)
 from .tool_name_codec import decode_tool_name
 
 
@@ -186,29 +191,6 @@ def build_tool_call_payload(
     if provider_payload is not None:
         payload["provider_payload"] = provider_payload
     return payload
-
-
-def _require_list(value: Any, field_name: str, *, allow_none: bool = False) -> list[Any] | None:
-    if value is None and allow_none:
-        return None
-    if not isinstance(value, list) or not value:
-        raise ConfigurationError(f"{field_name} must be a non-empty list")
-    return value
-
-
-def _require_dict(value: Any, field_name: str, *, allow_none: bool = False) -> dict[str, Any] | None:
-    if value is None and allow_none:
-        return None
-    if not isinstance(value, dict):
-        raise ConfigurationError(f"{field_name} must be an object")
-    return value
-
-
-def _optional_string(value: Any) -> str | None:
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    return stripped or None
 
 
 def _copy_provider_payload(value: Any) -> dict[str, Any] | None:

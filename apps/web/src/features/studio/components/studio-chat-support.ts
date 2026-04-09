@@ -8,6 +8,7 @@ import type {
 import { getErrorMessage } from "@/lib/api/client";
 import {
   buildAssistantModelOverride,
+  buildIncubatorReasoningDraftFields,
   resolveFailedAssistantReply,
   resolveIncubatorAssistantReply,
 } from "@/features/lobby/components/incubator-chat-support";
@@ -18,6 +19,11 @@ import {
 import {
   resolveAssistantMaxOutputTokens,
 } from "@/features/shared/assistant/assistant-output-token-support";
+import {
+  describeAssistantReasoningSelection,
+  normalizeAssistantReasoningDraft,
+  resolveAssistantReasoningControl,
+} from "@/features/shared/assistant/assistant-reasoning-support";
 import {
   buildStudioAttachmentContext,
   type StudioChatAttachment,
@@ -70,7 +76,10 @@ export type StudioChatSettings = {
   maxOutputTokens: string;
   modelName: string;
   provider: string;
+  reasoningEffort: string;
   streamOutput: boolean;
+  thinkingBudget: string;
+  thinkingLevel: string;
 };
 
 export type StudioAssistantMessageActionState = {
@@ -82,6 +91,7 @@ export type StudioAssistantMessageActionState = {
 };
 
 export type StudioProviderOption = {
+  defaultModel?: string;
   description?: string;
   label: string;
   value: string;
@@ -91,7 +101,10 @@ export const INITIAL_STUDIO_CHAT_SETTINGS: StudioChatSettings = {
   maxOutputTokens: "",
   modelName: "",
   provider: "",
+  reasoningEffort: "",
   streamOutput: true,
+  thinkingBudget: "",
+  thinkingLevel: "",
 };
 
 export function createStudioChatMessage(
@@ -211,8 +224,10 @@ export function finalizeStudioChatToolProgress(
 
 export function buildStudioAssistantTurnPayload(options: {
   activeBufferState?: AssistantActiveBufferState | null;
+  apiDialect?: string | null;
   conversationId: string;
   currentDocumentPath: string | null;
+  defaultModelName?: string | null;
   documentCatalogEntries?: ProjectDocumentCatalogEntry[] | null;
   latestCompletedRunId: string | null;
   messages: StudioChatMessage[];
@@ -240,7 +255,10 @@ export function buildStudioAssistantTurnPayload(options: {
     conversation_id: options.conversationId,
     client_turn_id: currentUserMessage.id,
     messages: buildStudioPayloadMessages(options.messages),
-    model: buildAssistantModelOverride(options.settings),
+    model: buildAssistantModelOverride(options.settings, {
+      apiDialect: options.apiDialect,
+      defaultModelName: options.defaultModelName,
+    }),
     ...(documentContext ? { document_context: documentContext } : {}),
     ...(options.latestCompletedRunId
       ? {
@@ -282,6 +300,7 @@ export function buildStudioProviderOptions(
   credentialOptions: IncubatorCredentialOption[],
 ): StudioProviderOption[] {
   return credentialOptions.map((option) => ({
+    defaultModel: option.defaultModel,
     description: option.defaultModel ? `默认模型：${option.defaultModel}` : "当前连接未设置默认模型",
     label: option.displayLabel,
     value: option.provider,
@@ -295,12 +314,23 @@ export function buildNextStudioChatSettingsForProvider(
 ): StudioChatSettings {
   const currentOption = credentialOptions.find((item) => item.provider === current.provider) ?? null;
   const nextOption = credentialOptions.find((item) => item.provider === provider) ?? null;
+  const nextModelName = nextOption?.defaultModel ?? "";
+  const nextReasoningDraft = normalizeAssistantReasoningDraft(
+    buildIncubatorReasoningDraftFields(current),
+    resolveAssistantReasoningControl({
+      apiDialect: nextOption?.apiDialect ?? null,
+      modelName: nextModelName,
+    }),
+  );
   return {
     ...current,
     maxOutputTokens: resolveNextStudioTokenDraft(current.maxOutputTokens, currentOption, nextOption),
-    modelName: nextOption?.defaultModel ?? "",
+    modelName: nextModelName,
     provider,
+    reasoningEffort: nextReasoningDraft.reasoningEffort,
     streamOutput: prefersBufferedOutput(nextOption) ? false : current.streamOutput,
+    thinkingBudget: nextReasoningDraft.thinkingBudget,
+    thinkingLevel: nextReasoningDraft.thinkingLevel,
   };
 }
 
@@ -318,7 +348,27 @@ export function mergeStudioAssistantPreferences(
       projectPreferences?.default_model_name ?? userPreferences?.default_model_name ?? null,
     default_provider:
       projectPreferences?.default_provider ?? userPreferences?.default_provider ?? null,
+    default_reasoning_effort:
+      projectPreferences?.default_reasoning_effort ?? userPreferences?.default_reasoning_effort ?? null,
+    default_thinking_budget:
+      projectPreferences?.default_thinking_budget ?? userPreferences?.default_thinking_budget ?? null,
+    default_thinking_level:
+      projectPreferences?.default_thinking_level ?? userPreferences?.default_thinking_level ?? null,
   };
+}
+
+export function describeStudioReasoningSelection(
+  settings: Pick<StudioChatSettings, "reasoningEffort" | "thinkingBudget" | "thinkingLevel">,
+  option: Pick<IncubatorCredentialOption, "apiDialect" | "defaultModel"> | null,
+  resolvedModelName: string,
+) {
+  return describeAssistantReasoningSelection(
+    buildIncubatorReasoningDraftFields(settings),
+    resolveAssistantReasoningControl({
+      apiDialect: option?.apiDialect ?? null,
+      modelName: resolvedModelName || option?.defaultModel,
+    }),
+  );
 }
 
 export function buildStudioCredentialSettingsHref(projectId: string) {

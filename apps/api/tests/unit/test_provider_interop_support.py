@@ -202,7 +202,7 @@ def test_resolve_provider_interop_profile_preserves_interop_profile_into_request
     assert request.interop_profile == "responses_strict"
 
 
-def test_build_provider_interop_probe_request_sets_minimal_gemini_thinking(tmp_path) -> None:
+def test_build_provider_interop_probe_request_keeps_gemini_shape_aligned_with_runtime(tmp_path) -> None:
     config_path = tmp_path / "provider-interop.local.json"
     env_path = tmp_path / ".env.provider-interop.local"
     config_path.write_text(
@@ -236,7 +236,12 @@ def test_build_provider_interop_probe_request_sets_minimal_gemini_thinking(tmp_p
         system_prompt="请直接回答用户问题。",
     )
 
-    assert request.json_body["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "minimal"}
+    assert request.json_body["generationConfig"] == {
+        "temperature": 0.0,
+        "maxOutputTokens": 256,
+        "topP": 1.0,
+    }
+    assert "thinkingConfig" not in request.json_body["generationConfig"]
 
 
 def test_resolve_provider_interop_profile_requires_custom_header_name(tmp_path) -> None:

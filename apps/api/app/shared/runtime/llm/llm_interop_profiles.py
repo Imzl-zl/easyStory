@@ -34,9 +34,12 @@ DEFAULT_INTEROP_PROFILE_BY_DIALECT = {
 
 @dataclass(frozen=True)
 class LLMInteropCapabilities:
+    """只保留当前 runtime 已有消费点的 capability 字段，避免长空壳结构。"""
+
     profile: LlmInteropProfile | None
     tool_name_policy: ToolNamePolicy = "safe_ascii_only"
     tool_schema_mode: ToolSchemaMode = "portable_subset"
+    supports_parallel_tool_calls: bool = False
     supports_provider_response_continuation: bool = False
     allows_responses_empty_output_in_stream_terminal: bool = False
     captures_chat_reasoning_content: bool = False

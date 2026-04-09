@@ -15,6 +15,9 @@ export type AssistantModelConfig = {
   frequency_penalty?: number | null;
   presence_penalty?: number | null;
   stop?: string[] | null;
+  reasoning_effort?: import("./assistant-preferences").OpenAIReasoningEffort | null;
+  thinking_level?: import("./assistant-preferences").GeminiThinkingLevel | null;
+  thinking_budget?: number | null;
 };
 
 export type AssistantContinuationAnchor = {

@@ -41,16 +41,23 @@ type AiChatPanelProps = {
   onCreateNewDocument: (markdown: string) => void;
   onModelNameChange: (value: string) => void;
   onProviderChange: (provider: string) => void;
+  onReasoningEffortChange: (value: string) => void;
   onRemoveAttachment: (attachmentId: string) => void;
   onSendMessage: (message: string) => boolean | Promise<boolean>;
   onStreamOutputChange: (value: boolean) => void;
+  onThinkingBudgetChange: (value: string) => void;
+  onThinkingLevelChange: (value: string) => void;
   onToggleContext: (path: string) => void;
   onToggleWriteToCurrentDocument: () => void;
   providerOptions: StudioProviderOption[];
   selectConversation: (conversationId: string) => void;
   selectedContextPaths: string[];
+  selectedCredentialApiDialect: string | null;
   selectedCredentialLabel: string | null;
-  settings: Pick<StudioChatSettings, "modelName" | "provider" | "streamOutput">;
+  settings: Pick<
+    StudioChatSettings,
+    "modelName" | "provider" | "reasoningEffort" | "streamOutput" | "thinkingBudget" | "thinkingLevel"
+  >;
   showWriteToCurrentDocument: boolean;
   skillModel: StudioChatSkillModel;
   visibleModelLabel: string;
@@ -82,14 +89,18 @@ export function AiChatPanel({
   onCreateNewDocument,
   onModelNameChange,
   onProviderChange,
+  onReasoningEffortChange,
   onRemoveAttachment,
   onSendMessage,
   onStreamOutputChange,
+  onThinkingBudgetChange,
+  onThinkingLevelChange,
   onToggleContext,
   onToggleWriteToCurrentDocument,
   providerOptions,
   selectConversation,
   selectedContextPaths,
+  selectedCredentialApiDialect,
   selectedCredentialLabel,
   settings,
   showWriteToCurrentDocument,
@@ -194,13 +205,17 @@ export function AiChatPanel({
         onComposerTextChange={onComposerTextChange}
         onModelNameChange={onModelNameChange}
         onProviderChange={onProviderChange}
+        onReasoningEffortChange={onReasoningEffortChange}
         onRemoveAttachment={onRemoveAttachment}
         onSendMessage={onSendMessage}
         onStreamOutputChange={onStreamOutputChange}
+        onThinkingBudgetChange={onThinkingBudgetChange}
+        onThinkingLevelChange={onThinkingLevelChange}
         onToggleContext={onToggleContext}
         onToggleWriteToCurrentDocument={onToggleWriteToCurrentDocument}
         providerOptions={providerOptions}
         selectedContextPaths={selectedContextPaths}
+        selectedCredentialApiDialect={selectedCredentialApiDialect}
         selectedCredentialLabel={selectedCredentialLabel}
         settings={settings}
         showWriteToCurrentDocument={showWriteToCurrentDocument}

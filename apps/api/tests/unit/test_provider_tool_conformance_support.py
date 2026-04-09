@@ -90,7 +90,7 @@ def test_build_conformance_probe_request_uses_safe_tool_alias() -> None:
     assert request.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
 
 
-def test_build_conformance_probe_request_disables_gemini_probe_thinking() -> None:
+def test_build_conformance_probe_request_keeps_gemini_probe_shape_aligned_with_runtime() -> None:
     request = build_conformance_probe_request(
         LLMConnection(
             api_dialect="gemini_generate_content",
@@ -105,7 +105,12 @@ def test_build_conformance_probe_request_disables_gemini_probe_thinking() -> Non
         "mode": "ANY",
         "allowedFunctionNames": ["probe_echo_payload"],
     }
-    assert request.json_body["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+    assert request.json_body["generationConfig"] == {
+        "temperature": 0.0,
+        "maxOutputTokens": 256,
+        "topP": 1.0,
+    }
+    assert "thinkingConfig" not in request.json_body["generationConfig"]
     assert request.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
 
 
@@ -193,7 +198,12 @@ def test_build_tool_continuation_probe_followup_request_exposes_echoed_value_for
     assert response_payload["structured_output"]["echoed"] == "probe-result-gemini"
     assert "probe-result-gemini" not in followup_user_prompt
     assert request.json_body["contents"][1]["parts"][0]["functionCall"]["name"] == "probe_echo_payload"
-    assert request.json_body["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+    assert request.json_body["generationConfig"] == {
+        "temperature": 0.0,
+        "maxOutputTokens": 256,
+        "topP": 1.0,
+    }
+    assert "thinkingConfig" not in request.json_body["generationConfig"]
     assert request.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
 
 

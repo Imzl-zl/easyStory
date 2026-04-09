@@ -1,11 +1,17 @@
 import type {
   AssistantPreferences,
-  AssistantPreferencesUpdatePayload,
   CredentialView,
 } from "@/lib/api/types";
 import {
   sanitizeAssistantOutputTokenInput,
 } from "@/features/shared/assistant/assistant-output-token-support";
+import type { AssistantReasoningControl } from "@/features/shared/assistant/assistant-reasoning-support";
+import {
+  buildAssistantReasoningShapeError,
+  buildAssistantReasoningPayload,
+  normalizeAssistantReasoningDraft,
+  parseAssistantThinkingBudgetDraft,
+} from "@/features/shared/assistant/assistant-reasoning-support";
 
 export type AssistantPreferencesScope = "user" | "project";
 
@@ -13,9 +19,14 @@ export type AssistantPreferencesDraft = {
   defaultModelName: string;
   defaultMaxOutputTokens: string;
   defaultProvider: string;
+  defaultReasoningEffort: string;
+  defaultThinkingBudget: string;
+  defaultThinkingLevel: string;
 };
 
 export type AssistantProviderOption = {
+  apiDialect?: string | null;
+  defaultModel?: string;
   description?: string;
   label: string;
   value: string;
@@ -40,27 +51,86 @@ export function toAssistantPreferencesDraft(
     defaultModelName: preferences.default_model_name ?? "",
     defaultMaxOutputTokens: toAssistantPreferencesTokenDraft(preferences.default_max_output_tokens),
     defaultProvider: preferences.default_provider ?? "",
+    defaultReasoningEffort: preferences.default_reasoning_effort ?? "",
+    defaultThinkingBudget: preferences.default_thinking_budget === null
+      ? ""
+      : String(preferences.default_thinking_budget),
+    defaultThinkingLevel: preferences.default_thinking_level ?? "",
   };
+}
+
+export function normalizeAssistantPreferencesDraft(
+  draft: AssistantPreferencesDraft,
+  reasoningControl: AssistantReasoningControl,
+): AssistantPreferencesDraft {
+  const reasoningDraft = {
+    reasoningEffort: draft.defaultReasoningEffort,
+    thinkingBudget: draft.defaultThinkingBudget,
+    thinkingLevel: draft.defaultThinkingLevel,
+  };
+  if (buildAssistantReasoningShapeError(reasoningDraft)) {
+    return draft;
+  }
+  const normalizedReasoning = normalizeAssistantReasoningDraft(
+    reasoningDraft,
+    reasoningControl,
+  );
+  return {
+    ...draft,
+    defaultReasoningEffort: normalizedReasoning.reasoningEffort,
+    defaultThinkingBudget: normalizedReasoning.thinkingBudget,
+    defaultThinkingLevel: normalizedReasoning.thinkingLevel,
+  };
+}
+
+export function toNormalizedAssistantPreferencesDraft(
+  preferences: AssistantPreferences,
+  reasoningControl: AssistantReasoningControl,
+): AssistantPreferencesDraft {
+  return normalizeAssistantPreferencesDraft(toAssistantPreferencesDraft(preferences), reasoningControl);
 }
 
 export function buildAssistantPreferencesPayload(
   draft: AssistantPreferencesDraft,
-): AssistantPreferencesUpdatePayload {
+  reasoningControl: AssistantReasoningControl,
+) {
+  const normalizedDraft = normalizeAssistantPreferencesDraft(draft, reasoningControl);
+  const reasoningPayload = buildAssistantReasoningPayload(
+    {
+      reasoningEffort: normalizedDraft.defaultReasoningEffort,
+      thinkingBudget: normalizedDraft.defaultThinkingBudget,
+      thinkingLevel: normalizedDraft.defaultThinkingLevel,
+    },
+    reasoningControl,
+    { preserveInvalidShape: true },
+  );
   return {
-    default_model_name: normalizeDraftValue(draft.defaultModelName),
-    default_max_output_tokens: normalizeTokenDraftValue(draft.defaultMaxOutputTokens),
-    default_provider: normalizeDraftValue(draft.defaultProvider),
+    default_model_name: normalizeDraftValue(normalizedDraft.defaultModelName),
+    default_max_output_tokens: normalizeTokenDraftValue(normalizedDraft.defaultMaxOutputTokens),
+    default_provider: normalizeDraftValue(normalizedDraft.defaultProvider),
+    default_reasoning_effort: reasoningPayload.reasoning_effort ?? null,
+    default_thinking_level: reasoningPayload.thinking_level ?? null,
+    default_thinking_budget: reasoningPayload.thinking_budget ?? null,
   };
 }
 
 export function isAssistantPreferencesDirty(
   draft: AssistantPreferencesDraft,
   preferences: AssistantPreferences,
+  reasoningControl: AssistantReasoningControl,
 ): boolean {
+  const currentPayload = buildAssistantPreferencesPayload(draft, reasoningControl);
+  const savedPayload = buildAssistantPreferencesPayload(
+    toNormalizedAssistantPreferencesDraft(preferences, reasoningControl),
+    reasoningControl,
+  );
   return (
-    normalizeDraftValue(draft.defaultProvider) !== preferences.default_provider
-    || normalizeDraftValue(draft.defaultModelName) !== preferences.default_model_name
-    || normalizeTokenDraftValue(draft.defaultMaxOutputTokens) !== preferences.default_max_output_tokens
+    currentPayload.default_provider !== savedPayload.default_provider
+    || currentPayload.default_model_name !== savedPayload.default_model_name
+    || currentPayload.default_max_output_tokens !== savedPayload.default_max_output_tokens
+    || currentPayload.default_reasoning_effort !== savedPayload.default_reasoning_effort
+    || currentPayload.default_thinking_level !== savedPayload.default_thinking_level
+    || currentPayload.default_thinking_budget !== savedPayload.default_thinking_budget
   );
 }
 
@@ -79,6 +149,10 @@ export function buildAssistantProviderOptions(
       continue;
     }
     optionByProvider.set(provider, {
+      apiDialect: credential.api_dialect,
+      ...(credential.default_model?.trim()
+        ? { defaultModel: credential.default_model.trim() }
+        : {}),
       description: buildProviderDescription(credential, scope),
       label: credential.display_name.trim() || provider,
       value: provider,
@@ -101,6 +175,9 @@ export function buildAssistantPreferencesFormKey(preferences: AssistantPreferenc
     preferences.default_provider ?? "none",
     preferences.default_model_name ?? "none",
     preferences.default_max_output_tokens ?? "none",
+    preferences.default_reasoning_effort ?? "none",
+    preferences.default_thinking_level ?? "none",
+    preferences.default_thinking_budget ?? "none",
   ].join(":");
 }
 
@@ -130,6 +207,17 @@ function toAssistantPreferencesTokenDraft(value: number | null) {
     return "";
   }
   return String(value);
+}
+
+export function toAssistantPreferencesThinkingBudgetDraft(value: number | null) {
+  if (value === null) {
+    return "";
+  }
+  return String(value);
+}
+
+export function normalizeAssistantThinkingBudgetDraft(value: string) {
+  return parseAssistantThinkingBudgetDraft(value);
 }
 
 function buildProviderDescription(

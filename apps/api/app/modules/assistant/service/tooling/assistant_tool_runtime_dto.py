@@ -48,6 +48,7 @@ class AssistantToolDescriptor:
     approval_mode: AssistantToolApprovalMode
     idempotency_class: AssistantToolIdempotencyClass
     timeout_seconds: int
+    strict: bool = True
 
 
 @dataclass(frozen=True)

@@ -43,6 +43,9 @@ def _simplify_required_only_any_of(schema: dict[str, Any]) -> dict[str, Any]:
     any_of = schema.get("anyOf")
     if not _is_required_only_any_of(any_of):
         return schema
+    # This is an intentional portability downgrade: preserve the "at least one of"
+    # constraint as description text, while emitting a schema subset that current
+    # strict tool gateways accept consistently.
     required_fields = sorted({field for entry in any_of for field in entry["required"]})
     simplified = {key: value for key, value in schema.items() if key != "anyOf"}
     simplified["description"] = _merge_schema_description(
@@ -92,6 +95,8 @@ def _normalize_openai_strict_schema(value: Any) -> Any:
         return normalized
     property_names = list(properties.keys())
     required = _read_required_property_names(normalized.get("required"))
+    # OpenAI strict requires every declared property to appear in required; optional
+    # fields are represented as nullable instead of being omitted from required.
     normalized["properties"] = {
         name: (
             properties[name]

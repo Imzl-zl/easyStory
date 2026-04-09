@@ -4906,6 +4906,7 @@ async def test_assistant_service_applies_preferences_and_rules_to_agent_hook(tmp
         assistant_preferences_service=AssistantPreferencesService(
             project_service=create_project_service(),
             config_store=assistant_store,
+            credential_service_factory=_FakeCredentialService,
         ),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,
@@ -5299,6 +5300,7 @@ async def test_assistant_service_applies_user_model_preferences(tmp_path) -> Non
         assistant_preferences_service=AssistantPreferencesService(
             project_service=create_project_service(),
             config_store=assistant_store,
+            credential_service_factory=_FakeCredentialService,
         ),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,
@@ -5319,8 +5321,9 @@ async def test_assistant_service_applies_user_model_preferences(tmp_path) -> Non
                 session,
                 owner.id,
                 AssistantPreferencesUpdateDTO(
-                    default_provider="anthropic",
-                    default_model_name="claude-sonnet-4",
+                    default_provider="openai",
+                    default_model_name="gpt-5.4",
+                    default_reasoning_effort="high",
                 ),
             )
             payload = _build_turn_request(
@@ -5331,8 +5334,9 @@ async def test_assistant_service_applies_user_model_preferences(tmp_path) -> Non
 
         model = tool_provider.requests[0]["model"]
         assert isinstance(model, dict)
-        assert model["provider"] == "anthropic"
-        assert model["name"] == "claude-sonnet-4"
+        assert model["provider"] == "openai"
+        assert model["name"] == "gpt-5.4"
+        assert model["reasoning_effort"] == "high"
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
@@ -5347,6 +5351,7 @@ async def test_assistant_service_project_preferences_override_user_preferences(t
         assistant_preferences_service=AssistantPreferencesService(
             project_service=create_project_service(),
             config_store=assistant_store,
+            credential_service_factory=_FakeCredentialService,
         ),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,
@@ -5368,9 +5373,10 @@ async def test_assistant_service_project_preferences_override_user_preferences(t
                 session,
                 owner_id=owner.id,
                 payload=AssistantPreferencesUpdateDTO(
-                    default_provider="anthropic",
-                    default_model_name="claude-sonnet-4",
+                    default_provider="gemini",
+                    default_model_name="gemini-2.5-flash",
                     default_max_output_tokens=8192,
+                    default_thinking_budget=0,
                 ),
             )
             await service.assistant_preferences_service.update_project_preferences(
@@ -5378,8 +5384,10 @@ async def test_assistant_service_project_preferences_override_user_preferences(t
                 project.id,
                 owner_id=owner.id,
                 payload=AssistantPreferencesUpdateDTO(
-                    default_model_name="claude-3-7-sonnet",
+                    default_provider="openai",
+                    default_model_name="gpt-5.4",
                     default_max_output_tokens=6144,
+                    default_reasoning_effort="medium",
                 ),
             )
             payload = _build_turn_request(
@@ -5391,9 +5399,75 @@ async def test_assistant_service_project_preferences_override_user_preferences(t
 
         model = tool_provider.requests[0]["model"]
         assert isinstance(model, dict)
-        assert model["provider"] == "anthropic"
-        assert model["name"] == "claude-3-7-sonnet"
+        assert model["provider"] == "openai"
+        assert model["name"] == "gpt-5.4"
         assert model["max_tokens"] == 6144
+        assert model["reasoning_effort"] == "medium"
+        assert "thinking_budget" not in model
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_clears_stale_provider_native_reasoning_when_target_changes(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        assistant_preferences_service=AssistantPreferencesService(
+            project_service=create_project_service(),
+            config_store=assistant_store,
+            credential_service_factory=_FakeCredentialService,
+        ),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+    )
+    service.plugin_registry = build_assistant_plugin_registry(service, config_loader=loader)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-clear-stale-reasoning")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+        async with async_session_factory() as session:
+            await service.assistant_preferences_service.update_user_preferences(
+                session,
+                owner_id=owner.id,
+                payload=AssistantPreferencesUpdateDTO(
+                    default_provider="gemini",
+                    default_model_name="gemini-2.5-flash",
+                    default_thinking_budget=0,
+                ),
+            )
+            await service.assistant_preferences_service.update_project_preferences(
+                session,
+                project.id,
+                owner_id=owner.id,
+                payload=AssistantPreferencesUpdateDTO(
+                    default_provider="openai",
+                    default_model_name="gpt-4.1",
+                ),
+            )
+            payload = _build_turn_request(
+                skill_id="skill.assistant.general_chat",
+                project_id=project.id,
+                messages=[AssistantMessageDTO(role="user", content="给我一个故事方向。")],
+            )
+            await service.turn(session, payload, owner_id=owner.id)
+
+        model = tool_provider.requests[0]["model"]
+        assert isinstance(model, dict)
+        assert model["provider"] == "openai"
+        assert model["name"] == "gpt-4.1"
+        assert "thinking_budget" not in model
+        assert "thinking_level" not in model
+        assert "reasoning_effort" not in model
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 

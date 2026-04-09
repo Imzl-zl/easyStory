@@ -15,14 +15,18 @@ const SETTINGS: IncubatorChatSettings = {
   allowSystemCredentialPool: false,
   hookIds: ["hook.user.story-summary", "hook.user.after-polish"],
   maxOutputTokens: "8192",
-  modelName: "gpt-4.1",
+  modelName: "gpt-5.4",
   provider: "openai",
+  reasoningEffort: "high",
   skillId: "",
   streamOutput: true,
+  thinkingBudget: "",
+  thinkingLevel: "",
 };
 
 test("incubator assistant request support builds payload with explicit max tokens", () => {
   const payload = buildIncubatorAssistantTurnPayload({
+    apiDialect: "openai_responses",
     conversationId: "conv-incubator-1",
     latestCompletedRunId: null,
     messages: [...createIncubatorInitialMessages(), createIncubatorMessage("user", "先给我一个方向")],
@@ -30,8 +34,9 @@ test("incubator assistant request support builds payload with explicit max token
   });
   assert.deepEqual(payload.model, {
     max_tokens: 8192,
-    name: "gpt-4.1",
+    name: "gpt-5.4",
     provider: "openai",
+    reasoning_effort: "high",
   });
   assert.equal(payload.conversation_id, "conv-incubator-1");
   assert.equal(payload.client_turn_id.startsWith("user-"), true);
@@ -41,6 +46,24 @@ test("incubator assistant request support builds payload with explicit max token
   assert.equal(payload.messages[0]?.role, "assistant");
   assert.equal(payload.messages[1]?.role, "user");
   assert.equal("skill_id" in payload, false);
+});
+
+test("incubator assistant request support keeps reasoning when following credential default model", () => {
+  const payload = buildIncubatorAssistantTurnPayload({
+    apiDialect: "openai_responses",
+    conversationId: "conv-incubator-default-model",
+    defaultModelName: "gpt-5.4",
+    latestCompletedRunId: null,
+    messages: [...createIncubatorInitialMessages(), createIncubatorMessage("user", "继续给我一个方向")],
+    settings: { ...SETTINGS, modelName: "" },
+  });
+
+  assert.deepEqual(payload.model, {
+    max_tokens: 8192,
+    name: undefined,
+    provider: "openai",
+    reasoning_effort: "high",
+  });
 });
 
 test("incubator assistant request support prefers agent id when selected", () => {

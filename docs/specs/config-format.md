@@ -5,7 +5,7 @@
 | 文档类型 | 技术规范 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-14 |
-| 更新时间 | 2026-03-30 |
+| 更新时间 | 2026-04-09 |
 | 关联文档 | [系统架构设计](./architecture.md)、[数据库设计](./database-design.md) |
 
 ---
@@ -187,16 +187,36 @@ scope: user
 AI 偏好使用 YAML 文件，文件名固定为 `preferences.yaml`。用户层和项目层都使用同一份格式：
 
 ```yaml
-default_provider: "anthropic"
-default_model_name: "claude-sonnet-4"
+default_provider: "openai"
+default_model_name: "gpt-5.4"
 default_max_output_tokens: 4096
+default_reasoning_effort: "high"
+# Gemini 示例：
+# default_provider: "gemini"
+# default_model_name: "gemini-3.1-flash"
+# default_thinking_level: "medium"
+# Gemini 2.5 使用 thinking_budget
+# default_thinking_budget: -1
 ```
 
 字段说明：
 
 - `default_provider`：默认连接标识；用户层为空表示跟随系统默认，项目层为空表示继续跟随个人 AI 偏好
-- `default_model_name`：默认模型；为空表示继续跟随当前作用域下已经解析出的默认模型
+- `default_model_name`：默认模型；为空表示继续跟随当前作用域下已经解析出的默认模型；若下层作用域显式切换了 `default_provider` 但未填写模型，则会跟随新连接解析出的默认模型，而不是继续继承旧连接的模型名
 - `default_max_output_tokens`：默认单次回复上限；为空表示继续跟随上一级作用域，最终回落到系统默认 `4096`
+- `default_reasoning_effort`：OpenAI reasoning 默认值；Responses 方言会发送 `reasoning.effort`，Chat Completions 方言会发送 `reasoning_effort`；当前允许保存的值集合是 `none / minimal / low / medium / high / xhigh`，但官方逐模型支持矩阵并不完全相同
+- `default_thinking_level`：Gemini 原生 `thinkingLevel` 默认值；当前允许保存的值集合是 `minimal / low / medium / high`，但官方逐模型支持矩阵并不完全相同
+- `default_thinking_budget`：Gemini 原生 `thinkingBudget` 默认值；`0` 表示关闭思考，`-1` 表示动态思考；正整数范围是否有效取决于具体模型
+
+约束：
+
+- `default_thinking_level` 与 `default_thinking_budget` 不能同时填写
+- 保存阶段只做字段互斥与协议族边界校验：`reasoning_effort` 不能和 Gemini thinking 字段混用；Anthropic 目标不接受这些 provider-native 字段；OpenAI 连接不接受 Gemini thinking 字段；Gemini 连接不接受 `reasoning_effort`
+- 不再按具体模型型号或当前 active credential 做硬校验；只要字段形状正确，就允许保存为“偏好值”
+- 某些组合在真实上游是否支持，由当前模型或网关决定；若目标模型不支持，错误会在实际请求阶段显式返回
+- 当 `default_provider` 为空时，这些 provider-native 字段可以作为 provider-agnostic 默认值保存；运行时只会在最终协议族兼容时应用到真实请求
+- 历史脏数据不会在读路径被自动“修正”；如果互斥字段同时存在，重新保存或进入运行时合并时会显式报错
+- 项目层若切换了 provider/model，但未显式覆盖 reasoning/thinking 字段，上层 provider-native 偏好会继续保留；真正发请求时再按最终协议族决定是否应用
 
 作用域优先级：
 

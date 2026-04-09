@@ -124,6 +124,214 @@ def test_prepare_generation_request_forces_tool_call_for_openai_responses() -> N
     assert request.json_body["tool_choice"] == "required"
 
 
+def test_prepare_generation_request_includes_openai_chat_reasoning_effort() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="openai_chat_completions",
+                api_key="test-key",
+                base_url="https://api.openai.com",
+            ),
+            model_name="gpt-5.4",
+            prompt="读取文稿。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            reasoning_effort="high",
+        )
+    )
+
+    assert request.json_body["reasoning_effort"] == "high"
+    assert request.json_body["max_completion_tokens"] == 256
+    assert "max_tokens" not in request.json_body
+
+
+def test_prepare_generation_request_uses_compat_max_tokens_for_custom_openai_chat_gateway() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="openai_chat_completions",
+                api_key="test-key",
+                base_url="https://gateway.example.com/v1",
+            ),
+            model_name="gpt-5.4",
+            prompt="读取文稿。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            reasoning_effort="high",
+        )
+    )
+
+    assert request.json_body["reasoning_effort"] == "high"
+    assert request.json_body["max_tokens"] == 256
+    assert "max_completion_tokens" not in request.json_body
+
+
+def test_prepare_generation_request_uses_official_openai_token_field_for_openai_host_even_with_custom_provider_name() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                provider="new_api",
+                api_dialect="openai_chat_completions",
+                api_key="test-key",
+                base_url="https://api.openai.com",
+            ),
+            model_name="gpt-5.4",
+            prompt="读取文稿。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            reasoning_effort="high",
+        )
+    )
+
+    assert request.json_body["max_completion_tokens"] == 256
+    assert "max_tokens" not in request.json_body
+
+
+def test_prepare_generation_request_allows_openai_reasoning_without_model_specific_matrix() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="openai_chat_completions",
+                api_key="test-key",
+                base_url="https://api.openai.com",
+            ),
+            model_name="gpt-5.1",
+            prompt="读取文稿。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            reasoning_effort="minimal",
+        )
+    )
+
+    assert request.json_body["reasoning_effort"] == "minimal"
+
+
+def test_prepare_generation_request_rejects_gemini_native_reasoning_on_openai_dialect() -> None:
+    with pytest.raises(
+        ConfigurationError,
+        match="thinking_level and thinking_budget are only valid for Gemini native requests",
+    ):
+        prepare_generation_request(
+            LLMGenerateRequest(
+                connection=LLMConnection(
+                    api_dialect="openai_chat_completions",
+                    api_key="test-key",
+                    base_url="https://api.openai.com",
+                ),
+                model_name="claude-sonnet-4",
+                prompt="读取文稿。",
+                system_prompt="你是小说助手。",
+                response_format="text",
+                temperature=None,
+                max_tokens=256,
+                top_p=None,
+                thinking_level="low",
+            )
+        )
+
+
+def test_prepare_generation_request_includes_openai_responses_reasoning_object() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="openai_responses",
+                api_key="test-key",
+                base_url="https://api.openai.com",
+            ),
+            model_name="gpt-5.4",
+            prompt="读一下设定",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            reasoning_effort="none",
+        )
+    )
+
+    assert request.json_body["reasoning"] == {"effort": "none"}
+
+
+def test_prepare_generation_request_includes_gemini_thinking_level() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="gemini_generate_content",
+                api_key="test-key",
+                base_url="https://generativelanguage.googleapis.com",
+            ),
+            model_name="gemini-3-flash-preview",
+            prompt="读取文稿。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            thinking_level="low",
+        )
+    )
+
+    assert request.json_body["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "low"}
+
+
+def test_prepare_generation_request_includes_gemini_thinking_budget() -> None:
+    request = prepare_generation_request(
+        LLMGenerateRequest(
+            connection=LLMConnection(
+                api_dialect="gemini_generate_content",
+                api_key="test-key",
+                base_url="https://generativelanguage.googleapis.com",
+            ),
+            model_name="gemini-2.5-flash",
+            prompt="读取文稿。",
+            system_prompt="你是小说助手。",
+            response_format="text",
+            temperature=None,
+            max_tokens=256,
+            top_p=None,
+            thinking_budget=0,
+        )
+    )
+
+    assert request.json_body["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+
+
+def test_prepare_generation_request_rejects_gemini_native_reasoning_effort() -> None:
+    with pytest.raises(
+        ConfigurationError,
+        match="reasoning_effort is not valid for Gemini native requests",
+    ):
+        prepare_generation_request(
+            LLMGenerateRequest(
+                connection=LLMConnection(
+                    api_dialect="gemini_generate_content",
+                    api_key="test-key",
+                    base_url="https://generativelanguage.googleapis.com",
+                ),
+                model_name="gemini-2.5-flash",
+                prompt="读取文稿。",
+                system_prompt="你是小说助手。",
+                response_format="text",
+                temperature=None,
+                max_tokens=256,
+                top_p=None,
+                reasoning_effort="high",
+            )
+        )
+
+
 def test_prepare_generation_request_compiles_portable_tool_schema_for_openai_responses() -> None:
     request = prepare_generation_request(
         LLMGenerateRequest(

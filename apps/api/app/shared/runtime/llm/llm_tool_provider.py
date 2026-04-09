@@ -9,11 +9,13 @@ from ..tool_provider import ToolProvider
 from .interop import provider_interop_stream_support as stream_support
 from .llm_interop_profiles import normalize_interop_profile
 from .llm_protocol import (
+    GeminiThinkingLevel,
     HttpJsonResponse,
     LLMConnection,
     LLMContinuationSupport,
     LLMFunctionToolDefinition,
     LLMGenerateRequest,
+    OpenAIReasoningEffort,
     NormalizedLLMResponse,
     PreparedLLMHttpRequest,
     allows_provider_continuation_state,
@@ -49,6 +51,9 @@ class LLMRequest:
     temperature: float | None
     max_tokens: int | None
     top_p: float | None
+    reasoning_effort: OpenAIReasoningEffort | None
+    thinking_level: GeminiThinkingLevel | None
+    thinking_budget: int | None
     stop: list[str] | None
     tools: list[LLMFunctionToolDefinition]
     continuation_items: list[dict[str, Any]]
@@ -220,6 +225,9 @@ def _build_request(params: dict[str, Any]) -> LLMRequest:
             default_value=credential.get("default_max_output_tokens"),
         ),
         top_p=_optional_float(model.get("top_p")),
+        reasoning_effort=_optional_reasoning_effort(model.get("reasoning_effort")),
+        thinking_level=_optional_thinking_level(model.get("thinking_level")),
+        thinking_budget=_optional_int(model.get("thinking_budget"), field_name="model.thinking_budget"),
         stop=_optional_string_list(model.get("stop")),
         tools=_optional_function_tool_list(params.get("tools")),
         continuation_items=_optional_record_list(params.get("continuation_items")),
@@ -271,6 +279,9 @@ def _to_generate_request(request: LLMRequest) -> LLMGenerateRequest:
         temperature=request.temperature,
         max_tokens=request.max_tokens,
         top_p=request.top_p,
+        reasoning_effort=request.reasoning_effort,
+        thinking_level=request.thinking_level,
+        thinking_budget=request.thinking_budget,
         stop=request.stop,
         tools=request.tools,
         continuation_items=request.continuation_items,
@@ -323,6 +334,7 @@ def _is_terminal_stream_event(
 
 def _build_connection(credential: dict[str, Any]) -> LLMConnection:
     return LLMConnection(
+        provider=_optional_string(credential.get("provider")),
         api_dialect=normalize_api_dialect(_optional_string(credential.get("api_dialect"))),
         api_key=_require_non_empty_string(credential.get("api_key"), "credential.api_key"),
         base_url=_optional_string(credential.get("base_url")),
@@ -367,12 +379,32 @@ def _optional_float(value: Any) -> float | None:
     return float(value)
 
 
-def _optional_int(value: Any) -> int | None:
+def _optional_int(value: Any, *, field_name: str) -> int | None:
     if value is None:
         return None
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ConfigurationError("Expected integer value")
+        raise ConfigurationError(f"{field_name} must be an integer")
     return value
+
+
+def _optional_reasoning_effort(value: Any) -> OpenAIReasoningEffort | None:
+    normalized = _optional_string(value)
+    if normalized is None:
+        return None
+    allowed: set[str] = {"none", "minimal", "low", "medium", "high", "xhigh"}
+    if normalized not in allowed:
+        raise ConfigurationError("model.reasoning_effort is invalid")
+    return normalized  # type: ignore[return-value]
+
+
+def _optional_thinking_level(value: Any) -> GeminiThinkingLevel | None:
+    normalized = _optional_string(value)
+    if normalized is None:
+        return None
+    allowed: set[str] = {"minimal", "low", "medium", "high"}
+    if normalized not in allowed:
+        raise ConfigurationError("model.thinking_level is invalid")
+    return normalized  # type: ignore[return-value]
 
 
 def _optional_function_tool_list(value: Any) -> list[LLMFunctionToolDefinition]:
@@ -424,10 +456,16 @@ def _optional_record_list(value: Any) -> list[dict[str, Any]]:
 
 
 def _resolve_max_tokens(*, requested_value: Any, default_value: Any) -> int | None:
-    requested_max_tokens = _optional_int(requested_value)
+    requested_max_tokens = _optional_int(
+        requested_value,
+        field_name="model.max_tokens",
+    )
     if requested_max_tokens is not None:
         return requested_max_tokens
-    return _optional_int(default_value)
+    return _optional_int(
+        default_value,
+        field_name="credential.default_max_output_tokens",
+    )
 
 
 def _optional_string_list(value: Any) -> list[str] | None:

@@ -446,7 +446,12 @@ def test_verify_gemini_request_includes_user_role_and_prompt() -> None:
     assert request.json_body["system_instruction"] == {
         "parts": [{"text": VERIFY_SYSTEM_PROMPT}],
     }
-    assert request.json_body["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+    assert request.json_body["generationConfig"] == {
+        "temperature": 0.0,
+        "maxOutputTokens": 256,
+        "topP": 1.0,
+    }
+    assert "thinkingConfig" not in request.json_body["generationConfig"]
     assert captured["api_dialect"] == "gemini_generate_content"
     assert result.message == "验证成功"
     assert result.probe_kind == "text_probe"

@@ -17,16 +17,20 @@ def test_resolve_interop_capabilities_uses_declared_default_profile() -> None:
 
     assert responses_capabilities.profile == "responses_delta_first_terminal_empty_output"
     assert responses_capabilities.allows_responses_empty_output_in_stream_terminal is True
+    assert responses_capabilities.supports_parallel_tool_calls is False
     assert responses_capabilities.supports_provider_response_continuation is False
     assert responses_capabilities.tool_name_policy == "safe_ascii_only"
     assert responses_capabilities.tool_schema_mode == "openai_strict_compatible"
     assert chat_capabilities.profile == "chat_compat_plain"
     assert chat_capabilities.captures_chat_reasoning_content is False
+    assert chat_capabilities.supports_parallel_tool_calls is False
     assert chat_capabilities.tool_name_policy == "safe_ascii_only"
     assert chat_capabilities.tool_schema_mode == "openai_strict_compatible"
     assert anthropic_capabilities.profile is None
+    assert anthropic_capabilities.supports_parallel_tool_calls is False
     assert anthropic_capabilities.tool_schema_mode == "portable_subset"
     assert gemini_capabilities.profile is None
+    assert gemini_capabilities.supports_parallel_tool_calls is False
     assert gemini_capabilities.tool_schema_mode == "gemini_compatible"
 
 

@@ -64,7 +64,10 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
       hookIds: [],
       modelName: "",
       provider: INCUBATOR_DEFAULT_PROVIDER,
+      reasoningEffort: "",
       skillId: "",
+      thinkingBudget: "",
+      thinkingLevel: "",
     })),
     {
       agentId: "",
@@ -72,7 +75,10 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
       hookIds: [],
       modelName: "",
       provider: INCUBATOR_DEFAULT_PROVIDER,
+      reasoningEffort: "",
       skillId: "",
+      thinkingBudget: "",
+      thinkingLevel: "",
     },
   );
   assert.equal(
@@ -80,6 +86,9 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
       maxOutputTokens: "4096",
       modelName: "",
       provider: INCUBATOR_DEFAULT_PROVIDER,
+      reasoningEffort: "",
+      thinkingBudget: "",
+      thinkingLevel: "",
     }),
     undefined,
   );
@@ -88,16 +97,38 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
       maxOutputTokens: "4096",
       modelName: "",
       provider: "openai",
+      reasoningEffort: "",
+      thinkingBudget: "",
+      thinkingLevel: "",
     }),
     { max_tokens: 4096, name: undefined, provider: "openai" },
   );
   assert.deepEqual(
     buildAssistantModelOverride({
       maxOutputTokens: "8192",
-      modelName: "gpt-4.1",
+      modelName: "gpt-5.4",
       provider: "openai",
+      reasoningEffort: "high",
+      thinkingBudget: "",
+      thinkingLevel: "",
+    }, {
+      apiDialect: "openai_responses",
     }),
-    { max_tokens: 8192, name: "gpt-4.1", provider: "openai" },
+    { max_tokens: 8192, name: "gpt-5.4", provider: "openai", reasoning_effort: "high" },
+  );
+  assert.deepEqual(
+    buildAssistantModelOverride({
+      maxOutputTokens: "4096",
+      modelName: "",
+      provider: "openai",
+      reasoningEffort: "high",
+      thinkingBudget: "",
+      thinkingLevel: "",
+    }, {
+      apiDialect: "openai_responses",
+      defaultModelName: "gpt-5.4",
+    }),
+    { max_tokens: 4096, name: undefined, provider: "openai", reasoning_effort: "high" },
   );
   assert.equal(resolveChatOutputModeLabel(true), "边写边显示");
   assert.equal(resolveChatOutputModeLabel(false), "生成后整体显示");

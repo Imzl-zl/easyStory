@@ -3,6 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from ..errors import ConfigurationError
+from .interop.codec_value_helpers import (
+    optional_string as _optional_string,
+    require_dict as _require_dict,
+    require_list as _require_list,
+)
 from .interop.tool_call_codec import (
     build_tool_call_payload,
     extract_anthropic_tool_calls,
@@ -327,35 +332,12 @@ def _stringify_openai_content(content: Any) -> str:
     raise ConfigurationError("OpenAI chat response content must be string or list")
 
 
-def _require_list(value: Any, field_name: str, *, allow_none: bool = False) -> list[Any] | None:
-    if value is None and allow_none:
-        return None
-    if not isinstance(value, list) or not value:
-        raise ConfigurationError(f"{field_name} must be a non-empty list")
-    return value
-
-
-def _require_dict(value: Any, field_name: str, *, allow_none: bool = False) -> dict[str, Any] | None:
-    if value is None and allow_none:
-        return None
-    if not isinstance(value, dict):
-        raise ConfigurationError(f"{field_name} must be an object")
-    return value
-
-
 def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigurationError("Expected integer value")
     return value
-
-
-def _optional_string(value: Any) -> str | None:
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    return stripped or None
 
 
 def _build_openai_chat_output_items(

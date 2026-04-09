@@ -331,6 +331,9 @@ def _read_preferences_file(path: Path) -> AssistantPreferencesDTO:
         default_provider=raw.get("default_provider"),
         default_model_name=raw.get("default_model_name"),
         default_max_output_tokens=raw.get("default_max_output_tokens"),
+        default_reasoning_effort=raw.get("default_reasoning_effort"),
+        default_thinking_level=raw.get("default_thinking_level"),
+        default_thinking_budget=raw.get("default_thinking_budget"),
     )
 
 
@@ -342,6 +345,12 @@ def _write_preferences_file(path: Path, preferences: AssistantPreferencesDTO) ->
         payload["default_model_name"] = preferences.default_model_name
     if preferences.default_max_output_tokens is not None:
         payload["default_max_output_tokens"] = preferences.default_max_output_tokens
+    if preferences.default_reasoning_effort is not None:
+        payload["default_reasoning_effort"] = preferences.default_reasoning_effort
+    if preferences.default_thinking_level is not None:
+        payload["default_thinking_level"] = preferences.default_thinking_level
+    if preferences.default_thinking_budget is not None:
+        payload["default_thinking_budget"] = preferences.default_thinking_budget
     _ensure_parent_dir(path)
     path.write_text(
         yaml.safe_dump(payload, allow_unicode=True, sort_keys=False),

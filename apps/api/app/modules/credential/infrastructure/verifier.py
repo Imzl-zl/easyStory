@@ -38,7 +38,9 @@ from app.shared.runtime.llm.interop.provider_interop_stream_support import (
     synthesize_stream_terminal_response,
 )
 
-VERIFY_TIMEOUT_SECONDS = 5
+# Tool probes can trigger reasoning/tool-planning paths, so a very short
+# timeout creates false negatives for otherwise healthy providers.
+VERIFY_TIMEOUT_SECONDS = 30
 VERIFY_TEXT_PROBE_TIMEOUT_SECONDS = 30
 VERIFY_EMPTY_CONTENT_MESSAGE = "测试消息没有返回可用内容"
 TEXT_PROBE_JSON_DIALECTS = frozenset({"anthropic_messages", "gemini_generate_content"})
@@ -135,6 +137,7 @@ class AsyncHttpCredentialVerifier:
             transport_mode=transport_mode,
         )
         connection = LLMConnection(
+            provider=provider,
             api_dialect=api_dialect,
             api_key=api_key,
             base_url=base_url,

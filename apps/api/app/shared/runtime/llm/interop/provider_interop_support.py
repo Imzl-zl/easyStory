@@ -9,7 +9,6 @@ from typing import Any
 from dotenv import dotenv_values
 
 from ...errors import ConfigurationError
-from .gemini_probe_support import apply_gemini_probe_thinking_config
 from ..llm_interop_profiles import normalize_interop_profile
 from ..llm_protocol import (
     LLMConnection,
@@ -149,8 +148,6 @@ def build_provider_interop_probe_request(
                 top_p=1.0,
             )
         )
-        if profile.connection.api_dialect == "gemini_generate_content":
-            return apply_gemini_probe_thinking_config(request, profile.model_name)
         return request
     return build_verification_request(profile.connection)
 

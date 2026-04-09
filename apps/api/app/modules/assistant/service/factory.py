@@ -3,7 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.modules.config_registry import ConfigLoader
-from app.modules.credential.service import create_credential_service
+from app.modules.credential.service import (
+    create_credential_resolution_service,
+    create_credential_service,
+)
 from app.modules.project.service import (
     ProjectDocumentCapabilityService,
     ProjectService,
@@ -136,9 +139,13 @@ def create_assistant_preferences_service(
     config_store: AssistantConfigFileStore | None = None,
     project_service: ProjectService | None = None,
 ) -> AssistantPreferencesService:
+    resolved_project_service = project_service or create_project_service()
     return AssistantPreferencesService(
-        project_service=project_service or create_project_service(),
+        project_service=resolved_project_service,
         config_store=config_store,
+        credential_service_factory=lambda: create_credential_resolution_service(
+            project_service=resolved_project_service,
+        ),
     )
 
 

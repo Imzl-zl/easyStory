@@ -3,9 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .openai_chat_stream_synthesizer import (
+    synthesize_openai_chat_terminal_response as codec_synthesize_openai_chat_terminal_response,
+)
+from .openai_responses_stream_synthesizer import (
+    synthesize_openai_responses_terminal_response as codec_synthesize_openai_responses_terminal_response,
+)
 from ..llm_interop_profiles import resolve_interop_capabilities
 from ..llm_protocol import NormalizedLLMResponse
-from ..llm_protocol_responses import parse_generation_response, parse_stream_terminal_response
+from ..llm_protocol_responses import parse_stream_terminal_response
+from ..llm_protocol_types import LlmApiDialect, normalize_api_dialect
 
 
 @dataclass(frozen=True)
@@ -26,14 +33,15 @@ def parse_raw_stream_event(
     interop_profile: str | None = None,
     tool_name_aliases: dict[str, str] | None = None,
 ) -> ParsedStreamEvent:
-    capabilities = resolve_interop_capabilities(api_dialect, interop_profile)
-    stop_reason = extract_stream_stop_reason(api_dialect, event_name, payload)
+    dialect = normalize_api_dialect(api_dialect)
+    capabilities = resolve_interop_capabilities(dialect, interop_profile)
+    stop_reason = extract_stream_stop_reason(dialect, event_name, payload)
     return ParsedStreamEvent(
         event_name=event_name,
         payload=payload,
-        delta=extract_stream_delta(api_dialect, event_name, payload),
+        delta=extract_stream_delta(dialect, event_name, payload),
         reasoning_delta=extract_stream_reasoning_delta(
-            api_dialect,
+            dialect,
             payload,
             captures_reasoning_content=capabilities.captures_chat_reasoning_content,
         ),
@@ -42,7 +50,7 @@ def parse_raw_stream_event(
             None
             if extract_stream_truncation_reason(stop_reason) is not None
             else extract_stream_terminal_response(
-                api_dialect,
+                dialect,
                 event_name,
                 payload,
                 interop_profile=interop_profile,
@@ -53,7 +61,7 @@ def parse_raw_stream_event(
 
 
 def extract_stream_delta(
-    api_dialect: str,
+    api_dialect: LlmApiDialect,
     event_name: str | None,
     payload: dict[str, Any],
 ) -> str:
@@ -67,7 +75,7 @@ def extract_stream_delta(
 
 
 def extract_stream_reasoning_delta(
-    api_dialect: str,
+    api_dialect: LlmApiDialect,
     payload: dict[str, Any],
     *,
     captures_reasoning_content: bool,
@@ -99,7 +107,7 @@ def build_truncated_stream_message(stop_reason: str) -> str:
 
 
 def extract_stream_stop_reason(
-    api_dialect: str,
+    api_dialect: LlmApiDialect,
     event_name: str | None,
     payload: dict[str, Any],
 ) -> str | None:
@@ -113,7 +121,7 @@ def extract_stream_stop_reason(
 
 
 def extract_stream_terminal_response(
-    api_dialect: str,
+    api_dialect: LlmApiDialect,
     event_name: str | None,
     payload: dict[str, Any],
     *,
@@ -138,12 +146,12 @@ def synthesize_stream_terminal_response(
     tool_name_aliases: dict[str, str] | None = None,
 ) -> NormalizedLLMResponse | None:
     if api_dialect == "openai_responses":
-        return _synthesize_openai_responses_terminal_response(
+        return codec_synthesize_openai_responses_terminal_response(
             raw_events,
             tool_name_aliases=tool_name_aliases or {},
         )
     if api_dialect == "openai_chat_completions":
-        return _synthesize_openai_chat_terminal_response(
+        return codec_synthesize_openai_chat_terminal_response(
             raw_events,
             tool_name_aliases=tool_name_aliases or {},
         )
@@ -291,428 +299,6 @@ def _extract_gemini_delta(payload: dict[str, Any]) -> str:
         for part in parts
         if isinstance(part, dict) and isinstance(part.get("text"), str)
     )
-
-
-def _synthesize_openai_responses_terminal_response(
-    raw_events: list[tuple[str | None, dict[str, Any]]],
-    *,
-    tool_name_aliases: dict[str, str],
-) -> NormalizedLLMResponse | None:
-    function_calls: dict[str, dict[str, Any]] = {}
-    function_call_key_aliases: dict[str, str] = {}
-    function_call_orders: dict[str, int] = {}
-    output_indexes: dict[str, int] = {}
-    completed_response: dict[str, Any] | None = None
-    for event_name, payload in raw_events:
-        if event_name == "response.completed":
-            response = payload.get("response")
-            if isinstance(response, dict):
-                completed_response = response
-            continue
-        if event_name in {"response.output_item.added", "response.output_item.done"}:
-            item = payload.get("item")
-            if not isinstance(item, dict) or item.get("type") != "function_call":
-                continue
-            item_id, current = _resolve_openai_responses_function_call_entry(
-                function_calls=function_calls,
-                function_call_key_aliases=function_call_key_aliases,
-                function_call_orders=function_call_orders,
-                item_id=item.get("id"),
-                call_id=item.get("call_id"),
-                payload_item_id=payload.get("item_id"),
-                fallback_index=len(function_calls),
-            )
-            _merge_openai_responses_function_call_item(current, item)
-            _capture_openai_responses_output_index(
-                output_indexes,
-                item_id=item_id,
-                output_index=payload.get("output_index"),
-            )
-            continue
-        if event_name == "response.function_call_arguments.delta":
-            item_id, current = _resolve_openai_responses_function_call_entry(
-                function_calls=function_calls,
-                function_call_key_aliases=function_call_key_aliases,
-                function_call_orders=function_call_orders,
-                item_id=payload.get("item_id"),
-                call_id=payload.get("call_id"),
-                payload_item_id=None,
-                fallback_index=len(function_calls),
-            )
-            delta = payload.get("delta")
-            if isinstance(delta, str):
-                current["arguments"] = f"{_read_openai_responses_function_call_arguments(current)}{delta}"
-            _capture_openai_responses_output_index(
-                output_indexes,
-                item_id=item_id,
-                output_index=payload.get("output_index"),
-            )
-            continue
-        if event_name == "response.function_call_arguments.done":
-            item_id, current = _resolve_openai_responses_function_call_entry(
-                function_calls=function_calls,
-                function_call_key_aliases=function_call_key_aliases,
-                function_call_orders=function_call_orders,
-                item_id=payload.get("item_id"),
-                call_id=payload.get("call_id"),
-                payload_item_id=None,
-                fallback_index=len(function_calls),
-            )
-            call_id = _optional_string(payload.get("call_id"))
-            if call_id is not None:
-                current["call_id"] = call_id
-            name = _optional_string(payload.get("name"))
-            if name is not None:
-                current["name"] = name
-            arguments = payload.get("arguments")
-            if isinstance(arguments, str):
-                current["arguments"] = arguments
-            _capture_openai_responses_output_index(
-                output_indexes,
-                item_id=item_id,
-                output_index=payload.get("output_index"),
-            )
-    if not function_calls:
-        return None
-    reconstructed_payload = dict(completed_response or {})
-    reconstructed_payload["output"] = _merge_openai_responses_synthesized_output(
-        existing_output=reconstructed_payload.get("output"),
-        synthesized_calls=function_calls,
-        function_call_key_aliases=function_call_key_aliases,
-        function_call_orders=function_call_orders,
-        output_indexes=output_indexes,
-    )
-    return parse_generation_response(
-        "openai_responses",
-        reconstructed_payload,
-        tool_name_aliases=tool_name_aliases,
-    )
-
-
-def _resolve_openai_responses_function_call_entry(
-    *,
-    function_calls: dict[str, dict[str, Any]],
-    function_call_key_aliases: dict[str, str],
-    function_call_orders: dict[str, int],
-    item_id: Any,
-    call_id: Any,
-    payload_item_id: Any,
-    fallback_index: int,
-) -> tuple[str, dict[str, Any]]:
-    resolved_call_id = _optional_string(call_id)
-    resolved_item_id = _optional_string(item_id)
-    resolved_payload_item_id = _optional_string(payload_item_id)
-    resolved_key = _lookup_openai_responses_function_call_alias(
-        function_call_key_aliases,
-        resolved_call_id,
-        resolved_item_id,
-        resolved_payload_item_id,
-    )
-    if resolved_key is None:
-        resolved_key = (
-            resolved_call_id
-            or resolved_item_id
-            or resolved_payload_item_id
-            or f"function_call:{fallback_index}"
-        )
-    current = function_calls.setdefault(
-        resolved_key,
-        {"type": "function_call"},
-    )
-    if resolved_key not in function_call_orders:
-        function_call_orders[resolved_key] = len(function_call_orders)
-    if resolved_call_id is not None:
-        current["call_id"] = resolved_call_id
-        function_call_key_aliases[resolved_call_id] = resolved_key
-    preferred_item_id = resolved_item_id or resolved_payload_item_id
-    if preferred_item_id is not None:
-        current["id"] = preferred_item_id
-        function_call_key_aliases[preferred_item_id] = resolved_key
-    return resolved_key, current
-
-
-def _lookup_openai_responses_function_call_alias(
-    function_call_key_aliases: dict[str, str],
-    *candidates: str | None,
-) -> str | None:
-    for candidate in candidates:
-        if candidate is None:
-            continue
-        resolved = function_call_key_aliases.get(candidate)
-        if resolved is not None:
-            return resolved
-    return None
-
-
-def _merge_openai_responses_function_call_item(
-    current: dict[str, Any],
-    item: dict[str, Any],
-) -> None:
-    item_id = _optional_string(item.get("id"))
-    if item_id is not None:
-        current["id"] = item_id
-    call_id = _optional_string(item.get("call_id"))
-    if call_id is not None:
-        current["call_id"] = call_id
-    name = _optional_string(item.get("name"))
-    if name is not None:
-        current["name"] = name
-    arguments = item.get("arguments")
-    if isinstance(arguments, str):
-        current["arguments"] = arguments
-
-
-def _read_openai_responses_function_call_arguments(current: dict[str, Any]) -> str:
-    arguments = current.get("arguments")
-    if isinstance(arguments, str):
-        return arguments
-    return ""
-
-
-def _capture_openai_responses_output_index(
-    output_indexes: dict[str, int],
-    *,
-    item_id: str,
-    output_index: Any,
-) -> None:
-    if isinstance(output_index, int):
-        output_indexes[item_id] = output_index
-
-
-def _merge_openai_responses_synthesized_output(
-    *,
-    existing_output: Any,
-    synthesized_calls: dict[str, dict[str, Any]],
-    function_call_key_aliases: dict[str, str],
-    function_call_orders: dict[str, int],
-    output_indexes: dict[str, int],
-) -> list[dict[str, Any]]:
-    ordered_calls = [
-        synthesized_calls[item_id]
-        for item_id in sorted(
-            synthesized_calls,
-            key=lambda candidate: (
-                output_indexes.get(candidate, 1_000_000),
-                function_call_orders.get(candidate, 1_000_000),
-                candidate,
-            ),
-        )
-    ]
-    if not isinstance(existing_output, list) or not existing_output:
-        return ordered_calls
-    remaining_calls = dict(synthesized_calls)
-    surviving_output_items: list[dict[str, Any]] = []
-    for item in existing_output:
-        if not isinstance(item, dict):
-            continue
-        if item.get("type") != "function_call":
-            surviving_output_items.append(item)
-            continue
-        key = _lookup_openai_responses_function_call_key(
-            remaining_calls,
-            function_call_key_aliases=function_call_key_aliases,
-            item_id=item.get("id"),
-            call_id=item.get("call_id"),
-            payload_item_id=None,
-        )
-        replacement = remaining_calls.pop(key, None) if key is not None else None
-        surviving_output_items.append(replacement or item)
-    pending_insertions = _group_openai_responses_function_call_insertions(
-        existing_output=existing_output,
-        remaining_calls=remaining_calls,
-        function_call_key_aliases=function_call_key_aliases,
-        function_call_orders=function_call_orders,
-        output_indexes=output_indexes,
-    )
-    return _rebuild_openai_responses_output_transcript(
-        surviving_output_items=surviving_output_items,
-        pending_insertions=pending_insertions,
-    )
-
-
-def _lookup_openai_responses_function_call_key(
-    synthesized_calls: dict[str, dict[str, Any]],
-    *,
-    function_call_key_aliases: dict[str, str],
-    item_id: Any,
-    call_id: Any,
-    payload_item_id: Any,
-) -> str | None:
-    resolved_call_id = _optional_string(call_id)
-    resolved_item_id = _optional_string(item_id)
-    resolved_payload_item_id = _optional_string(payload_item_id)
-    for candidate in (
-        resolved_call_id,
-        resolved_item_id,
-        resolved_payload_item_id,
-    ):
-        if candidate is None:
-            continue
-        resolved_key = function_call_key_aliases.get(candidate, candidate)
-        if resolved_key in synthesized_calls:
-            return resolved_key
-    return None
-
-
-def _group_openai_responses_function_call_insertions(
-    *,
-    existing_output: list[Any],
-    remaining_calls: dict[str, dict[str, Any]],
-    function_call_key_aliases: dict[str, str],
-    function_call_orders: dict[str, int],
-    output_indexes: dict[str, int],
-) -> dict[int, list[dict[str, Any]]]:
-    existing_function_call_keys = {
-        key
-        for item in existing_output
-        if isinstance(item, dict) and item.get("type") == "function_call"
-        for key in [
-            _lookup_openai_responses_function_call_key(
-                remaining_calls,
-                function_call_key_aliases=function_call_key_aliases,
-                item_id=item.get("id"),
-                call_id=item.get("call_id"),
-                payload_item_id=None,
-            )
-        ]
-        if key is not None
-    }
-    insertions: dict[int, list[tuple[int, dict[str, Any]]]] = {}
-    for item_id, call in remaining_calls.items():
-        if item_id in existing_function_call_keys:
-            continue
-        target_index = output_indexes.get(item_id, len(existing_output))
-        insertions.setdefault(target_index, []).append(
-            (function_call_orders.get(item_id, len(function_call_orders)), call)
-        )
-    return {
-        index: [
-            item
-            for _, item in sorted(group, key=lambda candidate: candidate[0])
-        ]
-        for index, group in insertions.items()
-    }
-
-
-def _rebuild_openai_responses_output_transcript(
-    *,
-    surviving_output_items: list[dict[str, Any]],
-    pending_insertions: dict[int, list[dict[str, Any]]],
-) -> list[dict[str, Any]]:
-    if not pending_insertions:
-        return list(surviving_output_items)
-    rebuilt_output: list[dict[str, Any]] = []
-    existing_index = 0
-    slot_index = 0
-    max_insertion_index = max(pending_insertions)
-    while existing_index < len(surviving_output_items) or slot_index <= max_insertion_index:
-        insertion_group = pending_insertions.get(slot_index)
-        if insertion_group:
-            rebuilt_output.extend(insertion_group)
-            slot_index += 1
-            continue
-        if existing_index < len(surviving_output_items):
-            rebuilt_output.append(surviving_output_items[existing_index])
-            existing_index += 1
-        slot_index += 1
-    return rebuilt_output
-
-
-def _synthesize_openai_chat_terminal_response(
-    raw_events: list[tuple[str | None, dict[str, Any]]],
-    *,
-    tool_name_aliases: dict[str, str],
-) -> NormalizedLLMResponse | None:
-    tool_calls_by_index: dict[int, dict[str, Any]] = {}
-    finish_reason: str | None = None
-    usage: dict[str, Any] | None = None
-    response_id: str | None = None
-    for _, payload in raw_events:
-        if response_id is None:
-            response_id = _optional_string(payload.get("id"))
-        payload_usage = payload.get("usage")
-        if isinstance(payload_usage, dict):
-            usage = payload_usage
-        choices = payload.get("choices")
-        if not isinstance(choices, list) or not choices:
-            continue
-        first_choice = choices[0]
-        if not isinstance(first_choice, dict):
-            continue
-        choice_finish_reason = _optional_string(first_choice.get("finish_reason"))
-        if choice_finish_reason is not None:
-            finish_reason = choice_finish_reason
-        delta = first_choice.get("delta")
-        if not isinstance(delta, dict):
-            continue
-        tool_calls = delta.get("tool_calls")
-        if not isinstance(tool_calls, list):
-            continue
-        for fallback_index, item in enumerate(tool_calls):
-            if not isinstance(item, dict):
-                continue
-            index = item.get("index")
-            if not isinstance(index, int):
-                index = fallback_index
-            current = tool_calls_by_index.setdefault(
-                index,
-                {
-                    "id": None,
-                    "type": "function",
-                    "function": {
-                        "name": "",
-                        "arguments": "",
-                    },
-                },
-            )
-            call_id = _optional_string(item.get("id"))
-            if call_id is not None:
-                current["id"] = call_id
-            call_type = _optional_string(item.get("type"))
-            if call_type is not None:
-                current["type"] = call_type
-            function = item.get("function")
-            if not isinstance(function, dict):
-                continue
-            name = _optional_string(function.get("name"))
-            if name is not None:
-                previous_name = current["function"]["name"]
-                current["function"]["name"] = (
-                    f"{previous_name}{name}" if previous_name and not previous_name.endswith(name) else name
-                )
-            arguments_chunk = function.get("arguments")
-            if isinstance(arguments_chunk, str):
-                current["function"]["arguments"] += arguments_chunk
-    if not tool_calls_by_index:
-        return None
-    reconstructed_payload: dict[str, Any] = {
-        "choices": [
-            {
-                "message": {
-                    "role": "assistant",
-                    "content": "",
-                    "tool_calls": [tool_calls_by_index[index] for index in sorted(tool_calls_by_index)],
-                },
-                "finish_reason": finish_reason or "tool_calls",
-            }
-        ]
-    }
-    if usage is not None:
-        reconstructed_payload["usage"] = usage
-    if response_id is not None:
-        reconstructed_payload["id"] = response_id
-    return parse_generation_response(
-        "openai_chat_completions",
-        reconstructed_payload,
-        tool_name_aliases=tool_name_aliases,
-    )
-
-
-def _optional_string(value: Any) -> str | None:
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    return stripped or None
 
 
 def _extract_gemini_stop_reason(payload: dict[str, Any]) -> str | None:

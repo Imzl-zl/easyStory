@@ -4,9 +4,17 @@ import {
   resolveAssistantMaxOutputTokens,
   sanitizeAssistantOutputTokenInput,
 } from "@/features/shared/assistant/assistant-output-token-support";
+import {
+  describeAssistantReasoningSelection,
+  normalizeAssistantReasoningDraft,
+  resolveAssistantReasoningControl,
+} from "@/features/shared/assistant/assistant-reasoning-support";
 
 import { prefersBufferedOutput } from "./incubator-chat-credential-support";
-import { resolveChatOutputModeLabel } from "./incubator-chat-support";
+import {
+  buildIncubatorReasoningDraftFields,
+  resolveChatOutputModeLabel,
+} from "./incubator-chat-support";
 import type { IncubatorChatModel } from "./incubator-page-model";
 
 export function updateIncubatorChatSetting<K extends keyof IncubatorChatModel["settings"]>(
@@ -48,6 +56,16 @@ export function buildChatSettingsSummaryItemsWithSkill(
   if (shouldShowModelSummaryItem(resolvedModelName, option.defaultModel)) {
     items.push(resolvedModelName);
   }
+  const reasoningSummary = describeAssistantReasoningSelection(
+    buildIncubatorReasoningDraftFields(model.settings),
+    resolveAssistantReasoningControl({
+      apiDialect: option.apiDialect,
+      modelName: resolvedModelName === "跟随连接默认模型" ? option.defaultModel : resolvedModelName,
+    }),
+  );
+  if (reasoningSummary) {
+    items.push(reasoningSummary);
+  }
   if (shouldShowTokenSummaryItem(model.settings.maxOutputTokens, option)) {
     items.push(`上限 ${resolveResolvedMaxOutputTokens(model.settings.maxOutputTokens, option)}`);
   }
@@ -64,13 +82,21 @@ export function normalizeMaxOutputTokensInput(value: string) {
 export function syncProviderSelection(model: IncubatorChatModel, provider: string) {
   const currentOption = model.credentialOptions.find((item) => item.provider === model.settings.provider) ?? null;
   const option = model.credentialOptions.find((item) => item.provider === provider);
-  model.setSettings((current) => ({
-    ...current,
-    maxOutputTokens: shouldSyncMaxOutputTokens(current.maxOutputTokens, currentOption, option),
-    modelName: option?.defaultModel ?? "",
-    provider,
-    streamOutput: prefersBufferedOutput(option ?? null) ? false : current.streamOutput,
-  }));
+  model.setSettings((current) => {
+    const nextModelName = option?.defaultModel ?? "";
+    return {
+      ...current,
+      ...normalizeReasoningSettings(
+        current,
+        option?.apiDialect ?? null,
+        nextModelName,
+      ),
+      maxOutputTokens: shouldSyncMaxOutputTokens(current.maxOutputTokens, currentOption, option),
+      modelName: nextModelName,
+      provider,
+      streamOutput: prefersBufferedOutput(option ?? null) ? false : current.streamOutput,
+    };
+  });
 }
 
 function stripDefaultModelSuffix(option: IncubatorChatModel["credentialOptions"][number]) {
@@ -142,4 +168,23 @@ function resolveResolvedMaxOutputTokens(
 ) {
   const normalizedValue = maxOutputTokens.trim() || resolveOptionMaxOutputTokensDraft(option);
   return resolveAssistantMaxOutputTokens(normalizedValue);
+}
+
+function normalizeReasoningSettings(
+  settings: Pick<IncubatorChatModel["settings"], "reasoningEffort" | "thinkingBudget" | "thinkingLevel">,
+  apiDialect: string | null,
+  modelName: string,
+) {
+  const normalized = normalizeAssistantReasoningDraft(
+    buildIncubatorReasoningDraftFields(settings),
+    resolveAssistantReasoningControl({
+      apiDialect,
+      modelName,
+    }),
+  );
+  return {
+    reasoningEffort: normalized.reasoningEffort,
+    thinkingBudget: normalized.thinkingBudget,
+    thinkingLevel: normalized.thinkingLevel,
+  };
 }

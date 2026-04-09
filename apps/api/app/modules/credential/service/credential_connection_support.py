@@ -34,6 +34,7 @@ SENSITIVE_EXTRA_HEADER_FRAGMENTS = ("token", "secret", "api-key", "api_key")
 
 
 class RuntimeCredentialPayload(TypedDict):
+    provider: str
     api_key: str
     api_dialect: str
     base_url: str | None
@@ -84,6 +85,7 @@ def build_runtime_credential_payload(
     decrypt_api_key: Callable[[str], str],
 ) -> RuntimeCredentialPayload:
     return {
+        "provider": credential.provider,
         "api_key": decrypt_api_key(credential.encrypted_key),
         "api_dialect": credential.api_dialect,
         "base_url": credential.base_url,

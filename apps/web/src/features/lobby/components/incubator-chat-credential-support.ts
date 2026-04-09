@@ -4,6 +4,10 @@ import type {
   CredentialView,
 } from "@/lib/api/types";
 import { DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS } from "@/features/shared/assistant/assistant-output-token-support";
+import {
+  normalizeAssistantReasoningDraft,
+  resolveAssistantReasoningControl,
+} from "@/features/shared/assistant/assistant-reasoning-support";
 
 import type { IncubatorChatSettings } from "./incubator-chat-support";
 
@@ -118,10 +122,16 @@ export function resolveIncubatorCredentialState(options: {
 }
 
 export function resolveHydratedIncubatorChatSettings(
-  current: Pick<IncubatorChatSettings, "maxOutputTokens" | "modelName" | "provider" | "streamOutput">,
+  current: Pick<
+    IncubatorChatSettings,
+    "maxOutputTokens" | "modelName" | "provider" | "reasoningEffort" | "streamOutput" | "thinkingBudget" | "thinkingLevel"
+  >,
   selectedCredential: IncubatorCredentialOption | null,
   preferences?: AssistantPreferences,
-): Pick<IncubatorChatSettings, "maxOutputTokens" | "modelName" | "provider" | "streamOutput"> | null {
+): Pick<
+  IncubatorChatSettings,
+  "maxOutputTokens" | "modelName" | "provider" | "reasoningEffort" | "streamOutput" | "thinkingBudget" | "thinkingLevel"
+> | null {
   if (!selectedCredential) {
     return null;
   }
@@ -137,7 +147,13 @@ export function resolveHydratedIncubatorChatSettings(
       ?? DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS,
   );
   const nextProvider = selectedCredential.provider;
-  const fallbackModelName = preferredProvider === nextProvider
+  const appliesPreferredDefaults = preferredProvider
+    ? preferredProvider === nextProvider
+    : supportsProviderAgnosticPreferredModel({
+      apiDialect: selectedCredential.apiDialect,
+      preferredModelName,
+    });
+  const fallbackModelName = appliesPreferredDefaults
     ? preferredModelName || selectedCredential.defaultModel
     : selectedCredential.defaultModel;
   const nextModelName = currentProvider === nextProvider
@@ -147,12 +163,38 @@ export function resolveHydratedIncubatorChatSettings(
   const nextStreamOutput = currentProvider === nextProvider
     ? current.streamOutput
     : !prefersBufferedOutput(selectedCredential);
+  const nextReasoningDraft = normalizeAssistantReasoningDraft(
+    currentProvider === nextProvider
+      ? {
+        reasoningEffort: current.reasoningEffort,
+        thinkingBudget: current.thinkingBudget,
+        thinkingLevel: current.thinkingLevel,
+      }
+      : {
+        reasoningEffort: appliesPreferredDefaults
+          ? preferences?.default_reasoning_effort ?? ""
+          : "",
+        thinkingBudget: appliesPreferredDefaults && preferences?.default_thinking_budget != null
+          ? String(preferences?.default_thinking_budget ?? "")
+          : "",
+        thinkingLevel: appliesPreferredDefaults
+          ? preferences?.default_thinking_level ?? ""
+          : "",
+      },
+    resolveAssistantReasoningControl({
+      apiDialect: selectedCredential.apiDialect,
+      modelName: nextModelName,
+    }),
+  );
 
   if (
     nextProvider === currentProvider
     && nextModelName === currentModelName
     && nextMaxOutputTokens === currentMaxOutputTokens
     && nextStreamOutput === current.streamOutput
+    && nextReasoningDraft.reasoningEffort === current.reasoningEffort
+    && nextReasoningDraft.thinkingLevel === current.thinkingLevel
+    && nextReasoningDraft.thinkingBudget === current.thinkingBudget
   ) {
     return null;
   }
@@ -161,11 +203,34 @@ export function resolveHydratedIncubatorChatSettings(
     maxOutputTokens: nextMaxOutputTokens,
     modelName: nextModelName,
     provider: nextProvider,
+    reasoningEffort: nextReasoningDraft.reasoningEffort,
     streamOutput: nextStreamOutput,
+    thinkingBudget: nextReasoningDraft.thinkingBudget,
+    thinkingLevel: nextReasoningDraft.thinkingLevel,
   };
 }
 
 export function prefersBufferedOutput(_option: IncubatorCredentialOption | null) {
+  return false;
+}
+
+function supportsProviderAgnosticPreferredModel(options: {
+  apiDialect: string;
+  preferredModelName: string;
+}) {
+  const preferredModelName = options.preferredModelName.trim().toLowerCase();
+  if (!preferredModelName) {
+    return true;
+  }
+  if (options.apiDialect === "openai_chat_completions" || options.apiDialect === "openai_responses") {
+    return !preferredModelName.startsWith("claude-") && !preferredModelName.startsWith("gemini-");
+  }
+  if (options.apiDialect === "anthropic_messages") {
+    return preferredModelName.startsWith("claude-");
+  }
+  if (options.apiDialect === "gemini_generate_content") {
+    return preferredModelName.startsWith("gemini-");
+  }
   return false;
 }
 
