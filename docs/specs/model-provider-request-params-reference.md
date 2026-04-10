@@ -2,17 +2,21 @@
 
 | 字段 | 内容 |
 |---|---|
-| 文档类型 | 技术规范 / 接口参考 |
-| 文档状态 | 生效 |
+| 文档类型 | 技术规范 / 扩展参考 |
+| 文档状态 | 参考 |
 | 创建时间 | 2026-04-02 |
-| 更新时间 | 2026-04-04 |
-| 关联文档 | [技术栈确定](./tech-stack.md)、[系统架构设计](./architecture.md)、[数据库设计](./database-design.md)、[主流模型厂商请求头与客户端标识参考](./model-provider-client-identity-and-headers-reference.md)、[主流模型厂商响应结构与流式事件参考](./model-provider-response-contract-reference.md) |
+| 更新时间 | 2026-04-10 |
+| 关联文档 | [模型协议与工具调用标准](./model-protocols/README.md)、[技术栈确定](./tech-stack.md)、[系统架构设计](./architecture.md)、[数据库设计](./database-design.md)、[主流模型厂商请求头与客户端标识参考](./model-provider-client-identity-and-headers-reference.md)、[主流模型厂商响应结构与流式事件参考](./model-provider-response-contract-reference.md) |
 
 ---
 
+> 当前 easyStory shared runtime 的正式协议标准、请求 builder 真值和工具调用维护入口，已迁到 [模型协议与工具调用标准](./model-protocols/README.md)。
+>
+> 本文继续保留更宽口径的厂商资料与市场参考，但不再作为当前运行时代码的唯一标准真值。
+
 ## 1. 适用范围
 
-本文整理 `OpenAI GPT / Anthropic Claude / Google Gemini / Moonshot Kimi / MiniMax / Zhipu GLM / DeepSeek` 的官方请求格式、流式输出、思考参数、上下文窗口和最大输出上限，供 easyStory 后端做模型方言适配时参考。
+本文整理 `OpenAI GPT / Anthropic Claude / Google Gemini / Moonshot Kimi / MiniMax / Zhipu GLM / DeepSeek` 的官方请求格式、流式输出、思考参数、上下文窗口和最大输出上限，供 easyStory 做扩展调研与市场比对时参考。
 
 使用原则：
 
@@ -21,6 +25,7 @@
 - token 上限始终以对应模型页为准；同厂商不同模型可能不同。
 - 对官方未明确公布的硬上限，本文会明确标注“官方未单列”。
 - 当前 easyStory runtime 原生只实现 `openai_chat_completions / openai_responses / anthropic_messages / gemini_generate_content` 四类方言；`Kimi / MiniMax / GLM / DeepSeek` 当前仍主要按 OpenAI-compatible 家族接入，不等于仓库里已经实现各自 vendor-native dialect。
+- 若要查看当前代码实际使用的请求字段名、tool schema 编译与流式开关，请优先看 [请求契约](./model-protocols/request-contracts.md)。
 
 口径校准：
 

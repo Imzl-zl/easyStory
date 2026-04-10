@@ -5,8 +5,8 @@
 | 文档类型 | 功能设计 |
 | 文档状态 | 部分落地 |
 | 创建时间 | 2026-04-08 |
-| 更新时间 | 2026-04-08 |
-| 关联文档 | [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[21-assistant-project-document-tools](./21-assistant-project-document-tools.md)、[系统架构设计](../specs/architecture.md)、[主流模型厂商请求参数参考](../specs/model-provider-request-params-reference.md)、[主流模型厂商响应结构与流式事件参考](../specs/model-provider-response-contract-reference.md)、[模型协议兼容中间层重构方案](../plans/2026-04-07-model-provider-compatibility-middleware-plan.md) |
+| 更新时间 | 2026-04-10 |
+| 关联文档 | [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[21-assistant-project-document-tools](./21-assistant-project-document-tools.md)、[模型协议与工具调用标准](../specs/model-protocols/README.md)、[系统架构设计](../specs/architecture.md)、[模型协议兼容中间层重构方案](../plans/2026-04-07-model-provider-compatibility-middleware-plan.md) |
 
 ---
 
@@ -14,7 +14,7 @@
 >
 > 当前代码里已经存在一版协议兼容中间层，但它还没有把“内部工具语义”和“外部协议格式”彻底隔离。本文关注的是最终稳定形态，不是一次性补丁。
 >
-> 截至 `2026-04-08`，tool name alias codec、conformance probe、凭证 `interop_profile -> verifier -> assistant runtime -> Credential Center` 贯通、`verified_probe_kind` 持久化、assistant visible-tools capability gating，以及 Credential Center 显式 `验证连接 / 验证工具调用` 产品语义都已落地；后续仍需继续推进更细粒度的 gateway profile。
+> 截至 `2026-04-10`，tool name alias codec、conformance probe、凭证 `interop_profile -> verifier -> assistant runtime -> Credential Center` 贯通、assistant visible-tools capability gating、Credential Center 显式 `验证连接 / 验证流式工具 / 验证非流工具` 产品语义，以及 Gemini 流式 tool-call terminal synthesis 都已落地；后续仍需继续推进更细粒度的 gateway profile。
 
 ## 1. 目的
 
@@ -120,7 +120,7 @@ assistant 侧与工具域的正式入口在：
 - `tool_schema_compiler` 已落地，但更细粒度的 schema / strict gateway profile 仍未完全展开
 - gateway profile 目前仍偏粗粒度，尚未覆盖更多代理方言差异
 
-### 3.1 当前已落地进展（2026-04-08）
+### 3.1 当前已落地进展（2026-04-10）
 
 - shared runtime 已建立 canonical dotted tool name -> external safe alias 的统一边界
 - `provider_interop_check.py` 已支持 `text_probe / tool_definition_probe / tool_call_probe / tool_continuation_probe`
@@ -128,12 +128,13 @@ assistant 侧与工具域的正式入口在：
 - `AsyncHttpCredentialVerifier`、assistant runtime 与 `LLMToolProvider` 已共享同一份 `interop_profile`
 - Credential Center 已暴露 `interop_profile` 配置入口，并按 `api_dialect` 约束可选项
 - `/api/v1/credentials/{id}/verify` 已支持显式 `probe_kind`
-- Credential Center 已显式区分 `验证连接(text_probe)` 与 `验证工具调用(tool_continuation_probe)`
-- `ModelCredential` 现已持久化 `verified_probe_kind`，作为“当前最高已证明 capability”真值
-- assistant runtime 在存在 visible tools 时会显式要求 `tool_continuation_probe`，不再把所有已验证连接默认为支持 project tools
+- Credential Center 已显式区分 `验证连接(text_probe)`、`验证流式工具(tool_continuation_probe + stream)` 与 `验证非流工具(tool_continuation_probe + buffered)`
+- `ModelCredential` 当前按 transport mode 分别持久化 `stream_tool_verified_probe_kind` 与 `buffered_tool_verified_probe_kind`
+- assistant runtime 在存在 visible tools 时会按当前 transport mode 显式要求 `tool_continuation_probe`，不再把所有已验证连接默认为支持 project tools
 - shared runtime 已新增 `tool_schema_compiler.py`，OpenAI / Claude / Gemini 的 tool definitions 统一走 `tool_schema_mode`
 - 当前 `portable_subset` 会收口 required-only `anyOf`，`gemini_compatible` 会在此基础上继续移除 Gemini 不支持的 schema key
 - shared runtime 已新增 `tool_continuation_codec.py`，runtime replay projection、tool result payload encoding 与 OpenAI Responses continuation input 已从 request builder 中抽离
+- shared runtime 已为 Gemini 流式补齐终态 tool-call synthesize，避免早期 `functionCall` 在 terminal 装配时丢失或重复
 
 ## 4. 设计目标
 
@@ -675,12 +676,14 @@ assistant runtime 不应再把所有已验证连接默认视为“支持 project
 
 ### 12.3 当前已落地门控真值
 
-截至 `2026-04-08`，产品已按以下口径落地：
+截至 `2026-04-10`，产品已按以下口径落地：
 
-- `ModelCredential.verified_probe_kind` 保存“当前最高已证明 capability”，不是“最后一次验证的 probe kind”
-- 连接级关键字段变更（如 `api_key / base_url / default_model / api_dialect / interop_profile / headers / user-agent`）会显式清空 `last_verified_at + verified_probe_kind`
+- `last_verified_at` 只表示文本连接验证状态
+- `stream_tool_verified_probe_kind` 保存“当前最高已证明的流式工具 capability”
+- `buffered_tool_verified_probe_kind` 保存“当前最高已证明的非流工具 capability”
+- 连接级关键字段变更（如 `api_key / base_url / default_model / api_dialect / interop_profile / headers / user-agent`）会显式清空文本和工具验证真值
 - verifier 成功后会按 probe 等级做 promote，不会因为再次执行较低等级 probe 而降级；该 promote 需要基于数据库当前值做原子更新，不能只依赖应用层内存对象
-- assistant prepare 阶段在存在 visible tools 时显式要求 `tool_continuation_probe`
+- assistant prepare 阶段在存在 visible tools 时，会根据当前 transport mode 显式要求对应侧的 `tool_continuation_probe`
 - 能力不足时直接返回显式业务错误，引导用户先执行“验证工具”，不做静默隐藏工具或自动降级到纯文本
 
 ## 13. 与现有代码的衔接原则

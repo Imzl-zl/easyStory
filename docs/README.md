@@ -5,7 +5,7 @@
 | 文档类型 | 索引 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-04-02 |
-| 更新时间 | 2026-04-04 |
+| 更新时间 | 2026-04-10 |
 
 ---
 
@@ -17,9 +17,11 @@
 | [系统架构设计](./specs/architecture.md) | 生效 | 模块化单体、分层与边界 |
 | [数据库设计](./specs/database-design.md) | 生效 | 数据模型和真值源 |
 | [配置格式规范](./specs/config-format.md) | 生效 | Skills / Agents / Hooks / Workflows 配置 |
-| [主流模型厂商请求参数参考](./specs/model-provider-request-params-reference.md) | 生效 | 请求格式、thinking、流式、上下文窗口与输出上限 |
-| [主流模型厂商请求头与客户端标识参考](./specs/model-provider-client-identity-and-headers-reference.md) | 生效 | 鉴权头、兼容层、浏览器边界与客户端自描述 |
-| [主流模型厂商响应结构与流式事件参考](./specs/model-provider-response-contract-reference.md) | 生效 | 响应体、SSE 事件、usage 位置与关键返回头 |
+| [模型协议与工具调用标准](./specs/model-protocols/README.md) | 生效 | 可跨项目复用的模型协议与 agent runtime 标准入口 |
+| [easyStory 采用映射](./specs/model-protocols/easystory-adoption-profile.md) | 生效 | 本项目对模型协议标准的字段、验证与工具面映射 |
+| [主流模型厂商请求参数参考](./specs/model-provider-request-params-reference.md) | 参考 | 更宽口径的市场请求格式、thinking、上下文窗口与输出上限资料 |
+| [主流模型厂商请求头与客户端标识参考](./specs/model-provider-client-identity-and-headers-reference.md) | 参考 | 更宽口径的鉴权头、兼容层与浏览器边界资料 |
+| [主流模型厂商响应结构与流式事件参考](./specs/model-provider-response-contract-reference.md) | 参考 | 更宽口径的响应体、SSE 事件与返回头资料 |
 
 ---
 
@@ -40,6 +42,7 @@
 - [Assistant 运行时与聊天主路径](./design/20-assistant-runtime-chat-mode.md)
 - [Assistant 原生 Tool-Calling Runtime 设计](./design/22-assistant-tool-calling-runtime.md)
 - [Assistant 项目文稿工具设计](./design/21-assistant-project-document-tools.md)
+- [模型协议与工具调用标准](./specs/model-protocols/README.md)
 - [系统架构设计](./specs/architecture.md)
 - [配置格式规范](./specs/config-format.md)
 
@@ -56,6 +59,6 @@
 
 ## 4. 使用说明
 
-- 查“请求怎么发”时，先看 [主流模型厂商请求参数参考](./specs/model-provider-request-params-reference.md)。
-- 查“请求头 / 浏览器 / User-Agent 怎么处理”时，看 [主流模型厂商请求头与客户端标识参考](./specs/model-provider-client-identity-and-headers-reference.md)。
-- 查“为什么流式解析错 / 为什么 usage 不对 / 为什么响应体字段不同”时，看 [主流模型厂商响应结构与流式事件参考](./specs/model-provider-response-contract-reference.md)。
+- 查“可跨项目复用的模型协议和 agent runtime 标准”时，先看 [模型协议与工具调用标准](./specs/model-protocols/README.md)。
+- 查“easyStory 当前如何采用这些标准”时，看 [easyStory 采用映射](./specs/model-protocols/easystory-adoption-profile.md)。
+- 查“更宽口径的厂商资料或市场对比”时，再看 [主流模型厂商请求参数参考](./specs/model-provider-request-params-reference.md)、[主流模型厂商请求头与客户端标识参考](./specs/model-provider-client-identity-and-headers-reference.md)、[主流模型厂商响应结构与流式事件参考](./specs/model-provider-response-contract-reference.md)。

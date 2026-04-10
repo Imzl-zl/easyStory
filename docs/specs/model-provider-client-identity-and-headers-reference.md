@@ -2,17 +2,21 @@
 
 | 字段 | 内容 |
 |---|---|
-| 文档类型 | 技术规范 / 接口参考 |
-| 文档状态 | 生效 |
+| 文档类型 | 技术规范 / 扩展参考 |
+| 文档状态 | 参考 |
 | 创建时间 | 2026-04-02 |
-| 更新时间 | 2026-04-02 |
-| 关联文档 | [主流模型厂商请求参数参考](./model-provider-request-params-reference.md)、[主流模型厂商响应结构与流式事件参考](./model-provider-response-contract-reference.md)、[技术栈确定](./tech-stack.md)、[系统架构设计](./architecture.md) |
+| 更新时间 | 2026-04-10 |
+| 关联文档 | [模型协议与工具调用标准](./model-protocols/README.md)、[主流模型厂商请求参数参考](./model-provider-request-params-reference.md)、[主流模型厂商响应结构与流式事件参考](./model-provider-response-contract-reference.md)、[技术栈确定](./tech-stack.md)、[系统架构设计](./architecture.md) |
 
 ---
 
+> 当前 easyStory shared runtime 的正式鉴权头、User-Agent、`extra_headers` 优先级与客户端身份维护入口，已迁到 [模型协议与工具调用标准](./model-protocols/README.md)。
+>
+> 本文继续保留更宽口径的厂商资料与浏览器边界说明，但不再作为当前运行时代码的唯一标准真值。
+
 ## 1. 适用范围
 
-本文补充 `OpenAI GPT / Anthropic Claude / Google Gemini / Moonshot Kimi / MiniMax / Zhipu GLM / DeepSeek` 的请求头、鉴权方式、客户端标识、OpenAI-compatible 兼容层和浏览器直连边界，供 easyStory 做 provider interop、请求排错和前后端边界设计时参考。
+本文补充 `OpenAI GPT / Anthropic Claude / Google Gemini / Moonshot Kimi / MiniMax / Zhipu GLM / DeepSeek` 的请求头、鉴权方式、客户端标识、OpenAI-compatible 兼容层和浏览器直连边界，供 easyStory 做扩展调研、请求排错和市场资料沉淀时参考。
 
 使用原则：
 
@@ -20,6 +24,7 @@
 - 明确区分“官方必需头”“兼容层头”“浏览器运行时自带头”。
 - 本文不讨论绕过风控、冒充官方产品或伪造平台身份。
 - 对 Kimi 这类主要通过 OpenAI SDK 兼容示例展示的场景，若文档未单列原始 HTTP 头名，会明确标注“基于官方兼容示例推断”。
+- 若要查看当前代码实际采用的 `auth_strategy / api_key_header_name / user_agent_override / client_name / runtime_kind` 规则，请优先看 [客户端身份、鉴权与请求头](./model-protocols/client-identity-auth-and-headers.md)。
 
 ---
 

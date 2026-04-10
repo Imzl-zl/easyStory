@@ -5,7 +5,7 @@
 | 文档类型 | 设计索引 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-16 |
-| 更新时间 | 2026-04-08 |
+| 更新时间 | 2026-04-10 |
 
 ---
 
@@ -20,7 +20,7 @@
 
 > `docs/plans/` 默认是实施记录，不替代本目录和 `docs/specs/` 的正式设计真值。
 >
-> assistant runtime 当前正式入口直接看 [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)、[22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[23-provider-tool-interop-compatibility-layer](./23-provider-tool-interop-compatibility-layer.md)、[21-assistant-project-document-tools](./21-assistant-project-document-tools.md)；其中 23 已覆盖 shared runtime 的 tool/stream codec、conformance probe、`interop_profile / verified_probe_kind` 与 Credential Center 工具能力验证语义。若需要查看 2026-04-07 这轮收口的历史过程，再看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。
+> assistant runtime 当前正式入口直接看 [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)、[22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[23-provider-tool-interop-compatibility-layer](./23-provider-tool-interop-compatibility-layer.md)、[21-assistant-project-document-tools](./21-assistant-project-document-tools.md) 和 [模型协议与工具调用标准](../specs/model-protocols/README.md)；其中 23 与 model-protocols 已覆盖 shared runtime 的 tool/stream codec、conformance probe、`interop_profile`、transport-mode 工具能力验证以及 Credential Center 工具验证语义。若需要查看 2026-04-07 这轮收口的历史过程，再看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。
 
 ---
 

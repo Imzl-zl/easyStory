@@ -2,17 +2,21 @@
 
 | 字段 | 内容 |
 |---|---|
-| 文档类型 | 技术规范 / 响应契约参考 |
-| 文档状态 | 生效 |
+| 文档类型 | 技术规范 / 扩展参考 |
+| 文档状态 | 参考 |
 | 创建时间 | 2026-04-02 |
-| 更新时间 | 2026-04-04 |
-| 关联文档 | [主流模型厂商请求参数参考](./model-provider-request-params-reference.md)、[主流模型厂商请求头与客户端标识参考](./model-provider-client-identity-and-headers-reference.md)、[技术栈确定](./tech-stack.md) |
+| 更新时间 | 2026-04-10 |
+| 关联文档 | [模型协议与工具调用标准](./model-protocols/README.md)、[主流模型厂商请求参数参考](./model-provider-request-params-reference.md)、[主流模型厂商请求头与客户端标识参考](./model-provider-client-identity-and-headers-reference.md)、[技术栈确定](./tech-stack.md) |
 
 ---
 
+> 当前 easyStory shared runtime 的正式响应契约、SSE normalizer、terminal assembly 与工具流式标准，已迁到 [模型协议与工具调用标准](./model-protocols/README.md)。
+>
+> 本文继续保留更宽口径的厂商响应资料，但不再作为当前运行时代码的唯一标准真值。
+
 ## 1. 适用范围
 
-本文补充 `OpenAI GPT / Anthropic Claude / Google Gemini / Moonshot Kimi / MiniMax / Zhipu GLM / DeepSeek` 的非流式响应体、流式 SSE 事件、`usage` 返回位置和关键返回头，供 easyStory 做 provider interop、流式解析和排错时参考。
+本文补充 `OpenAI GPT / Anthropic Claude / Google Gemini / Moonshot Kimi / MiniMax / Zhipu GLM / DeepSeek` 的非流式响应体、流式 SSE 事件、`usage` 返回位置和关键返回头，供 easyStory 做扩展调研、排错和市场比对时参考。
 
 使用原则：
 
@@ -20,7 +24,8 @@
 - 把“请求参数”“响应契约”“请求头 / 客户端标识”分开建模，不混成一个大兼容层。
 - 返回头主要用于排错和观测，不替代响应体解析。
 - 对官方未系统列出的返回头，只记录官方明确写出的字段，不做经验性扩展。
-- 当前 easyStory runtime 原生流式 / 非流式 parser 只覆盖 `openai_responses / openai_chat_completions / anthropic_messages / gemini_native` 四类；`Kimi / MiniMax / GLM / DeepSeek` 目前主要作为 `openai_chat_completions` 家族的参考资料。
+- 当前 easyStory runtime 原生流式 / 非流式 parser 只覆盖 `openai_responses / openai_chat_completions / anthropic_messages / gemini_generate_content` 四类；`Kimi / MiniMax / GLM / DeepSeek` 目前主要作为 `openai_chat_completions` 家族的参考资料。
+- 若要查看当前代码实际采用的 parser、Gemini 流式终态 synthesize 与工具空响应判定，请优先看 [响应、流式与终态装配](./model-protocols/response-streaming-and-terminal-assembly.md)。
 
 ---
 
@@ -51,7 +56,7 @@
 
 工程结论：
 
-- 解析层至少要区分 `openai_responses / anthropic_messages / gemini_native / openai_chat_completions` 四大类。
+- 解析层至少要区分 `openai_responses / anthropic_messages / gemini_generate_content / openai_chat_completions` 四大类。
 - `openai_chat_completions` 下面再细分 `reasoning_content` 是否独立回传。
 - “请求能发出去”和“响应能正确解析”是两件事，必须分别建测试。
 - easyStory 当前运行时代码也确实是按这四类建 parser；如果后续要把 `Kimi / MiniMax / GLM / DeepSeek` 做成 vendor-native dialect，需要新增独立的请求 builder、SSE parser 和测试，不要只补文档。
@@ -209,7 +214,7 @@
 
 | 内部语义 | 建议 |
 |---|---|
-| `response_dialect` | 至少区分 `openai_responses / openai_chat_completions / anthropic_messages / gemini_native` |
+| `response_dialect` | 至少区分 `openai_responses / openai_chat_completions / anthropic_messages / gemini_generate_content` |
 | `stream_protocol` | 区分 `semantic_sse / named_sse / openai_chunk_sse / full-response-sse` |
 | `text_accumulator` | 区分 `output_text / delta.content / parts[].text` |
 | `reasoning_accumulator` | 区分 `reasoning_content / thinking_delta / reasoning_details / none` |

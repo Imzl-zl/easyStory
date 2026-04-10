@@ -5,8 +5,8 @@
 | 文档类型 | 功能设计 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-04-04 |
-| 更新时间 | 2026-04-08 |
-| 关联文档 | [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)、[21-assistant-project-document-tools](./21-assistant-project-document-tools.md)、[23-provider-tool-interop-compatibility-layer](./23-provider-tool-interop-compatibility-layer.md)、[16-mcp-architecture](./16-mcp-architecture.md)、[系统架构设计](../specs/architecture.md) |
+| 更新时间 | 2026-04-10 |
+| 关联文档 | [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)、[21-assistant-project-document-tools](./21-assistant-project-document-tools.md)、[23-provider-tool-interop-compatibility-layer](./23-provider-tool-interop-compatibility-layer.md)、[模型协议与工具调用标准](../specs/model-protocols/README.md)、[16-mcp-architecture](./16-mcp-architecture.md)、[系统架构设计](../specs/architecture.md) |
 
 ---
 
@@ -14,7 +14,7 @@
 >
 > 若你需要查看 2026-04-07 这轮 assistant runtime 收口的历史实施过程，请看 [Assistant Runtime 文档重构计划](../plans/2026-04-07-assistant-runtime-doc-refactor.md)。当前正式语义以本文、相关 design 文档与代码为准。
 >
-> provider/tool 协议边界、canonical tool contract、gateway capability profile 与 conformance 验证，统一见 [23-provider-tool-interop-compatibility-layer](./23-provider-tool-interop-compatibility-layer.md)。本文不再承载这些跨 provider 的长期兼容细节。
+> provider/tool 协议边界、canonical tool contract、gateway capability profile 与 conformance 验证，统一见 [23-provider-tool-interop-compatibility-layer](./23-provider-tool-interop-compatibility-layer.md) 和 [模型协议与工具调用标准](../specs/model-protocols/README.md)。本文不再承载这些跨 provider 的长期兼容细节。
 
 ## 1. 目的
 
@@ -44,7 +44,11 @@
 - Hook / MCP / Plugin 仍主要服务 hook 事件，不是 ordinary chat 的旁路工具循环
 - SSE 已补 `run_started / tool_call_start / tool_call_result / completed`
 - `document_context` 已有结构化 request contract，Studio 旧 prompt stuffing 只剩兼容投影层
-- assistant 在存在 visible `project.*` 工具时，现已显式要求凭证先通过 `tool_continuation_probe`；能力真值来自 `ModelCredential.verified_probe_kind`
+- assistant 在存在 visible `project.*` 工具时，现已显式要求凭证先通过 `tool_continuation_probe`
+- 工具能力真值当前按 transport mode 分离保存：
+  - 流式看 `ModelCredential.stream_tool_verified_probe_kind`
+  - 非流式看 `ModelCredential.buffered_tool_verified_probe_kind`
+- Credential Center 当前产品语义已显式区分 `验证连接 / 验证流式工具 / 验证非流工具`
 - provider/tool 协议边界当前已在 shared runtime 收口为 `tool_name_codec / tool_schema_compiler / tool_call_codec / tool_continuation_codec / stream_event_normalizer`，assistant 业务层不再直接承载协议散点兼容
 
 当前仍未完全闭合的边界主要是：

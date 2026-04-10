@@ -5,8 +5,8 @@
 | 文档类型 | 功能设计 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-04-03 |
-| 更新时间 | 2026-04-07 |
-| 关联文档 | [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)、[22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[16-mcp-architecture](./16-mcp-architecture.md)、[系统架构设计](../specs/architecture.md) |
+| 更新时间 | 2026-04-10 |
+| 关联文档 | [20-assistant-runtime-chat-mode](./20-assistant-runtime-chat-mode.md)、[22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[23-provider-tool-interop-compatibility-layer](./23-provider-tool-interop-compatibility-layer.md)、[模型协议与工具调用标准](../specs/model-protocols/README.md)、[16-mcp-architecture](./16-mcp-architecture.md)、[系统架构设计](../specs/architecture.md) |
 
 ---
 
@@ -25,6 +25,8 @@
 - 一次修改往往会影响多份资料，不能继续靠逐份手工打开再追问
 
 ordinary chat 的原生 tool-calling runtime、provider 适配、run / step 真值、SSE 协议和授权模型，统一见 [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)。本文只定义“项目文稿能力域”本身。
+
+与 provider 协议、工具名 alias、tool schema 编译、tool result continuation、stream terminal 装配有关的当前标准实现，统一维护在 [模型协议与工具调用标准](../specs/model-protocols/README.md)。
 
 ---
 
