@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.orm import Session
@@ -276,10 +276,14 @@ def test_resolve_credential_prefers_project_then_user_then_system(db, monkeypatc
     assert resolved.id == system_credential.id
 
 
-def test_list_credentials_prefers_latest_updated_record_order(db, monkeypatch) -> None:
+def test_list_credentials_keeps_creation_order_after_updates_and_verification(
+    db,
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
     user = create_user(db)
-    service = create_credential_service(verifier=FakeVerifier())
+    verified_at = datetime.now(timezone.utc).replace(microsecond=0)
+    service = create_credential_service(verifier=FakeVerifier(verified_at=verified_at))
     older = asyncio.run(
         service.create_credential(
             async_db(db),
@@ -294,11 +298,27 @@ def test_list_credentials_prefers_latest_updated_record_order(db, monkeypatch) -
             actor_user_id=user.id,
         )
     )
+    baseline = datetime(2026, 4, 10, 12, 0, tzinfo=timezone.utc)
+    older_record = db.query(ModelCredential).filter(ModelCredential.id == older.id).one()
+    newer_record = db.query(ModelCredential).filter(ModelCredential.id == newer.id).one()
+    older_record.created_at = baseline
+    older_record.updated_at = baseline
+    newer_record.created_at = baseline + timedelta(minutes=1)
+    newer_record.updated_at = baseline + timedelta(minutes=1)
+    db.commit()
+
     asyncio.run(
         service.update_credential(
             async_db(db),
             older.id,
             CredentialUpdateDTO(display_name="最近更新"),
+            actor_user_id=user.id,
+        )
+    )
+    asyncio.run(
+        service.verify_credential(
+            async_db(db),
+            older.id,
             actor_user_id=user.id,
         )
     )
@@ -311,7 +331,7 @@ def test_list_credentials_prefers_latest_updated_record_order(db, monkeypatch) -
         )
     )
 
-    assert [item.id for item in listed] == [older.id, newer.id]
+    assert [item.id for item in listed] == [newer.id, older.id]
 
 
 def test_system_pool_is_blocked_when_project_disallows(db, monkeypatch) -> None:
