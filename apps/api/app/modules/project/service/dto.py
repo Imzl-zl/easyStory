@@ -83,6 +83,7 @@ class ProjectIncubatorConversationDraftRequestDTO(BaseModel):
         min_length=1,
         max_length=PROJECT_INCUBATOR_MODEL_NAME_MAX_LENGTH,
     )
+    base_project_setting: ProjectSetting | None = None
 
 
 class ProjectIncubatorCreateRequestDTO(BaseModel):

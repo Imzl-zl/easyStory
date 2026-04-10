@@ -207,6 +207,7 @@ export type ProjectIncubatorConversationDraftPayload = {
   conversation_text: string;
   provider: string;
   model_name?: string;
+  base_project_setting?: ProjectSetting | null;
 };
 
 export type ProjectIncubatorConversationDraft = {

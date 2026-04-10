@@ -182,3 +182,34 @@ def test_compile_tool_parameters_adds_null_to_enum_for_openai_strict() -> None:
     assert compiled["properties"]["source"]["type"] == ["string", "null"]
     assert compiled["properties"]["source"]["enum"] == ["file", "outline", None]
     assert compiled["required"] == ["source"]
+
+
+def test_compile_tool_parameters_collapses_nullable_anyof_for_openai_strict() -> None:
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "paths": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1},
+                "minItems": 1,
+            },
+            "cursors": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {"type": "string", "minLength": 1},
+                    },
+                    {"type": "null"},
+                ],
+            },
+        },
+        "required": ["paths"],
+    }
+
+    compiled = compile_tool_parameters(schema, mode="openai_strict_compatible")
+
+    assert compiled["properties"]["cursors"] == {
+        "type": ["array", "null"],
+        "items": {"type": "string", "minLength": 1},
+    }

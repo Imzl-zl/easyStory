@@ -235,8 +235,13 @@ PROJECT_READ_DOCUMENTS_DESCRIPTOR = AssistantToolDescriptor(
                 "minItems": 1,
             },
             "cursors": {
-                "type": "array",
-                "items": {"type": "string", "minLength": 1},
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {"type": "string", "minLength": 1},
+                    },
+                    {"type": "null"},
+                ],
             },
         },
         "required": ["paths"],

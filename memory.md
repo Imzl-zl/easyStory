@@ -46,7 +46,7 @@
 - template + incubator 闭环：built-in sync、自定义模板、draft / create-project / conversation draft、完整度前移
 - config_registry 管理闭环：skills / agents / hooks / workflows 查询与 detail / update，strict DTO + staged config 校验
 - Config Registry 前端闭环：Lobby 子视图已支持 skills / agents / hooks / mcp_servers / workflows 列表、详情预览与 JSON 编辑保存
-- Project Settings 前端闭环：`/workspace/project/:projectId/settings` 已支持项目摘要自由文本提炼/保存、项目规则、项目 AI 偏好、项目 Skills、项目 MCP、项目审计日志子页，以及未保存离开保护
+- Project Settings 前端闭环：`/workspace/project/:projectId/settings` 已支持基于 `项目说明.md` 的项目摘要提取/保存（保存时会和当前 `project_setting` 做增量合并）、项目规则、项目 AI 偏好、项目 Skills、项目 MCP、项目审计日志子页，以及未保存离开保护
 - Credential Center 前端闭环：`/workspace/lobby/settings?tab=credentials` 已支持全局/项目作用域切换、项目入口、凭证编辑更新、审计子视图和未保存离开保护；编辑态保存成功后会立即以最新返回结果重建表单，`apiKey` 这类不会回显明文的字段不再让“返回项目大厅”误判为仍有未保存更改
 - Credential Center 删除确认闭环：删除前现有显式确认弹窗，影响文案对齐后端作用域优先级与 usage 历史限制
 - Credential Center 覆盖提示闭环：带项目上下文查看全局凭证时，可显式看到哪些 provider 已被项目级启用凭证接管
@@ -54,7 +54,7 @@
 - Workspace Shell 折叠侧栏闭环：全局工作台侧栏现支持桌面端展开/收起、偏好持久化与小屏自动收口，相关导航纯函数已补单测
 - Workspace UI 壳层优化闭环：`WorkspaceShell` 现已改为更克制的导航面板 + 主内容舞台结构，侧栏激活态、折叠态、导航语义和共用卡片层级已统一；同时补齐 `skip link`、`aria-live`、触控细节和输入提示，移动端不再显示无效的展开/收起切换按钮
 - Studio 顶部 Tab 布局闭环：`Studio` 现已改为页头操作区 + 顶部 Tab + 右侧辅助卡片，章节目录只在章节面板内部展示，章节列表已显式区分 loading / error / empty
-- Studio 文稿文件保存闭环：当前创作页已支持项目文稿文件 `GET/PUT`，默认保存到 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；文件层现在支持 `.md + .json`，并会在新建项目时直接创建一套空模板（项目说明、设定细分、`数据层/*.json`、章节规划、时间轴、附录、校验、导出），后续允许用户自行删改；正式 `大纲 / 开篇设计 / 正文章节` 继续走 DB 内容真值。`正文` 目录下允许新增卷目录和章节路径占位文件，但章节正文仍只通过 content 保存链更新。
+- Studio 文稿文件保存闭环：当前创作页已支持项目文稿文件 `GET/PUT`，默认保存到 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；文件层现在支持 `.md + .json`，并会在新建项目时直接创建模板，其中 `项目说明.md` 会按当前 `project_setting` 生成初稿，其余设定细分、`数据层/*.json`、章节规划、时间轴、附录、校验、导出模板默认空白，后续允许用户自行删改；正式 `大纲 / 开篇设计 / 正文章节` 继续走 DB 内容真值。`正文` 目录下允许新增卷目录和章节路径占位文件，但章节正文仍只通过 content 保存链更新。
 - Studio 文稿树 CRUD 闭环：当前创作页左侧文稿树已从“固定骨架 + 自定义节点”改成“少量固定槽位 + 可编辑默认模板”；固定只保留 `设定 / 大纲 / 正文` 语义槽位和 DB 真值节点，其余模板节点都支持重命名、删除、新增与扩展。正文现在支持新增卷目录和章节创建；删除当前文稿时会优先回退到邻近文稿，不再直接跳到全局第一份。重命名/删除若影响当前打开文稿，会同步更新 `doc` 路由；聊天里已选的上下文路径也会随之重映射或移除
 - Engine 控制区压缩闭环：`Engine` 现已改为页头控制区 + 顶部状态区 + 全宽详情区，workflow 输入、控制按钮、摘要与调试入口已从左侧控制栏收口
 - 数据库演进闭环：Alembic baseline，startup 与文件型 SQLite helper 优先走 Alembic

@@ -227,6 +227,15 @@ def test_assistant_tool_descriptor_registry_exposes_project_read_documents_descr
     assert descriptor.mutability == "read_only"
     assert descriptor.origin == "project_document"
     assert descriptor.trust_class == "local_first_party"
+    assert descriptor.input_schema["properties"]["cursors"] == {
+        "anyOf": [
+            {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1},
+            },
+            {"type": "null"},
+        ]
+    }
 
     write_descriptor = registry.get_descriptor("project.write_document")
 

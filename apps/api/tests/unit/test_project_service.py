@@ -589,7 +589,11 @@ def test_project_management_create_project_bootstraps_template_directly(db, tmp_
     assert (documents_root / "设定" / "人物.md").exists()
     assert (documents_root / "数据层" / "人物关系.json").exists()
     assert (documents_root / "数据层" / "势力关系.json").exists()
-    assert (documents_root / "项目说明.md").read_text(encoding="utf-8") == ""
+    overview_content = (documents_root / "项目说明.md").read_text(encoding="utf-8")
+    assert "# 项目说明" in overview_content
+    assert "项目名称：模板项目" in overview_content
+    assert "题材：玄幻" in overview_content
+    assert "核心冲突：主角在宗门追杀中求生" in overview_content
     assert (documents_root / "数据层" / "人物关系.json").read_text(encoding="utf-8") == ""
 
 

@@ -19,6 +19,8 @@ export type ProjectSettingSummaryEditorResources = {
   userPreferences: AssistantPreferences;
 };
 
+export const PROJECT_SETTING_SUMMARY_SOURCE_DOCUMENT_PATH = "项目说明.md";
+
 const EMPTY_PREFERENCES: AssistantPreferences = {
   default_max_output_tokens: null,
   default_model_name: null,
@@ -33,6 +35,26 @@ export function buildProjectSettingSummarySaveFeedback(impact: ProjectSettingImp
     return "项目摘要已保存，当前没有需要重新标记的下游内容。";
   }
   return `项目摘要已保存，并同步标记 ${impact.total_affected_entries} 个下游项为 stale。`;
+}
+
+export function normalizeProjectSettingSummarySourceContent(
+  content: string | null | undefined,
+) {
+  return content?.trim() ?? "";
+}
+
+export function buildProjectSettingSummarySourceExcerpt(
+  content: string | null | undefined,
+  maxLength = 220,
+) {
+  const normalized = normalizeProjectSettingSummarySourceContent(content).replace(/\s+/g, " ");
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength).trimEnd()}…`;
 }
 
 export function invalidateProjectSettingSummaryQueries(

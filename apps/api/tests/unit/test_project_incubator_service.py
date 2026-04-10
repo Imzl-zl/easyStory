@@ -25,6 +25,7 @@ from tests.unit.async_api_support import (
     cleanup_sqlite_session_factories,
 )
 from tests.unit.models.helpers import create_user
+from tests.unit.models.helpers import ready_project_setting
 
 TEST_MASTER_KEY = "credential-master-key-for-project-incubator-tests"
 
@@ -647,6 +648,63 @@ async def test_project_incubator_service_uses_explicit_model_name_override(
 
         assert fake_provider.params[0]["model"]["provider"] == "openai"
         assert fake_provider.params[0]["model"]["name"] == "gpt-4.1"
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_project_incubator_service_merges_conversation_draft_with_base_setting(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    fake_provider = FakeConversationToolProvider(
+        {
+            "tone": "热血",
+            "protagonist": {
+                "identity": "背负旧债的宗门弃徒",
+            },
+        }
+    )
+    incubator_service = create_project_incubator_service(tool_provider=fake_provider)
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(
+            tmp_path,
+            name="project-incubator-conversation-merge-base",
+        )
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+            create_model_credential(
+                session,
+                owner_id,
+                provider="openai",
+                api_dialect="openai_chat_completions",
+                default_model="gpt-4o-mini",
+            )
+
+        async with async_session_factory() as session:
+            draft = await incubator_service.build_conversation_draft(
+                session,
+                ProjectIncubatorConversationDraftRequestDTO(
+                    conversation_text="把主角身份改得更苦一点，整体更热血。",
+                    provider="openai",
+                    base_project_setting=ready_project_setting(),
+                ),
+                owner_id=owner_id,
+            )
+
+        assert draft.project_setting.genre == "玄幻"
+        assert draft.project_setting.core_conflict == "主角在宗门追杀中求生"
+        assert draft.project_setting.tone == "热血"
+        assert draft.project_setting.protagonist is not None
+        assert draft.project_setting.protagonist.identity == "背负旧债的宗门弃徒"
+        assert draft.project_setting.protagonist.goal == "重返内门"
+        assert draft.project_setting.world_setting is not None
+        assert draft.project_setting.world_setting.era_baseline == "宗门割据时代"
+        assert draft.setting_completeness.status == "ready"
+        assert draft.follow_up_questions == []
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
