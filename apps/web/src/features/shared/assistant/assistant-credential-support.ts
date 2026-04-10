@@ -85,11 +85,14 @@ export function resolveSelectedIncubatorCredentialOption(options: {
   preferredProvider: string;
 }) {
   const currentOption = options.options.find((option) => option.provider === options.currentProvider.trim()) ?? null;
-  if (options.preferredProvider.trim()) {
-    return pickIncubatorCredentialOption(options.options, options.preferredProvider);
-  }
-  if (currentOption && (options.hasUserMessage || !isInsecurePublicHttpCredentialOption(currentOption))) {
+  if (currentOption) {
     return currentOption;
+  }
+  if (options.preferredProvider.trim()) {
+    const preferredOption = pickIncubatorCredentialOption(options.options, options.preferredProvider);
+    if (preferredOption && (options.hasUserMessage || !isInsecurePublicHttpCredentialOption(preferredOption))) {
+      return preferredOption;
+    }
   }
   return pickIncubatorCredentialOption(options.options, "");
 }

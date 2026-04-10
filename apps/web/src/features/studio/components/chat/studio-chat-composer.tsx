@@ -6,6 +6,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { Button, Input, Message, Radio } from "@arco-design/web-react";
 
 import { AppSelect } from "@/components/ui/app-select";
+import { renderFloatingPanel, useFloatingPanelStyle } from "@/components/ui/floating-panel-support";
 import type {
   DocumentTreeNode,
   StudioChatLayoutMode,
@@ -19,7 +20,6 @@ import {
 import { STUDIO_ATTACHMENT_ACCEPT, type StudioChatAttachmentMeta } from "@/features/studio/components/chat/studio-chat-attachment-support";
 import { submitStudioComposerMessage } from "@/features/studio/components/chat/studio-chat-composer-support";
 import { StudioChatContextSelectorContent } from "@/features/studio/components/chat/studio-chat-context-selector";
-import { renderStudioFloatingPanel, useFloatingPanelStyle } from "@/features/studio/components/chat/studio-chat-floating-panel-support";
 import type { StudioChatSettings, StudioProviderOption } from "@/features/studio/components/chat/studio-chat-support";
 import { resolveStudioWriteToggleDisabled } from "@/features/studio/components/chat/studio-chat-write-support";
 
@@ -112,11 +112,13 @@ export function StudioChatComposer({
     align: "right",
     maxHeight: 480,
     preferredWidth: 352,
+    side: "top",
   });
   const contextSelectorStyle = useFloatingPanelStyle(showContextSelector, contextButtonRef, {
     align: "left",
     maxHeight: 320,
     preferredWidth: 352,
+    side: "top",
   });
 
   const currentProviderOption = useMemo(
@@ -265,7 +267,7 @@ export function StudioChatComposer({
                 <ContextIcon />
               </ToolbarChipButton>
 
-              {showContextSelector ? renderStudioFloatingPanel(
+              {showContextSelector ? renderFloatingPanel(
                 <StudioChatContextSelectorContent
                   availableContexts={availableContexts}
                   onToggleContext={onToggleContext}
@@ -286,7 +288,7 @@ export function StudioChatComposer({
                 <SparkIcon />
               </ToolbarChipButton>
 
-              {showModelPicker ? renderStudioFloatingPanel(
+              {showModelPicker ? renderFloatingPanel(
                 <div
                   className={MODEL_PICKER_PANEL_CLASS}
                   ref={modelPickerRef}

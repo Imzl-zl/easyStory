@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from ..errors import ConfigurationError
@@ -38,8 +39,29 @@ def raise_if_truncated_response(
     *,
     api_dialect: str,
     payload: dict[str, Any],
+    response_format: str = "text",
+    content: str | None = None,
 ) -> None:
     stop_reason = extract_response_truncation_reason(api_dialect, payload)
     if stop_reason is None:
         return
+    if _is_acceptable_truncated_json_object(
+        response_format=response_format,
+        content=content,
+    ):
+        return
     raise ConfigurationError(build_truncated_response_message(stop_reason))
+
+
+def _is_acceptable_truncated_json_object(
+    *,
+    response_format: str,
+    content: str | None,
+) -> bool:
+    if response_format != "json_object" or not isinstance(content, str):
+        return False
+    try:
+        payload = json.loads(content)
+    except json.JSONDecodeError:
+        return False
+    return isinstance(payload, dict)

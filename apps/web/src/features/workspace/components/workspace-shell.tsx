@@ -16,9 +16,12 @@ import {
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 
-type PageMode = "lobby" | "studio" | "project";
+type PageMode = "incubator" | "lobby" | "studio" | "project";
 
 function resolvePageMode(pathname: string): PageMode {
+  if (pathname === "/workspace/lobby/new") {
+    return "incubator";
+  }
   if (pathname.includes("/lobby") || pathname === "/workspace") {
     return "lobby";
   }
@@ -52,7 +55,7 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
   const currentProjectId = resolveWorkspaceProjectId(pathname);
   const workspaceItems = buildWorkspaceItems(currentProjectId, lastProjectId);
   const pageMode = resolvePageMode(pathname);
-  const shellClassName = pageMode === "studio"
+  const shellClassName = pageMode === "studio" || pageMode === "incubator"
     ? "flex h-[100dvh] flex-col overflow-hidden [background:radial-gradient(circle_at_top_left,rgba(90,122,107,0.06),transparent_26%),var(--bg-canvas)]"
     : "min-h-screen pb-[max(env(safe-area-inset-bottom),0px)] [background:radial-gradient(circle_at_top_left,rgba(90,122,107,0.06),transparent_26%),var(--bg-canvas)]";
 
@@ -74,8 +77,25 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
           userName={user?.username ?? "未登录"}
           workspaceItems={workspaceItems}
         />
-        <main className={pageMode === "studio" ? "w-full flex-1 min-h-0 overflow-hidden" : "w-[min(100%-2.5rem,1560px)] mx-auto"} id="workspace-main">
-          <div className={pageMode === "studio" ? "h-full min-h-0 overflow-hidden" : "min-h-[calc(100vh-72px)] py-5 pb-7"}>{children}</div>
+        <main
+          className={
+            pageMode === "studio"
+              ? "w-full flex-1 min-h-0 overflow-hidden"
+              : pageMode === "incubator"
+                ? "w-[min(100%-2.5rem,1560px)] mx-auto flex-1 min-h-0 overflow-hidden"
+                : "w-[min(100%-2.5rem,1560px)] mx-auto"
+          }
+          id="workspace-main"
+        >
+          <div
+            className={
+              pageMode === "studio" || pageMode === "incubator"
+                ? "h-full min-h-0 overflow-hidden py-5 pb-7"
+                : "min-h-[calc(100vh-72px)] py-5 pb-7"
+            }
+          >
+            {children}
+          </div>
         </main>
       </div>
     </AuthGuard>
@@ -97,7 +117,7 @@ function WorkspaceHeader({
   userName: string;
   workspaceItems: WorkspaceNavItem[];
 }>) {
-  if (pageMode === "lobby") {
+  if (pageMode === "lobby" || pageMode === "incubator") {
     return (
       <header className="sticky top-0 z-20 border-b border-[rgba(61,61,61,0.08)] bg-[rgba(255,253,251,0.9)] backdrop-blur-xl">
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 w-[min(100%-2.5rem,1560px)] mx-auto py-3.5">

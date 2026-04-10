@@ -13,6 +13,8 @@ from app.modules.project.service import (
     ProjectIncubatorDraftRequestDTO,
     create_project_incubator_service,
 )
+from app.shared.runtime.llm.llm_protocol import HttpJsonResponse
+from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
 from app.shared.runtime import ToolProvider
 from app.modules.template.models import Template
 from app.modules.template.service import (
@@ -705,6 +707,71 @@ async def test_project_incubator_service_merges_conversation_draft_with_base_set
         assert draft.project_setting.world_setting.era_baseline == "宗门割据时代"
         assert draft.setting_completeness.status == "ready"
         assert draft.follow_up_questions == []
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_project_incubator_service_accepts_parseable_truncated_json_object(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+
+    async def request_sender(_request):
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            '{"genre":"玄幻修仙","core_conflict":"主角必须在宗门压制中夺回成长机会",'
+                            '"protagonist":{"identity":"没落家族少年","goal":"恢复天赋，为家族复仇"},'
+                            '"world_setting":{"era_baseline":"宗门林立、强者为尊"}}'
+                        ),
+                    }
+                ],
+                "stop_reason": "max_tokens",
+                "usage": {"input_tokens": 10, "output_tokens": 20},
+            },
+            text="",
+        )
+
+    incubator_service = create_project_incubator_service(
+        tool_provider=LLMToolProvider(request_sender=request_sender)
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(
+            tmp_path,
+            name="project-incubator-conversation-truncated-json",
+        )
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+            create_model_credential(
+                session,
+                owner_id,
+                provider="anthropic",
+                api_dialect="anthropic_messages",
+                default_model="claude-sonnet-4-20250514",
+            )
+
+        async with async_session_factory() as session:
+            draft = await incubator_service.build_conversation_draft(
+                session,
+                ProjectIncubatorConversationDraftRequestDTO(
+                    conversation_text="我想写一本玄幻修仙小说。",
+                    provider="anthropic",
+                ),
+                owner_id=owner_id,
+            )
+
+        assert draft.project_setting.genre == "玄幻修仙"
+        assert draft.project_setting.core_conflict == "主角必须在宗门压制中夺回成长机会"
+        assert draft.project_setting.protagonist is not None
+        assert draft.project_setting.protagonist.identity == "没落家族少年"
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 

@@ -112,32 +112,29 @@ function ChatPanelHeader({
   model: IncubatorChatModel;
 }) {
   return (
-    <header className="border-b border-[var(--line-soft)] px-3 py-2 md:px-4 md:py-2 xl:px-5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-[13.5px] font-semibold text-[var(--text-primary)]">AI 聊天</h2>
-            {model.isCredentialLoading ? (
-              <span className="rounded-full bg-[rgba(31,27,22,0.05)] px-2 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)]">
-                正在准备聊天…
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-0.5 text-[11px] leading-5 text-[var(--text-secondary)]">
-            先聊想法，再整理草稿。
-          </p>
+    <header className="relative z-10 border-b border-[var(--line-soft)] px-3 py-1.5 md:px-4 md:py-2 xl:px-5">
+      <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">AI 聊天</h2>
+          {model.isCredentialLoading ? (
+            <span className="rounded-full bg-[rgba(31,27,22,0.05)] px-2 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)]">
+              正在准备
+            </span>
+          ) : null}
+        </div>
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+          <ChatHistoryPanel model={model} />
+          <ChatAdvancedSettings model={model} />
         </div>
       </div>
-      <div className="mt-1.5 space-y-1.5">
-        <ChatHistoryPanel model={model} />
-        {model.credentialNotice ? (
+      {model.credentialNotice ? (
+        <div className="mt-2">
           <CredentialNoticeCard
             credentialSettingsHref={model.credentialSettingsHref}
             message={model.credentialNotice}
           />
-        ) : null}
-        <ChatAdvancedSettings model={model} />
-      </div>
+        </div>
+      ) : null}
     </header>
   );
 }
@@ -158,7 +155,7 @@ function ChatTranscript({
   return (
     <div
       aria-live="polite"
-      className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-[linear-gradient(180deg,rgba(255,255,255,0.58)_0%,rgba(247,240,229,0.3)_100%)] px-3 py-2 md:px-4 md:py-2.5 xl:px-5"
+      className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-[linear-gradient(180deg,rgba(255,255,255,0.58)_0%,rgba(247,240,229,0.3)_100%)] px-3 py-1.5 md:px-4 md:py-2 xl:px-5"
       ref={transcriptRef}
     >
       <div className="mx-auto flex min-h-full w-full max-w-[980px] flex-col gap-1.5">
@@ -193,8 +190,8 @@ function ChatComposerSection({
   model,
 }: Readonly<ComposerSectionProps>) {
   return (
-    <footer className="border-t border-[var(--line-soft)] bg-[rgba(248,243,235,0.82)] px-3 py-2 md:px-4 xl:px-5">
-      <div className="rounded-[18px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.9)] px-2.5 py-1.5 shadow-[0_8px_18px_rgba(58,45,29,0.05)] transition-[border-color,box-shadow,background-color] focus-within:border-[rgba(46,111,106,0.24)] focus-within:shadow-[0_0_0_3px_rgba(46,111,106,0.1)]">
+    <footer className="border-t border-[var(--line-soft)] bg-[rgba(248,243,235,0.82)] px-3 py-1.5 md:px-4 md:py-2 xl:px-5">
+      <div className="rounded-[16px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.9)] px-2.5 py-1.5 shadow-[0_8px_18px_rgba(58,45,29,0.05)] transition-[border-color,box-shadow,background-color] focus-within:border-[rgba(46,111,106,0.24)] focus-within:shadow-[0_0_0_3px_rgba(46,111,106,0.1)]">
         <label className="block">
           <span className="sr-only">继续聊</span>
           <Input.TextArea

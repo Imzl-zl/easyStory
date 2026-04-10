@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode, RefObject } from "react";
 
-import { observeStudioChatLayoutChanges } from "@/features/studio/components/chat/studio-chat-floating-panel-support";
+import { observeFloatingPanelLayoutChanges } from "@/components/ui/floating-panel-support";
 import {
   filterStudioChatSkillOptions,
   type StudioChatSkillOption,
@@ -62,7 +62,7 @@ export function StudioChatSkillPanel({
 
     updateLayout();
     const frameId = window.requestAnimationFrame(() => searchInputRef.current?.focus());
-    const cleanupLayoutObserver = observeStudioChatLayoutChanges(containerRef.current, updateLayout);
+    const cleanupLayoutObserver = observeFloatingPanelLayoutChanges(containerRef.current, updateLayout);
     document.addEventListener("keydown", handleEscape);
     return () => {
       window.cancelAnimationFrame(frameId);

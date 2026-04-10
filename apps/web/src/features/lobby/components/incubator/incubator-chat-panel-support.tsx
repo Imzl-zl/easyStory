@@ -24,10 +24,10 @@ export function CredentialNoticeCard({
   message: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[rgba(183,121,31,0.14)] bg-[rgba(183,121,31,0.1)] px-3 py-2 text-[11.5px] leading-5 text-[var(--accent-warning)]">
-      <p className="min-w-0 flex-1">{message}</p>
+    <div className="flex flex-wrap items-center gap-2 rounded-[14px] border border-[rgba(183,121,31,0.16)] bg-[rgba(183,121,31,0.1)] px-2.5 py-2 text-[10.5px] leading-5 text-[var(--accent-warning)]">
+      <p className="min-w-0 flex-1 break-words">{message}</p>
       <Link
-        className="inline-flex shrink-0 items-center rounded-full bg-[rgba(255,255,255,0.76)] px-2 py-0.5 text-[10.5px] font-medium text-[var(--accent-ink)] transition hover:bg-[rgba(255,255,255,0.96)]"
+        className="inline-flex shrink-0 items-center rounded-full bg-[rgba(255,255,255,0.82)] px-2 py-0.5 text-[10px] font-medium text-[var(--accent-ink)] transition hover:bg-white"
         href={credentialSettingsHref}
       >
         前往模型连接

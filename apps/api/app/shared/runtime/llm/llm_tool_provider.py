@@ -97,14 +97,16 @@ class LLMToolProvider(ToolProvider):
         response = await self.request_sender(prepared_request)
         if response.status_code >= 400:
             raise ConfigurationError(_build_http_error_message(response))
-        raise_if_truncated_response(
-            api_dialect=request.connection.api_dialect,
-            payload=response.json_body or {},
-        )
         normalized = parse_generation_response(
             request.connection.api_dialect,
             response.json_body or {},
             tool_name_aliases=prepared_request.tool_name_aliases,
+        )
+        raise_if_truncated_response(
+            api_dialect=request.connection.api_dialect,
+            payload=response.json_body or {},
+            response_format=request.response_format,
+            content=normalized.content,
         )
         raise_if_empty_tool_response(
             has_tools=bool(request.tools),

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@arco-design/web-react";
 
+import { renderFloatingPanel, useFloatingPanelStyle } from "@/components/ui/floating-panel-support";
 import type { IncubatorChatModel } from "@/features/lobby/components/incubator/incubator-page-model";
 
 const TODAY_PREFIX = "今天";
@@ -24,37 +25,144 @@ const FULL_DATE_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
 
 export function ChatHistoryPanel({ model }: { model: IncubatorChatModel }) {
   const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const historyPanelId = "incubator-chat-history-panel";
   const conversations = model.conversationSummaries;
   const activeConversation = conversations.find(
     (conversation) => conversation.id === model.activeConversationId,
   ) ?? conversations[0] ?? null;
+  const panelStyle = useFloatingPanelStyle(isOpen, triggerRef, {
+    align: "right",
+    maxHeight: 320,
+    preferredWidth: 384,
+    side: "bottom",
+    zIndex: 160,
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) {
+        return;
+      }
+      setIsOpen(false);
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen]);
+
+  const popup = isOpen && panelStyle
+    ? renderFloatingPanel(
+      <div
+        className="overflow-hidden rounded-[18px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.98)] p-1.5 shadow-[0_18px_38px_rgba(58,45,29,0.12)]"
+        id={historyPanelId}
+        ref={panelRef}
+        style={panelStyle}
+      >
+        <div className="mb-1 flex items-center justify-between gap-2 px-1.5">
+          <p className="text-[10.5px] leading-5 text-[var(--text-secondary)]">最近对话</p>
+          <button
+            className="rounded-full px-2 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)] transition hover:bg-[rgba(248,243,235,0.92)]"
+            type="button"
+            onClick={() => setIsOpen(false)}
+          >
+            收起
+          </button>
+        </div>
+        <ul className="space-y-1 overflow-y-auto pr-0.5" style={{ maxHeight: panelStyle.maxHeight }}>
+          {conversations.map((conversation) => {
+            const isActive = conversation.id === model.activeConversationId;
+            return (
+              <li key={conversation.id}>
+                <div
+                  className={`flex items-center gap-1.5 rounded-[14px] border px-1 py-1 ${isActive ? "border-[rgba(46,111,106,0.18)] bg-[rgba(46,111,106,0.08)]" : "border-transparent bg-[rgba(248,243,235,0.52)] hover:border-[rgba(101,92,82,0.1)] hover:bg-[rgba(255,255,255,0.92)]"}`}
+                >
+                  <button
+                    className="min-w-0 flex-1 rounded-[12px] px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.18)]"
+                    type="button"
+                    onClick={() => {
+                      model.selectConversation(conversation.id);
+                      setIsOpen(false);
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-[12px] font-medium leading-5 text-[var(--text-primary)]">
+                        {conversation.title}
+                      </span>
+                      {isActive ? (
+                        <span className="inline-flex shrink-0 items-center rounded-full bg-[rgba(255,255,255,0.88)] px-1.5 py-0.5 text-[9.5px] leading-4 text-[var(--accent-ink)]">
+                          当前
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-0.5 text-[10.5px] leading-4 text-[var(--text-secondary)]">
+                      {formatConversationUpdatedAt(conversation.updatedAt)}
+                    </p>
+                  </button>
+                  <Button
+                    aria-label={`删除对话：${conversation.title}`}
+                    className="shrink-0"
+                    icon={<TrashIcon />}
+                    shape="circle"
+                    size="mini"
+                    status="danger"
+                    type="text"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      model.deleteConversation(conversation.id);
+                      setIsOpen(false);
+                    }}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>,
+    )
+    : null;
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex flex-wrap items-stretch gap-1.5">
+    <div className="shrink-0">
+      <div className="flex items-center gap-1.5">
         <button
           aria-controls={historyPanelId}
           aria-expanded={isOpen}
-          className="group flex min-w-0 flex-1 items-center justify-between rounded-[14px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-left transition-[border-color,background-color,box-shadow] hover:border-[rgba(46,111,106,0.18)] hover:bg-[rgba(255,255,255,0.96)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)]"
+          ref={triggerRef}
+          className="group flex max-w-[240px] items-center gap-2 rounded-full border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.82)] px-2.5 py-1.5 text-left transition-[border-color,background-color,box-shadow] hover:border-[rgba(46,111,106,0.18)] hover:bg-[rgba(255,255,255,0.96)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)]"
           onClick={() => setIsOpen((current) => !current)}
           type="button"
         >
-          <span className="min-w-0 flex-1">
-            <span className="block text-[10px] leading-4 tracking-[0.08em] text-[var(--text-secondary)]">
-              历史对话
-            </span>
-            <span className="mt-0.5 block truncate text-[12.5px] font-medium leading-5 text-[var(--text-primary)]">
-              {activeConversation?.title ?? "新对话"}
-            </span>
+          <span className="text-[10px] font-medium tracking-[0.08em] text-[var(--text-secondary)]">
+            历史
           </span>
-          <span className="ml-2 inline-flex shrink-0 items-center rounded-full bg-[rgba(248,243,235,0.92)] px-2 py-0.5 text-[10.5px] leading-4 text-[var(--text-secondary)]">
-            {conversations.length} 条
+          <span className="min-w-0 flex-1 truncate text-[11.5px] font-medium leading-5 text-[var(--text-primary)]">
+            {activeConversation?.title ?? "新对话"}
+          </span>
+          <span className="inline-flex shrink-0 items-center rounded-full bg-[rgba(248,243,235,0.92)] px-1.5 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)]">
+            {conversations.length}
           </span>
         </button>
         <Button
           shape="round"
-          size="default"
+          size="mini"
           type="secondary"
           onClick={() => {
             model.createConversation();
@@ -64,66 +172,7 @@ export function ChatHistoryPanel({ model }: { model: IncubatorChatModel }) {
           新建
         </Button>
       </div>
-      {isOpen ? (
-        <div
-          className="rounded-[18px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.94)] p-1.5 shadow-[0_12px_24px_rgba(58,45,29,0.06)]"
-          id={historyPanelId}
-        >
-          <div className="mb-1 flex items-center justify-between gap-2 px-1.5">
-            <p className="text-[10.5px] leading-5 text-[var(--text-secondary)]">最近对话</p>
-          </div>
-          <ul className="max-h-[220px] space-y-1 overflow-y-auto pr-0.5">
-            {conversations.map((conversation) => {
-              const isActive = conversation.id === model.activeConversationId;
-              return (
-                <li key={conversation.id}>
-                  <div
-                    className={`flex items-center gap-1.5 rounded-[14px] border px-1 py-1 ${isActive ? "border-[rgba(46,111,106,0.18)] bg-[rgba(46,111,106,0.08)]" : "border-transparent bg-[rgba(248,243,235,0.52)] hover:border-[rgba(101,92,82,0.1)] hover:bg-[rgba(255,255,255,0.92)]"}`}
-                  >
-                    <button
-                      className="min-w-0 flex-1 rounded-[12px] px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.18)]"
-                      onClick={() => {
-                        model.selectConversation(conversation.id);
-                        setIsOpen(false);
-                      }}
-                      type="button"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-[12px] font-medium leading-5 text-[var(--text-primary)]">
-                          {conversation.title}
-                        </span>
-                        {isActive ? (
-                          <span className="inline-flex shrink-0 items-center rounded-full bg-[rgba(255,255,255,0.88)] px-1.5 py-0.5 text-[9.5px] leading-4 text-[var(--accent-ink)]">
-                            当前
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-0.5 text-[10.5px] leading-4 text-[var(--text-secondary)]">
-                        {formatConversationUpdatedAt(conversation.updatedAt)}
-                      </p>
-                    </button>
-                    <Button
-                      aria-label={`删除对话：${conversation.title}`}
-                      className="shrink-0"
-                      icon={<TrashIcon />}
-                      shape="circle"
-                      size="mini"
-                      status="danger"
-                      type="text"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        model.deleteConversation(conversation.id);
-                        setIsOpen(false);
-                      }}
-                    />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
+      {popup}
     </div>
   );
 }

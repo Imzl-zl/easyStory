@@ -444,7 +444,7 @@ test("incubator chat credential support prefers safer connections before insecur
   assert.equal(pickIncubatorCredentialOption(options, "")?.provider, "薄荷");
 });
 
-test("incubator chat credential support replaces blocked public http default for empty chats", () => {
+test("incubator chat credential support keeps current provider selection for empty chats", () => {
   const options = [
     {
       apiDialect: "openai_chat_completions",
@@ -475,7 +475,7 @@ test("incubator chat credential support replaces blocked public http default for
       options,
       preferredProvider: "",
     })?.provider,
-    "薄荷",
+    "new_api",
   );
   assert.equal(
     resolveSelectedIncubatorCredentialOption({
@@ -485,6 +485,85 @@ test("incubator chat credential support replaces blocked public http default for
       preferredProvider: "",
     })?.provider,
     "new_api",
+  );
+});
+
+test("incubator chat credential support skips insecure preferred provider before first message when no current provider exists", () => {
+  const options = [
+    {
+      apiDialect: "openai_chat_completions",
+      baseUrl: "http://49.234.21.84:3000",
+      bufferedToolVerifiedProbeKind: null,
+      defaultModel: "gpt-5.2",
+      defaultMaxOutputTokens: null,
+      displayLabel: "my_new · gpt-5.2",
+      provider: "new_api",
+      streamToolVerifiedProbeKind: null,
+    },
+    {
+      apiDialect: "gemini_generate_content",
+      baseUrl: "https://x666.me",
+      bufferedToolVerifiedProbeKind: null,
+      defaultModel: "gemini-2.5-flash",
+      defaultMaxOutputTokens: null,
+      displayLabel: "薄荷codex · gemini-2.5-flash",
+      provider: "薄荷",
+      streamToolVerifiedProbeKind: null,
+    },
+  ];
+
+  assert.equal(
+    resolveSelectedIncubatorCredentialOption({
+      currentProvider: "",
+      hasUserMessage: false,
+      options,
+      preferredProvider: "new_api",
+    })?.provider,
+    "薄荷",
+  );
+});
+
+test("incubator chat credential support keeps explicit current provider over preferred provider", () => {
+  const options = [
+    {
+      apiDialect: "openai_responses",
+      baseUrl: null,
+      bufferedToolVerifiedProbeKind: null,
+      defaultModel: "gpt-4.1-mini",
+      defaultMaxOutputTokens: null,
+      displayLabel: "OpenAI 主账号 · gpt-4.1-mini",
+      provider: "openai",
+      streamToolVerifiedProbeKind: null,
+    },
+    {
+      apiDialect: "anthropic_messages",
+      baseUrl: null,
+      bufferedToolVerifiedProbeKind: null,
+      defaultModel: "claude-sonnet-4",
+      defaultMaxOutputTokens: null,
+      displayLabel: "Anthropic · claude-sonnet-4",
+      provider: "anthropic",
+      streamToolVerifiedProbeKind: null,
+    },
+  ];
+
+  assert.equal(
+    resolveSelectedIncubatorCredentialOption({
+      currentProvider: "anthropic",
+      hasUserMessage: false,
+      options,
+      preferredProvider: "openai",
+    })?.provider,
+    "anthropic",
+  );
+  assert.equal(
+    resolveSelectedIncubatorCredentialOption({
+      currentProvider: "",
+      hasUserMessage: false,
+      options,
+      preferredProvider: "openai",
+    })?.provider,
+    "openai",
   );
 });
 

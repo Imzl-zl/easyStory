@@ -92,3 +92,51 @@ def test_execute_rejects_truncated_non_stream_responses(
                 },
             )
         )
+
+
+def test_execute_allows_truncated_json_object_when_content_is_complete() -> None:
+    async def request_sender(_request):
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "candidates": [
+                    {
+                        "finishReason": "MAX_TOKENS",
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": '{"genre":"玄幻","core_conflict":"主角在宗门压制中夺回成长机会"}'
+                                }
+                            ]
+                        },
+                    }
+                ],
+                "usageMetadata": {
+                    "promptTokenCount": 10,
+                    "candidatesTokenCount": 20,
+                    "totalTokenCount": 30,
+                },
+            },
+            text="",
+        )
+
+    provider = LLMToolProvider(request_sender=request_sender)
+
+    result = asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "提取项目设定",
+                "response_format": "json_object",
+                "model": {"provider": "gemini", "name": "gemini-2.5-pro"},
+                "credential": {
+                    "api_key": "test-key",
+                    "api_dialect": "gemini_generate_content",
+                },
+            },
+        )
+    )
+
+    assert result["content"] == (
+        '{"genre":"玄幻","core_conflict":"主角在宗门压制中夺回成长机会"}'
+    )

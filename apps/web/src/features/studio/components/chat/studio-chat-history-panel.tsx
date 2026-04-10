@@ -12,8 +12,8 @@ import {
 } from "react";
 import type { CSSProperties } from "react";
 
+import { observeFloatingPanelLayoutChanges } from "@/components/ui/floating-panel-support";
 import type { StudioConversationSummary } from "@/features/studio/components/chat/studio-chat-store-support";
-import { observeStudioChatLayoutChanges } from "@/features/studio/components/chat/studio-chat-floating-panel-support";
 import type { StudioChatLayoutMode } from "@/features/studio/components/page/studio-page-support";
 
 type StudioChatHistoryPanelProps = {
@@ -70,7 +70,7 @@ export function StudioChatHistoryPanel({
     }
 
     const frameId = window.requestAnimationFrame(updatePanelPosition);
-    const cleanupLayoutObserver = observeStudioChatLayoutChanges(containerRef.current, updatePanelPosition);
+    const cleanupLayoutObserver = observeFloatingPanelLayoutChanges(containerRef.current, updatePanelPosition);
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleEscape);
     return () => {

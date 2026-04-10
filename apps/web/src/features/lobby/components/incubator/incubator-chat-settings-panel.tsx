@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Tag } from "@arco-design/web-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { AppSelect } from "@/components/ui/app-select";
+import { renderFloatingPanel, useFloatingPanelStyle } from "@/components/ui/floating-panel-support";
 import { listMyAssistantAgents, listMyAssistantHooks, listMyAssistantSkills } from "@/lib/api/assistant";
 import { buildAssistantSkillSelectOptions } from "@/features/shared/assistant/assistant-skill-select-options";
 import { buildIncubatorReasoningDraftFields } from "@/features/shared/assistant/assistant-chat-support";
@@ -41,6 +42,9 @@ import {
 } from "@/features/lobby/components/incubator/incubator-chat-support";
 
 export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const agentQuery = useQuery({
     queryKey: ["assistant-agents", "chat-selector"],
     queryFn: listMyAssistantAgents,
@@ -86,6 +90,13 @@ export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
         })),
     [hookQuery.data],
   );
+  const panelStyle = useFloatingPanelStyle(isOpen, triggerRef, {
+    align: "right",
+    maxHeight: 640,
+    preferredWidth: 576,
+    side: "bottom",
+    zIndex: 160,
+  });
 
   useEffect(() => {
     if (!agentQuery.data || !resolveIncubatorAgentId(model.settings.agentId)) {
@@ -127,58 +138,131 @@ export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
     updateIncubatorChatSetting(model, "hookIds", nextHookIds);
   }, [hookQuery.data, model, model.settings.hookIds]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      const targetElement = target instanceof HTMLElement ? target : target.parentElement;
+      if (targetElement?.closest(".arco-trigger, .arco-select-popup")) {
+        return;
+      }
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) {
+        return;
+      }
+      setIsOpen(false);
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen]);
+
+  const popup = isOpen && panelStyle
+    ? renderFloatingPanel(
+      <div
+        className="overflow-hidden rounded-[18px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.98)] shadow-[0_18px_38px_rgba(58,45,29,0.12)]"
+        ref={panelRef}
+        style={panelStyle}
+      >
+        <div className="border-b border-[var(--line-soft)] bg-[rgba(248,243,235,0.88)] px-3 py-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[12px] font-medium text-[var(--text-primary)]">模型与连接</p>
+              <p className="mt-0.5 text-[10.5px] leading-4 text-[var(--text-secondary)]">
+                只在需要时展开，不再长期占聊天区高度。
+              </p>
+            </div>
+            <button
+              aria-label="收起模型与连接设置"
+              className="rounded-full px-2 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)] transition hover:bg-[rgba(255,255,255,0.72)]"
+              type="button"
+              onClick={() => setIsOpen(false)}
+            >
+              收起
+            </button>
+          </div>
+        </div>
+        <div className="overflow-y-auto px-3 py-2" style={{ maxHeight: panelStyle.maxHeight }}>
+          {model.credentialState === "ready" ? (
+            <AdvancedSettingsForm
+              agentOptions={agentOptions}
+              agentQueryError={agentQuery.error}
+              hookOptions={hookOptions}
+              hookQueryError={hookQuery.error}
+              model={model}
+              skillOptions={skillOptions}
+              skillQueryError={skillQuery.error}
+            />
+          ) : (
+            <CredentialSettingsEmptyState
+              credentialSettingsHref={model.credentialSettingsHref}
+              credentialState={model.credentialState}
+            />
+          )}
+        </div>
+      </div>,
+    )
+    : null;
+
   return (
-    <details className="overflow-hidden rounded-[16px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.76)]">
-      <summary className="list-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-inset">
+    <div className="shrink-0">
+      <button
+        aria-expanded={isOpen}
+        className="list-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-inset"
+        ref={triggerRef}
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+      >
         <SettingsCollapseHeader summaryItems={summaryItems} />
-      </summary>
-      <div className="border-t border-[var(--line-soft)] px-3 py-2">
-        {model.credentialState === "ready" ? (
-          <AdvancedSettingsForm
-            agentOptions={agentOptions}
-            agentQueryError={agentQuery.error}
-            hookOptions={hookOptions}
-            hookQueryError={hookQuery.error}
-            model={model}
-            skillOptions={skillOptions}
-            skillQueryError={skillQuery.error}
-          />
-        ) : (
-          <CredentialSettingsEmptyState
-            credentialSettingsHref={model.credentialSettingsHref}
-            credentialState={model.credentialState}
-          />
-        )}
-      </div>
-    </details>
+      </button>
+      {popup}
+    </div>
   );
 }
 
 function SettingsCollapseHeader({ summaryItems }: { summaryItems: string[] }) {
+  const visibleItems = summaryItems.slice(0, 2);
+  const hiddenCount = Math.max(summaryItems.length - visibleItems.length, 0);
+
   return (
-    <div className="flex items-start justify-between gap-3 px-3 py-2">
-      <div className="min-w-0 flex-1">
-        <p className="text-[12.5px] font-medium text-[var(--text-primary)]">模型与连接</p>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {summaryItems.map((item) => (
-            <Tag
-              bordered={false}
-              className="!m-0 !rounded-full !bg-[rgba(248,243,235,0.96)] !px-2 !py-0.5 !text-[10.5px] !leading-4 !text-[var(--text-secondary)]"
-              key={item}
-              size="small"
-            >
-              {item}
-            </Tag>
-          ))}
-        </div>
+    <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.82)] px-2.5 py-1.5">
+      <span className="text-[11px] font-medium text-[var(--text-primary)]">模型与连接</span>
+      <div className="hidden items-center gap-1 sm:flex">
+        {visibleItems.map((item) => (
+          <Tag
+            bordered={false}
+            className="!m-0 !rounded-full !bg-[rgba(248,243,235,0.96)] !px-2 !py-0.5 !text-[10px] !leading-4 !text-[var(--text-secondary)]"
+            key={item}
+            size="small"
+          >
+            {item}
+          </Tag>
+        ))}
+        {hiddenCount > 0 ? (
+          <Tag
+            bordered={false}
+            className="!m-0 !rounded-full !bg-[rgba(248,243,235,0.96)] !px-2 !py-0.5 !text-[10px] !leading-4 !text-[var(--text-secondary)]"
+            size="small"
+          >
+            +{hiddenCount}
+          </Tag>
+        ) : null}
       </div>
-      <Tag
-        bordered={false}
-        className="!m-0 !rounded-full !bg-[rgba(248,243,235,0.92)] !px-2 !py-0.5 !text-[10.5px] !leading-4 !text-[var(--text-secondary)]"
-        size="small"
-      >
+      <span className="rounded-full bg-[rgba(248,243,235,0.92)] px-1.5 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)]">
         设置
-      </Tag>
+      </span>
     </div>
   );
 }
