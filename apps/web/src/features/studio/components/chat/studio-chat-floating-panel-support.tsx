@@ -63,11 +63,9 @@ export function useFloatingPanelStyle(
     }
 
     updateStyle();
-    window.addEventListener("resize", updateStyle);
-    window.addEventListener("scroll", updateStyle, true);
+    const cleanupLayoutObserver = observeStudioChatLayoutChanges(anchorRef.current, updateStyle);
     return () => {
-      window.removeEventListener("resize", updateStyle);
-      window.removeEventListener("scroll", updateStyle, true);
+      cleanupLayoutObserver();
     };
   }, [anchorRef, open, options.align, options.maxHeight, options.preferredWidth]);
 
@@ -83,4 +81,39 @@ export function renderStudioFloatingPanel(panel: ReactNode) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+export function observeStudioChatLayoutChanges(
+  anchor: HTMLElement | null,
+  onLayoutChange: () => void,
+) {
+  window.addEventListener("resize", onLayoutChange);
+  window.addEventListener("scroll", onLayoutChange, true);
+
+  if (typeof ResizeObserver === "undefined") {
+    return () => {
+      window.removeEventListener("resize", onLayoutChange);
+      window.removeEventListener("scroll", onLayoutChange, true);
+    };
+  }
+
+  const observer = new ResizeObserver(() => onLayoutChange());
+  const observedTargets = new Set<HTMLElement>();
+
+  const observe = (target: HTMLElement | null) => {
+    if (!target || observedTargets.has(target)) {
+      return;
+    }
+    observedTargets.add(target);
+    observer.observe(target);
+  };
+
+  observe(anchor);
+  observe(anchor?.closest("aside"));
+
+  return () => {
+    observer.disconnect();
+    window.removeEventListener("resize", onLayoutChange);
+    window.removeEventListener("scroll", onLayoutChange, true);
+  };
 }

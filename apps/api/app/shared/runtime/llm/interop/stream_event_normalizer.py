@@ -6,6 +6,9 @@ from typing import Any
 from .openai_chat_stream_synthesizer import (
     synthesize_openai_chat_terminal_response as codec_synthesize_openai_chat_terminal_response,
 )
+from .anthropic_stream_synthesizer import (
+    synthesize_anthropic_terminal_response as codec_synthesize_anthropic_terminal_response,
+)
 from .gemini_stream_synthesizer import (
     synthesize_gemini_terminal_response as codec_synthesize_gemini_terminal_response,
 )
@@ -155,6 +158,11 @@ def synthesize_stream_terminal_response(
         )
     if api_dialect == "openai_chat_completions":
         return codec_synthesize_openai_chat_terminal_response(
+            raw_events,
+            tool_name_aliases=tool_name_aliases or {},
+        )
+    if api_dialect == "anthropic_messages":
+        return codec_synthesize_anthropic_terminal_response(
             raw_events,
             tool_name_aliases=tool_name_aliases or {},
         )

@@ -240,6 +240,95 @@ def test_execute_stream_probe_request_preserves_gemini_tool_call_from_early_even
     assert normalized.tool_calls[0].arguments == {"echo": "ping"}
 
 
+def test_execute_stream_probe_request_preserves_anthropic_tool_call_from_stream_events(
+    monkeypatch,
+) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://2capi.com/v1/messages",
+        headers={"Accept": "text/event-stream"},
+        json_body={
+            "model": "claude-haiku-4-5-20251001",
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "调用工具"}]}],
+            "tools": [{"name": "probe_echo_payload"}],
+        },
+        tool_name_aliases={"probe.echo_payload": "probe_echo_payload"},
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield "event: message_start"
+            yield (
+                'data: {"type":"message_start","message":{"id":"msg_123","usage":{"input_tokens":109,"output_tokens":0}}}'
+            )
+            yield ""
+            yield "event: content_block_start"
+            yield 'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}'
+            yield ""
+            yield "event: content_block_delta"
+            yield 'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"先调用工具。"}}'
+            yield ""
+            yield "event: content_block_start"
+            yield (
+                'data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"call_1","name":"probe_echo_payload","input":{}}}'
+            )
+            yield ""
+            yield "event: content_block_delta"
+            yield (
+                'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"echo\\":\\"ping\\"}"}}'
+            )
+            yield ""
+            yield "event: message_delta"
+            yield (
+                'data: {"type":"message_delta","usage":{"input_tokens":109,"output_tokens":45},"delta":{"stop_reason":"tool_use"}}'
+            )
+            yield ""
+            yield "event: message_stop"
+            yield 'data: {"type":"message_stop"}'
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+
+    normalized = asyncio.run(
+        stream_support.execute_stream_probe_request(
+            request,
+            api_dialect="anthropic_messages",
+            print_response=False,
+        )
+    )
+
+    assert normalized.content == "先调用工具。"
+    assert normalized.finish_reason == "tool_use"
+    assert len(normalized.tool_calls) == 1
+    assert normalized.tool_calls[0].tool_call_id == "call_1"
+    assert normalized.tool_calls[0].tool_name == "probe.echo_payload"
+    assert normalized.tool_calls[0].arguments == {"echo": "ping"}
+
+
 def test_execute_stream_probe_request_ignores_openai_completed_payload(monkeypatch) -> None:
     request = PreparedLLMHttpRequest(
         method="POST",

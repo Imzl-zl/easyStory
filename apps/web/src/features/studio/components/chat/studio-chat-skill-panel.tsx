@@ -4,13 +4,16 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode, RefObject } from "react";
 
+import { observeStudioChatLayoutChanges } from "@/features/studio/components/chat/studio-chat-floating-panel-support";
 import {
   filterStudioChatSkillOptions,
   type StudioChatSkillOption,
 } from "@/features/studio/components/chat/studio-chat-skill-support";
 import type { StudioChatSkillModel } from "@/features/studio/components/chat/studio-chat-skill-model";
+import type { StudioChatLayoutMode } from "@/features/studio/components/page/studio-page-support";
 
 type StudioChatSkillPanelProps = {
+  layoutMode?: StudioChatLayoutMode;
   disabled?: boolean;
   isOpen: boolean;
   model: StudioChatSkillModel;
@@ -23,11 +26,13 @@ type SkillDrawerLayout = {
 };
 
 export function StudioChatSkillPanel({
+  layoutMode = "default",
   disabled = false,
   isOpen,
   model,
   onOpenChange,
 }: Readonly<StudioChatSkillPanelProps>) {
+  const compactLayout = layoutMode !== "default";
   const [layout, setLayout] = useState<SkillDrawerLayout | null>(null);
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -40,14 +45,13 @@ export function StudioChatSkillPanel({
     onOpenChange(false);
     setQuery("");
   }, [onOpenChange]);
+  const updateLayout = useCallback(() => {
+    setLayout(resolveSkillDrawerLayout(containerRef.current));
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
       return;
-    }
-
-    function updateLayout() {
-      setLayout(resolveSkillDrawerLayout(containerRef.current));
     }
 
     function handleEscape(event: KeyboardEvent) {
@@ -58,22 +62,20 @@ export function StudioChatSkillPanel({
 
     updateLayout();
     const frameId = window.requestAnimationFrame(() => searchInputRef.current?.focus());
+    const cleanupLayoutObserver = observeStudioChatLayoutChanges(containerRef.current, updateLayout);
     document.addEventListener("keydown", handleEscape);
-    window.addEventListener("resize", updateLayout);
-    window.addEventListener("scroll", updateLayout, true);
     return () => {
       window.cancelAnimationFrame(frameId);
+      cleanupLayoutObserver();
       document.removeEventListener("keydown", handleEscape);
-      window.removeEventListener("resize", updateLayout);
-      window.removeEventListener("scroll", updateLayout, true);
     };
-  }, [closeDrawer, isOpen]);
+  }, [closeDrawer, isOpen, updateLayout]);
 
   return (
-    <div className="relative min-w-0 max-w-[152px] shrink-0" ref={containerRef}>
+    <div className={`relative min-w-0 shrink-0 ${compactLayout ? "w-full max-w-none" : "max-w-[152px]"}`} ref={containerRef}>
       <button
         aria-expanded={isOpen}
-        className={`group flex h-[30px] min-w-[132px] max-w-[152px] items-center gap-2 rounded-full border px-3 text-left transition-[border-color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`group flex h-[30px] min-w-0 items-center gap-2 rounded-full border px-3 text-left transition-[border-color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] disabled:cursor-not-allowed disabled:opacity-60 ${compactLayout ? "w-full max-w-none" : "min-w-[132px] max-w-[152px]"} ${
           isOpen
             ? "border-[rgba(46,111,106,0.24)] bg-white shadow-[0_10px_24px_rgba(58,45,29,0.08)]"
             : "border-[rgba(101,92,82,0.12)] bg-[#fffdfa] hover:border-[rgba(46,111,106,0.18)] hover:bg-white"

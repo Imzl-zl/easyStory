@@ -119,6 +119,16 @@ def test_parse_tool_arguments_surfaces_invalid_contracts(
         assert arguments_text is None
 
 
+def test_parse_tool_arguments_accepts_angle_wrapped_json_object() -> None:
+    parsed, arguments_text, arguments_error = parse_tool_arguments(
+        '<{"paths":["设定/人物.md"]}>'
+    )
+
+    assert parsed == {"paths": ["设定/人物.md"]}
+    assert arguments_text == '{"paths":["设定/人物.md"]}'
+    assert arguments_error is None
+
+
 def test_build_tool_call_requires_id_and_name() -> None:
     with pytest.raises(ConfigurationError, match="Tool call is missing id"):
         build_tool_call(

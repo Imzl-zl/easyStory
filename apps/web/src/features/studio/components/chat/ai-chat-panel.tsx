@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { DocumentTreeNode } from "@/features/studio/components/page/studio-page-support";
+import type {
+  DocumentTreeNode,
+  StudioChatLayoutMode,
+} from "@/features/studio/components/page/studio-page-support";
 
 import type { StudioChatAttachmentMeta } from "@/features/studio/components/chat/studio-chat-attachment-support";
 import { StudioChatHistoryPanel } from "@/features/studio/components/chat/studio-chat-history-panel";
@@ -23,6 +26,7 @@ type AiChatPanelProps = {
   attachments: StudioChatAttachmentMeta[];
   availableContexts: DocumentTreeNode[];
   canChat: boolean;
+  layoutMode?: StudioChatLayoutMode;
   composerText: string;
   conversationSummaries: StudioConversationSummary[];
   createConversation: () => void;
@@ -71,6 +75,7 @@ export function AiChatPanel({
   attachments,
   availableContexts,
   canChat,
+  layoutMode = "default",
   composerText,
   conversationSummaries,
   createConversation,
@@ -112,6 +117,7 @@ export function AiChatPanel({
 }: Readonly<AiChatPanelProps>) {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const [activeHeaderPanel, setActiveHeaderPanel] = useState<"history" | "skill" | null>(null);
+  const compactLayout = layoutMode !== "default";
 
   useEffect(() => {
     const node = transcriptRef.current;
@@ -126,7 +132,7 @@ export function AiChatPanel({
       
       <header className="relative z-[180] shrink-0 px-4 pt-4 pb-3 bg-gradient-to-b from-white/95 to-[rgba(254,253,251,0.8)] border-b border-[rgba(44,36,22,0.06)]">
         <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-[var(--accent-primary)] to-transparent opacity-20" />
-        <div className="flex items-start justify-between gap-3">
+        <div className={`flex gap-3 ${compactLayout ? "flex-col items-start" : "items-start justify-between"}`}>
           <div className="flex min-w-0 items-center gap-2.5">
             <h2 className="m-0 font-serif text-[1.05rem] font-bold tracking-tight text-[var(--text-primary)]">共创助手</h2>
             <span className={`inline-flex items-center h-[22px] px-2 rounded text-[0.65rem] font-semibold tracking-widest uppercase transition-all ${resolveStatusToneClassName(credentialState)}`}>
@@ -134,13 +140,14 @@ export function AiChatPanel({
             </span>
           </div>
           {currentDocumentPath ? (
-            <p className="m-0 max-w-full break-all rounded-md bg-[rgba(107,143,113,0.08)] px-2.5 py-1 text-[11px] leading-5 text-[var(--text-secondary)] lg:max-w-[16rem]">
+            <p className={`m-0 break-all rounded-md bg-[rgba(107,143,113,0.08)] px-2.5 py-1 text-[11px] leading-5 text-[var(--text-secondary)] ${compactLayout ? "w-full max-w-none" : "max-w-full lg:max-w-[16rem]"}`}>
               当前文稿 · {currentDocumentPath}
             </p>
           ) : null}
         </div>
-        <div className="relative z-[180] mt-2 flex w-full min-w-0 items-center gap-2">
+        <div className={`relative z-[180] mt-2 flex w-full min-w-0 gap-2 ${compactLayout ? "flex-col items-stretch" : "items-center"}`}>
           <StudioChatSkillPanel
+            layoutMode={layoutMode}
             disabled={isResponding}
             isOpen={activeHeaderPanel === "skill"}
             model={skillModel}
@@ -148,6 +155,7 @@ export function AiChatPanel({
           />
           <StudioChatHistoryPanel
             activeConversationId={activeConversationId}
+            layoutMode={layoutMode}
             conversations={conversationSummaries}
             disabled={isResponding}
             isOpen={activeHeaderPanel === "history"}
@@ -195,6 +203,7 @@ export function AiChatPanel({
         attachments={attachments}
         availableContexts={availableContexts}
         canChat={canChat}
+        layoutMode={layoutMode}
         composerText={composerText}
         credentialNotice={credentialNotice}
         credentialSettingsHref={credentialSettingsHref}

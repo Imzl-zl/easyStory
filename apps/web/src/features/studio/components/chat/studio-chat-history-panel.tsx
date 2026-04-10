@@ -6,15 +6,19 @@ import {
 } from "@arco-design/web-react";
 import {
   useEffect,
+  useCallback,
   useRef,
   useState,
 } from "react";
 import type { CSSProperties } from "react";
 
 import type { StudioConversationSummary } from "@/features/studio/components/chat/studio-chat-store-support";
+import { observeStudioChatLayoutChanges } from "@/features/studio/components/chat/studio-chat-floating-panel-support";
+import type { StudioChatLayoutMode } from "@/features/studio/components/page/studio-page-support";
 
 type StudioChatHistoryPanelProps = {
   activeConversationId: string;
+  layoutMode?: StudioChatLayoutMode;
   conversations: StudioConversationSummary[];
   disabled?: boolean;
   isOpen: boolean;
@@ -26,6 +30,7 @@ type StudioChatHistoryPanelProps = {
 
 export function StudioChatHistoryPanel({
   activeConversationId,
+  layoutMode = "default",
   conversations,
   disabled = false,
   isOpen,
@@ -37,17 +42,18 @@ export function StudioChatHistoryPanel({
   const [panelStyle, setPanelStyle] = useState<CSSProperties | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  const compactLayout = layoutMode !== "default";
+  const iconLayout = layoutMode === "icon";
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId)
     ?? conversations[0]
     ?? null;
+  const updatePanelPosition = useCallback(() => {
+    setPanelStyle(resolveHistoryPanelStyle(containerRef.current));
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
       return;
-    }
-
-    function updatePanelPosition() {
-      setPanelStyle(resolveHistoryPanelStyle(containerRef.current));
     }
 
     function handlePointerDown(event: MouseEvent) {
@@ -64,18 +70,16 @@ export function StudioChatHistoryPanel({
     }
 
     const frameId = window.requestAnimationFrame(updatePanelPosition);
+    const cleanupLayoutObserver = observeStudioChatLayoutChanges(containerRef.current, updatePanelPosition);
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleEscape);
-    window.addEventListener("resize", updatePanelPosition);
-    window.addEventListener("scroll", updatePanelPosition, true);
     return () => {
       window.cancelAnimationFrame(frameId);
+      cleanupLayoutObserver();
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleEscape);
-      window.removeEventListener("resize", updatePanelPosition);
-      window.removeEventListener("scroll", updatePanelPosition, true);
     };
-  }, [isOpen, onOpenChange]);
+  }, [isOpen, onOpenChange, updatePanelPosition]);
 
   const popup = isOpen && panelStyle
     ? createPortal(
@@ -145,10 +149,12 @@ export function StudioChatHistoryPanel({
     : null;
 
   return (
-    <div className="relative ml-auto flex min-w-0 w-[min(228px,100%)] items-center justify-end gap-2" ref={containerRef}>
+    <div className={`relative flex min-w-0 items-center gap-2 ${compactLayout ? "w-full justify-stretch" : "ml-auto w-[min(228px,100%)] justify-end"}`} ref={containerRef}>
       <button
-        className="inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-full border border-[rgba(101,92,82,0.12)] bg-[#fffdfa] px-3 text-[11px] font-medium text-[var(--text-primary)] transition-[border-color,background-color] hover:border-[rgba(46,111,106,0.2)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] disabled:cursor-not-allowed disabled:opacity-60"
+        aria-label="新对话"
+        className={`inline-flex h-[30px] shrink-0 items-center rounded-full border border-[rgba(101,92,82,0.12)] bg-[#fffdfa] text-[11px] font-medium text-[var(--text-primary)] transition-[border-color,background-color] hover:border-[rgba(46,111,106,0.2)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] disabled:cursor-not-allowed disabled:opacity-60 ${iconLayout ? "w-[30px] justify-center px-0" : "gap-1.5 px-3"}`}
         disabled={disabled}
+        title="新对话"
         type="button"
         onClick={() => {
           onCreateConversation();
@@ -156,7 +162,7 @@ export function StudioChatHistoryPanel({
         }}
       >
         <span className="text-[13px] leading-none">+</span>
-        <span>新对话</span>
+        {!iconLayout ? <span>新对话</span> : null}
       </button>
       <button
         aria-expanded={isOpen}
@@ -196,7 +202,10 @@ function resolveHistoryPanelStyle(container: HTMLDivElement | null): CSSProperti
     return null;
   }
   const rect = container.getBoundingClientRect();
-  const width = Math.max(rect.width, HISTORY_PANEL_MIN_WIDTH);
+  const availableWidth = Math.max(window.innerWidth - HISTORY_PANEL_VIEWPORT_MARGIN * 2, 0);
+  const width = availableWidth === 0
+    ? 0
+    : Math.min(Math.max(rect.width, HISTORY_PANEL_MIN_WIDTH), availableWidth);
   const maxLeft = window.innerWidth - width - HISTORY_PANEL_VIEWPORT_MARGIN;
   const preferredLeft = rect.right - width;
 

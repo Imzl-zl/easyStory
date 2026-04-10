@@ -4,6 +4,7 @@ import test from "node:test";
 import { STUDIO_PENDING_REPLY_MESSAGE } from "@/features/studio/components/chat/studio-chat-support";
 import {
   createConversationForProjectState,
+  deleteConversationFromProjectState,
   normalizePersistedStudioChatProjectState,
   patchConversationInProjectState,
 } from "@/features/studio/components/chat/studio-chat-store-support";
@@ -108,6 +109,53 @@ test("studio chat store preserves tool progress when persisted pending reply is 
     toolCallId: "call-1",
     tone: "muted",
   }]);
+});
+
+test("studio chat store keeps provider settings when deleting the last conversation", () => {
+  const nextState = deleteConversationFromProjectState({
+    activeConversationId: "conversation-1",
+    conversations: [{
+      id: "conversation-1",
+      session: {
+        composerText: "",
+        conversationSkillId: null,
+        latestCompletedRunId: null,
+        messages: [{
+          content: "继续写第三章",
+          id: "user-1",
+          rawMarkdown: "继续写第三章",
+          role: "user",
+        }],
+        nextTurnSkillId: null,
+        selectedContextPaths: [],
+        settings: {
+          maxOutputTokens: "4096",
+          modelName: "gemini-2.5-flash",
+          provider: "mint",
+          reasoningEffort: "",
+          streamOutput: true,
+          thinkingBudget: "",
+          thinkingLevel: "",
+        },
+      },
+      title: "第三章推进",
+      updatedAt: "2026-04-08T12:00:00Z",
+    }],
+  }, "conversation-1");
+
+  const fallbackConversation = nextState.conversations[0];
+  assert.equal(nextState.activeConversationId, fallbackConversation?.id);
+  assert.deepEqual(fallbackConversation?.session.settings, {
+    maxOutputTokens: "4096",
+    modelName: "gemini-2.5-flash",
+    provider: "mint",
+    reasoningEffort: "",
+    streamOutput: true,
+    thinkingBudget: "",
+    thinkingLevel: "",
+  });
+  assert.deepEqual(fallbackConversation?.session.messages, []);
+  assert.equal(fallbackConversation?.session.latestCompletedRunId, null);
 });
 
 test("studio chat store clears latest completed run id when restored conversation ends with failed reply", () => {

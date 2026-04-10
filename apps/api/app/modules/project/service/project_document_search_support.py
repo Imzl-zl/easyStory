@@ -340,5 +340,20 @@ def _score_search_intents(
 def _sort_search_hits(hits: list[ProjectDocumentSearchHitDTO]) -> None:
     minimum = datetime.min.replace(tzinfo=UTC)
     hits.sort(key=lambda item: item.path)
-    hits.sort(key=lambda item: item.updated_at or minimum, reverse=True)
+    hits.sort(
+        key=lambda item: _normalize_search_hit_updated_at(item.updated_at, minimum=minimum),
+        reverse=True,
+    )
     hits.sort(key=lambda item: item.match_score, reverse=True)
+
+
+def _normalize_search_hit_updated_at(
+    value: datetime | None,
+    *,
+    minimum: datetime,
+) -> datetime:
+    if value is None:
+        return minimum
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

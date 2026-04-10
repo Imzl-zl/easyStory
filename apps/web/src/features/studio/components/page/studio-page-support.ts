@@ -4,6 +4,13 @@ export type StudioPanelKey = "setting" | "outline" | "opening-plan" | "chapter";
 export type StudioChapterListState = "loading" | "error" | "empty" | "ready";
 export type StudioDocumentEntryKind = "file" | "folder";
 export type DocumentTreeNodeOrigin = "custom" | "database" | "fixed";
+export type StudioChatLayoutMode = "default" | "compact" | "icon";
+
+export const STUDIO_DESKTOP_BREAKPOINT = 1024;
+export const STUDIO_XL_BREAKPOINT = 1280;
+export const STUDIO_CHAT_RESIZE_STEP = 24;
+export const STUDIO_CHAT_COMPACT_LAYOUT_WIDTH = 420;
+export const STUDIO_CHAT_ICON_LAYOUT_WIDTH = 360;
 
 export type DocumentTreeNode = {
   canCreateChild?: boolean;
@@ -42,6 +49,13 @@ const OUTLINE_ROOT_PATH = "大纲";
 const CONTENT_ROOT_PATH = "正文";
 const DATA_ROOT_PATH = "数据层";
 const CHAPTER_DOCUMENT_PATH = /^正文(?:\/[^/]+)*\/第(\d{3})章\.md$/;
+const STUDIO_CHAT_DEFAULT_LG_WIDTH = 392;
+const STUDIO_CHAT_DEFAULT_XL_WIDTH = 408;
+const STUDIO_CHAT_MIN_WIDTH = 320;
+const STUDIO_CHAT_MAX_WIDTH = 760;
+const STUDIO_EDITOR_MIN_WIDTH = 420;
+const STUDIO_LEFT_PANEL_LG_WIDTH = 236;
+const STUDIO_LEFT_PANEL_XL_WIDTH = 244;
 const ROOT_DISPLAY_ORDER = [
   "项目说明.md",
   SETTINGS_ROOT_PATH,
@@ -189,6 +203,58 @@ export function resolveStudioPanel(value: string | null): StudioPanelKey {
   return STUDIO_PANEL_OPTIONS.some((item) => item.key === value)
     ? (value as StudioPanelKey)
     : "setting";
+}
+
+export function isStudioDesktopLayout(containerWidth: number) {
+  return containerWidth >= STUDIO_DESKTOP_BREAKPOINT;
+}
+
+export function resolveStudioChatSidebarBounds(containerWidth: number) {
+  const leftPanelWidth = containerWidth >= STUDIO_XL_BREAKPOINT
+    ? STUDIO_LEFT_PANEL_XL_WIDTH
+    : STUDIO_LEFT_PANEL_LG_WIDTH;
+  const maxWidth = Math.max(
+    STUDIO_CHAT_MIN_WIDTH,
+    Math.min(STUDIO_CHAT_MAX_WIDTH, containerWidth - leftPanelWidth - STUDIO_EDITOR_MIN_WIDTH),
+  );
+  return { max: maxWidth, min: STUDIO_CHAT_MIN_WIDTH };
+}
+
+export function clampStudioChatSidebarWidth(width: number, containerWidth: number) {
+  const bounds = resolveStudioChatSidebarBounds(containerWidth);
+  return Math.round(Math.min(bounds.max, Math.max(bounds.min, width)));
+}
+
+export function resolveDefaultStudioChatSidebarWidth(containerWidth: number) {
+  const preferredWidth = containerWidth >= STUDIO_XL_BREAKPOINT
+    ? STUDIO_CHAT_DEFAULT_XL_WIDTH
+    : STUDIO_CHAT_DEFAULT_LG_WIDTH;
+  return clampStudioChatSidebarWidth(preferredWidth, containerWidth);
+}
+
+export function buildStudioChatGridTemplateColumns(options: {
+  chatOpen: boolean;
+  chatWidth: number | null;
+  containerWidth: number;
+}) {
+  if (!options.chatOpen || options.chatWidth === null || !isStudioDesktopLayout(options.containerWidth)) {
+    return null;
+  }
+  const leftPanelWidth = options.containerWidth >= STUDIO_XL_BREAKPOINT
+    ? STUDIO_LEFT_PANEL_XL_WIDTH
+    : STUDIO_LEFT_PANEL_LG_WIDTH;
+  const chatWidth = clampStudioChatSidebarWidth(options.chatWidth, options.containerWidth);
+  return `${leftPanelWidth}px minmax(0, 1fr) ${chatWidth}px`;
+}
+
+export function resolveStudioChatLayoutMode(chatWidth: number) : StudioChatLayoutMode {
+  if (chatWidth > 0 && chatWidth <= STUDIO_CHAT_ICON_LAYOUT_WIDTH) {
+    return "icon";
+  }
+  if (chatWidth > 0 && chatWidth <= STUDIO_CHAT_COMPACT_LAYOUT_WIDTH) {
+    return "compact";
+  }
+  return "default";
 }
 
 export function resolveDefaultDocumentPathFromPanel(

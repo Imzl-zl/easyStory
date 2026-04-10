@@ -4,6 +4,7 @@ from app.shared.runtime.llm.interop.stream_event_normalizer import (
     build_truncated_stream_message,
     extract_stream_truncation_reason,
     parse_raw_stream_event,
+    synthesize_stream_terminal_response,
 )
 
 
@@ -77,3 +78,77 @@ def test_extract_stream_truncation_reason_normalizes_known_values() -> None:
 
 def test_build_truncated_stream_message_includes_stop_reason() -> None:
     assert "stop_reason=MAX_TOKENS" in build_truncated_stream_message("MAX_TOKENS")
+
+
+def test_synthesize_stream_terminal_response_builds_anthropic_tool_call() -> None:
+    terminal = synthesize_stream_terminal_response(
+        "anthropic_messages",
+        raw_events=[
+            (
+                "message_start",
+                {
+                    "type": "message_start",
+                    "message": {
+                        "id": "msg_123",
+                        "usage": {"input_tokens": 109, "output_tokens": 0},
+                    },
+                },
+            ),
+            (
+                "content_block_start",
+                {
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": {"type": "text", "text": ""},
+                },
+            ),
+            (
+                "content_block_delta",
+                {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "text_delta", "text": "先调用工具。"},
+                },
+            ),
+            (
+                "content_block_start",
+                {
+                    "type": "content_block_start",
+                    "index": 1,
+                    "content_block": {
+                        "type": "tool_use",
+                        "id": "call_1",
+                        "name": "project_read_documents",
+                        "input": {},
+                    },
+                },
+            ),
+            (
+                "content_block_delta",
+                {
+                    "type": "content_block_delta",
+                    "index": 1,
+                    "delta": {"type": "input_json_delta", "partial_json": '{"paths":["设定/人物.md"]}'},
+                },
+            ),
+            (
+                "message_delta",
+                {
+                    "type": "message_delta",
+                    "usage": {"input_tokens": 109, "output_tokens": 45},
+                    "delta": {"stop_reason": "tool_use"},
+                },
+            ),
+            ("message_stop", {"type": "message_stop"}),
+        ],
+        tool_name_aliases={"project.read_documents": "project_read_documents"},
+    )
+
+    assert terminal is not None
+    assert terminal.provider_response_id == "msg_123"
+    assert terminal.finish_reason == "tool_use"
+    assert terminal.content == "先调用工具。"
+    assert len(terminal.tool_calls) == 1
+    assert terminal.tool_calls[0].tool_call_id == "call_1"
+    assert terminal.tool_calls[0].tool_name == "project.read_documents"
+    assert terminal.tool_calls[0].arguments == {"paths": ["设定/人物.md"]}

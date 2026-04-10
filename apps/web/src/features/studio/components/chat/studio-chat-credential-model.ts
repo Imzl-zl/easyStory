@@ -102,6 +102,12 @@ export function useStudioChatCredentialModel(
     preferences,
     projectPreferencesQuery.isLoading,
     selectedCredential,
+    settings.modelName,
+    settings.provider,
+    settings.reasoningEffort,
+    settings.streamOutput,
+    settings.thinkingBudget,
+    settings.thinkingLevel,
     setSettings,
     userPreferencesQuery.isLoading,
   ]);

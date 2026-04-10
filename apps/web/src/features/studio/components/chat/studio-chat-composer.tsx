@@ -6,7 +6,10 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { Button, Input, Message, Radio } from "@arco-design/web-react";
 
 import { AppSelect } from "@/components/ui/app-select";
-import type { DocumentTreeNode } from "@/features/studio/components/page/studio-page-support";
+import type {
+  DocumentTreeNode,
+  StudioChatLayoutMode,
+} from "@/features/studio/components/page/studio-page-support";
 import { getErrorMessage } from "@/lib/api/client";
 import {
   normalizeAssistantThinkingBudgetInput,
@@ -24,6 +27,7 @@ type StudioChatComposerProps = {
   attachments: StudioChatAttachmentMeta[];
   availableContexts: DocumentTreeNode[];
   canChat: boolean;
+  layoutMode?: StudioChatLayoutMode;
   composerText: string;
   credentialNotice: string | null;
   credentialSettingsHref: string;
@@ -65,6 +69,7 @@ export function StudioChatComposer({
   attachments,
   availableContexts,
   canChat,
+  layoutMode = "default",
   composerText,
   credentialNotice,
   credentialSettingsHref,
@@ -93,6 +98,8 @@ export function StudioChatComposer({
   writeTargetDisabledReason,
   isWriteToCurrentDocumentEnabled,
 }: Readonly<StudioChatComposerProps>) {
+  const compactLayout = layoutMode !== "default";
+  const iconLayout = layoutMode === "icon";
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showProviderList, setShowProviderList] = useState(false);
   const [showContextSelector, setShowContextSelector] = useState(false);
@@ -206,10 +213,11 @@ export function StudioChatComposer({
     <div className="relative z-20 shrink-0 border-t border-[rgba(44,36,22,0.08)] bg-gradient-to-b from-[var(--bg-surface)] to-[rgba(248,243,235,0.92)]">
       <div className="relative z-20 px-3 py-2.5">
         {credentialNotice ? (
-          <div className="mb-2 flex items-center gap-2 rounded-lg bg-[rgba(178,65,46,0.08)] px-3 py-2 text-sm text-[var(--accent-danger)]">
-            <p className="flex-1">{credentialNotice}</p>
-            <Link className="font-medium underline underline-offset-2 hover:no-underline" href={credentialSettingsHref}>
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg bg-[rgba(178,65,46,0.08)] px-3 py-2 text-sm text-[var(--accent-danger)]">
+            <p className="min-w-0 flex-1">{credentialNotice}</p>
+            <Link className="inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:no-underline" href={credentialSettingsHref}>
               模型连接
+              <JumpLinkIcon />
             </Link>
           </div>
         ) : null}
@@ -239,8 +247,8 @@ export function StudioChatComposer({
           onKeyDown={handleComposerKeyDown}
         />
 
-        <div className="mt-1.5 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1">
+        <div className={`mt-1.5 flex gap-2 ${compactLayout ? "flex-col items-stretch" : "items-start justify-between"}`}>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
             <ToolbarIconButton label="上传文件" onClick={() => fileInputRef.current?.click()}>
               <PaperclipIcon />
             </ToolbarIconButton>
@@ -248,6 +256,8 @@ export function StudioChatComposer({
             <div className="relative">
               <ToolbarChipButton
                 active={showContextSelector}
+                badge={selectedContextPaths.length > 0 ? String(selectedContextPaths.length) : null}
+                iconOnly={iconLayout}
                 label={`上下文 ${selectedContextPaths.length}`}
                 onClick={handleToggleContextSelector}
                 buttonRef={contextButtonRef}
@@ -425,6 +435,7 @@ export function StudioChatComposer({
                   enabled: isWriteToCurrentDocumentEnabled,
                   writeTargetDisabledReason,
                 })}
+                iconOnly={iconLayout}
                 label={isWriteToCurrentDocumentEnabled ? "本轮改当前稿" : "改当前稿"}
                 title={writeTargetDisabledReason ?? "显式开启后，助手本轮才可改写当前文稿。"}
                 onClick={onToggleWriteToCurrentDocument}
@@ -435,6 +446,7 @@ export function StudioChatComposer({
           </div>
 
           <Button
+            className={compactLayout ? "w-full" : "shrink-0"}
             disabled={!canChat || isResponding}
             loading={isResponding}
             shape="round"
@@ -506,13 +518,17 @@ function ToolbarIconButton({
 
 function ToolbarChipButton({
   active = false,
+  badge = null,
   children,
+  iconOnly = false,
   label,
   onClick,
   buttonRef,
 }: {
   active?: boolean;
+  badge?: string | null;
   children: ReactNode;
+  iconOnly?: boolean;
   label: string;
   onClick: () => void;
   buttonRef?: React.Ref<HTMLButtonElement>;
@@ -520,13 +536,20 @@ function ToolbarChipButton({
   return (
     <button
       ref={buttonRef}
-      className={`inline-flex h-[26px] items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium transition-colors ${active ? "bg-[rgba(107,143,113,0.15)] text-[var(--accent-primary)]" : "bg-[rgba(44,36,22,0.05)] text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.1)]"}`}
+      aria-label={label}
+      className={`relative inline-flex h-[26px] min-w-0 max-w-full items-center rounded-lg text-[11px] font-medium transition-colors ${active ? "bg-[rgba(107,143,113,0.15)] text-[var(--accent-primary)]" : "bg-[rgba(44,36,22,0.05)] text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.1)]"} ${iconOnly ? "w-[30px] justify-center px-0" : "gap-1.5 px-2.5"}`}
+      title={label}
       type="button"
       onClick={onClick}
     >
       <span className="opacity-70">{children}</span>
-      <span>{label}</span>
-      <span className="opacity-50 text-[10px]">⌄</span>
+      {!iconOnly ? <span className="min-w-0 truncate">{label}</span> : null}
+      {!iconOnly ? <span className="opacity-50 text-[10px]">⌄</span> : null}
+      {iconOnly && badge ? (
+        <span className="absolute -right-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-[var(--accent-primary)] px-1 text-[9px] leading-4 text-white">
+          {badge}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -535,6 +558,7 @@ function ToolbarToggleButton({
   active = false,
   children,
   disabled = false,
+  iconOnly = false,
   label,
   onClick,
   title,
@@ -542,6 +566,7 @@ function ToolbarToggleButton({
   active?: boolean;
   children: ReactNode;
   disabled?: boolean;
+  iconOnly?: boolean;
   label: string;
   onClick: () => void;
   title?: string;
@@ -549,21 +574,36 @@ function ToolbarToggleButton({
   return (
     <button
       aria-pressed={active}
-      className={`inline-flex h-[26px] items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium transition-colors ${
+      aria-label={label}
+      className={`inline-flex h-[26px] min-w-0 max-w-full items-center rounded-lg text-[11px] font-medium transition-colors ${
         disabled
           ? "cursor-not-allowed bg-[rgba(44,36,22,0.04)] text-[rgba(44,36,22,0.35)]"
           : active
             ? "bg-[rgba(107,143,113,0.16)] text-[var(--accent-primary)]"
             : "bg-[rgba(44,36,22,0.05)] text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.1)]"
-      }`}
+      } ${iconOnly ? "w-[30px] justify-center px-0" : "gap-1.5 px-2.5"}`}
       disabled={disabled}
-      title={title}
+      title={title ?? label}
       type="button"
       onClick={onClick}
     >
       <span className="opacity-70">{children}</span>
-      <span>{label}</span>
+      {!iconOnly ? <span className="min-w-0 truncate">{label}</span> : null}
     </button>
+  );
+}
+
+function JumpLinkIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 16 16" width="14">
+      <path
+        d="M6 4h6v6m-1-5-6.5 6.5M4 7.5V12h4.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
   );
 }
 

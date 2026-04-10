@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useTransition, useCallback, useState } from "react";
+import { useEffect, useMemo, useTransition, useCallback, useState, useRef } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Message } from "@arco-design/web-react";
@@ -17,15 +18,22 @@ import {
   buildStudioDocumentEntryPath,
   buildStudioDocumentTree,
   buildStudioPathWithParams,
+  buildStudioChatGridTemplateColumns,
+  clampStudioChatSidebarWidth,
   findClosestRemainingFilePath,
   findNodeByPath,
   findFirstFilePath,
   getStudioPanelLabel,
+  isStudioDesktopLayout,
   isDocumentTreePathAffected,
   listDocumentTreeFilePaths,
   listStaleChapters,
   readStudioDocumentEntryBaseName,
   remapDocumentTreePath,
+  resolveDefaultStudioChatSidebarWidth,
+  resolveStudioChatLayoutMode,
+  resolveStudioChatSidebarBounds,
+  STUDIO_CHAT_RESIZE_STEP,
   resolveDefaultDocumentPathFromPanel,
   resolveStudioDocumentPath,
   resolveStudioPanel,
@@ -40,6 +48,7 @@ import {
 } from "@/lib/api/projects";
 import { getErrorMessage } from "@/lib/api/client";
 import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import type { DocumentTreeNode } from "@/features/studio/components/page/studio-page-support";
 
 type StudioPageProps = {
@@ -72,6 +81,11 @@ export function StudioPage({ projectId }: StudioPageProps) {
   const [, startTransition] = useTransition();
   const [documentTreeDialog, setDocumentTreeDialog] = useState<DocumentTreeDialogState>(null);
   const [documentTreeDialogValue, setDocumentTreeDialogValue] = useState("");
+  const [dragChatWidth, setDragChatWidth] = useState<number | null>(null);
+  const [measuredChatWidth, setMeasuredChatWidth] = useState(0);
+  const [studioGridWidth, setStudioGridWidth] = useState(0);
+  const studioGridRef = useRef<HTMLDivElement>(null);
+  const chatPanelRef = useRef<HTMLElement>(null);
   const currentSearch = searchParams.toString();
   const currentUrl = currentSearch ? `${pathname}?${currentSearch}` : pathname;
 
@@ -79,6 +93,8 @@ export function StudioPage({ projectId }: StudioPageProps) {
   const rawPanel = searchParams.get("panel");
   const rawChapter = searchParams.get("chapter");
   const chatOpen = searchParams.get("chat") !== "0";
+  const storedChatWidth = useWorkspaceStore((state) => state.studioChatWidthByProject[projectId] ?? null);
+  const setStoredChatWidth = useWorkspaceStore((state) => state.setStudioChatWidth);
 
   const projectQuery = useQuery({
     queryKey: ["project", projectId],
@@ -382,6 +398,28 @@ export function StudioPage({ projectId }: StudioPageProps) {
     ? STUDIO_SAVE_BUTTON_CLASS
     : `${STUDIO_TOOLBAR_BUTTON_CLASS} h-9 px-4 text-[13px]`;
   const studioGridClassName = chatOpen ? STUDIO_GRID_WITH_CHAT_CLASS : STUDIO_GRID_WITHOUT_CHAT_CLASS;
+  const effectiveChatWidth = dragChatWidth ?? storedChatWidth;
+  const resolvedDesktopChatWidth = useMemo(() => {
+    if (!chatOpen || !isStudioDesktopLayout(studioGridWidth) || studioGridWidth <= 0) {
+      return null;
+    }
+    if (effectiveChatWidth === null) {
+      if (measuredChatWidth > 0) {
+        return clampStudioChatSidebarWidth(measuredChatWidth, studioGridWidth);
+      }
+      return resolveDefaultStudioChatSidebarWidth(studioGridWidth);
+    }
+    return clampStudioChatSidebarWidth(effectiveChatWidth, studioGridWidth);
+  }, [chatOpen, effectiveChatWidth, measuredChatWidth, studioGridWidth]);
+  const studioGridStyle = useMemo<CSSProperties | undefined>(() => {
+    const gridTemplateColumns = buildStudioChatGridTemplateColumns({
+      chatOpen,
+      chatWidth: effectiveChatWidth,
+      containerWidth: studioGridWidth,
+    });
+    return gridTemplateColumns ? { gridTemplateColumns } : undefined;
+  }, [chatOpen, effectiveChatWidth, studioGridWidth]);
+  const chatLayoutMode = resolveStudioChatLayoutMode(resolvedDesktopChatWidth ?? measuredChatWidth);
   const documentTreeDialogCopy = buildDocumentTreeDialogCopy(documentTreeDialog);
   const documentTreeDialogPending = documentTreeDialog?.mode === "rename"
     ? renameDocumentEntryMutation.isPending
@@ -389,9 +427,141 @@ export function StudioPage({ projectId }: StudioPageProps) {
       ? deleteDocumentEntryMutation.isPending
       : createDocumentEntryMutation.isPending;
 
+  useEffect(() => {
+    const gridNode = studioGridRef.current;
+    if (!gridNode) {
+      return;
+    }
+    const updateMeasurements = () => {
+      const nextWidth = Math.round(gridNode.getBoundingClientRect().width);
+      setStudioGridWidth((current) => (current === nextWidth ? current : nextWidth));
+      const nextChatWidth = chatPanelRef.current
+        ? Math.round(chatPanelRef.current.getBoundingClientRect().width)
+        : 0;
+      setMeasuredChatWidth((current) => (current === nextChatWidth ? current : nextChatWidth));
+    };
+    updateMeasurements();
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => updateMeasurements());
+      observer.observe(gridNode);
+      if (chatPanelRef.current) {
+        observer.observe(chatPanelRef.current);
+      }
+      return () => observer.disconnect();
+    }
+    window.addEventListener("resize", updateMeasurements);
+    return () => window.removeEventListener("resize", updateMeasurements);
+  }, [chatOpen]);
+
+  useEffect(() => {
+    if (!chatOpen && dragChatWidth !== null) {
+      setDragChatWidth(null);
+    }
+  }, [chatOpen, dragChatWidth]);
+
+  useEffect(() => {
+    if (
+      !chatOpen
+      || dragChatWidth !== null
+      || storedChatWidth === null
+      || !isStudioDesktopLayout(studioGridWidth)
+      || studioGridWidth <= 0
+    ) {
+      return;
+    }
+    const clampedWidth = clampStudioChatSidebarWidth(storedChatWidth, studioGridWidth);
+    if (clampedWidth !== storedChatWidth) {
+      setStoredChatWidth(projectId, clampedWidth);
+    }
+  }, [chatOpen, dragChatWidth, projectId, setStoredChatWidth, storedChatWidth, studioGridWidth]);
+
+  const handleChatResizePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!chatOpen || !isStudioDesktopLayout(studioGridWidth)) {
+      return;
+    }
+    const gridElement = studioGridRef.current;
+    if (!gridElement) {
+      return;
+    }
+    event.preventDefault();
+    const pointerId = event.pointerId;
+    const startWidth = resolvedDesktopChatWidth ?? resolveDefaultStudioChatSidebarWidth(studioGridWidth);
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+
+    const resolveWidthFromPointer = (clientX: number) => {
+      const rect = gridElement.getBoundingClientRect();
+      return clampStudioChatSidebarWidth(rect.right - clientX, rect.width);
+    };
+
+    const cleanup = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerCancel);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+    };
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) {
+        return;
+      }
+      setDragChatWidth(resolveWidthFromPointer(moveEvent.clientX));
+    };
+
+    const handlePointerUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) {
+        return;
+      }
+      cleanup();
+      setDragChatWidth(null);
+      setStoredChatWidth(projectId, resolveWidthFromPointer(upEvent.clientX));
+    };
+
+    const handlePointerCancel = (cancelEvent: PointerEvent) => {
+      if (cancelEvent.pointerId !== pointerId) {
+        return;
+      }
+      cleanup();
+      setDragChatWidth(null);
+    };
+
+    setDragChatWidth(startWidth);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerCancel);
+  }, [chatOpen, projectId, resolvedDesktopChatWidth, setStoredChatWidth, studioGridWidth]);
+
+  const handleChatResizeKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!chatOpen || !isStudioDesktopLayout(studioGridWidth) || studioGridWidth <= 0) {
+      return;
+    }
+    const currentWidth = resolvedDesktopChatWidth ?? resolveDefaultStudioChatSidebarWidth(studioGridWidth);
+    const bounds = resolveStudioChatSidebarBounds(studioGridWidth);
+
+    let nextWidth: number | null = null;
+    if (event.key === "ArrowLeft") {
+      nextWidth = clampStudioChatSidebarWidth(currentWidth + STUDIO_CHAT_RESIZE_STEP, studioGridWidth);
+    } else if (event.key === "ArrowRight") {
+      nextWidth = clampStudioChatSidebarWidth(currentWidth - STUDIO_CHAT_RESIZE_STEP, studioGridWidth);
+    } else if (event.key === "Home") {
+      nextWidth = bounds.min;
+    } else if (event.key === "End") {
+      nextWidth = bounds.max;
+    }
+
+    if (nextWidth === null) {
+      return;
+    }
+    event.preventDefault();
+    setStoredChatWidth(projectId, nextWidth);
+  }, [chatOpen, projectId, resolvedDesktopChatWidth, setStoredChatWidth, studioGridWidth]);
+
   return (
     <>
-      <div className={studioGridClassName}>
+      <div className={studioGridClassName} ref={studioGridRef} style={studioGridStyle}>
         <div className="fixed -top-1/2 -right-[20%] w-full h-[150%] pointer-events-none [background:radial-gradient(ellipse_at_60%_40%,rgba(107,143,113,0.15)_0%,transparent_50%),radial-gradient(ellipse_at_30%_70%,rgba(196,167,108,0.12)_0%,transparent_40%)]" />
 
         <div className="col-span-full flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-gradient-to-b from-white/98 to-white/88 backdrop-blur-xl border-b border-[rgba(44,36,22,0.06)] relative z-10 animate-[inkFadeIn_0.4s_cubic-bezier(0.16,1,0.3,1)] lg:px-5">
@@ -468,13 +638,33 @@ export function StudioPage({ projectId }: StudioPageProps) {
           </main>
 
           {chatOpen ? (
-            <aside className="relative z-5 flex min-h-0 min-w-0 flex-col overflow-hidden bg-gradient-to-b from-[rgba(254,253,251,0.98)] to-[rgba(249,247,243,0.95)] border-l border-[rgba(44,36,22,0.08)] shadow-[-2px_0_20px_rgba(44,36,22,0.03),inset_1px_0_0_rgba(255,255,255,0.5)] animate-[slideFromRight_0.5s_cubic-bezier(0.16,1,0.3,1)]">
+            <aside className="relative z-5 flex min-h-0 min-w-0 flex-col overflow-hidden bg-gradient-to-b from-[rgba(254,253,251,0.98)] to-[rgba(249,247,243,0.95)] border-l border-[rgba(44,36,22,0.08)] shadow-[-2px_0_20px_rgba(44,36,22,0.03),inset_1px_0_0_rgba(255,255,255,0.5)] animate-[slideFromRight_0.5s_cubic-bezier(0.16,1,0.3,1)]" ref={chatPanelRef}>
+              {resolvedDesktopChatWidth !== null ? (
+                <div
+                  aria-label="调整共创助手宽度"
+                  aria-orientation="vertical"
+                  aria-valuemax={resolveStudioChatSidebarBounds(studioGridWidth).max}
+                  aria-valuemin={resolveStudioChatSidebarBounds(studioGridWidth).min}
+                  aria-valuenow={resolvedDesktopChatWidth}
+                  className="absolute inset-y-0 left-0 z-20 hidden w-4 -translate-x-1/2 cursor-col-resize select-none items-center justify-center lg:flex"
+                  role="separator"
+                  tabIndex={0}
+                  title="拖动或使用方向键调整共创助手宽度；Home 到最窄，End 到最宽"
+                  onKeyDown={handleChatResizeKeyDown}
+                  onPointerDown={handleChatResizePointerDown}
+                >
+                  <div className={`flex h-24 w-2 items-center justify-center rounded-full border border-[rgba(44,36,22,0.1)] bg-[rgba(254,253,251,0.92)] shadow-[0_10px_18px_rgba(44,36,22,0.08)] transition ${dragChatWidth === null ? "opacity-0 hover:opacity-100 focus-within:opacity-100 focus-visible:opacity-100" : "opacity-100"}`}>
+                    <div className="h-10 w-[3px] rounded-full bg-[rgba(90,122,107,0.55)]" />
+                  </div>
+                </div>
+              ) : null}
               <div className="absolute top-0 left-0 w-0.5 h-full bg-gradient-to-b from-transparent via-[#c4a76c] to-transparent opacity-25" />
               <AiChatPanel
                 activeConversationId={chatModel.activeConversationId}
                 attachments={chatModel.attachments}
                 availableContexts={documentTree}
                 canChat={chatModel.credentialModel.canChat}
+                layoutMode={chatLayoutMode}
                 composerText={chatModel.composerText}
                 conversationSummaries={chatModel.conversationSummaries}
                 createConversation={chatModel.createConversation}

@@ -162,6 +162,7 @@ def parse_tool_arguments(value: Any) -> tuple[dict[str, Any], str | None, str | 
     text = value.strip()
     if not text:
         return {}, None, None
+    text = _unwrap_angle_bracket_json_envelope(text)
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError:
@@ -169,6 +170,19 @@ def parse_tool_arguments(value: Any) -> tuple[dict[str, Any], str | None, str | 
     if not isinstance(parsed, dict):
         return {}, text, "Tool call arguments JSON must decode to an object"
     return parsed, text, None
+
+
+def _unwrap_angle_bracket_json_envelope(text: str) -> str:
+    if not (text.startswith("<") and text.endswith(">")):
+        return text
+    inner = text[1:-1].strip()
+    if not inner:
+        return text
+    if (inner.startswith("{") and inner.endswith("}")) or (
+        inner.startswith("[") and inner.endswith("]")
+    ):
+        return inner
+    return text
 
 
 def build_tool_call_payload(

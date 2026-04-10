@@ -74,8 +74,10 @@ function createNextStudioChatSessionSeed(current: StudioChatSession | null): Stu
   };
 }
 
-export function createEmptyStudioChatProjectState(): StudioChatProjectState {
-  const conversation = buildConversationRecord(createEmptyStudioChatSession());
+export function createEmptyStudioChatProjectState(
+  seedSession: StudioChatSession | null = null,
+): StudioChatProjectState {
+  const conversation = buildConversationRecord(createNextStudioChatSessionSeed(seedSession));
   return { activeConversationId: conversation.id, conversations: [conversation] };
 }
 
@@ -151,12 +153,13 @@ export function deleteConversationFromProjectState(
   conversationId: string,
 ): StudioChatProjectState {
   const currentProjectState = ensureStudioChatProjectState(projectState);
+  const deletedConversation = currentProjectState.conversations.find((item) => item.id === conversationId) ?? null;
   const conversations = currentProjectState.conversations.filter((item) => item.id !== conversationId);
   if (conversations.length === currentProjectState.conversations.length) {
     return projectState ?? currentProjectState;
   }
   if (conversations.length === 0) {
-    return createEmptyStudioChatProjectState();
+    return createEmptyStudioChatProjectState(deletedConversation?.session ?? null);
   }
   return {
     activeConversationId:

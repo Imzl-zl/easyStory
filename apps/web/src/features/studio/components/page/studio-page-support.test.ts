@@ -2,13 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildStudioChatGridTemplateColumns,
   buildStudioDocumentEntryPath,
   buildStudioDocumentTree,
   buildStudioPathWithParams,
+  clampStudioChatSidebarWidth,
   findClosestRemainingFilePath,
   getStudioPanelLabel,
   listStudioPanelOptions,
+  resolveDefaultStudioChatSidebarWidth,
   resolveDefaultDocumentPathFromPanel,
+  resolveStudioChatLayoutMode,
   resolveStudioDocumentPath,
   resolveStudioChapterListState,
   resolveSelectedChapterNumber,
@@ -53,6 +57,48 @@ test("resolveSelectedChapterNumber prefers explicit chapter, then first stale, t
   assert.equal(resolveSelectedChapterNumber(chapters as never, "1"), 1);
   assert.equal(resolveSelectedChapterNumber(chapters as never, null), 2);
   assert.equal(resolveSelectedChapterNumber([{ chapter_number: 3, status: "draft" }] as never, null), 3);
+});
+
+test("studio chat sidebar width clamps within desktop bounds", () => {
+  assert.equal(clampStudioChatSidebarWidth(200, 1024), 320);
+  assert.equal(clampStudioChatSidebarWidth(999, 1024), 368);
+  assert.equal(clampStudioChatSidebarWidth(520, 1440), 520);
+  assert.equal(clampStudioChatSidebarWidth(1200, 1440), 760);
+});
+
+test("studio chat sidebar default width follows previous layout targets", () => {
+  assert.equal(resolveDefaultStudioChatSidebarWidth(1024), 368);
+  assert.equal(resolveDefaultStudioChatSidebarWidth(1280), 408);
+});
+
+test("studio chat layout mode switches from default to compact to icon", () => {
+  assert.equal(resolveStudioChatLayoutMode(520), "default");
+  assert.equal(resolveStudioChatLayoutMode(400), "compact");
+  assert.equal(resolveStudioChatLayoutMode(360), "icon");
+  assert.equal(resolveStudioChatLayoutMode(320), "icon");
+});
+
+test("studio chat grid template columns only apply when chat width is available on desktop", () => {
+  assert.equal(
+    buildStudioChatGridTemplateColumns({ chatOpen: true, chatWidth: 480, containerWidth: 1280 }),
+    "244px minmax(0, 1fr) 480px",
+  );
+  assert.equal(
+    buildStudioChatGridTemplateColumns({ chatOpen: true, chatWidth: 200, containerWidth: 1024 }),
+    "236px minmax(0, 1fr) 320px",
+  );
+  assert.equal(
+    buildStudioChatGridTemplateColumns({ chatOpen: false, chatWidth: 480, containerWidth: 1280 }),
+    null,
+  );
+  assert.equal(
+    buildStudioChatGridTemplateColumns({ chatOpen: true, chatWidth: null, containerWidth: 1280 }),
+    null,
+  );
+  assert.equal(
+    buildStudioChatGridTemplateColumns({ chatOpen: true, chatWidth: 360, containerWidth: 900 }),
+    null,
+  );
 });
 
 test("resolveDefaultDocumentPathFromPanel maps explicit panel routes to canonical documents", () => {

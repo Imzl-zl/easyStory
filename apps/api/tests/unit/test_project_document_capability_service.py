@@ -1,6 +1,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from datetime import UTC, datetime
 import hashlib
 import json
 import threading
@@ -30,6 +31,8 @@ from app.modules.project.service.project_document_capability_service import (
     ProjectDocumentMutationError,
     _build_catalog_version,
 )
+from app.modules.project.service.project_document_capability_dto import ProjectDocumentSearchHitDTO
+from app.modules.project.service.project_document_search_support import _sort_search_hits
 from app.modules.project.service.project_document_version_support import (
     build_project_file_document_version,
 )
@@ -402,6 +405,47 @@ def test_project_document_capability_search_documents_prioritizes_continuity_doc
         "时间轴/章节索引.md",
         "校验/伏笔回收清单.md",
     }
+
+
+def test_sort_search_hits_handles_mixed_naive_and_aware_updated_at():
+    hits = [
+        ProjectDocumentSearchHitDTO(
+            path="设定/人物.md",
+            document_ref="project_file:人物",
+            binding_version="binding:人物",
+            resource_uri="project-document://人物",
+            title="人物",
+            source="file",
+            document_kind="markdown",
+            schema_id=None,
+            content_state="ready",
+            writable=True,
+            version="sha256:人物",
+            updated_at=datetime(2026, 4, 10, 16, 0, 0),
+            matched_fields=["path"],
+            match_score=10,
+        ),
+        ProjectDocumentSearchHitDTO(
+            path="设定/势力.md",
+            document_ref="project_file:势力",
+            binding_version="binding:势力",
+            resource_uri="project-document://势力",
+            title="势力",
+            source="file",
+            document_kind="markdown",
+            schema_id=None,
+            content_state="ready",
+            writable=True,
+            version="sha256:势力",
+            updated_at=datetime(2026, 4, 10, 15, 0, 0, tzinfo=UTC),
+            matched_fields=["path"],
+            match_score=10,
+        ),
+    ]
+
+    _sort_search_hits(hits)
+
+    assert [item.path for item in hits] == ["设定/人物.md", "设定/势力.md"]
 
 
 def test_project_document_capability_read_documents_returns_content(db, tmp_path):

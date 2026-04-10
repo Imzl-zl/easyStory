@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">easyStory</title>
+  <desc id="desc">A rounded green tile with an ivory story notebook and a golden binding.</desc>
+  <defs>
+    <linearGradient id="tile" x1="36" y1="28" x2="228" y2="228" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#678877" />
+      <stop offset="1" stop-color="#4a6a5b" />
+    </linearGradient>
+    <linearGradient id="spine" x1="100" y1="42" x2="100" y2="208" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d8bd8f" />
+      <stop offset="1" stop-color="#b58846" />
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="56" fill="url(#tile)" />
+  <rect x="16" y="16" width="224" height="224" rx="56" fill="none" stroke="#7f9b8a" stroke-width="4" />
+  <path
+    d="M78 60c0-10.493 8.507-19 19-19h73c10.493 0 19 8.507 19 19v134c0 10.493-8.507 19-19 19h-57c-19.33 0-35-15.67-35-35V60Z"
+    fill="#fbf8f1"
+  />
+  <path
+    d="M101 41h19v172h-11c-17.121 0-31-13.879-31-31V64c0-12.703 10.297-23 23-23Z"
+    fill="url(#spine)"
+  />
+  <path d="M138 83h30a5 5 0 0 1 0 10h-30a5 5 0 0 1 0-10Z" fill="#c9d4cc" />
+  <path d="M138 106h34a5 5 0 0 1 0 10h-34a5 5 0 0 1 0-10Z" fill="#d5ddd6" />
+  <path d="M138 129h26a5 5 0 0 1 0 10h-26a5 5 0 0 1 0-10Z" fill="#d5ddd6" />
+  <path d="M138 152h34a5 5 0 0 1 0 10h-34a5 5 0 0 1 0-10Z" fill="#d5ddd6" />
+</svg>
