@@ -43,6 +43,7 @@ export function Modal({
 
     const previousFocusedElement =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const restoreFocusTarget = restoreFocusRef?.current;
     const container = containerRef.current;
     const previousOverflow = document.body.style.overflow;
 
@@ -85,7 +86,7 @@ export function Modal({
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
-      const focusTarget = restoreFocusRef?.current ?? previousFocusedElement;
+      const focusTarget = restoreFocusTarget ?? previousFocusedElement;
       focusTarget?.focus();
     };
   }, [open, handleDismiss, restoreFocusRef]);
