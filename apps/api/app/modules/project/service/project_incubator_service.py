@@ -36,6 +36,7 @@ from .project_incubator_support import (
     PROJECT_SETTING_CONVERSATION_SKILL_ID,
 )
 from .project_service_support import evaluate_project_setting
+from app.modules.project.schemas import merge_project_setting
 
 if TYPE_CHECKING:
     from app.modules.credential.service import CredentialService
@@ -102,6 +103,11 @@ class ProjectIncubatorService:
             model,
             owner_id=owner_id,
         )
+        if payload.base_project_setting is not None:
+            project_setting = merge_project_setting(
+                payload.base_project_setting,
+                project_setting,
+            )
         completeness = evaluate_project_setting(project_setting)
         return ProjectIncubatorConversationDraftDTO(
             project_setting=project_setting,

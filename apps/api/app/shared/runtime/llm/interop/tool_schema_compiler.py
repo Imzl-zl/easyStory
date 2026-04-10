@@ -88,6 +88,7 @@ def _normalize_openai_strict_schema(value: Any) -> Any:
         key: _normalize_openai_strict_schema(item)
         for key, item in value.items()
     }
+    normalized = _collapse_nullable_anyof_schema(normalized)
     if normalized.get("type") != "object":
         return normalized
     properties = normalized.get("properties")
@@ -107,6 +108,30 @@ def _normalize_openai_strict_schema(value: Any) -> Any:
     }
     normalized["required"] = property_names
     return normalized
+
+
+def _collapse_nullable_anyof_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    any_of = schema.get("anyOf")
+    if not isinstance(any_of, list):
+        return schema
+    non_null_entries = [
+        item
+        for item in any_of
+        if not (isinstance(item, dict) and item.get("type") == NULL_SCHEMA_TYPE)
+    ]
+    if len(non_null_entries) != 1 or len(non_null_entries) == len(any_of):
+        return schema
+    nullable_branch = non_null_entries[0]
+    if not isinstance(nullable_branch, dict):
+        return schema
+    collapsed = {
+        key: value
+        for key, value in schema.items()
+        if key != "anyOf"
+    }
+    for key, value in nullable_branch.items():
+        collapsed.setdefault(key, value)
+    return _make_schema_nullable(collapsed)
 
 
 def _read_required_property_names(value: Any) -> set[str]:

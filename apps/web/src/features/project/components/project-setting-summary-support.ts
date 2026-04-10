@@ -59,22 +59,6 @@ export function buildProjectSettingSections(setting: ProjectSetting): SettingPre
   ].flatMap((section) => (section ? [section] : []));
 }
 
-export function buildProjectSettingConversationSeed(setting: ProjectSetting | null): string {
-  if (!setting) {
-    return "";
-  }
-  const sections = buildProjectSettingSections(setting);
-  if (sections.length === 0) {
-    return "";
-  }
-  return sections
-    .map((section) => {
-      const lines = section.items.map((item) => `- ${item.label}：${item.value}`);
-      return `${section.title}\n${lines.join("\n")}`;
-    })
-    .join("\n\n");
-}
-
 export function formatProjectSettingFieldLabel(field: string): string {
   if (field === "genre") return "题材";
   if (field === "sub_genre") return "子题材";

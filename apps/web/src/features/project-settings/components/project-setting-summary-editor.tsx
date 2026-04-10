@@ -11,13 +11,13 @@ import {
   pickIncubatorCredentialOption,
 } from "@/features/shared/assistant/assistant-credential-support";
 import {
-  buildProjectSettingConversationSeed,
-} from "@/features/project/components/project-setting-summary-support";
-import {
+  buildProjectSettingSummarySourceExcerpt,
   buildProjectSettingSummaryProviderOptions,
   buildProjectSettingSummarySaveFeedback,
   invalidateProjectSettingSummaryQueries,
   loadProjectSettingSummaryEditorResources,
+  normalizeProjectSettingSummarySourceContent,
+  PROJECT_SETTING_SUMMARY_SOURCE_DOCUMENT_PATH,
   resolveProjectSettingSummaryPreferredModelName,
   resolveProjectSettingSummaryPreferredProvider,
 } from "@/features/project-settings/components/project-setting-summary-editor-support";
@@ -25,6 +25,7 @@ import { ProjectSettingSummaryPreview } from "@/features/project-settings/compon
 import { getErrorMessage } from "@/lib/api/client";
 import {
   buildIncubatorConversationDraft,
+  getProjectDocument,
   updateProjectSetting,
 } from "@/lib/api/projects";
 import type {
@@ -56,11 +57,6 @@ export function ProjectSettingSummaryEditor({
   projectId,
 }: Readonly<ProjectSettingSummaryEditorProps>) {
   const queryClient = useQueryClient();
-  const initialConversationText = useMemo(
-    () => buildProjectSettingConversationSeed(initialSetting),
-    [initialSetting],
-  );
-  const [conversationText, setConversationText] = useState(initialConversationText);
   const [modelName, setModelName] = useState("");
   const [preview, setPreview] = useState<ProjectIncubatorConversationDraft | null>(null);
   const [provider, setProvider] = useState("");
@@ -68,6 +64,10 @@ export function ProjectSettingSummaryEditor({
   const resourcesQuery = useQuery({
     queryKey: ["project-setting-summary-editor-resources", projectId],
     queryFn: () => loadProjectSettingSummaryEditorResources(projectId),
+  });
+  const sourceDocumentQuery = useQuery({
+    queryKey: ["project-setting-summary-source-document", projectId],
+    queryFn: () => getProjectDocument(projectId, PROJECT_SETTING_SUMMARY_SOURCE_DOCUMENT_PATH),
   });
   const credentialOptions = useMemo(
     () => resourcesQuery.data?.credentialOptions ?? [],
@@ -92,8 +92,20 @@ export function ProjectSettingSummaryEditor({
   );
   const resolvedProvider = provider.trim() || selectedOption?.provider || "";
   const resolvedModelName = modelName.trim() || preferredModelName || selectedOption?.defaultModel || "";
-  const isDirty = preview !== null || conversationText.trim() !== initialConversationText.trim();
+  const sourceContent = normalizeProjectSettingSummarySourceContent(
+    sourceDocumentQuery.data?.content,
+  );
+  const sourceExcerpt = buildProjectSettingSummarySourceExcerpt(
+    sourceDocumentQuery.data?.content,
+  );
+  const sourceCharacterCount = sourceContent.length;
+  const studioDocumentHref = `/workspace/project/${projectId}/studio?${new URLSearchParams({
+    doc: PROJECT_SETTING_SUMMARY_SOURCE_DOCUMENT_PATH,
+    panel: "setting",
+  }).toString()}`;
+  const isDirty = preview !== null;
   const hasAvailableProvider = providerOptions.length > 0;
+  const hasSourceContent = sourceContent.length > 0;
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -105,8 +117,23 @@ export function ProjectSettingSummaryEditor({
       if (!resolvedProvider) {
         throw new Error("请先选择一个可用模型连接。");
       }
+      const sourceDocument = await getProjectDocument(
+        projectId,
+        PROJECT_SETTING_SUMMARY_SOURCE_DOCUMENT_PATH,
+      );
+      queryClient.setQueryData(
+        ["project-setting-summary-source-document", projectId],
+        sourceDocument,
+      );
+      const latestSourceContent = normalizeProjectSettingSummarySourceContent(
+        sourceDocument.content,
+      );
+      if (!latestSourceContent) {
+        throw new Error("项目说明还是空的，请先补充内容。");
+      }
       return buildIncubatorConversationDraft({
-        conversation_text: conversationText,
+        conversation_text: latestSourceContent,
+        base_project_setting: initialSetting ?? undefined,
         model_name: resolvedModelName || undefined,
         provider: resolvedProvider,
       });
@@ -172,9 +199,9 @@ export function ProjectSettingSummaryEditor({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1.5">
           <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-primary)]">更新摘要</p>
-          <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">用自然语言写，交给 AI 提炼结构化摘要</h3>
+          <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">直接从项目说明提取结构化摘要</h3>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">
-            这里适合写人物、世界观、剧情走向和约束要求。保存后，当前已确认的大纲、开篇和章节会按实际影响标记为 stale，方便重新核对。
+            这里会读取最新的项目说明内容交给 AI 提炼，不需要再手动复制人物、世界观、剧情走向和约束要求。
           </p>
         </div>
         <StatusBadge status={preview?.setting_completeness.status ?? "draft"} />
@@ -182,18 +209,41 @@ export function ProjectSettingSummaryEditor({
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
         <div className="space-y-3">
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-[var(--text-primary)]">自由描述</span>
-            <textarea
-              className="min-h-[240px] w-full rounded-[18px] border border-[var(--line-soft)] bg-[var(--bg-surface)] px-4 py-3 text-sm leading-7 text-[var(--text-primary)] shadow-sm outline-none transition focus:border-[rgba(90,122,107,0.38)] focus:ring-2 focus:ring-[rgba(90,122,107,0.12)]"
-              placeholder="例如：这是一部发生在旧城区更新期的都市治愈小说。主角是守着祖传书店的年轻店主……"
-              value={conversationText}
-              onChange={(event) => {
-                setConversationText(event.target.value);
-                setPreview(null);
-              }}
-            />
-          </label>
+          <section className="space-y-3 rounded-[20px] border border-[var(--line-soft)] bg-[rgba(248,243,235,0.52)] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-[var(--text-primary)]">提取来源</p>
+                <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                  每次提取都会直接读取 <span className="font-medium text-[var(--text-primary)]">项目说明.md</span> 的最新内容。
+                </p>
+              </div>
+              <Link className={SETTINGS_LINK_CLASS} href={studioDocumentHref}>
+                前往编辑项目说明
+              </Link>
+            </div>
+            {sourceDocumentQuery.isLoading ? (
+              <p className="text-sm text-[var(--text-secondary)]">正在读取项目说明...</p>
+            ) : sourceDocumentQuery.error ? (
+              <p className="text-sm leading-6 text-[var(--accent-danger)]">
+                {getErrorMessage(sourceDocumentQuery.error)}
+              </p>
+            ) : hasSourceContent ? (
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+                  {PROJECT_SETTING_SUMMARY_SOURCE_DOCUMENT_PATH} · {sourceCharacterCount} 字
+                </p>
+                <div className="rounded-[16px] border border-[rgba(101,92,82,0.08)] bg-[var(--bg-surface)] px-4 py-3">
+                  <p className="break-words text-sm leading-7 text-[var(--text-primary)]">
+                    {sourceExcerpt}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-[16px] border border-[rgba(196,136,61,0.16)] bg-[rgba(196,136,61,0.08)] px-4 py-3 text-sm leading-6 text-[var(--accent-warning)]">
+                项目说明还是空的。先去文稿里写清楚故事背景、人物关系和约束，再回来提取摘要。
+              </div>
+            )}
+          </section>
           <div className="grid gap-3 md:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
             <label className="block space-y-2">
               <span className="text-sm font-medium text-[var(--text-primary)]">模型连接</span>
@@ -227,11 +277,16 @@ export function ProjectSettingSummaryEditor({
           <div className="flex flex-wrap items-center gap-3">
             <button
               className="ink-button"
-              disabled={!conversationText.trim() || draftMutation.isPending || !hasAvailableProvider}
+              disabled={
+                !hasSourceContent
+                || draftMutation.isPending
+                || !hasAvailableProvider
+                || sourceDocumentQuery.isLoading
+              }
               type="button"
               onClick={() => draftMutation.mutate()}
             >
-              {draftMutation.isPending ? "提炼中..." : "AI 提炼摘要"}
+              {draftMutation.isPending ? "提取中..." : "从项目说明提取"}
             </button>
             <button
               className="ink-button-secondary"
@@ -258,12 +313,15 @@ export function ProjectSettingSummaryEditor({
               <p className="text-sm leading-6 text-[var(--text-secondary)]">
                 {selectedOption ? `${selectedOption.provider} · ${selectedOption.displayLabel}` : "将按可用连接自动回退。"}
               </p>
+              <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                提取时会自动读取最新项目说明，不需要再手动整理一份自由描述。
+              </p>
             </>
           ) : (
             <>
               <p className="text-sm font-medium text-[var(--text-primary)]">还没有可用连接</p>
               <div className="space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
-                <p>先去启用项目或全局模型连接，再回来让 AI 提炼摘要。</p>
+                <p>先去启用项目或全局模型连接，再回来提取项目说明里的摘要。</p>
                 <Link
                   className={SETTINGS_LINK_CLASS}
                   href={`/workspace/lobby/settings?tab=credentials&scope=project&project=${projectId}&sub=list`}

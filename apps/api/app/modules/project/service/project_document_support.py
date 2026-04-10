@@ -230,13 +230,37 @@ def build_project_document_template_files(
     chapters: Sequence[Content],
     document_paths: Sequence[str],
 ) -> tuple[ProjectDocumentTemplateFileSeed, ...]:
-    del project_name, project_status, setting_payload, chapters
     return tuple(
         ProjectDocumentTemplateFileSeed(
             path=document_path,
-            content="",
+            content=_build_default_project_document_template_file_content(
+                project_name=project_name,
+                project_status=project_status,
+                setting_payload=setting_payload,
+                chapters=chapters,
+                document_path=document_path,
+            ),
         )
         for document_path in document_paths
+    )
+
+
+def _build_default_project_document_template_file_content(
+    *,
+    project_name: str,
+    project_status: str,
+    setting_payload: dict[str, Any] | None,
+    chapters: Sequence[Content],
+    document_path: str,
+) -> str:
+    del chapters
+    if document_path != PROJECT_OVERVIEW_DOCUMENT_PATH:
+        return ""
+    return build_project_document_template_seed(
+        project_name=project_name,
+        project_status=project_status,
+        setting_payload=setting_payload,
+        document_path=document_path,
     )
 
 

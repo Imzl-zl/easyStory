@@ -5,9 +5,11 @@ import asyncio
 import pytest
 from sqlalchemy import select
 
+from app.modules.project.infrastructure import ProjectDocumentFileStore
 from app.modules.content.models import Content
 from app.modules.project.service import (
     ProjectCreateDTO,
+    ProjectService,
     ProjectUpdateDTO,
     create_project_management_service,
 )
@@ -104,3 +106,36 @@ def test_project_management_service_scaffolds_preparation_assets_on_create(db) -
     assert all(len(content.versions) == 1 for content in contents)
     assert all(content.versions[0].version_number == 1 for content in contents)
     assert all(content.versions[0].content_text == "" for content in contents)
+
+
+def test_project_management_service_seeds_project_overview_document_from_setting(db, tmp_path) -> None:
+    owner = create_user(db)
+    file_store = ProjectDocumentFileStore(tmp_path)
+    project_service = ProjectService(document_file_store=file_store)
+
+    class StubStoryAssetService:
+        async def scaffold_preparation_assets(self, db, project_id):
+            return None
+
+    service = create_project_management_service(
+        project_service=project_service,
+        story_asset_service=StubStoryAssetService(),
+    )
+
+    created = asyncio.run(
+        service.create_project(
+            async_db(db),
+            ProjectCreateDTO(
+                name="带说明项目",
+                project_setting=ready_project_setting(),
+            ),
+            owner_id=owner.id,
+        )
+    )
+
+    overview = file_store.find_project_document(created.id, "项目说明.md")
+
+    assert overview is not None
+    assert "# 项目说明" in overview.content
+    assert "项目名称：带说明项目" in overview.content
+    assert "题材：玄幻" in overview.content
