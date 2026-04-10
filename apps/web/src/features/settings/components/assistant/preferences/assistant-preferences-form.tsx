@@ -247,7 +247,7 @@ function AssistantMaxOutputTokensField({
         value={draft.defaultMaxOutputTokens}
       />
       <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
-        只控制单次回复长度，不影响模型本身的输入容量。留空会回到当前作用域的默认值。
+        只控制显式默认的单次回复长度，不影响模型本身的输入容量。留空时不单独覆写，继续沿用当前作用域的默认处理。
       </p>
     </div>
   );

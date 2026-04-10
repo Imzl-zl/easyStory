@@ -201,7 +201,7 @@ function AdvancedSettingsForm({
   skillQueryError: unknown;
 }) {
   const currentOption = model.credentialOptions.find((option) => option.provider === model.settings.provider) ?? null;
-  const helperMaxOutputTokens = currentOption?.defaultMaxOutputTokens ?? 4096;
+  const helperMaxOutputTokens = currentOption?.defaultMaxOutputTokens ?? null;
 
   return (
     <div className="space-y-3">
@@ -220,7 +220,9 @@ function AdvancedSettingsForm({
           <div className="min-w-0">
             <p className="text-[12px] font-medium text-[var(--text-primary)]">回复细节</p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--text-secondary)]">
-              当前连接默认回复上限为 {helperMaxOutputTokens}，想让长回答更完整时再调高。
+              {helperMaxOutputTokens == null
+                ? "留空时不显式覆写单次回复上限，交给当前连接或上游模型默认处理。"
+                : `留空时不显式覆写单次回复上限；当前连接声明的默认上限为 ${helperMaxOutputTokens}。`}
             </p>
           </div>
           {prefersBufferedOutput(currentOption) ? (
@@ -256,7 +258,7 @@ function AdvancedSettingsForm({
           <TextSettingField
             label="单次回复上限"
             name="maxOutputTokens"
-            placeholder="4096"
+            placeholder={helperMaxOutputTokens == null ? "留空跟随连接/上游默认" : String(helperMaxOutputTokens)}
             value={model.settings.maxOutputTokens}
             onChange={(value) =>
               updateIncubatorChatSetting(model, "maxOutputTokens", normalizeMaxOutputTokensInput(value))

@@ -32,6 +32,7 @@ from .llm_protocol_types import (
     VERIFY_SYSTEM_PROMPT,
     VERIFY_USER_PROMPT,
     normalize_api_dialect,
+    resolve_anthropic_default_max_tokens,
     resolve_api_key_header_name,
     resolve_auth_strategy,
     resolve_model_name,
@@ -230,7 +231,13 @@ def _build_anthropic_messages_request(
 ) -> PreparedLLMHttpRequest:
     body: dict[str, Any] = {
         "model": request.model_name,
-        "max_tokens": request.max_tokens or 1024,
+        # Anthropic Messages requires max_tokens even when the caller does not
+        # explicitly override output length.
+        "max_tokens": (
+            request.max_tokens
+            if request.max_tokens is not None
+            else resolve_anthropic_default_max_tokens(request.connection.context_window_tokens)
+        ),
         "messages": _build_anthropic_messages(
             request,
             tool_name_aliases=tool_name_aliases,

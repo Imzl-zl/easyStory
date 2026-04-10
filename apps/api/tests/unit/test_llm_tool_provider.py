@@ -280,6 +280,113 @@ def test_execute_builds_openai_responses_request() -> None:
     assert result["content"] == "responses 结果"
 
 
+def test_execute_omits_openai_responses_max_output_tokens_without_overrides() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "output_text": "responses 结果",
+                "usage": {"input_tokens": 8, "output_tokens": 10, "total_tokens": 18},
+            },
+            text="",
+        )
+
+    provider = LLMToolProvider(request_sender=request_sender)
+    asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "写个摘要",
+                "model": {"provider": "openai", "name": "gpt-4.1-mini"},
+                "credential": {
+                    "api_key": "test-key",
+                    "api_dialect": "openai_responses",
+                },
+            },
+        )
+    )
+
+    assert "max_output_tokens" not in captured["request"].json_body
+
+
+def test_execute_uses_conservative_anthropic_max_tokens_when_no_override_exists() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "id": "msg_123",
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": "生成结果"}],
+                "model": "claude-sonnet-4",
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 12, "output_tokens": 34},
+            },
+            text="",
+        )
+
+    provider = LLMToolProvider(request_sender=request_sender)
+    asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "测试提示词",
+                "model": {"provider": "anthropic", "name": "claude-sonnet-4"},
+                "credential": {
+                    "api_key": "test-key",
+                    "api_dialect": "anthropic_messages",
+                },
+            },
+        )
+    )
+
+    assert captured["request"].json_body["max_tokens"] == 8192
+
+
+def test_execute_clamps_anthropic_default_max_tokens_to_context_window() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "id": "msg_123",
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": "生成结果"}],
+                "model": "claude-sonnet-4",
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 12, "output_tokens": 34},
+            },
+            text="",
+        )
+
+    provider = LLMToolProvider(request_sender=request_sender)
+    asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "测试提示词",
+                "model": {"provider": "anthropic", "name": "claude-sonnet-4"},
+                "credential": {
+                    "api_key": "test-key",
+                    "api_dialect": "anthropic_messages",
+                    "context_window_tokens": 4096,
+                },
+            },
+        )
+    )
+
+    assert captured["request"].json_body["max_tokens"] == 4095
 def test_execute_builds_openai_responses_runtime_replay_continuation_request() -> None:
     captured = {}
 

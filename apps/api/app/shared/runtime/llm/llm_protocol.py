@@ -10,6 +10,7 @@ from .llm_protocol_requests import build_verification_request, prepare_generatio
 from .llm_protocol_responses import parse_generation_response
 from .llm_protocol_types import (
     ANTHROPIC_VERSION,
+    DEFAULT_ANTHROPIC_MAX_OUTPUT_TOKENS,
     DEFAULT_API_DIALECT,
     DEFAULT_AUTH_STRATEGY_BY_DIALECT,
     DEFAULT_REQUEST_TIMEOUT_SECONDS,
@@ -35,6 +36,7 @@ from .llm_protocol_types import (
     normalize_auth_strategy,
     normalize_http_header_name,
     normalize_runtime_kind,
+    resolve_anthropic_default_max_tokens,
     resolve_api_key_header_name,
     resolve_auth_strategy,
     resolve_continuation_support,
@@ -64,6 +66,7 @@ def resolve_connection_continuation_support(
 
 __all__ = [
     "ANTHROPIC_VERSION",
+    "DEFAULT_ANTHROPIC_MAX_OUTPUT_TOKENS",
     "DEFAULT_API_DIALECT",
     "DEFAULT_AUTH_STRATEGY_BY_DIALECT",
     "DEFAULT_REQUEST_TIMEOUT_SECONDS",
@@ -96,6 +99,7 @@ __all__ = [
     "normalize_custom_base_url",
     "parse_generation_response",
     "prepare_generation_request",
+    "resolve_anthropic_default_max_tokens",
     "resolve_default_interop_profile",
     "resolve_api_key_header_name",
     "resolve_auth_strategy",

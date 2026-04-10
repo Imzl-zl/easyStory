@@ -8,6 +8,7 @@ from app.shared.runtime.errors import ConfigurationError
 from .tooling.assistant_tool_runtime_dto import AssistantToolDescriptor
 
 DEFAULT_ASSISTANT_MAX_PARALLEL_TOOL_CALLS = 1
+DEFAULT_ASSISTANT_OUTPUT_TOKEN_RESERVE = 8192
 
 
 @dataclass(frozen=True)
@@ -48,10 +49,18 @@ def enrich_assistant_run_budget_with_input_window(
     *,
     context_window_tokens: int | None,
     max_output_tokens: int | None,
+    default_output_token_reserve: int = DEFAULT_ASSISTANT_OUTPUT_TOKEN_RESERVE,
 ) -> AssistantRunBudget | None:
     if context_window_tokens is None:
         return budget
-    if max_output_tokens is not None and context_window_tokens <= max_output_tokens:
+    effective_output_tokens = max_output_tokens
+    if (
+        effective_output_tokens is None
+        and default_output_token_reserve > 0
+        and context_window_tokens > default_output_token_reserve
+    ):
+        effective_output_tokens = default_output_token_reserve
+    if effective_output_tokens is not None and context_window_tokens <= effective_output_tokens:
         raise ConfigurationError(
             "Assistant model output budget exceeds or matches the resolved context window"
         )
@@ -59,14 +68,14 @@ def enrich_assistant_run_budget_with_input_window(
         max_steps=1,
         max_parallel_tool_calls=DEFAULT_ASSISTANT_MAX_PARALLEL_TOOL_CALLS,
     )
-    if max_output_tokens is None:
+    if effective_output_tokens is None:
         return replace(
             base_budget,
             max_input_tokens=context_window_tokens,
         )
     return replace(
         base_budget,
-        max_input_tokens=context_window_tokens - max_output_tokens,
+        max_input_tokens=context_window_tokens - effective_output_tokens,
     )
 
 

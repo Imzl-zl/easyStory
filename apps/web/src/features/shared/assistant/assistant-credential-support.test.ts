@@ -172,7 +172,7 @@ test("incubator chat credential support hydrates defaults after recovery and fix
       },
     ),
     {
-      maxOutputTokens: "4096",
+      maxOutputTokens: "",
       modelName: "gpt-4.1-mini",
       provider: "openai",
       reasoningEffort: "",
@@ -197,7 +197,7 @@ test("incubator chat credential support hydrates defaults after recovery and fix
       },
     ),
     {
-      maxOutputTokens: "4096",
+      maxOutputTokens: "",
       modelName: "gpt-4.1-mini",
       provider: "openai",
       reasoningEffort: "",
@@ -249,7 +249,7 @@ test("incubator chat credential support prefers saved assistant preference befor
       },
     ),
     {
-      maxOutputTokens: "8192",
+      maxOutputTokens: "",
       modelName: "claude-sonnet-4",
       provider: "anthropic",
       reasoningEffort: "",
@@ -284,7 +284,7 @@ test("incubator chat credential support applies provider-agnostic model and reas
       },
     ),
     {
-      maxOutputTokens: "4096",
+      maxOutputTokens: "",
       modelName: "gpt-5.4",
       provider: "openai",
       reasoningEffort: "high",
@@ -319,7 +319,7 @@ test("incubator chat credential support does not apply provider-agnostic openai 
       },
     ),
     {
-      maxOutputTokens: "4096",
+      maxOutputTokens: "",
       modelName: "claude-sonnet-4",
       provider: "anthropic",
       reasoningEffort: "",
@@ -354,7 +354,7 @@ test("incubator chat credential support keeps provider-agnostic custom openai-co
       },
     ),
     {
-      maxOutputTokens: "4096",
+      maxOutputTokens: "",
       modelName: "deepseek-reasoner",
       provider: "new_api",
       reasoningEffort: "high",
@@ -381,7 +381,7 @@ test("incubator chat credential support keeps gemini connections on stream outpu
       },
     ),
     {
-      maxOutputTokens: "4096",
+      maxOutputTokens: "",
       modelName: "gemini-2.5-flash",
       provider: "薄荷",
       reasoningEffort: "",
@@ -504,7 +504,7 @@ test("incubator chat credential support falls back to credential token limit whe
       },
     ),
     {
-      maxOutputTokens: "16384",
+      maxOutputTokens: "",
       modelName: "gpt-4.1-mini",
       provider: "openai",
       reasoningEffort: "",

@@ -28,7 +28,7 @@ from ..assistant_execution_support import resolve_execution_spec
 from ..hooks.assistant_hook_service import AssistantHookService
 from ..assistant_llm_runtime_support import (
     ensure_assistant_runtime_supports_visible_tools,
-    resolve_assistant_max_output_tokens,
+    resolve_assistant_output_budget_tokens,
 )
 from ..preferences.preferences_service import AssistantPreferencesService
 from ..assistant_run_budget import enrich_assistant_run_budget_with_input_window
@@ -186,7 +186,7 @@ async def prepare_assistant_turn(
     run_budget = enrich_assistant_run_budget_with_input_window(
         run_budget,
         context_window_tokens=resolved_llm_runtime.context_window_tokens,
-        max_output_tokens=resolve_assistant_max_output_tokens(
+        max_output_tokens=resolve_assistant_output_budget_tokens(
             spec.model,
             resolved_runtime=resolved_llm_runtime,
         ),

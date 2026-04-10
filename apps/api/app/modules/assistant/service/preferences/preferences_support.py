@@ -85,9 +85,6 @@ def apply_preferred_model(
     provider = preferences.default_provider
     model_name = preferences.default_model_name
     max_output_tokens = preferences.default_max_output_tokens
-    reasoning_effort = preferences.default_reasoning_effort
-    thinking_level = preferences.default_thinking_level
-    thinking_budget = preferences.default_thinking_budget
     if provider is not None and provider != resolved.provider:
         resolved = resolved.model_copy(update={"provider": provider, "name": model_name})
     else:

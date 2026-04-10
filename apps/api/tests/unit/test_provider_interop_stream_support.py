@@ -171,6 +171,75 @@ def test_execute_stream_probe_request_rejects_empty_tool_response(monkeypatch) -
         )
 
 
+def test_execute_stream_probe_request_preserves_gemini_tool_call_from_early_event(monkeypatch) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://x666.me/v1beta/models/gemini-flash-latest:streamGenerateContent?alt=sse",
+        headers={"Accept": "text/event-stream"},
+        json_body={
+            "contents": [{"role": "user", "parts": [{"text": "调用工具"}]}],
+            "tools": [{"functionDeclarations": [{"name": "probe_echo_payload"}]}],
+        },
+        tool_name_aliases={"probe.echo_payload": "probe_echo_payload"},
+    )
+
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            yield (
+                'data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"probe_echo_payload",'
+                '"args":{"echo":"ping"},"id":"call_gemini_1"}}],"role":"model"},"index":0}],'
+                '"usageMetadata":{"promptTokenCount":114,"candidatesTokenCount":18,"totalTokenCount":189},'
+                '"responseId":"resp_gemini_1"}'
+            )
+            yield ""
+            yield (
+                'data: {"candidates":[{"content":{"parts":[{"text":""}],"role":"model"},'
+                '"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":114,'
+                '"candidatesTokenCount":18,"totalTokenCount":189},"responseId":"resp_gemini_1"}'
+            )
+            yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+
+    normalized = asyncio.run(
+        stream_support.execute_stream_probe_request(
+            request,
+            api_dialect="gemini_generate_content",
+            print_response=False,
+        )
+    )
+
+    assert normalized.content == ""
+    assert normalized.finish_reason == "STOP"
+    assert len(normalized.tool_calls) == 1
+    assert normalized.tool_calls[0].tool_name == "probe.echo_payload"
+    assert normalized.tool_calls[0].arguments == {"echo": "ping"}
+
+
 def test_execute_stream_probe_request_ignores_openai_completed_payload(monkeypatch) -> None:
     request = PreparedLLMHttpRequest(
         method="POST",

@@ -8,7 +8,7 @@ from app.shared.runtime.llm.llm_reasoning_validation import (
     build_provider_native_reasoning_shape_error,
 )
 
-DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS = 4096
+DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS = 8192
 PREFERENCES_PROVIDER_MAX_LENGTH = 50
 PREFERENCES_MODEL_NAME_MAX_LENGTH = 100
 PREFERENCES_MAX_OUTPUT_TOKENS_MIN = 128

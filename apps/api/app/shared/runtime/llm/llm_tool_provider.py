@@ -347,6 +347,10 @@ def _build_connection(credential: dict[str, Any]) -> LLMConnection:
         client_version=_optional_string(credential.get("client_version")),
         runtime_kind=normalize_runtime_kind(_optional_string(credential.get("runtime_kind"))),
         interop_profile=normalize_interop_profile(_optional_string(credential.get("interop_profile"))),
+        context_window_tokens=_optional_int(
+            credential.get("context_window_tokens"),
+            field_name="credential.context_window_tokens",
+        ),
     )
 
 

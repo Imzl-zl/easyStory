@@ -17,9 +17,6 @@ import {
   type IncubatorCredentialOption,
 } from "@/features/shared/assistant/assistant-credential-support";
 import {
-  resolveAssistantMaxOutputTokens,
-} from "@/features/shared/assistant/assistant-output-token-support";
-import {
   describeAssistantReasoningSelection,
   normalizeAssistantReasoningDraft,
   resolveAssistantReasoningControl,
@@ -698,19 +695,12 @@ export function resolveStudioModelButtonLabel(options: {
 
 function resolveNextStudioTokenDraft(
   currentValue: string,
-  currentOption: IncubatorCredentialOption | null,
-  nextOption: IncubatorCredentialOption | null,
+  _currentOption: IncubatorCredentialOption | null,
+  _nextOption: IncubatorCredentialOption | null,
 ) {
-  const normalizedCurrentValue = currentValue.trim();
-  if (!normalizedCurrentValue) {
-    return resolveStudioTokenDraft(nextOption);
-  }
-  if (normalizedCurrentValue !== resolveStudioTokenDraft(currentOption)) {
-    return currentValue;
-  }
-  return resolveStudioTokenDraft(nextOption);
+  return currentValue.trim() ? currentValue : "";
 }
 
 function resolveStudioTokenDraft(option: IncubatorCredentialOption | null) {
-  return String(option?.defaultMaxOutputTokens ?? resolveAssistantMaxOutputTokens(""));
+  return option?.defaultMaxOutputTokens != null ? String(option.defaultMaxOutputTokens) : "";
 }

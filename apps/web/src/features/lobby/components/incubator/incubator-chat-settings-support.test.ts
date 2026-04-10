@@ -72,7 +72,62 @@ test("incubator chat settings support shows only changed summary items", () => {
   ]);
 });
 
-test("incubator chat settings support syncs token limit when switching to a new connection default", () => {
+test("incubator chat settings support keeps blank token limit when switching connection", () => {
+  const initialSettings = {
+    agentId: "",
+    allowSystemCredentialPool: false,
+    hookIds: [],
+    maxOutputTokens: "",
+    modelName: "gpt-5.4",
+    provider: "openai",
+    reasoningEffort: "high",
+    skillId: "",
+    streamOutput: true,
+    thinkingBudget: "",
+    thinkingLevel: "",
+  };
+  let nextSettings: typeof initialSettings | null = null;
+  const model = {
+    credentialOptions: [
+      {
+        apiDialect: "openai_responses",
+        defaultModel: "gpt-5.4",
+        defaultMaxOutputTokens: 4096,
+        displayLabel: "OpenAI 主账号 · gpt-5.4",
+        provider: "openai",
+      },
+      {
+        apiDialect: "anthropic_messages",
+        defaultModel: "claude-sonnet-4",
+        defaultMaxOutputTokens: 12288,
+        displayLabel: "Claude · claude-sonnet-4",
+        provider: "anthropic",
+      },
+    ],
+    setSettings: (updater: (current: typeof initialSettings) => typeof initialSettings) => {
+      nextSettings = updater(initialSettings);
+    },
+    settings: initialSettings,
+  };
+
+  syncProviderSelection(model as never, "anthropic");
+
+  assert.deepEqual(nextSettings, {
+    agentId: "",
+    allowSystemCredentialPool: false,
+    hookIds: [],
+    maxOutputTokens: "",
+    modelName: "claude-sonnet-4",
+    provider: "anthropic",
+    reasoningEffort: "",
+    skillId: "",
+    streamOutput: true,
+    thinkingBudget: "",
+    thinkingLevel: "",
+  });
+});
+
+test("incubator chat settings support keeps explicit token limit when switching connection", () => {
   const initialSettings = {
     agentId: "",
     allowSystemCredentialPool: false,
@@ -116,7 +171,7 @@ test("incubator chat settings support syncs token limit when switching to a new 
     agentId: "",
     allowSystemCredentialPool: false,
     hookIds: [],
-    maxOutputTokens: "12288",
+    maxOutputTokens: "4096",
     modelName: "claude-sonnet-4",
     provider: "anthropic",
     reasoningEffort: "",

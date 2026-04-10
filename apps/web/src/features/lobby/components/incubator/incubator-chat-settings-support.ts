@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  resolveAssistantMaxOutputTokens,
+  resolveOptionalAssistantMaxOutputTokens,
   sanitizeAssistantOutputTokenInput,
 } from "@/features/shared/assistant/assistant-output-token-support";
 import {
@@ -66,8 +66,9 @@ export function buildChatSettingsSummaryItemsWithSkill(
   if (reasoningSummary) {
     items.push(reasoningSummary);
   }
-  if (shouldShowTokenSummaryItem(model.settings.maxOutputTokens, option)) {
-    items.push(`上限 ${resolveResolvedMaxOutputTokens(model.settings.maxOutputTokens, option)}`);
+  const explicitMaxOutputTokens = resolveOptionalAssistantMaxOutputTokens(model.settings.maxOutputTokens);
+  if (shouldShowTokenSummaryItem(explicitMaxOutputTokens, option)) {
+    items.push(`上限 ${explicitMaxOutputTokens}`);
   }
   if (shouldShowOutputModeSummaryItem(model.settings.streamOutput, option)) {
     items.push(resolveChatOutputModeLabel(model.settings.streamOutput));
@@ -111,23 +112,16 @@ function stripDefaultModelSuffix(option: IncubatorChatModel["credentialOptions"]
 
 function shouldSyncMaxOutputTokens(
   currentValue: string,
-  currentOption: IncubatorChatModel["credentialOptions"][number] | null,
-  nextOption: IncubatorChatModel["credentialOptions"][number] | undefined,
+  _currentOption: IncubatorChatModel["credentialOptions"][number] | null,
+  _nextOption: IncubatorChatModel["credentialOptions"][number] | undefined,
 ) {
-  const normalizedCurrentValue = currentValue.trim();
-  if (!normalizedCurrentValue) {
-    return resolveOptionMaxOutputTokensDraft(nextOption ?? null);
-  }
-  if (normalizedCurrentValue !== resolveOptionMaxOutputTokensDraft(currentOption)) {
-    return currentValue;
-  }
-  return resolveOptionMaxOutputTokensDraft(nextOption ?? null);
+  return currentValue.trim() ? currentValue : "";
 }
 
 function resolveOptionMaxOutputTokensDraft(
   option: IncubatorChatModel["credentialOptions"][number] | null | undefined,
 ) {
-  return String(option?.defaultMaxOutputTokens ?? resolveAssistantMaxOutputTokens(""));
+  return option?.defaultMaxOutputTokens != null ? String(option.defaultMaxOutputTokens) : "";
 }
 
 function resolveSummaryModelName(modelName: string, defaultModel: string) {
@@ -148,11 +142,13 @@ function shouldShowModelSummaryItem(modelName: string, defaultModel: string) {
 }
 
 function shouldShowTokenSummaryItem(
-  maxOutputTokens: string,
+  explicitMaxOutputTokens: number | undefined,
   option: IncubatorChatModel["credentialOptions"][number],
 ) {
-  return resolveResolvedMaxOutputTokens(maxOutputTokens, option)
-    !== resolveAssistantMaxOutputTokens(resolveOptionMaxOutputTokensDraft(option));
+  if (explicitMaxOutputTokens === undefined) {
+    return false;
+  }
+  return option.defaultMaxOutputTokens == null || explicitMaxOutputTokens !== option.defaultMaxOutputTokens;
 }
 
 function shouldShowOutputModeSummaryItem(
@@ -160,14 +156,6 @@ function shouldShowOutputModeSummaryItem(
   option: IncubatorChatModel["credentialOptions"][number],
 ) {
   return streamOutput !== !prefersBufferedOutput(option);
-}
-
-function resolveResolvedMaxOutputTokens(
-  maxOutputTokens: string,
-  option: IncubatorChatModel["credentialOptions"][number],
-) {
-  const normalizedValue = maxOutputTokens.trim() || resolveOptionMaxOutputTokensDraft(option);
-  return resolveAssistantMaxOutputTokens(normalizedValue);
 }
 
 function normalizeReasoningSettings(

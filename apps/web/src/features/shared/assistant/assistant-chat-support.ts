@@ -1,6 +1,6 @@
 import { looksLikeRetiredModelMessage, normalizeModelProviderMessage } from "@/lib/api/error-copy";
 import type { AssistantModelConfig } from "@/lib/api/types";
-import { resolveAssistantMaxOutputTokens } from "@/features/shared/assistant/assistant-output-token-support";
+import { resolveOptionalAssistantMaxOutputTokens } from "@/features/shared/assistant/assistant-output-token-support";
 import {
   buildAssistantReasoningPayload,
   resolveAssistantReasoningControl,
@@ -48,10 +48,11 @@ export function buildAssistantModelOverride(
       modelName: resolvedReasoningModelName,
     }),
   );
+  const maxOutputTokens = resolveOptionalAssistantMaxOutputTokens(settings.maxOutputTokens);
   return {
-    max_tokens: resolveAssistantMaxOutputTokens(settings.maxOutputTokens),
     provider,
     name: modelName || undefined,
+    ...(maxOutputTokens !== undefined ? { max_tokens: maxOutputTokens } : {}),
     ...reasoningPayload,
   };
 }

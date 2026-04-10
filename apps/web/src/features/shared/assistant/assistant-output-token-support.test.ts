@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS,
   MAX_ASSISTANT_MAX_OUTPUT_TOKENS,
+  resolveOptionalAssistantMaxOutputTokens,
   resolveAssistantMaxOutputTokens,
   sanitizeAssistantOutputTokenInput,
   toAssistantOutputTokenDraft,
@@ -17,6 +18,9 @@ test("assistant output token support falls back to safe default for invalid valu
   assert.equal(resolveAssistantMaxOutputTokens(""), DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS);
   assert.equal(resolveAssistantMaxOutputTokens("0"), DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS);
   assert.equal(resolveAssistantMaxOutputTokens(64), DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS);
+  assert.equal(resolveOptionalAssistantMaxOutputTokens(""), undefined);
+  assert.equal(resolveOptionalAssistantMaxOutputTokens("0"), undefined);
+  assert.equal(resolveOptionalAssistantMaxOutputTokens(64), undefined);
 });
 
 test("assistant output token support caps overlarge values and formats draft text", () => {

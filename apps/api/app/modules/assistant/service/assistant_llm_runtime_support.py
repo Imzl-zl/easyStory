@@ -23,6 +23,7 @@ from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
 from app.shared.runtime.llm.llm_protocol import (
     LLMContinuationSupport,
     allows_provider_continuation_state,
+    resolve_anthropic_default_max_tokens,
     resolve_connection_continuation_support,
 )
 from app.shared.runtime.llm.llm_tool_provider import (
@@ -239,14 +240,18 @@ def serialize_assistant_model_config(model: ModelConfig) -> dict[str, Any]:
     return payload
 
 
-def resolve_assistant_max_output_tokens(
+def resolve_assistant_output_budget_tokens(
     model: ModelConfig,
     *,
     resolved_runtime: ResolvedAssistantLlmRuntime,
 ) -> int | None:
     if "max_tokens" in model.model_fields_set:
         return model.max_tokens
-    return resolved_runtime.default_max_output_tokens
+    if resolved_runtime.default_max_output_tokens is not None:
+        return resolved_runtime.default_max_output_tokens
+    if resolved_runtime.credential_payload["api_dialect"] == "anthropic_messages":
+        return resolve_anthropic_default_max_tokens(resolved_runtime.context_window_tokens)
+    return None
 
 
 def ensure_assistant_runtime_supports_visible_tools(

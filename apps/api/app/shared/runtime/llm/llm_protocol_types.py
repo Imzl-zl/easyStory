@@ -63,6 +63,7 @@ VERIFY_SYSTEM_PROMPT = (
 VERIFY_MAX_TOKENS = 256
 JSON_OBJECT_RESPONSE_FORMAT = "json_object"
 HTTP_HEADER_TOKEN_PATTERN = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
+DEFAULT_ANTHROPIC_MAX_OUTPUT_TOKENS = 8192
 
 
 @dataclass(frozen=True)
@@ -87,6 +88,7 @@ class LLMConnection:
     runtime_kind: LlmRuntimeKind | None = None
     interop_profile: str | None = None
     provider: str | None = None
+    context_window_tokens: int | None = None
 
 
 @dataclass(frozen=True)
@@ -209,6 +211,14 @@ def resolve_auth_strategy(api_dialect: str | None, auth_strategy: str | None) ->
         return explicit_strategy
     dialect = normalize_api_dialect(api_dialect)
     return DEFAULT_AUTH_STRATEGY_BY_DIALECT[dialect]
+
+
+def resolve_anthropic_default_max_tokens(context_window_tokens: int | None) -> int:
+    if context_window_tokens is None:
+        return DEFAULT_ANTHROPIC_MAX_OUTPUT_TOKENS
+    if context_window_tokens <= 1:
+        return 1
+    return min(DEFAULT_ANTHROPIC_MAX_OUTPUT_TOKENS, context_window_tokens - 1)
 
 
 def resolve_api_key_header_name(

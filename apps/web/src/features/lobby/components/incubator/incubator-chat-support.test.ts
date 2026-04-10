@@ -96,14 +96,14 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
   );
   assert.deepEqual(
     buildAssistantModelOverride({
-      maxOutputTokens: "4096",
+      maxOutputTokens: "",
       modelName: "",
       provider: "openai",
       reasoningEffort: "",
       thinkingBudget: "",
       thinkingLevel: "",
     }),
-    { max_tokens: 4096, name: undefined, provider: "openai" },
+    { name: undefined, provider: "openai" },
   );
   assert.deepEqual(
     buildAssistantModelOverride({
@@ -120,7 +120,7 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
   );
   assert.deepEqual(
     buildAssistantModelOverride({
-      maxOutputTokens: "4096",
+      maxOutputTokens: "",
       modelName: "",
       provider: "openai",
       reasoningEffort: "high",
@@ -130,7 +130,7 @@ test("incubator chat support builds stable fingerprints and model overrides", ()
       apiDialect: "openai_responses",
       defaultModelName: "gpt-5.4",
     }),
-    { max_tokens: 4096, name: undefined, provider: "openai", reasoning_effort: "high" },
+    { name: undefined, provider: "openai", reasoning_effort: "high" },
   );
   assert.equal(resolveChatOutputModeLabel(true), "边写边显示");
   assert.equal(resolveChatOutputModeLabel(false), "生成后整体显示");

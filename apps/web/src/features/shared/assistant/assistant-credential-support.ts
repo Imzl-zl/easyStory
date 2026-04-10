@@ -3,7 +3,6 @@ import type {
   CredentialVerifyProbeKind,
   CredentialView,
 } from "@/lib/api/types";
-import { DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS } from "@/features/shared/assistant/assistant-output-token-support";
 import {
   normalizeAssistantReasoningDraft,
   resolveAssistantReasoningControl,
@@ -143,11 +142,6 @@ export function resolveHydratedIncubatorChatSettings(
   const currentMaxOutputTokens = current.maxOutputTokens.trim();
   const preferredProvider = preferences?.default_provider?.trim() ?? "";
   const preferredModelName = preferences?.default_model_name?.trim() ?? "";
-  const preferredMaxOutputTokens = String(
-    preferences?.default_max_output_tokens
-      ?? selectedCredential.defaultMaxOutputTokens
-      ?? DEFAULT_ASSISTANT_MAX_OUTPUT_TOKENS,
-  );
   const nextProvider = selectedCredential.provider;
   const appliesPreferredDefaults = preferredProvider
     ? preferredProvider === nextProvider
@@ -161,7 +155,6 @@ export function resolveHydratedIncubatorChatSettings(
   const nextModelName = currentProvider === nextProvider
     ? currentModelName || fallbackModelName
     : fallbackModelName;
-  const nextMaxOutputTokens = currentMaxOutputTokens || preferredMaxOutputTokens;
   const nextStreamOutput = currentProvider === nextProvider
     ? current.streamOutput
     : !prefersBufferedOutput(selectedCredential);
@@ -192,7 +185,6 @@ export function resolveHydratedIncubatorChatSettings(
   if (
     nextProvider === currentProvider
     && nextModelName === currentModelName
-    && nextMaxOutputTokens === currentMaxOutputTokens
     && nextStreamOutput === current.streamOutput
     && nextReasoningDraft.reasoningEffort === current.reasoningEffort
     && nextReasoningDraft.thinkingLevel === current.thinkingLevel
@@ -202,7 +194,7 @@ export function resolveHydratedIncubatorChatSettings(
   }
 
   return {
-    maxOutputTokens: nextMaxOutputTokens,
+    maxOutputTokens: currentMaxOutputTokens,
     modelName: nextModelName,
     provider: nextProvider,
     reasoningEffort: nextReasoningDraft.reasoningEffort,

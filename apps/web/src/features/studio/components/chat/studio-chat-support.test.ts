@@ -5,6 +5,7 @@ import {
   applyStudioChatToolCallResult,
   applyStudioChatToolCallStart,
   buildStudioAssistantTurnPayload,
+  buildNextStudioChatSettingsForProvider,
   buildStudioUserRequestContent,
   createStudioChatMessage,
   finalizeStudioChatToolProgress,
@@ -230,11 +231,48 @@ test("studio chat payload keeps reasoning when following credential default mode
   });
 
   assert.deepEqual(payload.model, {
-    max_tokens: 4096,
     name: undefined,
     provider: "openai",
     reasoning_effort: "high",
   });
+});
+
+test("studio chat provider switch keeps blank token override empty", () => {
+  const nextSettings = buildNextStudioChatSettingsForProvider(
+    [
+      {
+        apiDialect: "openai_responses",
+        baseUrl: null,
+        bufferedToolVerifiedProbeKind: null,
+        defaultModel: "gpt-5.4",
+        defaultMaxOutputTokens: 4096,
+        displayLabel: "OpenAI 主账号 · gpt-5.4",
+        provider: "openai",
+        streamToolVerifiedProbeKind: null,
+      },
+      {
+        apiDialect: "anthropic_messages",
+        baseUrl: null,
+        bufferedToolVerifiedProbeKind: null,
+        defaultModel: "claude-sonnet-4",
+        defaultMaxOutputTokens: 12288,
+        displayLabel: "Anthropic · claude-sonnet-4",
+        provider: "anthropic",
+        streamToolVerifiedProbeKind: null,
+      },
+    ],
+    {
+      ...INITIAL_STUDIO_CHAT_SETTINGS,
+      modelName: "gpt-5.4",
+      provider: "openai",
+      reasoningEffort: "high",
+    },
+    "anthropic",
+  );
+
+  assert.equal(nextSettings.maxOutputTokens, "");
+  assert.equal(nextSettings.modelName, "claude-sonnet-4");
+  assert.equal(nextSettings.provider, "anthropic");
 });
 
 test("studio user request content only appends attachment context", () => {

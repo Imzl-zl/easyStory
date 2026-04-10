@@ -135,7 +135,7 @@ function buildAssistantPreferencesCopy(scope: AssistantPreferencesScope) {
     emptyStateText: "你还没有启用可用连接。可以先去“模型连接”页添加或启用，再回来设置默认聊天方式。",
     formDescription: "保存当前账号的新聊天默认值。这里会同时记录默认连接、模型、回复上限和官方思考参数；输入容量仍由模型本身决定。",
     loadingText: "正在加载 AI 偏好...",
-    maxOutputPlaceholder: "4096",
+    maxOutputPlaceholder: "留空则不单独指定",
     title: "AI 偏好",
   };
 }
