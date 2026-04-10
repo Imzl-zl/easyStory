@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 
 import type { DocumentTreeNode } from "@/features/studio/components/page/studio-page-support";
+import type { StudioDocumentLiveSyncState } from "@/features/studio/components/document/studio-document-live-sync-support";
 
 type MarkdownDocumentEditorProps = {
   documentPath: string | null;
@@ -14,6 +15,7 @@ type MarkdownDocumentEditorProps = {
   onSave: () => void;
   isSaving?: boolean;
   hasUnsavedChanges?: boolean;
+  liveSyncState?: StudioDocumentLiveSyncState;
 };
 
 export function MarkdownDocumentEditor({
@@ -26,9 +28,17 @@ export function MarkdownDocumentEditor({
   onSave,
   isSaving = false,
   hasUnsavedChanges = false,
+  liveSyncState,
 }: Readonly<MarkdownDocumentEditorProps>) {
   const [viewMode, setViewMode] = useState<"edit" | "preview" | "split">("edit");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const surfaceState = resolveMarkdownDocumentSurfaceState({
+    hasUnsavedChanges,
+    isLoading,
+    isSaving,
+    liveSyncState,
+    saveNoun,
+  });
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
     if ((event.metaKey || event.ctrlKey) && event.key === "s") {
@@ -36,7 +46,7 @@ export function MarkdownDocumentEditor({
       if (!isLoading && !isSaving && hasUnsavedChanges) {
         onSave();
       }
-    } 
+    }
   }, [isLoading, isSaving, hasUnsavedChanges, onSave]);
 
   if (!documentPath) {
@@ -68,11 +78,16 @@ export function MarkdownDocumentEditor({
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex min-w-0 items-center gap-2">
             <h2 className="m-0 truncate font-serif text-[0.98rem] font-bold tracking-tight text-[var(--text-primary)]">{documentNode?.label ?? "未命名文档"}</h2>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] ${hasUnsavedChanges ? "bg-[rgba(196,167,108,0.14)] text-[var(--accent-warning)]" : "bg-[rgba(90,122,107,0.08)] text-[var(--accent-primary)]"}`}>
-              {hasUnsavedChanges ? "未保存" : "已同步"}
+            <span className={surfaceState.badgeClassName}>
+              {surfaceState.badgeLabel}
             </span>
           </div>
           <p className="m-0 truncate text-[0.72rem] text-[var(--text-muted)]">{documentPath}</p>
+          {surfaceState.detail ? (
+            <p className={surfaceState.detailClassName}>
+              {surfaceState.detail}
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <div className="hidden sm:flex bg-[rgba(44,36,22,0.04)] rounded-md p-0.5">
@@ -120,12 +135,89 @@ export function MarkdownDocumentEditor({
       
       <footer aria-live="polite" className="flex shrink-0 items-center justify-between gap-3 px-4 py-1.5 bg-gradient-to-b from-[rgba(254,253,251,0.5)] to-white/80 border-t border-[rgba(44,36,22,0.05)] lg:px-5">
         <span className="text-xs text-[var(--text-muted)]">{content.length} 字符 · {content.split(/\s+/).filter(Boolean).length} 词</span>
-        <span className={`text-xs ${isLoading || hasUnsavedChanges ? "text-[var(--accent-warning)]" : "text-[var(--text-muted)]"}`}>
-          {isLoading ? `正在载入${saveNoun}` : hasUnsavedChanges ? `${saveNoun}未保存` : `${saveNoun}已同步`}
+        <span className={surfaceState.footerClassName}>
+          {surfaceState.footerLabel}
         </span>
       </footer>
     </div>
   );
+}
+
+function resolveMarkdownDocumentSurfaceState(options: {
+  hasUnsavedChanges: boolean;
+  isLoading: boolean;
+  isSaving: boolean;
+  liveSyncState?: StudioDocumentLiveSyncState;
+  saveNoun: "文稿" | "文件";
+}) {
+  if (options.isLoading) {
+    return {
+      badgeClassName: "shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] bg-[rgba(196,167,108,0.14)] text-[var(--accent-warning)]",
+      badgeLabel: "载入中",
+      detail: null,
+      detailClassName: "m-0 text-[0.68rem] text-[var(--text-muted)]",
+      footerClassName: "text-xs text-[var(--accent-warning)]",
+      footerLabel: `正在载入${options.saveNoun}`,
+    };
+  }
+  if (options.isSaving) {
+    return {
+      badgeClassName: "shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] bg-[rgba(90,122,107,0.12)] text-[var(--accent-primary)] animate-pulse",
+      badgeLabel: "保存中",
+      detail: null,
+      detailClassName: "m-0 text-[0.68rem] text-[var(--text-muted)]",
+      footerClassName: "text-xs text-[var(--accent-primary)]",
+      footerLabel: `${options.saveNoun}保存中…`,
+    };
+  }
+  if (options.liveSyncState?.status === "stale_remote") {
+    return {
+      badgeClassName: "shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] bg-[rgba(196,167,108,0.14)] text-[var(--accent-warning)]",
+      badgeLabel: "待重载",
+      detail: options.liveSyncState.detail,
+      detailClassName: "m-0 text-[0.68rem] text-[var(--accent-warning)]",
+      footerClassName: "text-xs text-[var(--accent-warning)]",
+      footerLabel: "远端已有新版本，当前保留你的本地草稿",
+    };
+  }
+  if (options.hasUnsavedChanges) {
+    return {
+      badgeClassName: "shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] bg-[rgba(196,167,108,0.14)] text-[var(--accent-warning)]",
+      badgeLabel: "未保存",
+      detail: null,
+      detailClassName: "m-0 text-[0.68rem] text-[var(--text-muted)]",
+      footerClassName: "text-xs text-[var(--accent-warning)]",
+      footerLabel: `${options.saveNoun}未保存`,
+    };
+  }
+  if (options.liveSyncState?.status === "writing") {
+    return {
+      badgeClassName: "shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] bg-[rgba(90,122,107,0.12)] text-[var(--accent-primary)] animate-pulse",
+      badgeLabel: "写入中",
+      detail: options.liveSyncState.detail,
+      detailClassName: "m-0 text-[0.68rem] text-[var(--accent-primary)]",
+      footerClassName: "text-xs text-[var(--accent-primary)]",
+      footerLabel: "助手正在改写当前文稿…",
+    };
+  }
+  if (options.liveSyncState?.status === "synced") {
+    return {
+      badgeClassName: "shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] bg-[rgba(90,122,107,0.12)] text-[var(--accent-primary)] shadow-[0_0_0_4px_rgba(90,122,107,0.08)]",
+      badgeLabel: "刚更新",
+      detail: options.liveSyncState.detail,
+      detailClassName: "m-0 text-[0.68rem] text-[var(--accent-primary)]",
+      footerClassName: "text-xs text-[var(--accent-primary)]",
+      footerLabel: "助手写入已自动同步",
+    };
+  }
+  return {
+    badgeClassName: "shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] bg-[rgba(90,122,107,0.08)] text-[var(--accent-primary)]",
+    badgeLabel: "已同步",
+    detail: null,
+    detailClassName: "m-0 text-[0.68rem] text-[var(--text-muted)]",
+    footerClassName: "text-xs text-[var(--text-muted)]",
+    footerLabel: `${options.saveNoun}已同步`,
+  };
 }
 
 function MarkdownPreview({ content }: { content: string }) {

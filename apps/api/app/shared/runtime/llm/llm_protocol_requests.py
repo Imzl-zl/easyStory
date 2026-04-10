@@ -98,6 +98,7 @@ def build_verification_request(connection: LLMConnection) -> PreparedLLMHttpRequ
         default_model=connection.default_model,
         provider_label="credential verification",
     )
+    api_dialect = normalize_api_dialect(connection.api_dialect)
     request = prepare_generation_request(
         LLMGenerateRequest(
             connection=connection,
@@ -108,11 +109,14 @@ def build_verification_request(connection: LLMConnection) -> PreparedLLMHttpRequ
             temperature=0.0,
             max_tokens=VERIFY_MAX_TOKENS,
             top_p=1.0,
+            thinking_budget=0 if api_dialect == "gemini_generate_content" else None,
         )
     )
-    # Verification must reuse the same provider request shape as runtime calls.
-    # Provider-native thinking/reasoning fields are only sent when they are
-    # explicitly modeled on LLMGenerateRequest, never as probe-only heuristics.
+    # Gemini native endpoints can spend a large share of the verification budget
+    # on hidden thinking and then terminate with MAX_TOKENS before returning a
+    # stable baseline answer. Connection verification is intended to prove that
+    # the endpoint can return ordinary text replies, so Gemini probes opt out of
+    # native thinking explicitly while preserving the normal request shape.
     return request
 
 

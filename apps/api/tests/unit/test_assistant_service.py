@@ -1157,7 +1157,7 @@ async def test_assistant_service_runs_project_read_documents_tool_loop(db, tmp_p
     ]
 
 
-async def test_assistant_service_requires_tool_verified_credential_for_project_tools(
+async def test_assistant_service_allows_project_tools_without_verified_credential(
     db,
     tmp_path,
 ) -> None:
@@ -1209,10 +1209,10 @@ async def test_assistant_service_requires_tool_verified_credential_for_project_t
         messages=[AssistantMessageDTO(role="user", content="先读一下人物设定，再给我一个悬疑开场方向。")],
     )
 
-    with pytest.raises(BusinessRuleError, match="尚未通过“验证流式工具”"):
-        await service.turn(async_db(db), payload, owner_id=owner.id)
+    result = await service.turn(async_db(db), payload, owner_id=owner.id)
 
-    assert tool_provider.requests == []
+    assert "林渊" in result.content
+    assert len(tool_provider.requests) == 2
 
 
 async def test_assistant_service_persists_continuation_compaction_snapshot_for_tool_loop(

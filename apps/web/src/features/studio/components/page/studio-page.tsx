@@ -176,6 +176,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
   const chatModel = useStudioChatModel({
     activeBufferState: documentModel.activeBufferState,
     currentDocumentPath: documentPath,
+    onWriteEffect: documentModel.handleAssistantWriteEffect,
     projectId,
   });
 
@@ -628,6 +629,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
               documentNode={selectedNode}
               content={documentModel.documentContent}
               isLoading={documentModel.isDocumentLoading}
+              liveSyncState={documentModel.liveSyncState}
               isSaving={documentModel.isSaving}
               saveNoun={documentModel.saveNoun}
               onChange={documentModel.handleContentChange}

@@ -33,6 +33,10 @@ test("isPendingCredentialAction matches current row and action type", () => {
 test("resolveCredentialActionButtonLabel returns explicit pending labels", () => {
   assert.equal(resolveCredentialActionButtonLabel("verify_connection", false), "验证连接");
   assert.equal(resolveCredentialActionButtonLabel("verify_connection", true), "验证中...");
+  assert.equal(resolveCredentialActionButtonLabel("verify_stream_connection", false), "验证流式连接");
+  assert.equal(resolveCredentialActionButtonLabel("verify_stream_connection", true), "验证中...");
+  assert.equal(resolveCredentialActionButtonLabel("verify_buffered_connection", false), "验证非流连接");
+  assert.equal(resolveCredentialActionButtonLabel("verify_buffered_connection", true), "验证中...");
   assert.equal(resolveCredentialActionButtonLabel("verify_stream_tools", false), "验证流式工具");
   assert.equal(resolveCredentialActionButtonLabel("verify_stream_tools", true), "验证中...");
   assert.equal(resolveCredentialActionButtonLabel("verify_buffered_tools", false), "验证非流工具");

@@ -48,6 +48,7 @@ export type AssistantOutputItem = {
   status?: string | null;
   provider_ref?: string | null;
   call_id?: string | null;
+  tool_name?: string | null;
   payload?: unknown;
 };
 

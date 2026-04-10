@@ -24,6 +24,18 @@ export function resolveCredentialActionFeedback(
       tone: "info",
     };
   }
+  if (type === "verify_stream_connection" && result && "message" in result) {
+    return {
+      message: "流式连接验证成功。",
+      tone: "info",
+    };
+  }
+  if (type === "verify_buffered_connection" && result && "message" in result) {
+    return {
+      message: "非流连接验证成功。",
+      tone: "info",
+    };
+  }
   if (type === "verify_stream_tools" && result && "message" in result) {
     return {
       message: "流式工具调用验证成功。",
@@ -72,6 +84,12 @@ export function normalizeCredentialActionErrorMessage(
   if (actionType === "verify_buffered_tools") {
     return normalizeToolVerificationErrorMessage(trimmed, "非流工具");
   }
+  if (actionType === "verify_stream_connection") {
+    return normalizeConnectionVerificationErrorMessage(trimmed, "流式连接");
+  }
+  if (actionType === "verify_buffered_connection") {
+    return normalizeConnectionVerificationErrorMessage(trimmed, "非流连接");
+  }
   const subject = resolveVerifySubject(trimmed);
   if (trimmed.includes(VERIFY_EMPTY_CONTENT_MARKER)) {
     return `${subject}验证失败：测试消息没有拿到可用回复。请检查默认模型、接口类型或上游兼容设置。`;
@@ -89,6 +107,19 @@ function resolveVerifySubject(message: string) {
   return `连接“${match[1].trim()}”`;
 }
 
+function normalizeConnectionVerificationErrorMessage(
+  message: string,
+  connectionLabel: "流式连接" | "非流连接",
+) {
+  const subject = resolveVerifySubject(message);
+  if (message.includes(VERIFY_EMPTY_CONTENT_MARKER)) {
+    return `${subject}${connectionLabel}验证失败：测试消息没有拿到可用回复。请检查默认模型、接口类型或上游兼容设置。`;
+  }
+  return message
+    .replace(VERIFY_SUBJECT_PATTERN, `${subject}${connectionLabel}验证失败：`)
+    .replace(`${connectionLabel}验证失败：${connectionLabel}验证失败：`, `${connectionLabel}验证失败：`)
+    .replaceAll("凭证", "连接");
+}
 
 function normalizeToolVerificationErrorMessage(
   message: string,

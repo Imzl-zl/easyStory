@@ -72,9 +72,14 @@ export function CredentialCenterList({
         {credentials.map((credential) => {
           const overrideInfo = overrideInfoByCredentialId[credential.id];
           const toggleActionType = credential.is_active ? "disable" : "enable";
-          const isVerifyConnectionPending = isPendingCredentialAction(
+          const isVerifyStreamConnectionPending = isPendingCredentialAction(
             pendingAction,
-            "verify_connection",
+            "verify_stream_connection",
+            credential.id,
+          );
+          const isVerifyBufferedConnectionPending = isPendingCredentialAction(
+            pendingAction,
+            "verify_buffered_connection",
             credential.id,
           );
           const isVerifyStreamToolsPending = isPendingCredentialAction(
@@ -161,10 +166,21 @@ export function CredentialCenterList({
                     <button
                       className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"
                       disabled={isPending}
-                      onClick={() => onAction("verify_connection", credential.id)}
+                      onClick={() => onAction("verify_stream_connection", credential.id)}
                       type="button"
                     >
-                      {resolveCredentialActionButtonLabel("verify_connection", isVerifyConnectionPending)}
+                      {resolveCredentialActionButtonLabel("verify_stream_connection", isVerifyStreamConnectionPending)}
+                    </button>
+                    <button
+                      className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"
+                      disabled={isPending}
+                      onClick={() => onAction("verify_buffered_connection", credential.id)}
+                      type="button"
+                    >
+                      {resolveCredentialActionButtonLabel(
+                        "verify_buffered_connection",
+                        isVerifyBufferedConnectionPending,
+                      )}
                     </button>
                     <button
                       className="ink-button-secondary h-9 min-w-[84px] px-3.5 text-[13px]"

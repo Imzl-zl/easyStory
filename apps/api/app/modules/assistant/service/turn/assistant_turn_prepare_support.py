@@ -27,7 +27,6 @@ from ..context.assistant_prompt_support import (
 from ..assistant_execution_support import resolve_execution_spec
 from ..hooks.assistant_hook_service import AssistantHookService
 from ..assistant_llm_runtime_support import (
-    ensure_assistant_runtime_supports_visible_tools,
     resolve_assistant_output_budget_tokens,
 )
 from ..preferences.preferences_service import AssistantPreferencesService
@@ -157,11 +156,6 @@ async def prepare_assistant_turn(
         model=spec.model,
         owner_id=owner_id,
         project_id=project_id,
-    )
-    ensure_assistant_runtime_supports_visible_tools(
-        resolved_llm_runtime,
-        visible_tool_names=tuple(item.name for item in visible_tool_descriptors),
-        stream_output=normalized_payload.stream,
     )
     tool_schemas = resolve_assistant_tool_schemas(
         assistant_tool_loop=assistant_tool_loop,

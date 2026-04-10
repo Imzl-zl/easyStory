@@ -249,15 +249,11 @@ class AsyncHttpCredentialVerifier:
         probe_kind: ConformanceProbeKind,
         transport_mode: CredentialVerifyTransportMode | None,
     ) -> NormalizedLLMResponse:
-        if probe_kind == "text_probe" and self.stream_request_sender is None:
-            if api_dialect in TEXT_PROBE_JSON_DIALECTS:
-                return await _default_text_probe_json_request_sender(
-                    request,
-                    api_dialect=api_dialect,
-                )
-            return await _default_text_probe_request_sender(
-                build_stream_probe_request(request, api_dialect=api_dialect),
+        if probe_kind == "text_probe":
+            return await self._execute_text_probe_request(
+                request,
                 api_dialect=api_dialect,
+                transport_mode=transport_mode,
             )
         if transport_mode == "buffered":
             return await _default_buffered_probe_request_sender(
@@ -267,6 +263,39 @@ class AsyncHttpCredentialVerifier:
         streamed_request = build_stream_probe_request(request, api_dialect=api_dialect)
         sender = self.stream_request_sender or _default_stream_request_sender
         return await sender(streamed_request, api_dialect=api_dialect)
+
+    async def _execute_text_probe_request(
+        self,
+        request: PreparedLLMHttpRequest,
+        *,
+        api_dialect: str,
+        transport_mode: CredentialVerifyTransportMode | None,
+    ) -> NormalizedLLMResponse:
+        if transport_mode == "buffered":
+            return await _default_text_probe_json_request_sender(
+                request,
+                api_dialect=api_dialect,
+            )
+        if transport_mode == "stream":
+            streamed_request = build_stream_probe_request(request, api_dialect=api_dialect)
+            if self.stream_request_sender is not None:
+                return await self.stream_request_sender(streamed_request, api_dialect=api_dialect)
+            return await _default_text_probe_request_sender(
+                streamed_request,
+                api_dialect=api_dialect,
+            )
+        if api_dialect in TEXT_PROBE_JSON_DIALECTS and self.stream_request_sender is None:
+            return await _default_text_probe_json_request_sender(
+                request,
+                api_dialect=api_dialect,
+            )
+        streamed_request = build_stream_probe_request(request, api_dialect=api_dialect)
+        if self.stream_request_sender is not None:
+            return await self.stream_request_sender(streamed_request, api_dialect=api_dialect)
+        return await _default_text_probe_request_sender(
+            streamed_request,
+            api_dialect=api_dialect,
+        )
 
     def _validate_text_probe_response(
         self,
@@ -435,9 +464,11 @@ def _normalize_probe_transport_mode(
     transport_mode: CredentialVerifyTransportMode | None,
 ) -> CredentialVerifyTransportMode | None:
     if probe_kind == "text_probe":
-        if transport_mode is not None:
-            raise BusinessRuleError("验证连接时不支持 transport_mode。")
-        return None
+        if transport_mode is None:
+            return None
+        if transport_mode not in {"stream", "buffered"}:
+            raise BusinessRuleError("transport_mode 仅支持 stream 或 buffered。")
+        return transport_mode
     if transport_mode is None:
         raise BusinessRuleError("工具验证必须显式指定 transport_mode。")
     if transport_mode not in {"stream", "buffered"}:
@@ -490,6 +521,10 @@ def _resolve_probe_failure_label(
     transport_mode: CredentialVerifyTransportMode | None,
 ) -> str | None:
     if probe_kind == "text_probe":
+        if transport_mode == "buffered":
+            return "非流连接验证失败"
+        if transport_mode == "stream":
+            return "流式连接验证失败"
         return None
     if probe_kind == "tool_definition_probe":
         return f"{_resolve_transport_mode_label(transport_mode)}工具定义验证失败"
@@ -502,6 +537,10 @@ def _resolve_probe_success_message(
     transport_mode: CredentialVerifyTransportMode | None,
 ) -> str:
     if probe_kind == "text_probe":
+        if transport_mode == "buffered":
+            return "非流连接验证成功"
+        if transport_mode == "stream":
+            return "流式连接验证成功"
         return "验证成功"
     if probe_kind == "tool_definition_probe":
         return f"{_resolve_transport_mode_label(transport_mode)}工具定义验证成功"

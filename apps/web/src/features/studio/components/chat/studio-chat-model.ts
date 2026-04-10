@@ -26,6 +26,12 @@ import {
   STUDIO_ATTACHMENT_MAX_COUNT,
   type StudioChatAttachment,
 } from "@/features/studio/components/chat/studio-chat-attachment-support";
+import type { StudioAssistantWriteEffect } from "@/features/studio/components/chat/studio-chat-write-effects";
+import {
+  collectStudioWriteEffectsFromTurnResult,
+  resolveStudioWriteEffectFromToolCallResult,
+  resolveStudioWriteEffectFromToolCallStart,
+} from "@/features/studio/components/chat/studio-chat-write-effects";
 import { useStudioChatCredentialModel } from "@/features/studio/components/chat/studio-chat-credential-model";
 import {
   appendStudioChatMessageDelta,
@@ -62,12 +68,14 @@ import {
 type UseStudioChatModelOptions = {
   activeBufferState: AssistantActiveBufferState | null;
   currentDocumentPath: string | null;
+  onWriteEffect?: (effect: StudioAssistantWriteEffect) => void;
   projectId: string;
 };
 
 export function useStudioChatModel({
   activeBufferState,
   currentDocumentPath,
+  onWriteEffect,
   projectId,
 }: UseStudioChatModelOptions) {
   const state = useStudioChatState(projectId);
@@ -75,6 +83,7 @@ export function useStudioChatModel({
   const [isResponding, setIsResponding] = useState(false);
   const [writeToCurrentDocument, setWriteToCurrentDocument] = useState(false);
   const sendInFlightRef = useRef(false);
+  const writeEffectPathsRef = useRef(new Map<string, string[]>());
   const needsDocumentCatalog = Boolean(currentDocumentPath) || state.selectedContextPaths.length > 0;
   const hasUserMessage = useMemo(
     () => state.messages.some((message) => message.role === "user"),
@@ -103,6 +112,10 @@ export function useStudioChatModel({
 
   useEffect(() => {
     setAttachments([]);
+  }, [state.activeConversationId]);
+
+  useEffect(() => {
+    writeEffectPathsRef.current.clear();
   }, [state.activeConversationId]);
 
   const documentCatalogErrorMessage = useMemo(
@@ -314,7 +327,6 @@ export function useStudioChatModel({
         isResponding,
         needsDocumentCatalog,
         skillSendBlockReason,
-        toolCapabilityNotice: credentialModel.toolCapabilityNotice,
         writeSendBlockReason,
       })) {
         return false;
@@ -366,16 +378,30 @@ export function useStudioChatModel({
       setAttachments([]);
       setWriteToCurrentDocument(false);
       setIsResponding(true);
+      writeEffectPathsRef.current.clear();
 
       try {
         const result = state.settings.streamOutput
-          ? await runStudioChatStream(payload, assistantMessage.id, (updater) => {
-            state.patchConversationSession(conversationId, (current) => ({
-              ...current,
-              messages: updater(current.messages),
-            }));
-          })
+          ? await runStudioChatStream(
+            payload,
+            assistantMessage.id,
+            (updater) => {
+              state.patchConversationSession(conversationId, (current) => ({
+                ...current,
+                messages: updater(current.messages),
+              }));
+            },
+            (effect) => {
+              onWriteEffect?.(effect);
+            },
+            writeEffectPathsRef.current,
+          )
           : await runAssistantTurn(payload);
+        if (!state.settings.streamOutput) {
+          collectStudioWriteEffectsFromTurnResult(result).forEach((effect) => {
+            onWriteEffect?.(effect);
+          });
+        }
         state.patchConversationSession(conversationId, (current) =>
           buildSucceededStudioConversationSession(current, {
             consumedNextTurnSkillId,
@@ -410,11 +436,11 @@ export function useStudioChatModel({
     projectId,
     credentialModel.selectedCredential?.apiDialect,
     credentialModel.selectedCredential?.defaultModel,
-    credentialModel.toolCapabilityNotice,
     skillSendBlockReason,
     state,
     attachments,
     activeSkillSelection,
+    onWriteEffect,
     writeSendBlockReason,
     writeToCurrentDocument,
   ]);
@@ -462,6 +488,8 @@ async function runStudioChatStream(
   payload: Parameters<typeof runAssistantTurn>[0],
   messageId: string,
   updateMessages: (updater: (current: StudioChatMessage[]) => StudioChatMessage[]) => void,
+  onWriteEffect: (effect: StudioAssistantWriteEffect) => void,
+  writeEffectPaths: Map<string, string[]>,
 ) {
   return runAssistantTurnStream(payload, {
     onChunk: (delta) => {
@@ -469,10 +497,23 @@ async function runStudioChatStream(
         appendStudioChatMessageDelta(current, messageId, delta));
     },
     onToolCallResult: (payload) => {
+      const effect = resolveStudioWriteEffectFromToolCallResult(
+        payload,
+        writeEffectPaths.get(payload.tool_call_id) ?? [],
+      );
+      if (effect) {
+        writeEffectPaths.delete(payload.tool_call_id);
+        onWriteEffect(effect);
+      }
       updateMessages((current) =>
         applyStudioChatToolCallResult(current, messageId, payload));
     },
     onToolCallStart: (payload) => {
+      const effect = resolveStudioWriteEffectFromToolCallStart(payload);
+      if (effect) {
+        writeEffectPaths.set(payload.tool_call_id, effect.paths);
+        onWriteEffect(effect);
+      }
       updateMessages((current) =>
         applyStudioChatToolCallStart(current, messageId, payload));
     },
@@ -509,7 +550,6 @@ function ensureStudioChatTurnCanStart(options: {
   isResponding: boolean;
   needsDocumentCatalog: boolean;
   skillSendBlockReason: string | null;
-  toolCapabilityNotice: string | null;
   writeSendBlockReason: string | null;
 }) {
   if (options.isResponding) {
@@ -521,10 +561,6 @@ function ensureStudioChatTurnCanStart(options: {
   }
   if (options.skillSendBlockReason) {
     Message.warning(options.skillSendBlockReason);
-    return false;
-  }
-  if (options.toolCapabilityNotice) {
-    Message.warning(options.toolCapabilityNotice);
     return false;
   }
   if (options.writeSendBlockReason) {

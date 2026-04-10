@@ -34,6 +34,17 @@ def test_extract_openai_chat_tool_calls_decodes_alias_and_parses_arguments() -> 
     assert tool_calls[0].arguments == {"paths": ["设定/人物.md"]}
 
 
+def test_extract_openai_chat_tool_calls_accepts_empty_tool_calls_list() -> None:
+    tool_calls = extract_openai_chat_tool_calls(
+        {
+            "tool_calls": [],
+        },
+        tool_name_aliases={"project.read_documents": "project_read_documents"},
+    )
+
+    assert tool_calls == []
+
+
 def test_extract_openai_responses_tool_calls_preserves_provider_ref_and_invalid_arguments() -> None:
     tool_calls = extract_openai_responses_tool_calls(
         [

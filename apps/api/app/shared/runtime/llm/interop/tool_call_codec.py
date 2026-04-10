@@ -8,7 +8,6 @@ from ..llm_protocol_types import NormalizedLLMToolCall
 from .codec_value_helpers import (
     optional_string as _optional_string,
     require_dict as _require_dict,
-    require_list as _require_list,
 )
 from .tool_name_codec import decode_tool_name
 
@@ -18,7 +17,14 @@ def extract_openai_chat_tool_calls(
     *,
     tool_name_aliases: dict[str, str],
 ) -> list[NormalizedLLMToolCall]:
-    tool_calls = _require_list(message.get("tool_calls"), "message.tool_calls", allow_none=True) or []
+    raw_tool_calls = message.get("tool_calls")
+    if raw_tool_calls is None:
+        return []
+    if not isinstance(raw_tool_calls, list):
+        raise ConfigurationError("message.tool_calls must be a list")
+    if not raw_tool_calls:
+        return []
+    tool_calls = raw_tool_calls
     items: list[NormalizedLLMToolCall] = []
     for item in tool_calls:
         if not isinstance(item, dict):

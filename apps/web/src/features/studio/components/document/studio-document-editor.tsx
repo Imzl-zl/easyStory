@@ -19,6 +19,7 @@ export function StudioDocumentEditor(props: Readonly<StudioDocumentEditorProps>)
       documentPath={props.documentPath}
       hasUnsavedChanges={props.hasUnsavedChanges}
       isLoading={props.isLoading}
+      liveSyncState={props.liveSyncState}
       isSaving={props.isSaving}
       onChange={props.onChange}
       onSave={props.onSave}

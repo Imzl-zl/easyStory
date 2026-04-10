@@ -1,6 +1,7 @@
 "use client";
 
 import type { DocumentTreeNode } from "@/features/studio/components/page/studio-page-support";
+import type { StudioDocumentLiveSyncState } from "@/features/studio/components/document/studio-document-live-sync-support";
 
 export type StudioDocumentEditorProps = {
   availableDocumentPaths: readonly string[];
@@ -10,6 +11,7 @@ export type StudioDocumentEditorProps = {
   hasUnsavedChanges?: boolean;
   isLoading?: boolean;
   isSaving?: boolean;
+  liveSyncState?: StudioDocumentLiveSyncState;
   onChange: (content: string) => void;
   onSave: () => void;
   projectId: string;

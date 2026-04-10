@@ -450,8 +450,8 @@ def test_verify_gemini_request_includes_user_role_and_prompt() -> None:
         "temperature": 0.0,
         "maxOutputTokens": 256,
         "topP": 1.0,
+        "thinkingConfig": {"thinkingBudget": 0},
     }
-    assert "thinkingConfig" not in request.json_body["generationConfig"]
     assert captured["api_dialect"] == "gemini_generate_content"
     assert result.message == "验证成功"
     assert result.probe_kind == "text_probe"
@@ -537,20 +537,92 @@ def test_verify_tool_probe_requires_transport_mode() -> None:
         )
 
 
-def test_verify_text_probe_rejects_transport_mode() -> None:
-    verifier = AsyncHttpCredentialVerifier()
+def test_verify_text_probe_accepts_explicit_stream_transport_mode() -> None:
+    captured: dict[str, object] = {}
 
-    with pytest.raises(BusinessRuleError, match="验证连接时不支持 transport_mode"):
-        asyncio.run(
-            verifier.verify(
-                provider="openai",
-                api_key="test-key",
-                base_url=None,
-                api_dialect="openai_chat_completions",
-                default_model="gpt-4o-mini",
-                transport_mode="stream",
-            )
+    async def stream_request_sender(request, *, api_dialect):
+        captured["request"] = request
+        captured["api_dialect"] = api_dialect
+        return _ok_response("今天天气真好。")
+
+    verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
+    result = asyncio.run(
+        verifier.verify(
+            provider="claude",
+            api_key="test-key",
+            base_url="https://proxy.example.com",
+            api_dialect="anthropic_messages",
+            default_model="claude-sonnet-4-6",
+            transport_mode="stream",
         )
+    )
+
+    request = captured["request"]
+    assert request.headers["Accept"] == "text/event-stream"
+    assert request.json_body["stream"] is True
+    assert captured["api_dialect"] == "anthropic_messages"
+    assert result.message == "流式连接验证成功"
+    assert result.transport_mode == "stream"
+
+
+def test_verify_text_probe_accepts_explicit_buffered_transport_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_send_json_http_request(request, *, timeout_seconds):
+        captured["request"] = request
+        captured["timeout_seconds"] = timeout_seconds
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": "今天天气真好。",
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5},
+            },
+            text='{"choices":[{"message":{"content":"今天天气真好。"}}]}',
+        )
+
+    async def unexpected_iterate_stream_request(*_args, **_kwargs):
+        raise AssertionError("buffered text probe should not use stream transport")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(
+        verifier_module,
+        "send_json_http_request",
+        fake_send_json_http_request,
+    )
+    monkeypatch.setattr(
+        verifier_module,
+        "iterate_stream_request",
+        unexpected_iterate_stream_request,
+    )
+
+    verifier = AsyncHttpCredentialVerifier()
+    result = asyncio.run(
+        verifier.verify(
+            provider="openai",
+            api_key="test-key",
+            base_url="https://proxy.example.com",
+            api_dialect="openai_chat_completions",
+            default_model="gpt-4o-mini",
+            transport_mode="buffered",
+        )
+    )
+
+    request = captured["request"]
+    assert request.url == "https://proxy.example.com/v1/chat/completions"
+    assert "stream" not in request.json_body
+    assert captured["timeout_seconds"] == verifier_module.VERIFY_TEXT_PROBE_TIMEOUT_SECONDS
+    assert result.message == "非流连接验证成功"
+    assert result.transport_mode == "buffered"
 
 
 def test_verify_buffered_tool_probe_uses_json_request_sender(

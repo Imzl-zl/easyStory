@@ -14,10 +14,9 @@ from app.modules.credential.service import (
     build_runtime_credential_payload,
 )
 from app.shared.runtime import ToolProvider
-from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
+from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     ConformanceProbeKind,
-    conformance_probe_kind_satisfies,
     normalize_conformance_probe_kind,
 )
 from app.shared.runtime.llm.llm_protocol import (
@@ -252,37 +251,3 @@ def resolve_assistant_output_budget_tokens(
     if resolved_runtime.credential_payload["api_dialect"] == "anthropic_messages":
         return resolve_anthropic_default_max_tokens(resolved_runtime.context_window_tokens)
     return None
-
-
-def ensure_assistant_runtime_supports_visible_tools(
-    resolved_runtime: ResolvedAssistantLlmRuntime,
-    *,
-    visible_tool_names: tuple[str, ...],
-    stream_output: bool,
-) -> None:
-    if not visible_tool_names:
-        return
-    if conformance_probe_kind_satisfies(
-        _resolve_verified_tool_probe_kind(
-            resolved_runtime,
-            stream_output=stream_output,
-        ),
-        required_probe_kind="tool_continuation_probe",
-    ):
-        return
-    mode_label = "边写边显示" if stream_output else "生成后整体显示"
-    verify_label = "验证流式工具" if stream_output else "验证非流工具"
-    raise BusinessRuleError(
-        f"模型连接“{resolved_runtime.credential_display_name}”尚未通过“{verify_label}”，"
-        f"当前不能在“{mode_label}”模式下启用项目工具。"
-    )
-
-
-def _resolve_verified_tool_probe_kind(
-    resolved_runtime: ResolvedAssistantLlmRuntime,
-    *,
-    stream_output: bool,
-) -> ConformanceProbeKind | None:
-    if stream_output:
-        return resolved_runtime.stream_tool_verified_probe_kind
-    return resolved_runtime.buffered_tool_verified_probe_kind

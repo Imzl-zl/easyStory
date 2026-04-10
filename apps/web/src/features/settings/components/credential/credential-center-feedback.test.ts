@@ -20,6 +20,20 @@ test("resolveCredentialActionFeedback keeps verify success message user-facing",
     message: "模型连接验证成功。",
     tone: "info",
   });
+  assert.deepEqual(resolveCredentialActionFeedback(
+    { ...result, transport_mode: "stream", message: "流式连接验证成功" },
+    "verify_stream_connection",
+  ), {
+    message: "流式连接验证成功。",
+    tone: "info",
+  });
+  assert.deepEqual(resolveCredentialActionFeedback(
+    { ...result, transport_mode: "buffered", message: "非流连接验证成功" },
+    "verify_buffered_connection",
+  ), {
+    message: "非流连接验证成功。",
+    tone: "info",
+  });
 });
 
 test("resolveCredentialActionFeedback normalizes backend verify success copy to Chinese", () => {
@@ -81,6 +95,23 @@ test("normalizeCredentialActionErrorMessage rewrites empty probe content into us
       "无法验证 薄荷 凭证: 测试消息没有返回可用内容",
     ),
     "连接“薄荷”验证失败：测试消息没有拿到可用回复。请检查默认模型、接口类型或上游兼容设置。",
+  );
+});
+
+test("normalizeCredentialActionErrorMessage keeps connection transport labels explicit", () => {
+  assert.equal(
+    normalizeCredentialActionErrorMessage(
+      "无法验证 薄荷 凭证: 流式连接验证失败：HTTP 503 - upstream unavailable",
+      "verify_stream_connection",
+    ),
+    "连接“薄荷”流式连接验证失败：HTTP 503 - upstream unavailable",
+  );
+  assert.equal(
+    normalizeCredentialActionErrorMessage(
+      "无法验证 薄荷 凭证: 测试消息没有返回可用内容",
+      "verify_buffered_connection",
+    ),
+    "连接“薄荷”非流连接验证失败：测试消息没有拿到可用回复。请检查默认模型、接口类型或上游兼容设置。",
   );
 });
 
