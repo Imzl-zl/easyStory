@@ -22,7 +22,7 @@
 
 Studio 页面混用三套按钮系统:
 1. ink-button 系列（CSS 类）
-2. Arco `<Button>` 组件（4 处）
+2. Arco `<Button>` 组件（约 12 处，分布在 studio 和 incubator 模块）
 3. 自定义 Tailwind `<button>`（最多，约 20+ 处）
 
 ### 1.4 圆角不统一
@@ -55,14 +55,17 @@ Studio 区域同时存在 7 种圆角值（6px~9999px），同类 chip 按钮有
 | `--accent-primary` | `#7a9a85` (灰绿 18%饱和) | `#7c6e5d` (暖棕) | 温暖文学气质，对比度更高 |
 | `--accent-primary-hover` | `#6a8a75` | `#6d604f` | 同色系加深 |
 | `--accent-primary-dark` | `#5a7a68` | `#5b5040` | 英雄按钮渐变终点 |
-| `--accent-primary-soft` | `rgba(122,154,133,0.08)` | `rgba(124,110,93,0.08)` | 跟随主色 |
+| `--accent-primary-soft` | `rgba(122,154,133,0.08)` | `rgba(124,110,93,0.12)` | 跟随主色 + tab active 态更明显 |
 | `--accent-primary-muted` | `rgba(122,154,133,0.14)` | `rgba(124,110,93,0.14)` | 跟随主色 |
+| `--accent-info` | 未定义 | `#5a8faa` (钢蓝) | 组件已大量使用 `bg-accent-info` 但缺失 token |
+| `--accent-info-soft` | 未定义 | `rgba(90,143,170,0.10)` | 信息色浅底 |
+| `--accent-info-muted` | 未定义 | `rgba(90,143,170,0.18)` | 信息色边框 |
+| `--bg-elevated` | `#fdfcf9` (与 surface 同值) | `#ffffff` | 拉开和 surface 的差距，修复 secondary 按钮对比度 |
 | `--accent-success` | `#7a9a85` (同 primary) | `#6b8f71` (墨绿) | 和 primary 区分开，真正的"成功"色 |
 | `--accent-warning` | `#c4a050` | `#b8944a` | 和暖棕更协调 |
 | `--accent-danger` | `#c47070` | `#b85c5c` | 更沉稳 |
 | `--line-strong` | `rgba(90,75,50,0.12)` | `rgba(124,110,93,0.20)` | 跟随新主色，边框更明显 |
 | `--line-focus` | `rgba(122,154,133,0.28)` | `rgba(124,110,93,0.28)` | 跟随新主色 |
-| `--accent-primary-soft` (覆盖) | `0.08` | `0.12` | tab active 态更明显 |
 
 ### 2.3 Arco 主题色同步
 
@@ -125,13 +128,26 @@ Studio 区域同时存在 7 种圆角值（6px~9999px），同类 chip 按钮有
 |------|---------|--------|
 | `bg-[rgba(58,124,165,0.07~0.1)]` 信息蓝 | ~5 | `callout-info` 类 |
 | `bg-[rgba(183,121,31,0.08~0.14)]` 警告橙 | ~8 | `callout-warning` 类 |
+| `bg-[rgba(196,136,61,0.08~0.16)]` 暖橙变体 | ~4 | `callout-warning` 类（与上统一） |
 | `bg-[rgba(47,107,69,0.08)]` 成功绿 | ~2 | `callout-success` 类 |
 | `bg-[rgba(196,90,90,0.08~0.1)]` 危险红 | ~3 | `callout-danger` 类 |
-| `bg-[#ffffff]` / `bg-[#f3ede3]` / `bg-[#ebeef3]` | ~6 | `bg-surface` / `bg-muted` |
+| `bg-[rgba(125,153,178,...)]` 蓝灰 | ~2 | `accent-primary-soft` 或 `--accent-info-soft` |
 | `bg-[rgba(31,27,22,0.05~0.06)]` 深色叠加 | ~3 | `bg-surface-hover` / `bg-surface-active` |
-| AuthForm 渐变背景 | 1 | 提取为 `--auth-bg-gradient` 变量 |
+| `bg-[rgba(61,61,61,0.05~0.06)]` 中性叠加 | ~2 | `bg-surface-hover`（例外：模板内联 CSS 可保留） |
+| `bg-[#ffffff]` / `bg-[#f3ede3]` / `bg-[#ebeef3]` / `bg-[#b0bac8]` | ~6 | `bg-surface` / `bg-muted` / 对应 token |
+| `bg-white` / `bg-white/80` / `bg-white/92` / `bg-white/95` / `bg-white/90` | ~10 | 不透明→`bg-surface`；带透明度→`bg-surface/N` 或新增 `--bg-surface-translucent` token |
+| AuthForm 渐变背景 | 1 | 提取为 `--auth-bg-gradient` 变量，定义如下： |
+
+**`--auth-bg-gradient` 定义：**
+```css
+--auth-bg-gradient: radial-gradient(circle at top left, rgba(196,167,125,0.18), transparent 30%),
+  radial-gradient(circle at right 20%, rgba(90,154,170,0.16), transparent 28%),
+  linear-gradient(180deg, #ebeef3 0%, #f4efe7 48%, #f4f5f7 100%);
+```
+注意：rgba 值将在主题色更新后同步调整（暖棕替换灰绿方向）。
 | Studio 聊天面板硬编码 | ~8 | `--chat-*` token |
-| 组件内线性渐变 | ~4 | 提取为对应 CSS 变量 |
+| `bg-[linear-gradient(...)]` 组件内线性渐变 | ~5 | 提取为对应 CSS 变量 |
+| `workspace-shell.tsx` 背景渐变 rgba | 1 | 提取为 `--workspace-shell-accent-gradient` 变量 |
 
 ---
 
@@ -249,16 +265,21 @@ Studio 区域同时存在 7 种圆角值（6px~9999px），同类 chip 按钮有
 
 | 文件 | 当前 | 替换为 |
 |------|------|--------|
-| `studio-chat-composer.tsx` 发送按钮 | `<Button type="primary" shape="round">` | `<button className="ink-button">` |
-| `studio-chat-message-bubble.tsx` 复制/追加/新建 | `<Button size="mini" shape="round" type="secondary">` | `<button className="ink-button-secondary text-xs h-7 px-2.5">` |
+| `studio-chat-composer.tsx` 发送按钮 | `<Button type="primary" shape="round" loading={...}>` | `<button className="ink-button" disabled={...}>` + loading 态由组件内条件渲染图标实现 |
+| `studio-chat-message-bubble.tsx` 复制/追加/新建 (3处) | `<Button size="mini" shape="round" type="secondary">` | `<button className="ink-button-secondary text-xs h-7 px-2.5">` |
 | `studio-chat-history-panel.tsx` 删除对话 | `<Button shape="circle" status="danger" type="text">` | `<button className="ink-icon-button text-accent-danger">` |
+| `incubator-chat-panel.tsx` 发送按钮 | `<Button type="primary" shape="round">` | `<button className="ink-button">` |
+| `incubator-chat-history-panel.tsx` 发送/删除 (2处) | `<Button type="primary" shape="round">` / `<Button type="text">` | `<button className="ink-button">` / `<button className="ink-button-secondary">` |
+| `incubator-chat-draft-panel-support.tsx` 操作按钮 (2处) | `<Button>` | `<button className="ink-button-secondary">` |
+| `incubator-chat-draft-guidance.tsx` 操作按钮 | `<Button>` | `<button className="ink-button-secondary">` |
+| `incubator-chat-panel-support.tsx` 操作按钮 | `<Button>` | `<button className="ink-button-secondary">` |
 
 ### 4.4 对比度修复
 
 | 问题 | 修复 |
 |------|------|
 | `ink-button-secondary` 边框太浅 | `--line-strong` 提升到 `rgba(124,110,93,0.20)` |
-| `ink-button-secondary` 背景和面板接近 | 改为 `--bg-elevated`，和 surface/glass-heavy 拉开 |
+| `ink-button-secondary` 背景和面板接近 | `--bg-elevated` 改为 `#ffffff`（与 `--bg-surface: #fdfcf9` 拉开差距）+ `ink-button-secondary` background 改用 `var(--bg-elevated)` |
 | `ink-tab[data-active]` 背景太浅 | `--accent-primary-soft` 从 0.08 提升到 0.12 |
 | Composer 工具栏按钮和底栏融为一体 | 新 toolbar 类有明确边框 `var(--toolbar-border)` |
 | 聊天面板"新对话"按钮不可见 | 改为 `ink-button-secondary` 小尺寸，有边框 + shadow |
@@ -290,7 +311,11 @@ Studio 区域同时存在 7 种圆角值（6px~9999px），同类 chip 按钮有
 | `rounded-full` chip/触发器 | `rounded-pill` via token | 新对话按钮、Skill 触发器 |
 | `rounded-[10px]` | `rounded-lg` via token (12px) | 空状态图标 |
 
-### 5.3 约束
+### 5.3 保留的中间 Token
+
+`--radius-xs`(6px) 和 `--radius-md`(10px) 保留为 ink-input / ink-tab / ink-icon-button 等现有 CSS 类的内部引用，不对外暴露给组件直接使用。组件应使用 5.1 定义的 4 个语义级别。
+
+### 5.4 约束
 
 - 组件中不再允许直接写 Tailwind `rounded-*` 类，一律通过 CSS 变量或 ink-* 复合类引用
 - 新增 `ink-toolbar-*` 类内置圆角，不需要外部再写 `rounded-*`
@@ -350,6 +375,11 @@ Studio 区域同时存在 7 种圆角值（6px~9999px），同类 chip 按钮有
 | `ai-chat-panel.tsx` | 替换硬编码颜色 |
 | `auth-form.tsx` | 提取渐变背景为 CSS 变量 |
 | `workspace-shell.tsx` | 替换硬编码 rgba |
+| `incubator-chat-panel.tsx` | 替换 Arco Button + 硬编码 rgba/渐变 |
+| `incubator-chat-panel-support.tsx` | 替换 Arco Button + 硬编码 rgba |
+| `incubator-chat-draft-panel-support.tsx` | 替换 Arco Button (2处) |
+| `incubator-chat-draft-guidance.tsx` | 替换 Arco Button |
+| `incubator-chat-history-panel.tsx` | 替换 Arco Button (2处) + 硬编码颜色 |
 | 所有含 callout 横幅的组件 | 替换为 callout-* 类 |
 
 ### 7.2 可能影响但低风险
@@ -358,8 +388,8 @@ Studio 区域同时存在 7 种圆角值（6px~9999px），同类 chip 按钮有
 |------|---------|
 | `document-tree.tsx` | `bg-[#b0bac8]` → token |
 | `markdown-document-editor.tsx` | `bg-[#ffffff]` → `bg-surface` |
-| `json-document-editor.tsx` | `bg-[#ffffff]` → `bg-surface` |
-| `incubator-chat-panel.tsx` | 硬编码 rgba → token |
+| `json-document-editor.tsx` | `bg-[#ffffff]` → `bg-surface` + 补充 `accent-info` 引用 |
+| `incubator-chat-panel.tsx` | 已升为必改 |
 | `engine-export-panel.tsx` | 硬编码 rgba → callout-success 类 |
 | `engine-task-form-panels.tsx` | 硬编码 rgba → callout-warning 类 |
 | `config-registry-page-primitives.tsx` | 硬编码 rgba → callout-info 类 |
@@ -371,8 +401,15 @@ Studio 区域同时存在 7 种圆角值（6px~9999px），同类 chip 按钮有
 | `assistant-skill-editor.tsx` | 硬编码 rgba → callout-warning 类 |
 | `assistant-hook-guided-fields.tsx` | 硬编码 rgba → callout-info 类 |
 | `assistant-agent-guided-editor.tsx` | 硬编码 rgba → callout-info 类 |
-| `project-setting-summary-editor.tsx` | 硬编码 rgba → callout-warning 类 |
+| `assistant-getting-started-panel.tsx` | `bg-[linear-gradient(...)]` → CSS 变量 |
+| `assistant-config-file-map-panel.tsx` | `bg-[linear-gradient(...)]` → CSS 变量 |
+| `project-setting-summary-editor.tsx` | `rgba(196,136,61,...)` → callout-warning 类 |
+| `project-setting-summary-panel.tsx` | `rgba(196,136,61,...)` → callout-warning 类 |
 | `chapter-stale-notice.tsx` | 硬编码 rgba → callout-warning 类 |
+| `app-select.tsx` | 硬编码 `rgba(183,121,31,...)` → callout-warning 类 |
+| `incubator-panels-support.tsx` | 硬编码 `rgba(19,19,18,0.08)` → token |
+| `incubator-preview.tsx` | `accent-info` 引用（需确保 token 存在） |
+| `incubator-chat-settings-panel.tsx` | 硬编码 rgba → callout-info 类 |
 
 ### 7.3 不改
 
@@ -381,14 +418,25 @@ Studio 区域同时存在 7 种圆角值（6px~9999px），同类 chip 按钮有
 - 文案内容
 - 暗色模式（下一阶段）
 
+### 7.4 暗色模式前置说明
+
+本轮新增的所有 Token（`--callout-*`、`--toolbar-*`、`--chat-*`、`--accent-info-*`）使用了 `rgba()` 硬编码透明度值。这些值基于浅色背景调校，在暗色模式下需要提供覆盖值。建议实施暗色模式时：
+- 使用 `[data-theme="dark"]` 选择器覆盖所有 `--callout-*` 和 `--toolbar-*` token
+- 或改用 `color-mix()` / 双层变量结构降低迁移成本
+
+### 7.5 `ink-toolbar-chip` 与 `ink-toolbar-toggle` 公共基类
+
+`ink-toolbar-chip` 和 `ink-toolbar-toggle` 除激活态选择器外样式完全一致，保留为两个独立类以支持未来差异化（chip 可能发展为下拉触发器，toggle 可能增加开关指示器）。当前实现中提取公共部分到注释标记，不引入额外基类以避免过度抽象。
+
 ---
 
 ## 八、验证标准
 
 1. 所有页面在新主题色下按钮清晰可辨，不再和背景融为一体
 2. Studio Composer 所有工具栏按钮有明确边框和背景区分
-3. 全项目零硬编码 `bg-[rgba(...)]` / `border-[rgba(...)]` 颜色值
+3. 全项目零硬编码 `bg-[rgba(...)]` / `border-[rgba(...)]` / `bg-[#hex]` 颜色值（例外：模板内联 CSS 如 `dangerouslySetInnerHTML` 中的可保留）
 4. 零 Arco `<Button>` 直接使用（仅保留 Arco 组件内部渲染的按钮）
-5. 圆角仅使用 4 个语义级别 token
+5. 圆角仅使用 4 个语义级别 token（sm/lg/2xl/pill），`--radius-xs` 和 `--radius-md` 保留为 ink-input/ink-tab 等现有 CSS 类内部引用
 6. 色彩对比度满足 WCAG AA 标准
 7. 现有功能不受影响（纯样式改动）
+8. `ink-button` 的 loading 态需通过组件内条件渲染实现（替代 Arco Button 的 `loading` prop）
