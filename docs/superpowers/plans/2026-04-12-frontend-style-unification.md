@@ -20,18 +20,19 @@
 |------|------|
 | `apps/web/src/app/globals.css` | 更新 `:root` Token、新增 CSS 复合类、更新 ink-button-secondary 背景 |
 
-### 修改 — Studio 共创助手 (8 文件)
+### 修改 — Studio 共创助手 (9 文件)
 
 | 文件 | 职责 |
 |------|------|
-| `apps/web/src/features/studio/components/chat/studio-chat-composer.tsx` | 替换 Arco Button + 自定义工具栏按钮为 ink-toolbar-* |
+| `apps/web/src/features/studio/components/chat/studio-chat-composer.tsx` | 替换 Arco Button + 自定义工具栏按钮为 ink-toolbar-* + bg-white/N |
 | `apps/web/src/features/studio/components/chat/studio-chat-message-bubble.tsx` | 替换 Arco Button 为 ink-button-secondary + 硬编码颜色 |
 | `apps/web/src/features/studio/components/chat/studio-chat-history-panel.tsx` | 替换 Arco Button + 新对话/历史触发器 |
-| `apps/web/src/features/studio/components/chat/studio-chat-skill-panel.tsx` | 替换硬编码颜色 + 自定义按钮为 ink-toolbar-* |
+| `apps/web/src/features/studio/components/chat/studio-chat-skill-panel.tsx` | 替换硬编码颜色 + 自定义按钮为 ink-toolbar-* + chat token 引用 |
 | `apps/web/src/features/studio/components/chat/ai-chat-panel.tsx` | 替换硬编码颜色 |
 | `apps/web/src/features/studio/components/tree/document-tree.tsx` | `bg-[#b0bac8]` → token |
 | `apps/web/src/features/studio/components/document/markdown-document-editor.tsx` | `bg-[#ffffff]` → token |
 | `apps/web/src/features/studio/components/document/json-document-editor.tsx` | `bg-[#ffffff]` → token |
+| `apps/web/src/features/studio/components/document/chapter-stale-notice.tsx` | callout-warning |
 
 ### 修改 — Incubator 模块 (5 文件)
 
@@ -69,7 +70,11 @@
 | `apps/web/src/features/settings/components/assistant/assistant-config-file-map-panel.tsx` | 渐变 → CSS 变量 |
 | `apps/web/src/features/project-settings/components/project-setting-summary-editor.tsx` | callout-warning |
 | `apps/web/src/features/project-settings/components/project-setting-summary-panel.tsx` | callout-warning |
-| `apps/web/src/features/studio/components/chat/chapter-stale-notice.tsx` | callout-warning |
+| `apps/web/src/features/studio/components/document/chapter-stale-notice.tsx` | callout-warning |
+| `apps/web/src/features/engine/components/engine-task-panel.tsx` | callout-warning |
+| `apps/web/src/features/engine/components/engine-workflow-status-callout.tsx` | callout-warning + callout-info |
+| `apps/web/src/features/lobby/components/templates/template-library-editor-panel.tsx` | callout-warning + callout-info |
+| `apps/web/src/features/lobby/components/incubator/incubator-preview.tsx` | callout-warning + callout-info + accent-info |
 | `apps/web/src/components/ui/app-select.tsx` | callout-warning |
 | `apps/web/src/features/lobby/components/incubator/incubator-panels-support.tsx` | 硬编码 → token |
 | `apps/web/src/features/lobby/components/incubator/incubator-chat-settings-panel.tsx` | callout-info |
@@ -91,8 +96,8 @@
 --accent-primary-dark: #5b5040;
 --accent-primary-soft: rgba(124, 110, 93, 0.12);
 --accent-primary-muted: rgba(124, 110, 93, 0.14);
---accent-secondary: #8a9488;
---accent-tertiary: #b8b4ae;
+--accent-secondary: #9a9088;  /* 暖棕调和，配合新 primary */
+--accent-tertiary: #b8b4ae;  /* 微调，跟随暖色调 */
 --accent-success: #6b8f71;
 --accent-warning: #b8944a;
 --accent-danger: #b85c5c;
@@ -170,6 +175,8 @@ git commit -m "style: 更新主题色 Token 为暖棕文学风格"
 /* Chat 语义色 */
 --chat-user-bubble-bg: var(--bg-muted);
 --chat-assistant-bubble-bg: var(--accent-primary-soft);
+--chat-skill-panel-bg: var(--bg-surface);
+--chat-skill-option-active-bg: var(--accent-primary-soft);
 
 /* 场景渐变 */
 --auth-bg-gradient: radial-gradient(circle at top left, rgba(196,167,125,0.18), transparent 30%), radial-gradient(circle at right 20%, rgba(90,154,170,0.16), transparent 28%), linear-gradient(180deg, #ebeef3 0%, #f4efe7 48%, #f4f5f7 100%);
@@ -209,7 +216,9 @@ git commit -m "style: 更新主题色 Token 为暖棕文学风格"
 
 - [ ] **Step 3: 在现有 ink-pill 之后新增 toolbar CSS 类**
 
-在 `.ink-pill:disabled { ... }` 之后，新增完整的 `ink-toolbar-icon`、`ink-toolbar-chip`、`ink-toolbar-toggle` 定义（完整 CSS 见 spec 第四节 4.2）。
+在 `.ink-pill:disabled { ... }` 之后，新增完整的 `ink-toolbar-icon`、`ink-toolbar-chip`、`ink-toolbar-toggle` 定义（完整 CSS 见 spec 第四节 4.2）。**注意：三个类都必须包含 `:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }` 以保证键盘可访问性。**
+
+**设计说明：** callout Token（`--callout-info-*`）和 accent-info Token（`--accent-info-*`）是两套独立调色。callout 用于横幅/面板背景（低透明度），accent-info 用于文字/图标/徽章（高饱和度）。分开定义是为了暗色模式时可独立调参。
 
 - [ ] **Step 4: 更新 `ink-button-secondary` 的 background**
 
@@ -229,7 +238,53 @@ git commit -m "style: 新增 callout/toolbar/chat 语义 Token 和 CSS 复合类
 
 ---
 
-## Task 3: Studio Composer — 替换按钮体系
+## Task 2.5: 圆角统一 — 批量替换
+
+**前置依赖：** Task 2（CSS 类已就位）
+
+**规则：**
+- 新增 CSS 类（`ink-toolbar-*`、`callout-*`）已内置正确圆角，无需额外处理
+- 此 Task 处理现有组件中直接使用 Tailwind `rounded-*` 的情况
+
+**替换映射：**
+| 当前 | 替换为 | 适用场景 |
+|------|--------|---------|
+| `rounded` (6px) | 保持（`--radius-xs` 内部 token） | 状态标签 |
+| `rounded-md` (8px) | 保持（`--radius-sm` 内部 token） | 附件 pill |
+| `rounded-xl` (16px) | `rounded-2xl` | 面板内部区域、下拉触发 |
+| `rounded-full` (9999px) | `rounded-pill` | chip/触发器按钮 |
+| `rounded-[10px]` | `rounded-lg` | 空状态图标 |
+
+**注意：** `rounded-lg` (12px)、`rounded-2xl` (20px)、`rounded-3xl`+ (hero-card 内置) 保持不变。
+
+- [ ] **Step 1: 全局搜索替换 `rounded-xl` → `rounded-2xl`**
+
+Run:
+```bash
+cd apps/web/src && grep -rn "rounded-xl\b" --include="*.tsx" | grep -v "rounded-2xl\|rounded-3xl\|rounded-4xl\|rounded-5xl\|globals.css" | head -30
+```
+在列出的文件中，将独立的 `rounded-xl` 替换为 `rounded-2xl`（面板内部区域）。注意不要影响已经是 `rounded-2xl` 或更大圆角的。
+
+- [ ] **Step 2: 全局搜索替换 `rounded-full` → `rounded-pill`**
+
+Run:
+```bash
+cd apps/web/src && grep -rn "rounded-full" --include="*.tsx" | grep -v "globals.css" | head -30
+```
+在列出的文件中，将按钮/触发器上的 `rounded-full` 替换为 `rounded-pill`。
+
+- [ ] **Step 3: 验证构建**
+
+Run: `cd apps/web && npx next build 2>&1 | head -20`
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add -A
+git commit -m "style: 圆角统一 — rounded-xl→2xl, rounded-full→pill"
+```
+
+---
 
 **Files:**
 - Modify: `apps/web/src/features/studio/components/chat/studio-chat-composer.tsx`
@@ -254,7 +309,15 @@ git commit -m "style: 新增 callout/toolbar/chat 语义 Token 和 CSS 复合类
 
 将 `<Button type="primary" shape="round" loading={isResponding} ...>` 替换为 `<button className="ink-button" disabled={isResponding || !canChat}>`。Loading 态通过条件渲染内部图标/文字实现。
 
-- [ ] **Step 6: 移除 `@arco-design/web-react` 的 Button import（如果仅此处使用）**
+- [ ] **Step 6: 替换渠道下拉触发器**
+
+找到渠道选择触发器元素（`bg-white/92 shadow-xs` + `rounded-xl`），替换为使用 `ink-toolbar-chip` 类 + 适当增大尺寸（添加 `h-10 px-3`）。
+
+- [ ] **Step 7: 替换 `bg-white/N` 半透明背景**
+
+搜索文件中所有 `bg-white/92`、`bg-white/90`、`bg-white/95` 等用法，替换为 `bg-surface/92`、`bg-surface/90`、`bg-surface/95`。
+
+- [ ] **Step 8: 移除 `@arco-design/web-react` 的 Button import（如果仅此处使用）**
 
 如果 `studio-chat-composer.tsx` 中 `Button` 不再被其他地方引用，从 import 中移除。
 
@@ -294,11 +357,14 @@ git commit -m "style: Studio Composer 按钮统一为 ink-toolbar-* 体系"
 
 - [ ] **Step 3: studio-chat-skill-panel.tsx — 替换硬编码颜色和按钮**
 
-替换所有 `bg-[rgba(43,33,21,...)]` / `bg-[rgba(125,153,178,...)]` → `bg-surface-hover` / `accent-primary-soft`。
-替换 `bg-[rgba(238,244,234,0.86)]` → `bg-accent-primary-soft`。
-替换 `bg-[rgba(249,246,239,0.92)]` → `bg-surface` + `backdrop-blur`。
-替换 `bg-[#ffffff]` → `bg-surface`。
-将 Skill 触发器和 mode 按钮替换为 `ink-toolbar-chip`。
+逐元素替换：
+- `bg-[rgba(43,33,21,0.08)]` → `bg-surface-hover`
+- `bg-[rgba(125,153,178,0.07)]` → `bg-accent-primary-soft`
+- `bg-[rgba(238,244,234,0.86)]`（选项卡片激活态）→ `bg-[var(--chat-skill-option-active-bg)]`
+- `bg-[rgba(249,246,239,0.92)]`（面板背景）→ `bg-[var(--chat-skill-panel-bg)]` + `backdrop-blur`
+- `bg-[#ffffff]` → `bg-surface`
+- `bg-white/92` 等 → `bg-surface/92`
+- Skill 触发器和 mode 按钮替换为 `ink-toolbar-chip`
 
 - [ ] **Step 4: ai-chat-panel.tsx — 替换硬编码颜色**
 
@@ -323,7 +389,7 @@ git commit -m "style: Studio 聊天面板统一按钮体系和消灭硬编码颜
 - Modify: `apps/web/src/features/studio/components/tree/document-tree.tsx`
 - Modify: `apps/web/src/features/studio/components/document/markdown-document-editor.tsx`
 - Modify: `apps/web/src/features/studio/components/document/json-document-editor.tsx`
-- Modify: `apps/web/src/features/studio/components/chat/chapter-stale-notice.tsx`
+- Modify: `apps/web/src/features/studio/components/document/chapter-stale-notice.tsx`
 
 - [ ] **Step 1: document-tree.tsx** — `bg-[#b0bac8]` → `bg-text-tertiary/40` 或合适的 token
 
@@ -417,6 +483,8 @@ git commit -m "style: 认证和布局背景渐变提取为 CSS 变量"
 **Files:**
 - Modify: `apps/web/src/features/engine/components/engine-export-panel.tsx`
 - Modify: `apps/web/src/features/engine/components/engine-task-form-panels.tsx`
+- Modify: `apps/web/src/features/engine/components/engine-task-panel.tsx`
+- Modify: `apps/web/src/features/engine/components/engine-workflow-status-callout.tsx`
 - Modify: `apps/web/src/features/config-registry/components/config-registry-page-primitives.tsx`
 - Modify: `apps/web/src/features/config-registry/components/config-registry-skill-reader.tsx`
 - Modify: `apps/web/src/features/settings/components/credential/credential-center-list.tsx`
@@ -445,12 +513,12 @@ git commit -m "style: Engine/Config/Credential 组件 callout 横幅统一"
 ## Task 9: Callout 横幅组件批量替换 (Part 2 — Settings + Project + Lobby)
 
 **Files:**
-- Modify: `apps/web/src/features/settings/components/assistant/assistant-preferences-form.tsx`
-- Modify: `apps/web/src/features/settings/components/assistant/assistant-skill-editor.tsx`
-- Modify: `apps/web/src/features/settings/components/assistant/assistant-hook-guided-fields.tsx`
-- Modify: `apps/web/src/features/settings/components/assistant/assistant-agent-guided-editor.tsx`
-- Modify: `apps/web/src/features/settings/components/assistant/assistant-getting-started-panel.tsx`
-- Modify: `apps/web/src/features/settings/components/assistant/assistant-config-file-map-panel.tsx`
+- Modify: `apps/web/src/features/settings/components/assistant/preferences/assistant-preferences-form.tsx`
+- Modify: `apps/web/src/features/settings/components/assistant/skills/assistant-skill-editor.tsx`
+- Modify: `apps/web/src/features/settings/components/assistant/hooks/assistant-hook-guided-fields.tsx`
+- Modify: `apps/web/src/features/settings/components/assistant/agents/assistant-agent-guided-editor.tsx`
+- Modify: `apps/web/src/features/settings/components/assistant/common/assistant-getting-started-panel.tsx`
+- Modify: `apps/web/src/features/settings/components/assistant/common/assistant-config-file-map-panel.tsx`
 - Modify: `apps/web/src/features/project-settings/components/project-setting-summary-editor.tsx`
 - Modify: `apps/web/src/features/project-settings/components/project-setting-summary-panel.tsx`
 - Modify: `apps/web/src/features/lobby/components/projects/lobby-project-shelf.tsx`
@@ -477,15 +545,19 @@ git commit -m "style: Settings/Project/Lobby 组件 callout 横幅统一"
 
 ---
 
-## Task 10: Incubator 辅助模块 + 其他零散文件
+## Task 10: Incubator 辅助模块 + 模板编辑器 + Preview
 
 **Files:**
 - Modify: `apps/web/src/features/lobby/components/incubator/incubator-panels-support.tsx`
 - Modify: `apps/web/src/features/lobby/components/incubator/incubator-chat-settings-panel.tsx`
+- Modify: `apps/web/src/features/lobby/components/incubator/incubator-preview.tsx`
+- Modify: `apps/web/src/features/lobby/components/templates/template-library-editor-panel.tsx`
 
 **替换规则：**
 - `border-[rgba(19,19,18,0.08)]` → `border-line-soft`
-- `bg-[rgba(58,124,165,0.08)]` → `callout-info`
+- `bg-[rgba(58,124,165,0.08~0.1)]` + border → `callout-info`
+- `bg-[rgba(183,121,31,0.14)]` + border → `callout-warning`
+- incubator-preview 中 `accent-info` 引用需确保 Task 1 中 `--accent-info` Token 已定义
 
 - [ ] **Step 1: 替换硬编码**
 
@@ -506,9 +578,9 @@ git commit -m "style: Incubator 辅助模块替换硬编码颜色"
 
 Run:
 ```bash
-cd apps/web/src && grep -rn "bg-\[rgba(" --include="*.tsx" --include="*.ts" | grep -v "globals.css" | grep -v "var(--" | head -30
+cd apps/web/src && grep -rn 'bg-\[rgba(' --include="*.tsx" --include="*.ts" | grep -v "globals.css" | grep -v "dangerouslySetInnerHTML" | head -30
 ```
-Expected: 无结果或仅有 `dangerouslySetInnerHTML` 中的模板内联 CSS
+Expected: 无结果（注意：如果一行同时有 rgba 和 var(--)，仍然会被捕获，需要人工判断）
 
 - [ ] **Step 2: 搜索残留 Arco Button 直接使用**
 
