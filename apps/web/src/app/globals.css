@@ -77,6 +77,34 @@
   --z-overlay: 40;
   --z-modal: 50;
   --z-toast: 60;
+
+  /* Callout 语义色 — 替代所有散落的 rgba */
+  --callout-info-bg: rgba(58, 124, 165, 0.07);
+  --callout-info-border: rgba(58, 124, 165, 0.16);
+  --callout-warning-bg: rgba(183, 121, 31, 0.08);
+  --callout-warning-border: rgba(183, 121, 31, 0.20);
+  --callout-success-bg: rgba(47, 107, 69, 0.08);
+  --callout-success-border: rgba(47, 107, 69, 0.18);
+  --callout-danger-bg: rgba(184, 92, 92, 0.08);
+  --callout-danger-border: rgba(184, 92, 92, 0.16);
+
+  /* Toolbar 语义色 — 解决 Composer 按钮隐形 */
+  --toolbar-bg: var(--bg-surface);
+  --toolbar-bg-hover: rgba(124, 110, 93, 0.08);
+  --toolbar-bg-active: rgba(124, 110, 93, 0.14);
+  --toolbar-border: var(--line-strong);
+  --toolbar-text: var(--text-secondary);
+  --toolbar-text-active: var(--accent-primary);
+
+  /* Chat 语义色 — 统一聊天区域 */
+  --chat-user-bubble-bg: var(--bg-muted);
+  --chat-assistant-bubble-bg: var(--accent-primary-soft);
+  --chat-skill-panel-bg: var(--bg-surface);
+  --chat-skill-option-active-bg: var(--accent-primary-soft);
+
+  /* 场景渐变 */
+  --auth-bg-gradient: radial-gradient(circle at top left, rgba(196,167,125,0.18), transparent 30%), radial-gradient(circle at right 20%, rgba(90,154,170,0.16), transparent 28%), linear-gradient(180deg, #ebeef3 0%, #f4efe7 48%, #f4f5f7 100%);
+  --workspace-shell-accent-gradient: radial-gradient(circle at top left, rgba(124,110,93,0.04), transparent 26%);
 }
 
 @layer base {
@@ -391,7 +419,7 @@
   padding: 0 16px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-pill);
-  background: var(--bg-surface);
+  background: var(--bg-elevated);
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 500;
@@ -569,6 +597,104 @@
   cursor: not-allowed;
 }
 
+.ink-toolbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--toolbar-text);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+.ink-toolbar-icon:hover {
+  background: var(--toolbar-bg-hover);
+  color: var(--toolbar-text-active);
+}
+.ink-toolbar-icon:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ink-toolbar-icon:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.ink-toolbar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--toolbar-border);
+  border-radius: var(--radius-lg);
+  background: var(--toolbar-bg);
+  color: var(--toolbar-text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.ink-toolbar-chip:hover {
+  background: var(--toolbar-bg-hover);
+  border-color: var(--accent-primary-muted);
+  color: var(--toolbar-text-active);
+}
+.ink-toolbar-chip[data-active="true"] {
+  background: var(--toolbar-bg-active);
+  border-color: var(--accent-primary-muted);
+  color: var(--accent-primary);
+}
+.ink-toolbar-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ink-toolbar-chip:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.ink-toolbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--toolbar-border);
+  border-radius: var(--radius-lg);
+  background: var(--toolbar-bg);
+  color: var(--toolbar-text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.ink-toolbar-toggle:hover {
+  background: var(--toolbar-bg-hover);
+  border-color: var(--accent-primary-muted);
+  color: var(--toolbar-text-active);
+}
+.ink-toolbar-toggle[aria-pressed="true"] {
+  background: var(--toolbar-bg-active);
+  border-color: var(--accent-primary-muted);
+  color: var(--accent-primary);
+}
+.ink-toolbar-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ink-toolbar-toggle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 .section-card {
   display: flex;
   flex-direction: column;
@@ -643,6 +769,31 @@
 .badge--danger {
   background: var(--accent-danger-soft, rgba(196, 112, 112, 0.12));
   color: var(--accent-danger);
+}
+
+.callout-info {
+  background: var(--callout-info-bg);
+  border: 1px solid var(--callout-info-border);
+  border-radius: var(--radius-2xl);
+  padding: 12px 16px;
+}
+.callout-warning {
+  background: var(--callout-warning-bg);
+  border: 1px solid var(--callout-warning-border);
+  border-radius: var(--radius-2xl);
+  padding: 12px 16px;
+}
+.callout-success {
+  background: var(--callout-success-bg);
+  border: 1px solid var(--callout-success-border);
+  border-radius: var(--radius-2xl);
+  padding: 12px 16px;
+}
+.callout-danger {
+  background: var(--callout-danger-bg);
+  border: 1px solid var(--callout-danger-border);
+  border-radius: var(--radius-2xl);
+  padding: 12px 16px;
 }
 
 .divider {
