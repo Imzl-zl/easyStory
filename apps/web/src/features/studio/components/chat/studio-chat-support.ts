@@ -13,7 +13,6 @@ import {
   resolveIncubatorAssistantReply,
 } from "@/features/shared/assistant/assistant-chat-support";
 import {
-  prefersBufferedOutput,
   type IncubatorCredentialOption,
 } from "@/features/shared/assistant/assistant-credential-support";
 import {
@@ -325,7 +324,7 @@ export function buildNextStudioChatSettingsForProvider(
     modelName: nextModelName,
     provider,
     reasoningEffort: nextReasoningDraft.reasoningEffort,
-    streamOutput: prefersBufferedOutput(nextOption) ? false : current.streamOutput,
+    streamOutput: current.streamOutput,
     thinkingBudget: nextReasoningDraft.thinkingBudget,
     thinkingLevel: nextReasoningDraft.thinkingLevel,
   };

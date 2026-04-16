@@ -160,7 +160,7 @@ export function resolveHydratedIncubatorChatSettings(
     : fallbackModelName;
   const nextStreamOutput = currentProvider === nextProvider
     ? current.streamOutput
-    : !prefersBufferedOutput(selectedCredential);
+    : true;
   const nextReasoningDraft = normalizeAssistantReasoningDraft(
     currentProvider === nextProvider
       ? {
@@ -205,10 +205,6 @@ export function resolveHydratedIncubatorChatSettings(
     thinkingBudget: nextReasoningDraft.thinkingBudget,
     thinkingLevel: nextReasoningDraft.thinkingLevel,
   };
-}
-
-export function prefersBufferedOutput(_option: IncubatorCredentialOption | null) {
-  return false;
 }
 
 function supportsProviderAgnosticPreferredModel(options: {
@@ -300,10 +296,6 @@ function compareIncubatorCredentialOptions(
   const endpointPriorityDiff = resolveCredentialEndpointPriority(left) - resolveCredentialEndpointPriority(right);
   if (endpointPriorityDiff !== 0) {
     return endpointPriorityDiff;
-  }
-  const outputPriorityDiff = Number(prefersBufferedOutput(left)) - Number(prefersBufferedOutput(right));
-  if (outputPriorityDiff !== 0) {
-    return outputPriorityDiff;
   }
   return left.displayLabel.localeCompare(right.displayLabel, "zh-CN");
 }

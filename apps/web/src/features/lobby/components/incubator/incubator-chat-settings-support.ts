@@ -14,7 +14,6 @@ import {
   resolveAssistantReasoningControl,
 } from "@/features/shared/assistant/assistant-reasoning-support";
 
-import { prefersBufferedOutput } from "@/features/shared/assistant/assistant-credential-support";
 import type { IncubatorChatModel } from "@/features/lobby/components/incubator/incubator-page-model";
 
 export function updateIncubatorChatSetting<K extends keyof IncubatorChatModel["settings"]>(
@@ -95,7 +94,7 @@ export function syncProviderSelection(model: IncubatorChatModel, provider: strin
       maxOutputTokens: shouldSyncMaxOutputTokens(current.maxOutputTokens, currentOption, option),
       modelName: nextModelName,
       provider,
-      streamOutput: prefersBufferedOutput(option ?? null) ? false : current.streamOutput,
+      streamOutput: current.streamOutput,
     };
   });
 }
@@ -155,7 +154,7 @@ function shouldShowOutputModeSummaryItem(
   streamOutput: boolean,
   option: IncubatorChatModel["credentialOptions"][number],
 ) {
-  return streamOutput !== !prefersBufferedOutput(option);
+  return streamOutput === false;
 }
 
 function normalizeReasoningSettings(

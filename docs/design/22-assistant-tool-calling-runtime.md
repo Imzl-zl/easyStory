@@ -48,7 +48,7 @@
 - 工具能力真值当前按 transport mode 分离保存：
   - 流式看 `ModelCredential.stream_tool_verified_probe_kind`
   - 非流式看 `ModelCredential.buffered_tool_verified_probe_kind`
-- Credential Center 当前产品语义已显式区分 `验证连接 / 验证流式工具 / 验证非流工具`
+- Credential Center 设置页当前产品语义已显式区分 `验证流式链路 / 验证非流链路 / 验证流式工具 / 验证非流工具`
 - provider/tool 协议边界当前已在 shared runtime 收口为 `tool_name_codec / tool_schema_compiler / tool_call_codec / tool_continuation_codec / stream_event_normalizer`，assistant 业务层不再直接承载协议散点兼容
 
 当前仍未完全闭合的边界主要是：

@@ -112,7 +112,7 @@ def _parse_openai_responses_response(
     tool_name_aliases: dict[str, str],
 ) -> NormalizedLLMResponse:
     output_text = payload.get("output_text")
-    has_output_text = isinstance(output_text, str) and bool(output_text.strip())
+    has_output_text = isinstance(output_text, str) and output_text != ""
     if has_output_text:
         content = output_text
     else:

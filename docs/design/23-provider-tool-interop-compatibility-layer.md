@@ -14,7 +14,7 @@
 >
 > 当前代码里已经存在一版协议兼容中间层，但它还没有把“内部工具语义”和“外部协议格式”彻底隔离。本文关注的是最终稳定形态，不是一次性补丁。
 >
-> 截至 `2026-04-10`，tool name alias codec、conformance probe、凭证 `interop_profile -> verifier -> assistant runtime -> Credential Center` 贯通、assistant visible-tools capability gating、Credential Center 显式 `验证连接 / 验证流式工具 / 验证非流工具` 产品语义，以及 Gemini 流式 tool-call terminal synthesis 都已落地；后续仍需继续推进更细粒度的 gateway profile。
+> 截至 `2026-04-10`，tool name alias codec、conformance probe、凭证 `interop_profile -> verifier -> assistant runtime -> Credential Center` 贯通、assistant visible-tools capability gating、Credential Center 设置页显式 `验证流式链路 / 验证非流链路 / 验证流式工具 / 验证非流工具` 产品语义，以及 Gemini 流式 tool-call terminal synthesis 都已落地；后续仍需继续推进更细粒度的 gateway profile。
 
 ## 1. 目的
 
@@ -128,13 +128,14 @@ assistant 侧与工具域的正式入口在：
 - `AsyncHttpCredentialVerifier`、assistant runtime 与 `LLMToolProvider` 已共享同一份 `interop_profile`
 - Credential Center 已暴露 `interop_profile` 配置入口，并按 `api_dialect` 约束可选项
 - `/api/v1/credentials/{id}/verify` 已支持显式 `probe_kind`
-- Credential Center 已显式区分 `验证连接(text_probe)`、`验证流式工具(tool_continuation_probe + stream)` 与 `验证非流工具(tool_continuation_probe + buffered)`
+- Credential Center 设置页当前已显式区分 `验证流式链路(text_probe + stream)`、`验证非流链路(text_probe + buffered)`、`验证流式工具(tool_continuation_probe + stream)` 与 `验证非流工具(tool_continuation_probe + buffered)`
 - `ModelCredential` 当前按 transport mode 分别持久化 `stream_tool_verified_probe_kind` 与 `buffered_tool_verified_probe_kind`
 - assistant runtime 在存在 visible tools 时会按当前 transport mode 显式要求 `tool_continuation_probe`，不再把所有已验证连接默认为支持 project tools
 - shared runtime 已新增 `tool_schema_compiler.py`，OpenAI / Claude / Gemini 的 tool definitions 统一走 `tool_schema_mode`
 - 当前 `portable_subset` 会收口 required-only `anyOf`，`gemini_compatible` 会在此基础上继续移除 Gemini 不支持的 schema key
 - shared runtime 已新增 `tool_continuation_codec.py`，runtime replay projection、tool result payload encoding 与 OpenAI Responses continuation input 已从 request builder 中抽离
 - shared runtime 已为 Gemini 流式补齐终态 tool-call synthesize，避免早期 `functionCall` 在 terminal 装配时丢失或重复
+- shared runtime 当前已新增 `llm_backend.py + litellm_backend.py + native_http_backend.py`：默认 southbound provider transport 走 LiteLLM；`custom_header` 鉴权、完整 endpoint `base_url`、`Responses + stop`，以及 Gemini 原生 `thinking_level` / 非零 `thinking_budget` 走显式 `native_http` backend，不做 silent fallback
 
 ## 4. 设计目标
 
@@ -242,7 +243,7 @@ assistant、workflow、incubator、verifier 在业务层长期只认：
   - `response.output_item.added`
   - `response.function_call_arguments.delta`
   - `response.function_call_arguments.done`
-  - `response.completed`
+  - `response.completed / response.incomplete / response.failed`
 
 #### 应用回传工具结果
 
@@ -427,7 +428,7 @@ Gemini 原生也不是 OpenAI 结构。它走 `contents / parts / functionCall /
 | 请求主字段 | `input` / `instructions` / `tools` | `messages` / `tools` | `messages` / 顶层 `system` / `tools` | `contents` / `tools.functionDeclarations` | 跟随某个协议族 |
 | 模型工具调用 | `output[].function_call` | `message.tool_calls[]` | `content[].tool_use` | `parts[].functionCall` | 跟随某个协议族，但细节不一定完整 |
 | 工具结果回传 | `function_call_output` | `role=tool` message | `tool_result` block | `functionResponse` part | 跟随某个协议族，但约束更严格或更弱 |
-| 流式终态 | `response.completed` | `[DONE]` / final chunk | `message_stop` | 流结束 + 完整 response | 高度不稳定 |
+| 流式终态 | `response.completed / response.incomplete / response.failed` | `[DONE]` / final chunk | `message_stop` | 流结束 + 完整 response | 高度不稳定 |
 | 工具名约束 | 安全 ASCII 名，最长 64 | 安全 ASCII 名，最长 64 | 安全 ASCII 名，最长 64 | 官方建议禁用空格、句点、连字符 | 不得假设比官方更宽松 |
 | schema 支持 | strict 子集 | 通常弱于 Responses | `input_schema` | OpenAPI subset | 漂移最大 |
 | continuation | provider continuation 友好 | runtime replay 为主 | runtime replay 为主 | runtime replay 为主 | 逐 profile 判断 |

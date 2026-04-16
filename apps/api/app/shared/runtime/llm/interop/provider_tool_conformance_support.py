@@ -11,13 +11,11 @@ from ..llm_protocol import (
     LLMFunctionToolDefinition,
     LLMGenerateRequest,
     NormalizedLLMResponse,
-    PreparedLLMHttpRequest,
     allows_provider_continuation_state,
-    build_verification_request,
-    prepare_generation_request,
+    normalize_api_dialect,
     resolve_connection_continuation_support,
 )
-from ..llm_protocol_types import NormalizedLLMToolCall
+from ..llm_protocol_types import NormalizedLLMToolCall, VERIFY_MAX_TOKENS, VERIFY_SYSTEM_PROMPT, VERIFY_USER_PROMPT
 
 ConformanceProbeKind = Literal[
     "text_probe",
@@ -41,11 +39,22 @@ CONFORMANCE_PROBE_KIND_RANKS: dict[ConformanceProbeKind, int] = {
     "tool_continuation_probe": 3,
 }
 
-# Tool conformance probes must leave enough output budget for reasoning-capable
-# models to emit the tool call or final answer without tripping a false failure.
 PROBE_MAX_TOKENS = 256
 PROBE_TOOL_NAME = "probe.echo_payload"
 PROBE_ECHO_ARGUMENT = "ping"
+VERIFY_EMPTY_CONTENT_MESSAGE = "测试消息没有返回可用内容"
+TEXT_PROBE_RETIRED_MODEL_MARKERS = (
+    "is no longer available",
+    "please switch to",
+)
+TEXT_PROBE_MODEL_CONFIGURATION_ERROR_MARKERS = (
+    "not supported for this model",
+    "unsupported model",
+    "invalid model",
+    "unknown model",
+    "does not exist",
+    "model_not_found",
+)
 TOOL_DEFINITION_PROBE_SUCCESS_TEXT = "工具定义探测成功。"
 TOOL_DEFINITION_PROBE_PROMPT = (
     f"这是工具定义探测。请直接回复：{TOOL_DEFINITION_PROBE_SUCCESS_TEXT}"
@@ -127,15 +136,19 @@ def build_conformance_probe_request(
     *,
     model_name: str,
     probe_kind: ConformanceProbeKind,
-) -> PreparedLLMHttpRequest:
+) -> LLMGenerateRequest:
     if probe_kind == "text_probe":
-        return build_verification_request(connection)
+        return build_text_probe_request(
+            connection,
+            model_name=model_name,
+        )
     if probe_kind == "tool_definition_probe":
         return _build_generate_request(
             connection,
             model_name=model_name,
             prompt=TOOL_DEFINITION_PROBE_PROMPT,
             system_prompt=TOOL_DEFINITION_PROBE_SYSTEM_PROMPT,
+            force_tool_call=False,
         )
     if probe_kind in {"tool_call_probe", "tool_continuation_probe"}:
         return _build_generate_request(
@@ -143,6 +156,7 @@ def build_conformance_probe_request(
             model_name=model_name,
             prompt=TOOL_CALL_PROBE_PROMPT,
             system_prompt=TOOL_CALL_PROBE_SYSTEM_PROMPT,
+            force_tool_call=True,
         )
     raise ConfigurationError(f"Unsupported conformance probe kind: {probe_kind}")
 
@@ -153,7 +167,7 @@ def build_tool_continuation_probe_followup_request(
     model_name: str,
     initial_response: NormalizedLLMResponse,
     result_echo: str | None = None,
-) -> PreparedLLMHttpRequest:
+) -> LLMGenerateRequest:
     tool_call = validate_tool_call_probe_response(initial_response)
     resolved_result_echo = result_echo or build_tool_continuation_probe_result_echo()
     continuation_items = _build_tool_probe_continuation_items(
@@ -171,23 +185,20 @@ def build_tool_continuation_probe_followup_request(
         connection=connection,
         continuation_support=continuation_support,
     )
-    request = prepare_generation_request(
-        LLMGenerateRequest(
-            connection=connection,
-            model_name=model_name,
-            prompt=TOOL_CONTINUATION_PROBE_PROMPT,
-            system_prompt=TOOL_CONTINUATION_PROBE_SYSTEM_PROMPT,
-            response_format="text",
-            temperature=0.0,
-            max_tokens=PROBE_MAX_TOKENS,
-            top_p=1.0,
-            tools=[PROBE_TOOL_DEFINITION],
-            continuation_items=continuation_items,
-            provider_continuation_state=provider_continuation_state,
-            force_tool_call=False,
-        )
+    return LLMGenerateRequest(
+        connection=connection,
+        model_name=model_name,
+        prompt=TOOL_CONTINUATION_PROBE_PROMPT,
+        system_prompt=TOOL_CONTINUATION_PROBE_SYSTEM_PROMPT,
+        response_format="text",
+        temperature=0.0,
+        max_tokens=PROBE_MAX_TOKENS,
+        top_p=1.0,
+        tools=[PROBE_TOOL_DEFINITION],
+        continuation_items=continuation_items,
+        provider_continuation_state=provider_continuation_state,
+        force_tool_call=False,
     )
-    return request
 
 
 def validate_tool_definition_probe_response(response: NormalizedLLMResponse) -> None:
@@ -230,11 +241,22 @@ def validate_tool_continuation_probe_response(
     content = response.content.strip()
     if not content:
         raise ConfigurationError("Tool continuation probe returned empty final content")
-    if expected_echo not in content:
+    expected_content = render_tool_continuation_probe_success_text(expected_echo)
+    if content != expected_content:
         raise ConfigurationError(
-            "Tool continuation probe final content must include echoed value "
-            f"'{expected_echo}'"
+            "Tool continuation probe final content must equal "
+            f"'{expected_content}'"
         )
+
+
+def normalize_text_probe_error_message(reply: str) -> str | None:
+    normalized_reply = reply.strip()
+    lowered_reply = normalized_reply.lower()
+    if any(marker in lowered_reply for marker in TEXT_PROBE_RETIRED_MODEL_MARKERS):
+        return f"当前默认模型已不可用，请换成可用模型后再试。上游提示：{normalized_reply}"
+    if any(marker in lowered_reply for marker in TEXT_PROBE_MODEL_CONFIGURATION_ERROR_MARKERS):
+        return f"默认模型或接口类型不匹配。上游提示：{normalized_reply}"
+    return None
 
 
 def serialize_probe_response(response: NormalizedLLMResponse) -> dict[str, Any]:
@@ -256,26 +278,49 @@ def render_tool_continuation_probe_success_text(expected_echo: str) -> str:
     return f"工具续接成功：{expected_echo}。"
 
 
+
+
+def use_buffered_text_probe_by_default(api_dialect: str) -> bool:
+    return normalize_api_dialect(api_dialect) in {"anthropic_messages", "gemini_generate_content"}
+
+def build_text_probe_request(
+    connection: LLMConnection,
+    *,
+    model_name: str,
+    prompt: str | None = None,
+    system_prompt: str | None = None,
+) -> LLMGenerateRequest:
+    return LLMGenerateRequest(
+        connection=connection,
+        model_name=model_name,
+        prompt=prompt or VERIFY_USER_PROMPT,
+        system_prompt=system_prompt if prompt is not None else (system_prompt or VERIFY_SYSTEM_PROMPT),
+        response_format="text",
+        temperature=0.0,
+        max_tokens=VERIFY_MAX_TOKENS,
+        top_p=1.0,
+    )
+
+
 def _build_generate_request(
     connection: LLMConnection,
     *,
     model_name: str,
     prompt: str,
     system_prompt: str,
-) -> PreparedLLMHttpRequest:
-    return prepare_generation_request(
-        LLMGenerateRequest(
-            connection=connection,
-            model_name=model_name,
-            prompt=prompt,
-            system_prompt=system_prompt,
-            response_format="text",
-            temperature=0.0,
-            max_tokens=PROBE_MAX_TOKENS,
-            top_p=1.0,
-            tools=[PROBE_TOOL_DEFINITION],
-            force_tool_call=True,
-        )
+    force_tool_call: bool,
+) -> LLMGenerateRequest:
+    return LLMGenerateRequest(
+        connection=connection,
+        model_name=model_name,
+        prompt=prompt,
+        system_prompt=system_prompt,
+        response_format="text",
+        temperature=0.0,
+        max_tokens=PROBE_MAX_TOKENS,
+        top_p=1.0,
+        tools=[PROBE_TOOL_DEFINITION],
+        force_tool_call=force_tool_call,
     )
 
 

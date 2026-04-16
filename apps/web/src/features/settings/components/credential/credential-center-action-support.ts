@@ -1,5 +1,4 @@
 export type CredentialCenterActionType =
-  | "verify_connection"
   | "verify_stream_connection"
   | "verify_buffered_connection"
   | "verify_stream_tools"
@@ -14,9 +13,8 @@ export type PendingCredentialAction = Readonly<{
 }>;
 
 const ACTION_LABELS: Record<CredentialCenterActionType, string> = {
-  verify_connection: "验证连接",
-  verify_stream_connection: "验证流式连接",
-  verify_buffered_connection: "验证非流连接",
+  verify_stream_connection: "验证流式链路",
+  verify_buffered_connection: "验证非流链路",
   verify_stream_tools: "验证流式工具",
   verify_buffered_tools: "验证非流工具",
   enable: "启用",
@@ -25,7 +23,6 @@ const ACTION_LABELS: Record<CredentialCenterActionType, string> = {
 };
 
 const ACTION_PENDING_LABELS: Record<CredentialCenterActionType, string> = {
-  verify_connection: "验证中...",
   verify_stream_connection: "验证中...",
   verify_buffered_connection: "验证中...",
   verify_stream_tools: "验证中...",

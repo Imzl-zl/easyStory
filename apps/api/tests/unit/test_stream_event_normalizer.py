@@ -152,3 +152,41 @@ def test_synthesize_stream_terminal_response_builds_anthropic_tool_call() -> Non
     assert terminal.tool_calls[0].tool_call_id == "call_1"
     assert terminal.tool_calls[0].tool_name == "project.read_documents"
     assert terminal.tool_calls[0].arguments == {"paths": ["设定/人物.md"]}
+
+
+def test_parse_raw_stream_event_accepts_openai_responses_incomplete_terminal() -> None:
+    parsed = parse_raw_stream_event(
+        "openai_responses",
+        event_name="response.incomplete",
+        payload={
+            "type": "response.incomplete",
+            "response": {
+                "id": "resp_123",
+                "output": [
+                    {
+                        "id": "msg_1",
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "半截内容"}],
+                    }
+                ],
+                "incomplete_details": {"reason": "max_output_tokens"},
+            },
+        },
+    )
+
+    assert parsed.stop_reason == "max_output_tokens"
+    assert parsed.terminal_response is not None
+    assert parsed.terminal_response.content == "半截内容"
+
+
+def test_parse_raw_stream_event_does_not_build_terminal_for_openai_responses_failed() -> None:
+    parsed = parse_raw_stream_event(
+        "openai_responses",
+        event_name="response.failed",
+        payload={
+            "type": "response.failed",
+            "response": {"error": {"message": "boom"}},
+        },
+    )
+
+    assert parsed.terminal_response is None

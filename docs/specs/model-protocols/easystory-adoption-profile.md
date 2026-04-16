@@ -68,8 +68,10 @@ easyStory 当前连接真值对象使用这些字段：
 
 当前前端显式区分：
 
-- `验证连接`
-  - `text_probe`
+- `验证流式链路`
+  - `text_probe + transport_mode=stream`
+- `验证非流链路`
+  - `text_probe + transport_mode=buffered`
 - `验证流式工具`
   - `tool_continuation_probe + transport_mode=stream`
 - `验证非流工具`

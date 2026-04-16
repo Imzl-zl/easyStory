@@ -3,7 +3,9 @@ import test from "node:test";
 
 import type { CredentialView } from "@/lib/api/types";
 
-import { formatCredentialToolCapabilitySummary } from "./credential-center-display-support";
+import {
+  buildCredentialTransportCapabilityItem,
+} from "./credential-center-display-support";
 
 function createCredential(overrides: Partial<CredentialView> = {}): CredentialView {
   return {
@@ -36,40 +38,28 @@ function createCredential(overrides: Partial<CredentialView> = {}): CredentialVi
   };
 }
 
-test("formatCredentialToolCapabilitySummary reports explicit tool verification levels", () => {
-  assert.equal(
-    formatCredentialToolCapabilitySummary(
-      createCredential({ stream_tool_verified_probe_kind: "tool_continuation_probe" }),
-      "stream",
-    ),
-    "流式工具：已验证完整工具调用",
-  );
-  assert.equal(
-    formatCredentialToolCapabilitySummary(
-      createCredential({ buffered_tool_verified_probe_kind: "tool_call_probe" }),
-      "buffered",
-    ),
-    "非流工具：已验证工具调用，未验证结果续接",
-  );
-  assert.equal(
-    formatCredentialToolCapabilitySummary(
-      createCredential({ stream_tool_verified_probe_kind: "tool_definition_probe" }),
-      "stream",
-    ),
-    "流式工具：仅验证工具定义",
-  );
-  assert.equal(
-    formatCredentialToolCapabilitySummary(
+test("buildCredentialTransportCapabilityItem exposes user-facing detail and tone", () => {
+  assert.deepEqual(
+    buildCredentialTransportCapabilityItem(
       createCredential({ buffered_tool_verified_probe_kind: "text_probe" }),
       "buffered",
     ),
-    "非流工具：仅验证基础连接",
+    {
+      detail: "这条链路已经确认能稳定返回文本，工具能力还没验证。",
+      lastVerifiedAt: null,
+      summary: "基础连接可用",
+      title: "非流链路",
+      tone: "ready",
+    },
   );
-  assert.equal(
-    formatCredentialToolCapabilitySummary(
-      createCredential(),
-      "stream",
-    ),
-    "流式工具：未验证",
+  assert.deepEqual(
+    buildCredentialTransportCapabilityItem(createCredential(), "stream"),
+    {
+      detail: "还没执行这条链路的验证。",
+      lastVerifiedAt: null,
+      summary: "未验证",
+      title: "流式链路",
+      tone: "draft",
+    },
   );
 });

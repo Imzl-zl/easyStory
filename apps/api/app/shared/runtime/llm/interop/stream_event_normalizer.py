@@ -52,16 +52,12 @@ def parse_raw_stream_event(
             captures_reasoning_content=capabilities.captures_chat_reasoning_content,
         ),
         stop_reason=stop_reason,
-        terminal_response=(
-            None
-            if extract_stream_truncation_reason(stop_reason) is not None
-            else extract_stream_terminal_response(
-                dialect,
-                event_name,
-                payload,
-                interop_profile=interop_profile,
-                tool_name_aliases=tool_name_aliases,
-            )
+        terminal_response=extract_stream_terminal_response(
+            dialect,
+            event_name,
+            payload,
+            interop_profile=interop_profile,
+            tool_name_aliases=tool_name_aliases,
         ),
     )
 
@@ -248,7 +244,7 @@ def _extract_openai_responses_stop_reason(
     event_name: str | None,
     payload: dict[str, Any],
 ) -> str | None:
-    if event_name != "response.completed":
+    if event_name not in {"response.completed", "response.incomplete"}:
         return None
     incomplete_details = payload.get("incomplete_details")
     if isinstance(incomplete_details, dict):
@@ -270,7 +266,7 @@ def _extract_openai_responses_terminal_payload(
     event_name: str | None,
     payload: dict[str, Any],
 ) -> dict[str, Any] | None:
-    if event_name != "response.completed":
+    if event_name not in {"response.completed", "response.incomplete"}:
         return None
     response = payload.get("response")
     if isinstance(response, dict):

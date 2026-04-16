@@ -2,43 +2,32 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Protocol, TypedDict
+from typing import Any, TypedDict
 
 from ..errors import ConfigurationError
 from ..tool_provider import ToolProvider
-from .interop import provider_interop_stream_support as stream_support
+from .llm_backend import AsyncLLMGenerateBackend, resolve_backend_selection
 from .llm_interop_profiles import normalize_interop_profile
 from .llm_protocol import (
     GeminiThinkingLevel,
-    HttpJsonResponse,
     LLMConnection,
     LLMContinuationSupport,
     LLMFunctionToolDefinition,
     LLMGenerateRequest,
-    OpenAIReasoningEffort,
     NormalizedLLMResponse,
-    PreparedLLMHttpRequest,
+    OpenAIReasoningEffort,
     allows_provider_continuation_state,
     normalize_api_dialect,
     normalize_auth_strategy,
     normalize_runtime_kind,
-    parse_generation_response,
-    prepare_generation_request,
-    resolve_model_name,
     resolve_connection_continuation_support,
-    send_json_http_request,
+    resolve_model_name,
 )
-from .llm_response_validation import raise_if_empty_tool_response, raise_if_truncated_response
+from .llm_response_validation import raise_if_empty_tool_response
+from .litellm_backend import LiteLLMBackend
+from .native_http_backend import NativeHttpLLMBackend
 
 LLM_GENERATE_TOOL = "llm.generate"
-INCOMPLETE_STREAM_MESSAGE = (
-    "上游在输出尚未完成时提前停止了这次回复，当前只收到部分内容。"
-    "请关闭流式，或切换更稳定的连接后重试。"
-)
-
-
-class AsyncLlmRequestSender(Protocol):
-    async def __call__(self, request: PreparedLLMHttpRequest) -> HttpJsonResponse: ...
 
 
 @dataclass(frozen=True)
@@ -85,29 +74,24 @@ class LLMToolProvider(ToolProvider):
     def __init__(
         self,
         *,
-        request_sender: AsyncLlmRequestSender | None = None,
+        request_sender=None,
+        backend: AsyncLLMGenerateBackend | None = None,
+        native_backend: AsyncLLMGenerateBackend | None = None,
     ) -> None:
-        self.request_sender = request_sender or _default_request_sender
+        self.default_backend = backend
+        self.litellm_backend = backend or LiteLLMBackend()
+        self.native_backend = native_backend or NativeHttpLLMBackend(
+            request_sender=request_sender,
+        )
+        self._force_native_backend = request_sender is not None and backend is None
 
     async def execute(self, tool_name: str, params: dict[str, Any]) -> LLMGenerateToolResponse:
         if tool_name != LLM_GENERATE_TOOL:
             raise ConfigurationError(f"Unsupported tool: {tool_name}")
         request = _build_request(params)
-        prepared_request = prepare_generation_request(_to_generate_request(request))
-        response = await self.request_sender(prepared_request)
-        if response.status_code >= 400:
-            raise ConfigurationError(_build_http_error_message(response))
-        normalized = parse_generation_response(
-            request.connection.api_dialect,
-            response.json_body or {},
-            tool_name_aliases=prepared_request.tool_name_aliases,
-        )
-        raise_if_truncated_response(
-            api_dialect=request.connection.api_dialect,
-            payload=response.json_body or {},
-            response_format=request.response_format,
-            content=normalized.content,
-        )
+        generate_request = _to_generate_request(request)
+        backend = self._resolve_backend(generate_request)
+        normalized = await backend.generate(generate_request)
         raise_if_empty_tool_response(
             has_tools=bool(request.tools),
             content=normalized.content,
@@ -129,68 +113,27 @@ class LLMToolProvider(ToolProvider):
         if tool_name != LLM_GENERATE_TOOL:
             raise ConfigurationError(f"Unsupported tool: {tool_name}")
         request = _build_request(params)
-        api_dialect = request.connection.api_dialect
-        prepared_request = stream_support.build_stream_probe_request(
-            prepare_generation_request(_to_generate_request(request)),
-            api_dialect=api_dialect,
-        )
-        parts: list[str] = []
-        raw_event_tuples: list[tuple[str | None, dict[str, Any]]] = []
-        truncation_reason: str | None = None
-        saw_terminal_event = False
-        terminal_response = None
-        async for event in stream_support.iterate_stream_request(
-            prepared_request,
-            api_dialect=api_dialect,
+        generate_request = _to_generate_request(request)
+        backend = self._resolve_backend(generate_request)
+        terminal_response: NormalizedLLMResponse | None = None
+        async for event in backend.generate_stream(
+            generate_request,
             should_stop=should_stop,
         ):
-            raw_event_tuples.append((event.event_name, event.payload))
-            if truncation_reason is None:
-                truncation_reason = stream_support.extract_stream_truncation_reason(event.stop_reason)
-            if not saw_terminal_event:
-                saw_terminal_event = _is_terminal_stream_event(
-                    api_dialect=api_dialect,
-                    event=event,
-                )
+            if event.delta:
+                yield LLMStreamEvent(delta=event.delta)
             if event.terminal_response is not None:
                 terminal_response = event.terminal_response
-            if not event.delta:
-                continue
-            parts.append(event.delta)
-            yield LLMStreamEvent(delta=event.delta)
-        synthesized_terminal = stream_support.synthesize_stream_terminal_response(
-            api_dialect,
-            raw_events=raw_event_tuples,
-            tool_name_aliases=prepared_request.tool_name_aliases,
-        )
-        if synthesized_terminal is not None:
-            terminal_response = synthesized_terminal
-        normalized = stream_support.build_stream_completion(
-            api_dialect=api_dialect,
-            text_parts=parts,
-            terminal_response=terminal_response,
-        )
-        if normalized is None:
-            raise_if_empty_tool_response(
-                has_tools=bool(request.tools),
-                content="",
-                tool_calls=[],
-            )
-            raise ConfigurationError("模型没有返回可展示的内容，请稍后重试。")
-        if truncation_reason is not None:
-            raise ConfigurationError(
-                stream_support.build_truncated_stream_message(truncation_reason)
-            )
+        if terminal_response is None:
+            raise ConfigurationError("Streaming backend completed without terminal response")
         raise_if_empty_tool_response(
             has_tools=bool(request.tools),
-            content=normalized.content,
-            tool_calls=normalized.tool_calls,
+            content=terminal_response.content,
+            tool_calls=terminal_response.tool_calls,
         )
-        if not saw_terminal_event:
-            raise ConfigurationError(INCOMPLETE_STREAM_MESSAGE)
         yield LLMStreamEvent(
             response=_build_generate_tool_response(
-                normalized=normalized,
+                normalized=terminal_response,
                 model_name=request.model_name,
                 provider=request.provider,
             )
@@ -198,6 +141,16 @@ class LLMToolProvider(ToolProvider):
 
     def list_tools(self) -> list[str]:
         return [LLM_GENERATE_TOOL]
+
+    def _resolve_backend(self, request: LLMGenerateRequest) -> AsyncLLMGenerateBackend:
+        if self.default_backend is not None:
+            return self.default_backend
+        if self._force_native_backend:
+            return self.native_backend
+        selection = resolve_backend_selection(request)
+        if selection.backend_key == "native_http":
+            return self.native_backend
+        return self.litellm_backend
 
 
 def _build_request(params: dict[str, Any]) -> LLMRequest:
@@ -303,35 +256,6 @@ def _resolve_provider_continuation_state(
     if not allows_provider_continuation_state(continuation_support):
         return None
     return normalized_state
-
-
-def _build_http_error_message(response: HttpJsonResponse) -> str:
-    if response.json_body is not None:
-        error = response.json_body.get("error")
-        if isinstance(error, dict) and isinstance(error.get("message"), str):
-            return f"LLM request failed: HTTP {response.status_code} - {error['message']}"
-        if isinstance(error, str):
-            return f"LLM request failed: HTTP {response.status_code} - {error}"
-    suffix = response.text.strip()
-    if suffix:
-        return f"LLM request failed: HTTP {response.status_code} - {suffix}"
-    return f"LLM request failed: HTTP {response.status_code}"
-
-
-def _is_terminal_stream_event(
-    *,
-    api_dialect: str,
-    event: stream_support.ParsedStreamEvent,
-) -> bool:
-    if api_dialect == "openai_chat_completions":
-        return event.stop_reason is not None
-    if api_dialect == "openai_responses":
-        return event.event_name == "response.completed"
-    if api_dialect == "anthropic_messages":
-        return event.event_name == "message_stop" or event.stop_reason is not None
-    if api_dialect == "gemini_generate_content":
-        return event.stop_reason is not None
-    raise ConfigurationError(f"Unsupported api_dialect for stream terminal detection: {api_dialect}")
 
 
 def _build_connection(credential: dict[str, Any]) -> LLMConnection:
@@ -497,7 +421,3 @@ def _optional_string_mapping(value: Any) -> dict[str, str] | None:
         mapped_value = _require_non_empty_string(raw_value, f"string_mapping[{key}]")
         normalized[key] = mapped_value
     return normalized or None
-
-
-async def _default_request_sender(request: PreparedLLMHttpRequest) -> HttpJsonResponse:
-    return await send_json_http_request(request)

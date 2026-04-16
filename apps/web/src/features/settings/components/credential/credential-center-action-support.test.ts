@@ -11,7 +11,7 @@ import {
 test("resolvePendingCredentialAction returns current action only while mutation is pending", () => {
   const pendingAction: PendingCredentialAction = {
     credentialId: "credential-1",
-    type: "verify_connection",
+    type: "verify_stream_connection",
   };
 
   assert.equal(resolvePendingCredentialAction(false, pendingAction), null);
@@ -30,12 +30,10 @@ test("isPendingCredentialAction matches current row and action type", () => {
   assert.equal(isPendingCredentialAction(pendingAction, "disable", "credential-2"), false);
 });
 
-test("resolveCredentialActionButtonLabel returns explicit pending labels", () => {
-  assert.equal(resolveCredentialActionButtonLabel("verify_connection", false), "验证连接");
-  assert.equal(resolveCredentialActionButtonLabel("verify_connection", true), "验证中...");
-  assert.equal(resolveCredentialActionButtonLabel("verify_stream_connection", false), "验证流式连接");
+test("resolveCredentialActionButtonLabel returns compact user-facing labels", () => {
+  assert.equal(resolveCredentialActionButtonLabel("verify_stream_connection", false), "验证流式链路");
   assert.equal(resolveCredentialActionButtonLabel("verify_stream_connection", true), "验证中...");
-  assert.equal(resolveCredentialActionButtonLabel("verify_buffered_connection", false), "验证非流连接");
+  assert.equal(resolveCredentialActionButtonLabel("verify_buffered_connection", false), "验证非流链路");
   assert.equal(resolveCredentialActionButtonLabel("verify_buffered_connection", true), "验证中...");
   assert.equal(resolveCredentialActionButtonLabel("verify_stream_tools", false), "验证流式工具");
   assert.equal(resolveCredentialActionButtonLabel("verify_stream_tools", true), "验证中...");

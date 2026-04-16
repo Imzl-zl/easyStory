@@ -207,9 +207,6 @@ export function CredentialCenter({
       type,
       credentialId,
     }: PendingCredentialAction) => {
-      if (type === "verify_connection") {
-        return verifyCredential(credentialId, "text_probe");
-      }
       if (type === "verify_stream_connection") {
         return verifyCredential(credentialId, "text_probe", "stream");
       }
@@ -364,14 +361,11 @@ export function CredentialCenter({
 }
 
 function resolveCredentialNoticeTitle(type: PendingCredentialAction["type"]) {
-  if (type === "verify_connection") {
-    return "模型连接验证";
-  }
   if (type === "verify_stream_connection") {
-    return "流式连接验证";
+    return "流式链路验证";
   }
   if (type === "verify_buffered_connection") {
-    return "非流连接验证";
+    return "非流链路验证";
   }
   if (type === "verify_stream_tools") {
     return "流式工具验证";

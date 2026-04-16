@@ -7,11 +7,11 @@ import pytest
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm.interop.provider_interop_support import (
     ProviderInteropOverride,
-    build_provider_interop_probe_request,
     enforce_provider_interop_rate_limit,
     load_provider_interop_profiles,
     resolve_provider_interop_profile,
 )
+from app.shared.runtime.llm.interop.provider_tool_conformance_support import build_text_probe_request
 
 
 def test_load_provider_interop_profiles_reads_local_json(tmp_path) -> None:
@@ -115,12 +115,13 @@ def test_resolve_provider_interop_profile_applies_override_and_env(tmp_path) -> 
         "X-Trace-Id": "probe-001",
     }
 
-    request = build_provider_interop_probe_request(resolved)
+    request = build_text_probe_request(resolved.connection, model_name=resolved.model_name)
 
-    assert request.json_body["model"] == "claude-haiku-override"
+    assert request.model_name == "claude-haiku-override"
+    assert request.connection.base_url == "https://proxy.example.com/v1/messages"
 
 
-def test_build_provider_interop_probe_request_supports_custom_prompt(tmp_path) -> None:
+def test_build_text_probe_request_supports_custom_prompt(tmp_path) -> None:
     config_path = tmp_path / "provider-interop.local.json"
     env_path = tmp_path / ".env.provider-interop.local"
     config_path.write_text(
@@ -148,20 +149,17 @@ def test_build_provider_interop_probe_request_supports_custom_prompt(tmp_path) -
         env_path=env_path,
     )
 
-    request = build_provider_interop_probe_request(
-        resolved,
+    request = build_text_probe_request(
+        resolved.connection,
+        model_name=resolved.model_name,
         prompt="今天有什么新闻",
         system_prompt="请直接回答用户问题。",
     )
 
-    assert request.json_body["model"] == "gpt-5.2-codex"
-    assert request.json_body["input"] == [
-        {
-            "role": "user",
-            "content": [{"type": "input_text", "text": "今天有什么新闻"}],
-        }
-    ]
-    assert request.json_body["instructions"] == "请直接回答用户问题。"
+    assert request.model_name == "gpt-5.2-codex"
+    assert request.prompt == "今天有什么新闻"
+    assert request.system_prompt == "请直接回答用户问题。"
+    assert request.response_format == "text"
 
 
 def test_resolve_provider_interop_profile_preserves_interop_profile_into_request(tmp_path) -> None:
@@ -193,16 +191,17 @@ def test_resolve_provider_interop_profile_preserves_interop_profile_into_request
         env_path=env_path,
     )
 
-    request = build_provider_interop_probe_request(
-        resolved,
+    request = build_text_probe_request(
+        resolved.connection,
+        model_name=resolved.model_name,
         prompt="今天有什么新闻",
     )
 
     assert resolved.connection.interop_profile == "responses_strict"
-    assert request.interop_profile == "responses_strict"
+    assert request.connection.interop_profile == "responses_strict"
 
 
-def test_build_provider_interop_probe_request_keeps_gemini_shape_aligned_with_runtime(tmp_path) -> None:
+def test_build_text_probe_request_keeps_gemini_shape_aligned_with_runtime(tmp_path) -> None:
     config_path = tmp_path / "provider-interop.local.json"
     env_path = tmp_path / ".env.provider-interop.local"
     config_path.write_text(
@@ -230,18 +229,20 @@ def test_build_provider_interop_probe_request_keeps_gemini_shape_aligned_with_ru
         env_path=env_path,
     )
 
-    request = build_provider_interop_probe_request(
-        resolved,
+    default_request = build_text_probe_request(resolved.connection, model_name=resolved.model_name)
+    custom_request = build_text_probe_request(
+        resolved.connection,
+        model_name=resolved.model_name,
         prompt="今天有什么新闻",
         system_prompt="请直接回答用户问题。",
     )
 
-    assert request.json_body["generationConfig"] == {
-        "temperature": 0.0,
-        "maxOutputTokens": 256,
-        "topP": 1.0,
-    }
-    assert "thinkingConfig" not in request.json_body["generationConfig"]
+    assert default_request.connection.api_dialect == "gemini_generate_content"
+    assert default_request.max_tokens == 256
+    assert default_request.temperature == 0.0
+    assert default_request.top_p == 1.0
+    assert default_request.thinking_budget is None
+    assert custom_request.thinking_budget is None
 
 
 def test_resolve_provider_interop_profile_requires_custom_header_name(tmp_path) -> None:

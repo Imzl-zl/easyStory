@@ -10,16 +10,16 @@ def build_stream_completion(
     text_parts: list[str],
     terminal_response: NormalizedLLMResponse | None,
 ) -> NormalizedLLMResponse | None:
-    delta_content = "".join(text_parts).strip()
+    delta_content = "".join(text_parts)
     if terminal_response is None:
         return _build_delta_only_completion(delta_content)
-    terminal_content = terminal_response.content.strip()
+    terminal_content = terminal_response.content
     content = _resolve_stream_content(
         api_dialect=api_dialect,
         delta_content=delta_content,
         terminal_content=terminal_content,
     )
-    if not content and not terminal_response.tool_calls:
+    if content == "" and not terminal_response.tool_calls:
         return None
     return NormalizedLLMResponse(
         content=content,
@@ -34,7 +34,7 @@ def build_stream_completion(
 
 
 def _build_delta_only_completion(delta_content: str) -> NormalizedLLMResponse | None:
-    if not delta_content:
+    if delta_content == "":
         return None
     return NormalizedLLMResponse(
         content=delta_content,
@@ -51,7 +51,7 @@ def _resolve_stream_content(
     delta_content: str,
     terminal_content: str,
 ) -> str:
-    if not delta_content:
+    if delta_content == "":
         return terminal_content
     if not terminal_content:
         return delta_content

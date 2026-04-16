@@ -6,7 +6,7 @@ from .llm_interop_profiles import (
     resolve_default_interop_profile,
     resolve_interop_capabilities,
 )
-from .llm_protocol_requests import build_verification_request, prepare_generation_request
+from .llm_protocol_requests import prepare_generation_request
 from .llm_protocol_responses import parse_generation_response
 from .llm_protocol_types import (
     ANTHROPIC_VERSION,
@@ -90,7 +90,6 @@ __all__ = [
     "VERIFY_SYSTEM_PROMPT",
     "VERIFY_USER_PROMPT",
     "allows_provider_continuation_state",
-    "build_verification_request",
     "normalize_api_dialect",
     "normalize_auth_strategy",
     "normalize_http_header_name",

@@ -6,6 +6,14 @@ import type {
   CredentialView,
 } from "@/lib/api/types";
 
+export type CredentialTransportCapabilityItem = {
+  detail: string;
+  lastVerifiedAt: string | null;
+  summary: string;
+  title: string;
+  tone: "completed" | "draft" | "ready" | "warning";
+};
+
 export function formatAuditTime(value: string) {
   return formatObservabilityDateTime(value);
 }
@@ -19,20 +27,23 @@ export function formatCredentialTokenSummary(credential: CredentialView) {
   return `上下文窗口：${contextWindow ?? "未填写"} · 回复上限：${maxOutput ?? "未填写"}`;
 }
 
-export function formatCredentialToolCapabilitySummary(
+export function buildCredentialTransportCapabilityItem(
   credential: CredentialView,
   transportMode: CredentialVerifyTransportMode,
-) {
-  const modeLabel = transportMode === "buffered" ? "非流工具" : "流式工具";
+): CredentialTransportCapabilityItem {
+  const title = transportMode === "buffered" ? "非流链路" : "流式链路";
   const verifiedProbeKind = resolveToolVerifiedProbeKind(credential, transportMode);
   const lastVerifiedAt = transportMode === "buffered"
     ? credential.buffered_tool_last_verified_at
     : credential.stream_tool_last_verified_at;
-  const summary = resolveToolCapabilityLabel(verifiedProbeKind);
-  if (!lastVerifiedAt) {
-    return `${modeLabel}：${summary}`;
-  }
-  return `${modeLabel}：${summary} · 最近验证：${formatAuditTime(lastVerifiedAt)}`;
+  const descriptor = resolveToolCapabilityDescriptor(verifiedProbeKind);
+  return {
+    detail: descriptor.detail,
+    lastVerifiedAt,
+    summary: descriptor.summary,
+    title,
+    tone: descriptor.tone,
+  };
 }
 
 function resolveToolVerifiedProbeKind(
@@ -45,20 +56,42 @@ function resolveToolVerifiedProbeKind(
   return credential.stream_tool_verified_probe_kind;
 }
 
-function resolveToolCapabilityLabel(
+type CredentialCapabilityDescriptor = Pick<CredentialTransportCapabilityItem, "detail" | "summary" | "tone">;
+
+function resolveToolCapabilityDescriptor(
   verifiedProbeKind: CredentialVerifyProbeKind | null | undefined,
-) {
+): CredentialCapabilityDescriptor {
   if (verifiedProbeKind === "tool_continuation_probe") {
-    return "已验证完整工具调用";
+    return {
+      detail: "这条链路已经通过完整工具续接验证，可直接承接项目工具。",
+      summary: "工具链已就绪",
+      tone: "completed",
+    };
   }
   if (verifiedProbeKind === "tool_call_probe") {
-    return "已验证工具调用，未验证结果续接";
+    return {
+      detail: "模型已经能发起工具调用，最后一步还没验证工具结果续接。",
+      summary: "工具调用已通",
+      tone: "warning",
+    };
   }
   if (verifiedProbeKind === "tool_definition_probe") {
-    return "仅验证工具定义";
+    return {
+      detail: "模型接受工具定义，但还没确认它会按约定调用工具。",
+      summary: "工具定义已通",
+      tone: "ready",
+    };
   }
   if (verifiedProbeKind === "text_probe") {
-    return "仅验证基础连接";
+    return {
+      detail: "这条链路已经确认能稳定返回文本，工具能力还没验证。",
+      summary: "基础连接可用",
+      tone: "ready",
+    };
   }
-  return "未验证";
+  return {
+    detail: "还没执行这条链路的验证。",
+    summary: "未验证",
+    tone: "draft",
+  };
 }

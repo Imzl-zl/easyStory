@@ -66,7 +66,7 @@ export function LobbySettingsSidebar({
       <div className="panel-muted space-y-2 px-4 py-4 text-sm leading-6 text-text-secondary">
         <p className="text-[11px] font-semibold tracking-[0.16em] text-text-tertiary uppercase">作用域</p>
         <p>这里只管理你自己的默认设置。</p>
-        <p>项目专属规则请前往"项目设置"。</p>
+        <p>项目专属规则请前往“项目设置”。</p>
       </div>
     </aside>
   );

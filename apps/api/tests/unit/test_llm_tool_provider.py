@@ -8,6 +8,7 @@ import pytest
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm.llm_protocol import HttpJsonResponse
 from app.shared.runtime.llm.llm_tool_provider import LLMStreamEvent, LLMToolProvider
+from app.shared.runtime.llm.native_http_backend import NativeHttpLLMBackend
 
 
 def _build_runtime_replay_continuation_items() -> list[dict[str, object]]:
@@ -209,7 +210,7 @@ def test_execute_falls_back_to_credential_default_max_output_tokens() -> None:
 
 
 def test_execute_rejects_invalid_provider_native_reasoning_for_runtime_request() -> None:
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     with pytest.raises(
         ConfigurationError,
@@ -1042,7 +1043,7 @@ def test_execute_reports_gemini_finish_reason_when_response_has_no_parts() -> No
 
 
 def test_execute_rejects_missing_model_name_and_default_model() -> None:
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     with pytest.raises(ConfigurationError, match="missing executable model name"):
         asyncio.run(
@@ -1105,7 +1106,7 @@ def test_execute_stream_yields_chunks_and_completed_result(monkeypatch) -> None:
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -1188,7 +1189,7 @@ def test_execute_stream_uses_openai_completed_payload_when_no_deltas(monkeypatch
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -1274,7 +1275,7 @@ def test_execute_stream_accepts_openai_completed_payload_with_tool_calls_and_no_
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -1381,7 +1382,7 @@ def test_execute_stream_accepts_openai_completed_payload_with_empty_output_and_d
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -1463,7 +1464,7 @@ def test_execute_stream_recovers_openai_responses_tool_calls_from_output_item_ev
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -1578,7 +1579,7 @@ def test_execute_stream_recovers_openai_responses_tool_calls_from_argument_event
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -1677,7 +1678,7 @@ def test_execute_stream_deduplicates_openai_responses_tool_calls_across_call_id_
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -1780,7 +1781,7 @@ def test_execute_stream_preserves_openai_responses_output_order_for_multiple_mis
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -1874,7 +1875,7 @@ def test_execute_stream_recovers_openai_chat_tool_calls_from_delta_events(monkey
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -1977,7 +1978,7 @@ def test_execute_stream_rejects_openai_empty_output_with_strict_interop_profile(
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -2040,7 +2041,7 @@ def test_execute_stream_rejects_empty_tool_response_when_tools_enabled(monkeypat
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -2115,7 +2116,7 @@ def test_execute_stream_rejects_openai_terminal_content_conflict(monkeypatch) ->
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -2177,7 +2178,7 @@ def test_execute_stream_accepts_gemini_terminal_payload_with_tool_calls_and_no_t
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_events():
         return [
@@ -2266,7 +2267,7 @@ def test_execute_stream_raises_when_upstream_reports_truncation(monkeypatch) -> 
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
     monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
-    provider = LLMToolProvider()
+    provider = LLMToolProvider(backend=NativeHttpLLMBackend())
 
     async def collect_parts():
         parts: list[str] = []

@@ -15,7 +15,6 @@ import {
   resolveAssistantReasoningControl,
 } from "@/features/shared/assistant/assistant-reasoning-support";
 
-import { prefersBufferedOutput } from "@/features/shared/assistant/assistant-credential-support";
 import { ChatCapabilitiesPanel } from "@/features/lobby/components/incubator/incubator-chat-capabilities-panel";
 import {
   CredentialSettingsEmptyState,
@@ -309,11 +308,6 @@ function AdvancedSettingsForm({
                 : `留空时不显式覆写单次回复上限；当前连接声明的默认上限为 ${helperMaxOutputTokens}。`}
             </p>
           </div>
-          {prefersBufferedOutput(currentOption) ? (
-            <span className="rounded-full bg-accent-info-soft px-2.5 py-1 text-[10.5px] text-accent-info">
-              当前连接更适合生成后整体显示
-            </span>
-          ) : null}
         </div>
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)]">
           <TextSettingField

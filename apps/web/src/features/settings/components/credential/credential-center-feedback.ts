@@ -12,39 +12,34 @@ const VERIFY_SUBJECT_PATTERN = /^无法验证\s+(.+?)\s+凭证:\s*/;
 const TOOL_CALL_PROBE_ZERO_CALLS_MARKER = "Tool call probe expected exactly one tool call, got 0";
 const TOOL_CALL_PROBE_RESPONSE_ID_MARKER = "requires provider_response_id";
 const TOOL_CONTINUATION_EMPTY_MARKER = "Tool continuation probe returned empty final content";
+const TOOL_CONTINUATION_EQUAL_MARKER = "Tool continuation probe final content must equal";
 const TOOL_CONTINUATION_FOLLOWUP_MARKER = "Tool continuation probe final content must mention";
 
 export function resolveCredentialActionFeedback(
   result: CredentialVerifyResult | CredentialView | void,
   type: CredentialCenterActionType,
 ): CredentialCenterFeedback {
-  if (type === "verify_connection" && result && "message" in result) {
-    return {
-      message: "模型连接验证成功。",
-      tone: "info",
-    };
-  }
   if (type === "verify_stream_connection" && result && "message" in result) {
     return {
-      message: "流式连接验证成功。",
+      message: "流式链路验证成功。",
       tone: "info",
     };
   }
   if (type === "verify_buffered_connection" && result && "message" in result) {
     return {
-      message: "非流连接验证成功。",
+      message: "非流链路验证成功。",
       tone: "info",
     };
   }
   if (type === "verify_stream_tools" && result && "message" in result) {
     return {
-      message: "流式工具调用验证成功。",
+      message: "流式工具验证成功。",
       tone: "info",
     };
   }
   if (type === "verify_buffered_tools" && result && "message" in result) {
     return {
-      message: "非流工具调用验证成功。",
+      message: "非流工具验证成功。",
       tone: "info",
     };
   }
@@ -72,7 +67,7 @@ export function resolveCredentialActionErrorFeedback(
 
 export function normalizeCredentialActionErrorMessage(
   message: string,
-  actionType: CredentialCenterActionType = "verify_connection",
+  actionType: CredentialCenterActionType = "verify_stream_connection",
 ) {
   const trimmed = message.trim();
   if (!trimmed) {
@@ -85,10 +80,10 @@ export function normalizeCredentialActionErrorMessage(
     return normalizeToolVerificationErrorMessage(trimmed, "非流工具");
   }
   if (actionType === "verify_stream_connection") {
-    return normalizeConnectionVerificationErrorMessage(trimmed, "流式连接");
+    return normalizeConnectionVerificationErrorMessage(trimmed, "流式链路");
   }
   if (actionType === "verify_buffered_connection") {
-    return normalizeConnectionVerificationErrorMessage(trimmed, "非流连接");
+    return normalizeConnectionVerificationErrorMessage(trimmed, "非流链路");
   }
   const subject = resolveVerifySubject(trimmed);
   if (trimmed.includes(VERIFY_EMPTY_CONTENT_MARKER)) {
@@ -109,15 +104,17 @@ function resolveVerifySubject(message: string) {
 
 function normalizeConnectionVerificationErrorMessage(
   message: string,
-  connectionLabel: "流式连接" | "非流连接",
+  connectionLabel: "流式链路" | "非流链路",
 ) {
   const subject = resolveVerifySubject(message);
+  const legacyLabel = connectionLabel === "流式链路" ? "流式连接" : "非流连接";
   if (message.includes(VERIFY_EMPTY_CONTENT_MARKER)) {
     return `${subject}${connectionLabel}验证失败：测试消息没有拿到可用回复。请检查默认模型、接口类型或上游兼容设置。`;
   }
   return message
     .replace(VERIFY_SUBJECT_PATTERN, `${subject}${connectionLabel}验证失败：`)
     .replace(`${connectionLabel}验证失败：${connectionLabel}验证失败：`, `${connectionLabel}验证失败：`)
+    .replace(`${connectionLabel}验证失败：${legacyLabel}验证失败：`, `${connectionLabel}验证失败：`)
     .replaceAll("凭证", "连接");
 }
 
@@ -135,6 +132,7 @@ function normalizeToolVerificationErrorMessage(
   if (
     message.includes(TOOL_CONTINUATION_EMPTY_MARKER)
     || message.includes(TOOL_CONTINUATION_FOLLOWUP_MARKER)
+    || message.includes(TOOL_CONTINUATION_EQUAL_MARKER)
   ) {
     return `${subject}${toolLabel}调用验证失败：模型没有完成工具结果续接。请检查上游的 tool continuation 兼容性。`;
   }

@@ -28,14 +28,10 @@ from .llm_protocol_types import (
     LLMConnection,
     LLMGenerateRequest,
     PreparedLLMHttpRequest,
-    VERIFY_MAX_TOKENS,
-    VERIFY_SYSTEM_PROMPT,
-    VERIFY_USER_PROMPT,
     normalize_api_dialect,
     resolve_anthropic_default_max_tokens,
     resolve_api_key_header_name,
     resolve_auth_strategy,
-    resolve_model_name,
 )
 
 USER_AGENT_HEADER_NAME = "User-Agent"
@@ -90,34 +86,6 @@ def prepare_generation_request(request: LLMGenerateRequest) -> PreparedLLMHttpRe
             tool_name_aliases=tool_name_aliases,
         )
     raise ConfigurationError(f"Unsupported api_dialect for request preparation: {dialect}")
-
-
-def build_verification_request(connection: LLMConnection) -> PreparedLLMHttpRequest:
-    model_name = resolve_model_name(
-        requested_model_name=None,
-        default_model=connection.default_model,
-        provider_label="credential verification",
-    )
-    api_dialect = normalize_api_dialect(connection.api_dialect)
-    request = prepare_generation_request(
-        LLMGenerateRequest(
-            connection=connection,
-            model_name=model_name,
-            prompt=VERIFY_USER_PROMPT,
-            system_prompt=VERIFY_SYSTEM_PROMPT,
-            response_format="text",
-            temperature=0.0,
-            max_tokens=VERIFY_MAX_TOKENS,
-            top_p=1.0,
-            thinking_budget=0 if api_dialect == "gemini_generate_content" else None,
-        )
-    )
-    # Gemini native endpoints can spend a large share of the verification budget
-    # on hidden thinking and then terminate with MAX_TOKENS before returning a
-    # stable baseline answer. Connection verification is intended to prove that
-    # the endpoint can return ordinary text replies, so Gemini probes opt out of
-    # native thinking explicitly while preserving the normal request shape.
-    return request
 
 
 def _build_openai_chat_request(

@@ -82,14 +82,15 @@
 - 新实现优先补服务和测试，再接路由；保持 API 只做装配，不直接写业务规则。
 - 所有业务模块公开面已收敛为 async-only：统一 `Service + create_*_service` 命名，不保留 `Async*` 镜像类或 `create_async_*` 第二导出面。内部若只剩 async 一套实现，把 `*_async` 名称改回业务语义名。
 - LLM 供应商兼容层当前最佳实践入口：`api_dialect` 只决定协议格式与解析；鉴权方式由 `auth_strategy` / `api_key_header_name` 显式 override，不再硬绑在 dialect 上。
+- LLM southbound transport 当前默认走 `apps/api/app/shared/runtime/llm/litellm_backend.py`；`custom_header` 鉴权、完整 endpoint `base_url`、`openai_responses + stop`，以及 Gemini 原生 `thinking_level` / 非零 `thinking_budget` 显式走 `native_http_backend.py`，不要再把 provider HTTP 细节写回 `LLMToolProvider` 或 verifier 业务层。
 - Credential Center 当前正式支持的高级连接字段：`interop_profile`、`auth_strategy`、`api_key_header_name`、`extra_headers`、`user_agent_override`、`client_name`、`client_version`、`runtime_kind`；这些字段同时作用于保存、验证和运行时请求，其中 `interop_profile` 用于显式表达协议兼容 override，不单独下沉到 assistant 业务层。
-- Credential Center 当前已显式区分 `验证连接`、`验证流式工具`、`验证非流工具`；后端统一入口仍是 `POST /api/v1/credentials/{id}/verify?probe_kind=...&transport_mode=...`，不要再额外造一套产品级 probe API。
+- Credential Center 设置页当前主入口已显式区分 `验证流式链路`、`验证非流链路`、`验证流式工具`、`验证非流工具`；后端统一入口仍是 `POST /api/v1/credentials/{id}/verify?probe_kind=...&transport_mode=...`，底层仍保留不带 `transport_mode` 的 `text_probe`。
 - `model_credentials` 当前的工具能力真值已按传输模式拆开：`stream_tool_verified_probe_kind + stream_tool_last_verified_at` 只代表流式工具链，`buffered_tool_verified_probe_kind + buffered_tool_last_verified_at` 只代表非流工具链；`last_verified_at` 只代表基础连接验证时间，不再承载工具能力语义。
 - 工具能力 promote / failure invalidation 现在都按模式独立进行：流式 probe 只影响 `stream_tool_*`，非流 probe 只影响 `buffered_tool_*`；较低等级 probe 不能覆盖同模式下已证明的更高能力，失败也只清同模式里同级或更高的工具能力真值。
 - provider conformance probe 当前正式契约：`tool_definition_probe` 只接受精确 success token；`tool_continuation_probe` 的最终回答必须携带只存在于 tool result 中的动态 echoed 值，follow-up prompt 不能直接泄漏期望答案。
 - shared runtime 现在把“启用 tools 后上游返回空 assistant 响应（无文本、无 tool_calls）”统一视为明确协议错误，而不是普通中断；`LLMToolProvider` 主链和 credential verifier 的 stream probe 都会抛同一条 `空工具响应` 错误语义。
 - 2026-04-08 本地实测：`ice(openai_chat_completions/gpt-5.4)` 与 `bwen(openai_responses/gpt-5.4)` 当前真实 tool probe 都失败，失败形态都是“启用工具时返回空响应”；其中 `ice` 的旧 `tool_continuation_probe` 真值已清掉，`bwen` 仍只保留 `text_probe`。不要把旧的成功验证结果继续当成当前工具能力真值。
-- Gemini tool continuation / conformance probe 当前稳定口径：runtime replay 仍以“当前 prompt 在前、tool_call/tool_result replay 在后”为时序；Gemini 2.5 probe 必须显式 `thinkingBudget: 0`，且任何 probe request 调整都必须保留 `PreparedLLMHttpRequest.tool_name_aliases`，否则流式 tool call 会停留在 external alias，无法还原回 canonical dotted name。
+- Gemini tool continuation / conformance probe 当前稳定口径：runtime replay 仍以“当前 prompt 在前、tool_call/tool_result replay 在后”为时序；Gemini text/tool probe 默认不再注入 `thinkingBudget: 0`，且任何 probe request 调整都必须保留 `tool_name_aliases`，否则流式 tool call 会停留在 external alias，无法还原回 canonical dotted name。
 - assistant 当前正式门控口径：只要本轮存在 visible `project.*` 工具，就按 `payload.stream` 选择门控目标；`stream=true` 要求 `stream_tool_verified_probe_kind >= tool_continuation_probe`，`stream=false` 要求 `buffered_tool_verified_probe_kind >= tool_continuation_probe`；能力不足直接显式报错，不静默隐藏工具，也不自动切换传输模式。
 - 当前共享 tool schema 编译口径：外部协议默认先走 `portable_subset`，把 required-only `anyOf` 收口为描述性约束；Gemini 再叠加 `gemini_compatible`，继续移除不支持的 schema key。不要再把 schema sanitize 内联回具体 request builder。
 - 当前共享 continuation 编码口径：runtime replay 文本投影、OpenAI Chat / Claude / Gemini continuation projection，以及 OpenAI Responses `function_call_output` 构造，统一走 `tool_continuation_codec.py`；不要再把 continuation helper 堆回 `llm_protocol_requests.py`。
@@ -98,7 +99,7 @@
 - 客户端预设只是帮你把一条常见 `User-Agent` 模板写入 `user_agent_override`；运行时若存在 `user_agent_override` 会优先发送它，不会再拼接下面的应用名/版本/运行环境。
 - provider interop 本地 probe 若使用 `--model` 覆写，最终请求体中的探测模型也必须同步覆写，不能只改展示值。
 - Anthropic Messages 请求当前默认把 `system_prompt` 编码为 text block 数组，而不是裸字符串；官方两种都允许，但兼容代理对数组更稳。
-- Gemini probe 对简单连通性验证应显式压低思考配置；否则某些 `gemini-flash-latest` 代理会落到带默认 thinking 的 Gemini 3 变体，直接把 probe token 吃在内部思考上，表面看是“返回半句”，实际是上游 `finishReason=MAX_TOKENS`。
+- Gemini text probe 当前统一口径是 buffered + 不显式注入 `thinkingBudget: 0`；若后续某个代理需要单独压低 thinking，只能作为显式 profile/contract 处理，不能再把验证链和运行链做出静默差异。
 - assistant / provider interop 当前正式流式口径：`AssistantTurnRequestDTO.stream` 默认 `true`；前端若明确走 JSON 路径，必须显式发送 `stream=false`，不能依赖后端默认值。
 - `ProjectSetting` 当前仍是运行时上下文投影输入之一：字段缺口只产生 `warning`，不会阻塞继续生成；但摘要一旦保存为新值，已确认的大纲 / 开篇设计 / 章节任务 / 正文仍需按 impact 标记为 stale，不能静默混用旧产物。
 - `Studio` 当前已补齐项目文稿文件读写：`GET/PUT /api/v1/projects/{project_id}/documents?path=...`，文件默认落在 `apps/api/.runtime/project-documents/projects/<project_id>/documents/`；文件层现在支持 `.md + .json`，并采用“一次性默认模板 + 用户可编辑工作台”模式：默认会在新建项目时生成 `项目说明`、设定细分文稿、`数据层/*.json`、章节规划、时间轴、附录、校验、导出等模板文件/目录，其中 `项目说明.md` 会按当前 `ProjectSetting` 生成初稿，其余模板项默认空白，后续都允许用户重命名、删除和扩展；正式 `大纲 / 开篇设计 / 正文章节` 继续走 `contents + content_versions` 真值链，不写入项目文件目录。`正文` 现在允许创建卷目录和章节路径占位文件；章节正文仍只通过 content 保存链更新。文稿模板只在项目创建时显式写入；读文稿/读树接口不再做隐式补模板或迁移。

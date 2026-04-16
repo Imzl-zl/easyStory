@@ -7,6 +7,7 @@ from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     PROBE_TOOL_NAME,
     TOOL_DEFINITION_PROBE_SUCCESS_TEXT,
     build_conformance_probe_request,
+    build_text_probe_request,
     build_tool_continuation_probe_followup_request,
     conformance_probe_kind_satisfies,
     normalize_conformance_probe_kind,
@@ -17,10 +18,7 @@ from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     validate_tool_continuation_probe_response,
     validate_tool_definition_probe_response,
 )
-from app.shared.runtime.llm.llm_protocol import (
-    LLMConnection,
-    NormalizedLLMResponse,
-)
+from app.shared.runtime.llm.llm_protocol import LLMConnection, NormalizedLLMResponse, prepare_generation_request
 from app.shared.runtime.llm.llm_protocol_types import NormalizedLLMToolCall
 
 
@@ -74,6 +72,47 @@ def test_promote_conformance_probe_kind_keeps_highest_verified_capability() -> N
     )
 
 
+def test_build_text_probe_request_uses_default_verification_prompt() -> None:
+    request = build_text_probe_request(
+        LLMConnection(
+            api_dialect="openai_chat_completions",
+            api_key="test-key",
+            base_url="https://api.openai.com",
+        ),
+        model_name="gpt-5.4",
+    )
+
+    assert request.prompt == "今天天气怎么样？"
+    assert request.system_prompt == "请像日常聊天一样，用一句简短中文直接回答用户问题，不要使用 Markdown。"
+    assert request.thinking_budget is None
+
+
+def test_build_text_probe_request_keeps_gemini_thinking_budget_clear() -> None:
+    default_request = build_text_probe_request(
+        LLMConnection(
+            api_dialect="gemini_generate_content",
+            api_key="test-key",
+            base_url="https://generativelanguage.googleapis.com",
+        ),
+        model_name="gemini-2.5-flash",
+    )
+    custom_request = build_text_probe_request(
+        LLMConnection(
+            api_dialect="gemini_generate_content",
+            api_key="test-key",
+            base_url="https://generativelanguage.googleapis.com",
+        ),
+        model_name="gemini-2.5-flash",
+        prompt="请简单自我介绍。",
+        system_prompt="你是测试模型。",
+    )
+
+    assert default_request.thinking_budget is None
+    assert custom_request.thinking_budget is None
+    assert custom_request.prompt == "请简单自我介绍。"
+    assert custom_request.system_prompt == "你是测试模型。"
+
+
 def test_build_conformance_probe_request_uses_safe_tool_alias() -> None:
     request = build_conformance_probe_request(
         LLMConnection(
@@ -84,10 +123,13 @@ def test_build_conformance_probe_request_uses_safe_tool_alias() -> None:
         model_name="gpt-5.4",
         probe_kind="tool_call_probe",
     )
+    prepared = prepare_generation_request(request)
 
-    assert request.json_body["tools"][0]["name"] == "probe_echo_payload"
-    assert request.json_body["tool_choice"] == "required"
-    assert request.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
+    assert request.force_tool_call is True
+    assert request.tools[0].name == PROBE_TOOL_NAME
+    assert prepared.json_body["tools"][0]["name"] == "probe_echo_payload"
+    assert prepared.json_body["tool_choice"] == "required"
+    assert prepared.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
 
 
 def test_build_conformance_probe_request_keeps_gemini_probe_shape_aligned_with_runtime() -> None:
@@ -100,18 +142,20 @@ def test_build_conformance_probe_request_keeps_gemini_probe_shape_aligned_with_r
         model_name="gemini-2.5-flash",
         probe_kind="tool_call_probe",
     )
+    prepared = prepare_generation_request(request)
 
-    assert request.json_body["toolConfig"]["functionCallingConfig"] == {
+    assert request.force_tool_call is True
+    assert prepared.json_body["toolConfig"]["functionCallingConfig"] == {
         "mode": "ANY",
         "allowedFunctionNames": ["probe_echo_payload"],
     }
-    assert request.json_body["generationConfig"] == {
+    assert prepared.json_body["generationConfig"] == {
         "temperature": 0.0,
         "maxOutputTokens": 256,
         "topP": 1.0,
     }
-    assert "thinkingConfig" not in request.json_body["generationConfig"]
-    assert request.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
+    assert "thinkingConfig" not in prepared.json_body["generationConfig"]
+    assert prepared.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
 
 
 def test_build_conformance_probe_request_forces_anthropic_tool_call() -> None:
@@ -124,8 +168,10 @@ def test_build_conformance_probe_request_forces_anthropic_tool_call() -> None:
         model_name="claude-sonnet-4-20250514",
         probe_kind="tool_call_probe",
     )
+    prepared = prepare_generation_request(request)
 
-    assert request.json_body["tool_choice"] == {
+    assert request.force_tool_call is True
+    assert prepared.json_body["tool_choice"] == {
         "type": "any",
         "disable_parallel_tool_use": True,
     }
@@ -142,11 +188,13 @@ def test_build_tool_continuation_probe_followup_request_replays_for_default_resp
         initial_response=_tool_call_response(provider_response_id="resp_123"),
         result_echo="probe-result-123",
     )
+    prepared = prepare_generation_request(request)
 
-    assert "previous_response_id" not in request.json_body
-    replay_prompt = request.json_body["input"][0]["content"][0]["text"]
+    assert request.force_tool_call is False
+    assert "previous_response_id" not in prepared.json_body
+    replay_prompt = prepared.json_body["input"][0]["content"][0]["text"]
     assert "probe-result-123" in replay_prompt
-    assert request.json_body["tools"][0]["name"] == "probe_echo_payload"
+    assert prepared.json_body["tools"][0]["name"] == "probe_echo_payload"
 
 
 def test_build_tool_continuation_probe_followup_request_replays_for_chat_dialect() -> None:
@@ -160,17 +208,18 @@ def test_build_tool_continuation_probe_followup_request_replays_for_chat_dialect
         initial_response=_tool_call_response(provider_response_id=None),
         result_echo="probe-result-456",
     )
+    prepared = prepare_generation_request(request)
 
-    assert "previous_response_id" not in request.json_body
+    assert "previous_response_id" not in prepared.json_body
     assistant_tool_call_message = next(
-        item for item in request.json_body["messages"] if item.get("role") == "assistant" and item.get("tool_calls")
+        item for item in prepared.json_body["messages"] if item.get("role") == "assistant" and item.get("tool_calls")
     )
     tool_result_message = next(
-        item for item in request.json_body["messages"] if item.get("role") == "tool"
+        item for item in prepared.json_body["messages"] if item.get("role") == "tool"
     )
     followup_user_message = next(
         item
-        for item in reversed(request.json_body["messages"])
+        for item in reversed(prepared.json_body["messages"])
         if item.get("role") == "user"
     )
     assert assistant_tool_call_message["tool_calls"][0]["function"]["name"] == "probe_echo_payload"
@@ -190,21 +239,22 @@ def test_build_tool_continuation_probe_followup_request_exposes_echoed_value_for
         initial_response=_tool_call_response(provider_response_id=None),
         result_echo="probe-result-gemini",
     )
+    prepared = prepare_generation_request(request)
 
-    followup_user_prompt = request.json_body["contents"][0]["parts"][0]["text"]
-    response_payload = request.json_body["contents"][2]["parts"][0]["functionResponse"]["response"]
+    followup_user_prompt = prepared.json_body["contents"][0]["parts"][0]["text"]
+    response_payload = prepared.json_body["contents"][2]["parts"][0]["functionResponse"]["response"]
 
     assert response_payload["echoed"] == "probe-result-gemini"
     assert response_payload["structured_output"]["echoed"] == "probe-result-gemini"
     assert "probe-result-gemini" not in followup_user_prompt
-    assert request.json_body["contents"][1]["parts"][0]["functionCall"]["name"] == "probe_echo_payload"
-    assert request.json_body["generationConfig"] == {
+    assert prepared.json_body["contents"][1]["parts"][0]["functionCall"]["name"] == "probe_echo_payload"
+    assert prepared.json_body["generationConfig"] == {
         "temperature": 0.0,
         "maxOutputTokens": 256,
         "topP": 1.0,
     }
-    assert "thinkingConfig" not in request.json_body["generationConfig"]
-    assert request.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
+    assert "thinkingConfig" not in prepared.json_body["generationConfig"]
+    assert prepared.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
 
 
 def test_build_tool_continuation_probe_followup_request_preserves_gemini_provider_metadata() -> None:
@@ -228,10 +278,11 @@ def test_build_tool_continuation_probe_followup_request_preserves_gemini_provide
         ),
         result_echo="probe-result-gemini",
     )
+    prepared = prepare_generation_request(request)
 
-    assert request.json_body["contents"][1]["parts"][0]["thoughtSignature"] == "sig_123"
-    assert request.json_body["contents"][1]["parts"][0]["functionCall"]["id"] == "fn_123"
-    assert request.json_body["contents"][2]["parts"][0]["functionResponse"]["id"] == "fn_123"
+    assert prepared.json_body["contents"][1]["parts"][0]["thoughtSignature"] == "sig_123"
+    assert prepared.json_body["contents"][1]["parts"][0]["functionCall"]["id"] == "fn_123"
+    assert prepared.json_body["contents"][2]["parts"][0]["functionResponse"]["id"] == "fn_123"
 
 
 def test_build_tool_continuation_probe_followup_request_uses_provider_continuation_for_responses_strict() -> None:
@@ -246,9 +297,10 @@ def test_build_tool_continuation_probe_followup_request_uses_provider_continuati
         initial_response=_tool_call_response(provider_response_id="resp_123"),
         result_echo="probe-result-strict",
     )
+    prepared = prepare_generation_request(request)
 
-    assert request.json_body["previous_response_id"] == "resp_123"
-    assert request.json_body["input"] == [
+    assert prepared.json_body["previous_response_id"] == "resp_123"
+    assert prepared.json_body["input"] == [
         {
             "type": "function_call_output",
             "call_id": "call_123",
@@ -300,8 +352,8 @@ def test_validate_tool_call_probe_response_rejects_wrong_arguments() -> None:
         )
 
 
-def test_validate_tool_continuation_probe_response_requires_dynamic_echo_in_final_text() -> None:
-    with pytest.raises(ConfigurationError, match="must include echoed value"):
+def test_validate_tool_continuation_probe_response_requires_exact_success_text() -> None:
+    with pytest.raises(ConfigurationError, match="must equal"):
         validate_tool_continuation_probe_response(
             NormalizedLLMResponse(
                 content="工具续接成功，但没有带回工具结果。",
@@ -314,7 +366,7 @@ def test_validate_tool_continuation_probe_response_requires_dynamic_echo_in_fina
         )
     validate_tool_continuation_probe_response(
         NormalizedLLMResponse(
-            content=f"收到结果，{render_tool_continuation_probe_success_text('probe-result-789')}",
+            content=f"  {render_tool_continuation_probe_success_text('probe-result-789')}  ",
             finish_reason=None,
             input_tokens=None,
             output_tokens=None,

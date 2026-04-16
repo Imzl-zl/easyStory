@@ -208,6 +208,6 @@ def _flush_stream_event(
 
 def _build_gemini_stream_url(url: str) -> str:
     if ":streamGenerateContent" in url:
-        return url
+        return url if "alt=sse" in url else f"{url}{'&' if '?' in url else '?'}alt=sse"
     separator = "&" if "?" in url else "?"
     return url.replace(":generateContent", ":streamGenerateContent") + f"{separator}alt=sse"

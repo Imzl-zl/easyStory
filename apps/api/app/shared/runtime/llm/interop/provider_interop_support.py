@@ -4,7 +4,6 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from dotenv import dotenv_values
 
@@ -12,11 +11,8 @@ from ...errors import ConfigurationError
 from ..llm_interop_profiles import normalize_interop_profile
 from ..llm_protocol import (
     LLMConnection,
-    LLMGenerateRequest,
-    build_verification_request,
     normalize_api_dialect,
     normalize_auth_strategy,
-    prepare_generation_request,
     resolve_api_key_header_name,
     resolve_model_name,
 )
@@ -35,7 +31,6 @@ DEFAULT_PROVIDER_INTEROP_CONFIG_PATH = Path(".runtime/provider-interop.local.jso
 DEFAULT_PROVIDER_INTEROP_ENV_PATH = Path(".env.provider-interop.local")
 DEFAULT_PROVIDER_INTEROP_RATE_LIMIT_PATH = Path(".runtime/provider-interop.rate-limit.json")
 RATE_LIMIT_WINDOW_SECONDS = 60
-PROBE_MAX_TOKENS = 256
 
 
 @dataclass(frozen=True)
@@ -129,29 +124,6 @@ def resolve_provider_interop_profile(
     )
 
 
-def build_provider_interop_probe_request(
-    profile: ResolvedProviderInteropProfile,
-    *,
-    prompt: str | None = None,
-    system_prompt: str | None = None,
-):
-    if prompt is not None:
-        request = prepare_generation_request(
-            LLMGenerateRequest(
-                connection=profile.connection,
-                model_name=profile.model_name,
-                prompt=prompt,
-                system_prompt=system_prompt,
-                response_format="text",
-                temperature=0.0,
-                max_tokens=PROBE_MAX_TOKENS,
-                top_p=1.0,
-            )
-        )
-        return request
-    return build_verification_request(profile.connection)
-
-
 def enforce_provider_interop_rate_limit(
     *,
     profile_id: str,
@@ -178,7 +150,7 @@ def enforce_provider_interop_rate_limit(
     write_json_file(path, state)
 
 
-def _parse_profile(raw_profile: Any) -> ProviderInteropProfile:
+def _parse_profile(raw_profile) -> ProviderInteropProfile:
     if not isinstance(raw_profile, dict):
         raise ConfigurationError("provider interop profile must be an object")
     return ProviderInteropProfile(
@@ -247,27 +219,36 @@ def _resolve_interop_profile(
     return profile.interop_profile
 
 
-def _resolve_api_key(api_key_env: str, env_values: dict[str, str | None]) -> str:
-    value = os.environ.get(api_key_env) or env_values.get(api_key_env)
+def _resolve_api_key(api_key_env: str, env_values: dict[str, str]) -> str:
+    value = env_values.get(api_key_env) or os.getenv(api_key_env)
     if value is None or not value.strip():
-        raise ConfigurationError(f"Missing API key value for env var: {api_key_env}")
+        raise ConfigurationError(f"Missing API key in env: {api_key_env}")
     return value.strip()
 
 
-def _load_env_values(env_path: str | Path) -> dict[str, str | None]:
+def _load_env_values(env_path: str | Path) -> dict[str, str]:
     path = to_path(env_path)
     if not path.exists():
         return {}
-    values = dotenv_values(path)
-    return {key: value for key, value in values.items()}
+    raw_values = dotenv_values(path)
+    return {
+        key: value
+        for key, value in raw_values.items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
 
 
 def _load_rate_limit_state(path: Path) -> dict[str, list[int]]:
     if not path.exists():
         return {}
     payload = load_json_file(path)
-    state: dict[str, list[int]] = {}
-    for profile_id, timestamps in payload.items():
-        if isinstance(profile_id, str) and isinstance(timestamps, list):
-            state[profile_id] = [timestamp for timestamp in timestamps if isinstance(timestamp, int)]
-    return state
+    if not isinstance(payload, dict):
+        raise ConfigurationError("provider interop rate-limit state must be an object")
+    normalized: dict[str, list[int]] = {}
+    for raw_key, raw_value in payload.items():
+        if not isinstance(raw_key, str):
+            continue
+        if not isinstance(raw_value, list):
+            continue
+        normalized[raw_key] = [item for item in raw_value if isinstance(item, int)]
+    return normalized

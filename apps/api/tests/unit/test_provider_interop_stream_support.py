@@ -1099,3 +1099,22 @@ def test_iterate_stream_request_stops_when_callback_requests_interrupt(monkeypat
 
 def json_line(value: str) -> str:
     return value
+
+
+def test_build_stream_probe_request_keeps_existing_gemini_stream_endpoint_and_adds_alt_sse() -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url=(
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            "gemini-2.5-flash:streamGenerateContent"
+        ),
+        headers={"x-goog-api-key": "test-key"},
+        json_body={"contents": []},
+    )
+
+    streamed = stream_support.build_stream_probe_request(
+        request,
+        api_dialect="gemini_generate_content",
+    )
+
+    assert streamed.url.endswith(":streamGenerateContent?alt=sse")
