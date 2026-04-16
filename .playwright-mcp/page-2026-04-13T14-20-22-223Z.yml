@@ -1,0 +1,55 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - link "跳到主内容" [ref=e12] [cursor=pointer]:
+    - /url: "#workspace-main"
+  - generic [ref=e13]:
+    - banner [ref=e14]:
+      - generic [ref=e15]:
+        - link "easyStory 写作空间" [ref=e16] [cursor=pointer]:
+          - /url: /workspace/lobby
+          - generic [ref=e17]: easyStory
+          - generic [ref=e18]: 写作空间
+        - navigation "工作台导航" [ref=e19]:
+          - link "书架" [ref=e20] [cursor=pointer]:
+            - /url: /workspace/lobby
+          - generic "请先打开一个项目" [ref=e21]: 创作
+          - generic "请先打开一个项目" [ref=e22]: 推进
+          - generic "请先打开一个项目" [ref=e23]: 洞察
+        - generic [ref=e24]:
+          - link "我的助手" [ref=e25] [cursor=pointer]:
+            - /url: /workspace/lobby/settings?tab=assistant
+          - generic [ref=e26]:
+            - generic [ref=e28]: z
+            - generic [ref=e29]: zhanglu
+          - button "退出" [ref=e30] [cursor=pointer]
+    - main [ref=e31]:
+      - generic [ref=e33]:
+        - complementary [ref=e34]:
+          - navigation [ref=e35]:
+            - link "我的作品" [ref=e36] [cursor=pointer]:
+              - /url: /workspace/lobby
+              - img [ref=e39]
+              - generic [ref=e43]: 我的作品
+            - link "我的助手" [ref=e44] [cursor=pointer]:
+              - /url: /workspace/lobby/settings?tab=assistant
+              - img [ref=e47]
+              - generic [ref=e50]: 我的助手
+            - link "模板库" [ref=e51] [cursor=pointer]:
+              - /url: /workspace/lobby/templates
+              - img [ref=e54]
+              - generic [ref=e57]: 模板库
+            - link "回收站" [ref=e58] [cursor=pointer]:
+              - /url: /workspace/lobby/recycle-bin
+              - img [ref=e61]
+              - generic [ref=e64]: 回收站
+          - link "打开我的助手" [ref=e66] [cursor=pointer]:
+            - /url: /workspace/lobby/settings?tab=assistant
+        - main [ref=e67]:
+          - generic [ref=e68]:
+            - textbox "搜索作品名、题材或模板…" [ref=e69]
+            - link "新建作品" [ref=e70] [cursor=pointer]:
+              - /url: /workspace/lobby/new
+          - paragraph [ref=e71]: 共 0 部作品
+          - generic [ref=e72]: 正在加载项目列表…

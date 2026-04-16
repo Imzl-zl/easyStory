@@ -28,14 +28,14 @@ export function LabDeleteConfirmDialog({
       onClose={onClose}
     >
       <div className="space-y-4">
-        <div className="space-y-3 rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.56)] p-4">
+        <div className="space-y-3 rounded-2xl bg-muted shadow-sm p-4">
           <div className="flex flex-wrap gap-2">
             <StatusBadge status="failed" label="删除确认" />
             <StatusBadge status="active" label={analysisType} />
             {generatedSkillKey ? <StatusBadge status="approved" label={generatedSkillKey} /> : null}
           </div>
-          <p className="text-base font-medium text-[var(--text-primary)]">{analysisTitle}</p>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-base font-medium text-text-primary">{analysisTitle}</p>
+          <p className="text-sm leading-6 text-text-secondary">
             删除后列表会回退到下一条可用记录；若当前过滤条件下不再有结果，详情区会显式回到空态。
           </p>
         </div>

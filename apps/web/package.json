@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test:unit": "node ./scripts/run-unit-tests.mjs"
+    "test:unit": "node ./scripts/run-unit-tests.mjs",
+    "postinstall": "node ./scripts/patch-arco-react19.cjs"
   },
   "dependencies": {
     "@arco-design/web-react": "^2.66.12",

@@ -21,7 +21,6 @@ export function TemplateLibraryPage({ initialTemplateId = null }: TemplateLibrar
         bodyClassName="min-h-0 flex-1"
         className="flex min-h-0 flex-1 flex-col"
         title="模板库"
-        description="查看和维护项目模板。"
         action={
           <div className="flex flex-wrap gap-2">
             <Link className="ink-button-secondary" href="/workspace/lobby">返回书架</Link>

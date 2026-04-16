@@ -24,11 +24,8 @@ function SidebarHeader({ onStartCreate }: { onStartCreate: () => void }) {
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">模板库</p>
+        <p className="text-xs uppercase tracking-[0.24em] text-accent-primary">模板库</p>
         <h2 className="font-serif text-2xl font-semibold">模板列表</h2>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          管理内置模板和自定义模板。
-        </p>
       </div>
       <button className="ink-button w-full justify-center" onClick={onStartCreate} type="button">
         创建模板
@@ -120,7 +117,7 @@ function GenreTabs({
 
 function SidebarBody({ model }: { model: TemplateLibraryModel }) {
   if (model.templatesQuery.isLoading) {
-    return <p className="text-sm text-[var(--text-secondary)]">正在读取模板列表…</p>;
+    return <p className="text-sm text-text-secondary">正在读取模板列表…</p>;
   }
   if (model.templatesQuery.error) {
     return (
@@ -139,7 +136,7 @@ function SidebarBody({ model }: { model: TemplateLibraryModel }) {
     return (
       <EmptyState
         title="暂无模板"
-        description="创建模板，或使用内置模板。"
+        description="点击上方按钮创建模板。"
       />
     );
   }
@@ -171,14 +168,14 @@ function TemplateListCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="font-serif text-lg font-semibold">{template.name}</p>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">{template.description ?? "暂无说明。"}</p>
+          <p className="text-sm leading-6 text-text-secondary">{template.description ?? "暂无说明。"}</p>
         </div>
         <StatusBadge
           status={template.is_builtin ? "approved" : "draft"}
           label={template.is_builtin ? "内置" : "自定义"}
         />
       </div>
-      <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+      <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.16em] text-text-secondary">
         <span>{template.genre ?? "未设题材"}</span>
         <span>{template.node_count} 步</span>
       </div>

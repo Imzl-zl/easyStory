@@ -23,7 +23,6 @@ import {
 } from "@/features/settings/components/assistant/rules/assistant-rules-support";
 
 type AssistantRulesEditorProps = {
-  description: string;
   headerAction?: React.ReactNode;
   onDirtyChange?: (isDirty: boolean) => void;
   projectId?: string | null;
@@ -35,7 +34,6 @@ export function AssistantRulesEditor({
   scope,
   projectId = null,
   title,
-  description,
   headerAction,
   onDirtyChange,
 }: AssistantRulesEditorProps) {
@@ -77,13 +75,13 @@ export function AssistantRulesEditor({
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   return (
-    <SectionCard action={headerAction} description={description} title={title}>
+    <SectionCard action={headerAction} title={title}>
       <div className="space-y-4">
         {query.isLoading && !query.data ? (
-          <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载规则...</div>
+          <div className="panel-muted px-4 py-5 text-sm text-text-secondary">正在加载规则...</div>
         ) : null}
         {query.error ? (
-          <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+          <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
             {getErrorMessage(query.error)}
           </div>
         ) : null}
@@ -137,19 +135,19 @@ function AssistantRulesForm({
         onSubmit(draft);
       }}
     >
-      <label className="flex items-start gap-3 rounded-xl bg-[rgba(248,243,235,0.92)] px-4 py-3 cursor-pointer">
+      <label className="flex items-start gap-3 rounded-2xl bg-glass-heavy px-4 py-3 cursor-pointer">
         <span className="flex items-start gap-3">
           <input
             checked={draft.enabled}
-            className="mt-1 size-4 accent-[var(--accent-ink)]"
+            className="mt-1 size-4 accent-accent-primary"
             onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })}
             type="checkbox"
           />
           <span className="space-y-1">
-            <span className="block text-[13px] font-medium text-[var(--text-primary)]">
+            <span className="block text-[13px] font-medium text-text-primary">
               在每次聊天时自动带上这份规则
             </span>
-            <span className="block text-[12px] leading-5 text-[var(--text-secondary)]">
+            <span className="block text-[12px] leading-5 text-text-secondary">
               会在基础对话要求上叠加这份长期规则。
             </span>
           </span>
@@ -157,7 +155,7 @@ function AssistantRulesForm({
       </label>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium text-[var(--text-primary)]" htmlFor={buildAssistantRuleFieldId(scope)}>
+        <label className="text-sm font-medium text-text-primary" htmlFor={buildAssistantRuleFieldId(scope)}>
           规则内容
         </label>
         <textarea
@@ -167,8 +165,8 @@ function AssistantRulesForm({
           placeholder="例如：\n1. 先给结论，再展开。\n2. 不要让我先填一堆表单。\n3. 如果信息不足，每次只追问一个关键问题。"
           value={draft.content}
         />
-        <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
-          适合写回复口吻、创作偏好、禁忌项和固定要求。一次性的具体问题，直接在聊天里说就行。
+        <p className="text-[12px] leading-5 text-text-secondary">
+          写入口吻偏好和固定要求。
         </p>
       </div>
 

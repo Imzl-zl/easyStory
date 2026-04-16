@@ -109,7 +109,7 @@ function HookFormEditorBody({
           <TextField label="优先级" inputMode="numeric" name="hook-priority" value={String(draft.priority)} onChange={(value) => setDraft({ ...draft, priority: parseNumber(value, draft.priority) })} />
         </div>
         <TextAreaField label="描述" name="hook-description" value={draft.description ?? ""} onChange={(value) => setDraft({ ...draft, description: value || null })} />
-        <label className="flex items-center gap-3 text-sm text-[var(--text-primary)]">
+        <label className="flex items-center gap-3 text-sm text-text-primary">
           <input checked={draft.enabled} type="checkbox" onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} />
           已启用
         </label>
@@ -187,7 +187,7 @@ function HookFormEditorBody({
       <FormSection title="执行设置">
         <div className="grid gap-3 md:grid-cols-2">
           <TextField label="超时（秒）" inputMode="numeric" name="hook-timeout" value={String(draft.timeout)} onChange={(value) => setDraft({ ...draft, timeout: parseNumber(value, draft.timeout) })} />
-          <label className="flex items-center gap-3 text-sm text-[var(--text-primary)]">
+          <label className="flex items-center gap-3 text-sm text-text-primary">
             <input checked={draft.retry !== null} type="checkbox" onChange={(event) => setDraft({ ...draft, retry: event.target.checked ? draft.retry ?? { delay: 1, max_attempts: 3 } : null })} />
             启用重试
           </label>
@@ -255,7 +255,7 @@ function McpFormEditorBody({
           <TextField label="超时（秒）" inputMode="numeric" name="mcp-timeout" value={String(draft.timeout)} onChange={(value) => setDraft({ ...draft, timeout: parseNumber(value, draft.timeout) })} />
         </div>
         <TextAreaField label="描述" name="mcp-description" value={draft.description ?? ""} onChange={(value) => setDraft({ ...draft, description: value || null })} />
-        <label className="flex items-center gap-3 text-sm text-[var(--text-primary)]">
+        <label className="flex items-center gap-3 text-sm text-text-primary">
           <input checked={draft.enabled} type="checkbox" onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} />
           已启用
         </label>
@@ -270,7 +270,7 @@ function McpFormEditorBody({
 function FormActions({ errorMessage, isDirty, isPending, onReset, onSave }: Readonly<{ errorMessage: string | null; isDirty: boolean; isPending: boolean; onReset: () => void; onSave: () => void; }>) {
   return (
     <div className="space-y-3">
-      {errorMessage ? <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">{errorMessage}</div> : null}
+      {errorMessage ? <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">{errorMessage}</div> : null}
       <div className="flex flex-wrap items-center gap-2.5 pt-1">
         <button className="ink-button h-9 px-4 text-[13px]" disabled={isPending || !isDirty || Boolean(errorMessage)} type="button" onClick={onSave}>{isPending ? "保存中…" : "保存修改"}</button>
         <button className="ink-button-secondary h-9 px-4 text-[13px]" disabled={isPending || !isDirty} type="button" onClick={onReset}>撤销修改</button>

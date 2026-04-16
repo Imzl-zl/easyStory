@@ -66,7 +66,7 @@ export function ChapterEditor({
     return (
       <EmptyState
         title="还没有章节可编辑"
-        description="选择章节，或启动工作流生成内容。"
+        description="选择章节或启动工作流。"
       />
     );
   }
@@ -218,7 +218,6 @@ function ChapterEditorForm({
     <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
       <SectionCard
         title={`Chapter ${chapterNumber}`}
-        description="编辑章节内容，保存后可确认或查看历史版本。"
         action={
           <div className="flex flex-wrap gap-2">
             {detail ? <StatusBadge status={detail.status} /> : null}
@@ -231,9 +230,9 @@ function ChapterEditorForm({
           </div>
         }
       >
-        {detailLoading ? <p className="text-sm text-[var(--text-secondary)]">正在加载章节...</p> : null}
+        {detailLoading ? <p className="text-sm text-text-secondary">正在加载章节...</p> : null}
         {detailError ? (
-          <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+          <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
             {getErrorMessage(detailError)}
           </div>
         ) : null}
@@ -270,11 +269,11 @@ function ChapterEditorForm({
         <aside className="panel-shell fan-panel space-y-4 p-5">
           <div className="space-y-1">
             <h3 className="font-serif text-lg font-semibold">版本面板</h3>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="text-sm leading-6 text-text-secondary">
               当前只保留版本列表、最佳版本标记与回滚入口。
             </p>
           </div>
-          {versions === undefined ? <p className="text-sm text-[var(--text-secondary)]">正在加载版本...</p> : null}
+          {versions === undefined ? <p className="text-sm text-text-secondary">正在加载版本...</p> : null}
           {versions?.map((version) => (
             <article key={version.version_number} className="panel-muted space-y-3 p-4">
               <div className="flex items-center justify-between gap-2">
@@ -282,11 +281,11 @@ function ChapterEditorForm({
                   <StatusBadge status={version.is_current ? "active" : "archived"} label={`v${version.version_number}`} />
                   {version.is_best ? <StatusBadge status="approved" label="best" /> : null}
                 </div>
-                <p className="text-xs text-[var(--text-secondary)]">
+                <p className="text-xs text-text-secondary">
                   {new Date(version.created_at).toLocaleString("zh-CN")}
                 </p>
               </div>
-              <p className="text-sm leading-6 text-[var(--text-secondary)]">
+              <p className="text-sm leading-6 text-text-secondary">
                 {version.change_summary ?? "没有变更说明。"}
               </p>
               <div className="flex flex-wrap gap-2">

@@ -76,9 +76,9 @@ export function ConfigRegistrySidebar({
 
       <div className="panel-muted space-y-4 p-4">
         <div className="space-y-1">
-          <p className="text-xs tracking-[0.16em] text-[var(--accent-ink)]">系统分类</p>
+          <p className="text-xs tracking-[0.16em] text-accent-primary">系统分类</p>
           <h3 className="font-serif text-lg font-semibold">{activeTab.label}</h3>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">{activeTab.description}</p>
+          <p className="text-sm leading-6 text-text-secondary">{activeTab.description}</p>
         </div>
 
         <label className="block space-y-2">
@@ -123,7 +123,7 @@ export function ConfigRegistrySidebar({
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-[var(--text-secondary)]">这一类暂时没有可筛选标签。</p>
+              <p className="text-sm text-text-secondary">这一类暂时没有可筛选标签。</p>
             )}
           </div>
         ) : null}
@@ -187,7 +187,7 @@ function SidebarCard({
   const enabled = "enabled" in item ? String(item.enabled) : undefined;
   return (
     <button
-      className="w-full rounded-[24px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.58)] p-4 text-left transition data-[active=true]:border-[rgba(46,111,106,0.28)] data-[active=true]:bg-[rgba(46,111,106,0.08)]"
+      className="w-full rounded-3xl bg-muted shadow-sm p-4 text-left transition data-[active=true]:border-accent-primary/25 data-[active=true]:bg-accent-soft"
       data-active={isActive}
       data-enabled={enabled}
       type="button"
@@ -195,15 +195,15 @@ function SidebarCard({
     >
       <div className="space-y-2">
         <div className="space-y-1">
-          <p className="text-sm font-medium text-[var(--text-primary)]">{item.name}</p>
-          <p className="text-xs text-[var(--text-secondary)]">{item.id}</p>
+          <p className="text-sm font-medium text-text-primary">{item.name}</p>
+          <p className="text-xs text-text-secondary">{item.id}</p>
         </div>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">{item.description ?? "暂无描述。"}</p>
+        <p className="text-sm leading-6 text-text-secondary">{item.description ?? "暂无描述。"}</p>
         <dl className="grid gap-2">
           {rows.map((row) => (
-            <div key={row.label} className="grid grid-cols-[68px_1fr] gap-2 text-xs text-[var(--text-secondary)]">
+            <div key={row.label} className="grid grid-cols-[68px_1fr] gap-2 text-xs text-text-secondary">
               <dt>{row.label}</dt>
-              <dd className="min-w-0 break-words text-[var(--text-primary)]">{row.value}</dd>
+              <dd className="min-w-0 break-words text-text-primary">{row.value}</dd>
             </div>
           ))}
         </dl>
@@ -221,10 +221,10 @@ function Banner({
 }>) {
   if (tone === "danger") {
     return (
-      <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+      <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
         {message}
       </div>
     );
   }
-  return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">{message}</div>;
+  return <div className="panel-muted px-4 py-5 text-sm text-text-secondary">{message}</div>;
 }

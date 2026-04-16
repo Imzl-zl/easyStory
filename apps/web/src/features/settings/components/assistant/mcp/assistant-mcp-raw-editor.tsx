@@ -17,8 +17,8 @@ export function AssistantMcpRawEditor({
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.92fr)]">
       <label className="block space-y-2">
         <span className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-medium text-[var(--text-primary)]">MCP.yaml</span>
-          <span className="text-[12px] leading-5 text-[var(--text-secondary)]">
+          <span className="text-sm font-medium text-text-primary">MCP.yaml</span>
+          <span className="text-[12px] leading-5 text-text-secondary">
             按连接文件直接写，保存后就能在 Hooks 里选用。
           </span>
         </span>
@@ -30,23 +30,23 @@ export function AssistantMcpRawEditor({
         />
       </label>
       <div className="space-y-3">
-        <div className="rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-4 text-[12px] leading-6 text-[var(--text-secondary)]">
-          <p className="text-sm font-medium text-[var(--text-primary)]">文件约定</p>
+        <div className="rounded-3xl bg-glass shadow-glass px-4 py-4 text-[12px] leading-6 text-text-secondary">
+          <p className="text-sm font-medium text-text-primary">文件约定</p>
           <p className="mt-2">当前正式支持的字段是 `name / enabled / version / description / transport / url / headers / timeout`。</p>
           <p className="mt-2">地址、请求头和超时都在这里维护，保存后聊天里的 Hook 会直接读取这份连接。</p>
           {mode === "create" ? (
-            <p className="mt-3 rounded-2xl bg-[rgba(248,243,235,0.84)] px-3 py-2 text-[12px] leading-5 text-[var(--text-secondary)]">
+            <p className="mt-3 rounded-2xl bg-glass px-3 py-2 text-[12px] leading-5 text-text-secondary">
               第一次保存后，系统会自动补上这份 MCP 的 id。
             </p>
           ) : null}
           {documentError ? (
-            <p className="mt-3 rounded-2xl bg-[rgba(178,65,46,0.08)] px-3 py-2 text-[12px] leading-5 text-[var(--accent-danger)]">
+            <p className="mt-3 rounded-2xl bg-accent-danger/10 px-3 py-2 text-[12px] leading-5 text-accent-danger">
               当前文件还没写对，修正后才能保存。
             </p>
           ) : null}
         </div>
-        <div className="rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-4 text-[12px] leading-6 text-[var(--text-secondary)]">
-          <p className="text-sm font-medium text-[var(--text-primary)]">适合放什么</p>
+        <div className="rounded-3xl bg-glass shadow-glass px-4 py-4 text-[12px] leading-6 text-text-secondary">
+          <p className="text-sm font-medium text-text-primary">适合放什么</p>
           <p className="mt-2">适合保存稳定的外部工具连接，比如搜索、资料检索、知识库、抓取接口。</p>
           <p className="mt-2">不建议在这里堆临时参数；临时查询条件更适合在 Hook 的 `arguments` 或 `input_mapping` 里填写。</p>
         </div>

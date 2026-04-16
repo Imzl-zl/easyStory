@@ -77,7 +77,7 @@ export function DialogShell({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(45,35,25,0.18)] backdrop-blur-[2px] p-4 md:items-center animate-overlay-in"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--overlay-bg)] backdrop-blur-[2px] p-4 md:items-center animate-overlay-in"
       role="presentation"
       onClick={onClose}
     >
@@ -85,7 +85,7 @@ export function DialogShell({
         aria-describedby={description ? descriptionId : undefined}
         aria-labelledby={titleId}
         aria-modal="true"
-        className="bg-glass-heavy border border-line-glass rounded-2xl shadow-float backdrop-blur-xl max-h-[88vh] w-full max-w-6xl overflow-hidden animate-modal-in"
+        className="bg-glass-heavy rounded-2xl shadow-float backdrop-blur-xl max-h-[88vh] w-full max-w-6xl overflow-hidden animate-modal-in"
         ref={containerRef}
         role="dialog"
         tabIndex={-1}

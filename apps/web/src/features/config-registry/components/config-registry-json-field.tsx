@@ -107,8 +107,8 @@ function JsonTextAreaFieldBody<T>({
           }
         }}
       />
-      {errorMessage ? <p className="text-sm text-[var(--accent-danger)]">{errorMessage}</p> : null}
-      {helpText ? <p className="text-xs text-[var(--text-secondary)]">{helpText}</p> : null}
+      {errorMessage ? <p className="text-sm text-accent-danger">{errorMessage}</p> : null}
+      {helpText ? <p className="text-xs text-text-secondary">{helpText}</p> : null}
     </label>
   );
 }

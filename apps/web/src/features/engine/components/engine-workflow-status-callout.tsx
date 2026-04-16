@@ -20,8 +20,8 @@ export function EngineWorkflowStatusCallout({
 
   const className =
     callout.tone === "danger"
-      ? "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]"
-      : "bg-[rgba(183,121,31,0.1)] text-[var(--accent-warning)]";
+      ? "bg-accent-danger/10 text-accent-danger"
+      : "bg-accent-warning/10 text-accent-warning";
 
   return (
     <div className={`rounded-2xl px-4 py-4 ${className}`}>

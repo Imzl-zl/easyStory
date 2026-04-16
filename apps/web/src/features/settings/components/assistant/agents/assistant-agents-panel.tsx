@@ -123,14 +123,13 @@ export function AssistantAgentsPanel({ onDirtyChange }: AssistantAgentsPanelProp
 
   return (
     <SectionCard
-      description="你的角色配置文件。想固定助手风格时，再把常用组合整理成自己的 AGENT.md。"
       title="Agents"
     >
       <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="space-y-3 rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.68)] p-4 xl:sticky xl:top-6 xl:self-start">
-          <div className="space-y-1 rounded-[18px] bg-[rgba(248,243,235,0.78)] px-4 py-3">
-            <p className="text-sm font-medium text-[var(--text-primary)]">我的 Agents</p>
-            <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+        <aside className="space-y-3 rounded-3xl bg-glass shadow-glass p-4 xl:sticky xl:top-6 xl:self-start">
+          <div className="space-y-1 rounded-2xl bg-muted px-4 py-3">
+            <p className="text-sm font-medium text-text-primary">我的 Agents</p>
+            <p className="text-[12px] leading-5 text-text-secondary">
               已启用 {enabledAgentCount} 个，共 {orderedAgents.length} 个。
             </p>
           </div>
@@ -145,38 +144,38 @@ export function AssistantAgentsPanel({ onDirtyChange }: AssistantAgentsPanelProp
           <div className="space-y-2 xl:max-h-[28rem] xl:overflow-y-auto xl:pr-1">
             {orderedAgents.map((agent) => (
               <button
-                className="ink-tab w-full justify-start rounded-[20px] px-4 py-3 text-left"
+                className="ink-tab w-full justify-start rounded-2xl px-4 py-3 text-left"
                 data-active={selection === agent.id}
                 key={agent.id}
                 type="button"
                 onClick={() => attemptSelect(agent.id, editorDirty, setRequestedSelection)}
               >
                 <span className="flex flex-col items-start gap-1">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">{agent.name}</span>
-                  <span className="text-[12px] leading-5 text-[var(--text-secondary)]">
+                  <span className="text-sm font-medium text-text-primary">{agent.name}</span>
+                  <span className="text-[12px] leading-5 text-text-secondary">
                     {buildAssistantAgentListDescription(agent, skillLabelMap.get(agent.skill_id) ?? null)}
                   </span>
                 </span>
               </button>
             ))}
             {listQuery.isLoading ? (
-              <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在读取你的 Agents...</div>
+              <div className="panel-muted px-4 py-5 text-sm text-text-secondary">正在读取你的 Agents...</div>
             ) : null}
             {listQuery.error ? (
-              <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+              <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
                 {getErrorMessage(listQuery.error)}
               </div>
             ) : null}
             {showGettingStarted ? (
-              <div className="rounded-2xl bg-[rgba(248,243,235,0.84)] px-4 py-4 text-sm leading-6 text-[var(--text-secondary)]">
-                右侧已经放好一份起步模板。你也可以切到“按文件编辑”，直接按 AGENT.md 的格式来写。
+              <div className="rounded-2xl bg-glass px-4 py-4 text-sm leading-6 text-text-secondary">
+                使用起步模板，或切换到文件编辑模式。
               </div>
             ) : null}
           </div>
         </aside>
         <div className="space-y-4">
           {listQuery.isLoading && !selection ? (
-            <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在准备 Agents...</div>
+            <div className="panel-muted px-4 py-5 text-sm text-text-secondary">正在准备 Agents...</div>
           ) : null}
           {showCreateEditor ? (
             <AssistantAgentEditor
@@ -191,10 +190,10 @@ export function AssistantAgentsPanel({ onDirtyChange }: AssistantAgentsPanelProp
             />
           ) : null}
           {!showCreateEditor && detailQuery.isLoading && selection ? (
-            <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载 Agent...</div>
+            <div className="panel-muted px-4 py-5 text-sm text-text-secondary">正在加载 Agent...</div>
           ) : null}
           {!showCreateEditor && detailQuery.error ? (
-            <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+            <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
               {getErrorMessage(detailQuery.error)}
             </div>
           ) : null}

@@ -41,7 +41,7 @@ export function HookGuidedFormPanel({
 }: Readonly<HookGuidedFormPanelProps>) {
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-[rgba(58,124,165,0.07)] px-4 py-3 text-[12px] leading-6 text-[var(--text-secondary)]">
+      <div className="callout-info px-4 py-3 text-[12px] leading-6 text-text-secondary">
         Hook 会在回复前后自动多做一步。你可以让它调用一个 Agent，也可以直接连接一个 MCP 工具。
       </div>
       <AssistantTextField

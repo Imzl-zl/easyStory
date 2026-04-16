@@ -39,9 +39,9 @@ export function CredentialScopeTabs({
         当前项目连接
       </button>
       {!canUseProjectScope ? (
-        <p className="text-sm text-[var(--text-secondary)]">当前没有项目上下文，只能管理全局连接。</p>
+        <p className="text-sm text-text-secondary">当前没有项目上下文，只能管理全局连接。</p>
       ) : projectId ? (
-        <p className="text-sm text-[var(--text-secondary)]">项目上下文：{projectId}</p>
+        <p className="text-sm text-text-secondary">项目上下文：{projectId}</p>
       ) : null}
     </div>
   );

@@ -66,7 +66,6 @@ export function AssistantAgentEditor({
       }}
     >
       <AssistantDocumentModeToggle
-        description="可以先用可视化编辑固定角色，也可以直接按 AGENT.md 的格式来写。"
         fileLabel={ASSISTANT_AGENT_FILE_LABEL}
         guidedDisabled={Boolean(documentError)}
         mode={editorMode}
@@ -102,7 +101,7 @@ export function AssistantAgentEditor({
       )}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {documentError ? (
-          <p className="mr-auto rounded-2xl bg-[rgba(178,65,46,0.08)] px-3 py-2 text-[12px] leading-5 text-[var(--accent-danger)]">
+          <p className="mr-auto rounded-2xl bg-accent-danger/10 px-3 py-2 text-[12px] leading-5 text-accent-danger">
             {documentError}
           </p>
         ) : null}

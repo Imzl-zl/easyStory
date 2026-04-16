@@ -35,19 +35,15 @@ export function CredentialCompatibilityPanel({
   const showInteropProfileField = supportsCredentialInteropProfile(formState.apiDialect);
 
   return (
-    <details className="rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.56)] p-4">
-      <summary className="cursor-pointer text-[13px] font-medium leading-5 text-[var(--text-primary)]">
+    <details className="rounded-2xl bg-muted shadow-sm p-4">
+      <summary className="cursor-pointer text-[13px] font-medium leading-5 text-text-primary">
         兼容设置
-        <span className="ml-2 text-xs text-[var(--text-secondary)]">大多数情况不用改</span>
+        <span className="ml-2 text-xs text-text-secondary">大多数情况不用改</span>
       </summary>
       <div className={layout === "full" ? "mt-4 grid gap-4 xl:grid-cols-2" : "mt-4 grid gap-4"}>
-        <p className={`text-[13px] leading-6 text-[var(--text-secondary)] ${descriptionClassName ?? ""}`}>
-          只有当上游服务要求特殊请求头、特殊密钥位置，或者工具调用 / 流式协议存在兼容差异时，才需要修改这里。
-        </p>
         {showInteropProfileField ? (
           <CredentialSelectField
             className={fieldClassName}
-            description="只在当前服务类型需要额外兼容约束时使用；普通官方接口一般保持默认。"
             label="协议兼容 Profile"
             options={interopProfileOptions}
             value={formState.interopProfile}
@@ -96,7 +92,7 @@ export function CredentialCompatibilityPanel({
               setFormState((current) => ({ ...current, extraHeadersText: event.target.value }))
             }
           />
-          <p className="mt-2 text-xs text-[var(--text-secondary)]">
+          <p className="mt-2 text-xs text-text-secondary">
             这里适合填写站点来源、租户标识这类补充信息。不要在这里填写 Token、Secret 或鉴权头。
           </p>
         </label>

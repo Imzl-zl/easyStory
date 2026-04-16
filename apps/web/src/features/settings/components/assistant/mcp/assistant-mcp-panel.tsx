@@ -112,10 +112,10 @@ export function AssistantMcpPanel({
   return (
     <SectionCard description={copy.description} title={copy.title}>
       <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="space-y-3 rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.68)] p-4 xl:sticky xl:top-6 xl:self-start">
-          <div className="space-y-1 rounded-[18px] bg-[rgba(248,243,235,0.78)] px-4 py-3">
-            <p className="text-sm font-medium text-[var(--text-primary)]">{copy.summaryLabel}</p>
-            <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+        <aside className="space-y-3 rounded-3xl bg-glass shadow-glass p-4 xl:sticky xl:top-6 xl:self-start">
+          <div className="space-y-1 rounded-2xl bg-muted px-4 py-3">
+            <p className="text-sm font-medium text-text-primary">{copy.summaryLabel}</p>
+            <p className="text-[12px] leading-5 text-text-secondary">
               已启用 {enabledCount} 个，共 {orderedMcpServers.length} 个。
             </p>
           </div>
@@ -130,25 +130,25 @@ export function AssistantMcpPanel({
           <div className="space-y-2 xl:max-h-[28rem] xl:overflow-y-auto xl:pr-1">
             {orderedMcpServers.map((server) => (
               <button
-                className="ink-tab w-full justify-start rounded-[20px] px-4 py-3 text-left"
+                className="ink-tab w-full justify-start rounded-2xl px-4 py-3 text-left"
                 data-active={selection === server.id}
                 key={server.id}
                 type="button"
                 onClick={() => attemptMcpSelect(server.id, editorDirty, setRequestedSelection, copy)}
               >
                 <span className="flex flex-col items-start gap-1">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">{server.name}</span>
-                  <span className="text-[12px] leading-5 text-[var(--text-secondary)]">
+                  <span className="text-sm font-medium text-text-primary">{server.name}</span>
+                  <span className="text-[12px] leading-5 text-text-secondary">
                     {buildAssistantMcpListDescription(server)}
                   </span>
                 </span>
               </button>
             ))}
             {listQuery.isLoading ? (
-              <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">{copy.listLoading}</div>
+              <div className="panel-muted px-4 py-5 text-sm text-text-secondary">{copy.listLoading}</div>
             ) : null}
             {listQuery.error ? (
-              <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+              <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
                 {getErrorMessage(listQuery.error)}
               </div>
             ) : null}
@@ -166,10 +166,10 @@ export function AssistantMcpPanel({
             />
           ) : null}
           {!showCreateEditor && detailQuery.isLoading && selection ? (
-            <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">{copy.detailLoading}</div>
+            <div className="panel-muted px-4 py-5 text-sm text-text-secondary">{copy.detailLoading}</div>
           ) : null}
           {!showCreateEditor && detailQuery.error ? (
-            <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+            <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
               {getErrorMessage(detailQuery.error)}
             </div>
           ) : null}

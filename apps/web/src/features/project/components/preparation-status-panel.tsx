@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { InfoPanel } from "@/components/ui/info-panel";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   buildPreparationStatusRows,
@@ -24,23 +25,19 @@ export function PreparationStatusPanel({ projectId }: PreparationStatusPanelProp
   const rows = query.data ? buildPreparationStatusRows(query.data) : [];
 
   return (
-    <section className="panel-muted space-y-4 rounded-[28px] p-4">
-      <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.2em] text-[var(--accent-ink)]">准备状态</p>
-        <h2 className="font-serif text-lg font-semibold text-[var(--text-primary)]">创作准备</h2>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          查看当前准备进度和下一步。
-        </p>
-      </div>
-
+    <InfoPanel
+      className="rounded-3xl"
+      description="查看当前准备进度和下一步。"
+      title="创作准备"
+    >
       {query.isLoading ? (
-        <p className="text-sm text-[var(--text-secondary)]">正在汇总创作准备状态...</p>
+        <p className="text-sm text-text-secondary">正在汇总创作准备状态...</p>
       ) : null}
 
       {query.error ? (
-        <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
-          {getErrorMessage(query.error)}
-        </div>
+        <InfoPanel tone="danger" className="rounded-2xl">
+          <p className="text-sm text-accent-danger">{getErrorMessage(query.error)}</p>
+        </InfoPanel>
       ) : null}
 
       {query.data ? (
@@ -49,7 +46,7 @@ export function PreparationStatusPanel({ projectId }: PreparationStatusPanelProp
           <PreparationRows rows={rows} />
         </>
       ) : null}
-    </section>
+    </InfoPanel>
   );
 }
 
@@ -61,31 +58,31 @@ function PreparationSummaryCard({
   const badgeStatus = preparation.can_start_workflow ? "ready" : preparation.next_step;
   const badgeLabel = preparation.can_start_workflow ? "可启动工作流" : "待推进";
   return (
-    <div className="rounded-2xl border border-[rgba(58,124,165,0.16)] bg-[rgba(58,124,165,0.06)] p-4">
+    <InfoPanel tone="accent" className="rounded-2xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+          <p className="text-xs uppercase tracking-[0.16em] text-text-secondary">
             下一步
           </p>
-          <p className="font-medium text-[var(--text-primary)]">
+          <p className="font-medium text-text-primary">
             {formatPreparationNextStep(preparation.next_step)}
           </p>
         </div>
         <StatusBadge status={badgeStatus} label={badgeLabel} />
       </div>
-      <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+      <p className="mt-3 text-sm leading-6 text-text-secondary">
         {preparation.next_step_detail}
       </p>
       {preparation.active_workflow ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-[var(--text-secondary)]">
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
           <span>当前工作流：</span>
-          <span className="font-medium text-[var(--text-primary)]">
+          <span className="font-medium text-text-primary">
             {preparation.active_workflow.workflow_name ?? preparation.active_workflow.workflow_id}
           </span>
           <StatusBadge status={preparation.active_workflow.status} />
         </div>
       ) : null}
-    </div>
+    </InfoPanel>
   );
 }
 
@@ -97,18 +94,15 @@ function PreparationRows({
   return (
     <div className="space-y-3">
       {rows.map((row) => (
-        <div
-          key={row.label}
-          className="rounded-2xl border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.5)] px-4 py-3"
-        >
+        <InfoPanel key={row.label} className="rounded-2xl px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="font-medium text-[var(--text-primary)]">{row.label}</p>
+            <p className="font-medium text-text-primary">{row.label}</p>
             <StatusBadge status={row.status} label={formatPreparationStatusLabel(row.status)} />
           </div>
-          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="mt-2 text-sm leading-6 text-text-secondary">
             {row.description}
           </p>
-        </div>
+        </InfoPanel>
       ))}
     </div>
   );

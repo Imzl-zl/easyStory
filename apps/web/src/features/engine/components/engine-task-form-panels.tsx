@@ -54,7 +54,7 @@ export function EngineTaskEditorSection({
     <section className="panel-muted space-y-4 p-5">
       <div className="space-y-1">
         <h3 className="font-serif text-lg font-semibold">任务编辑器</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+        <p className="text-sm leading-6 text-text-secondary">
           当前只允许编辑可修改状态的任务草稿，不对已确认任务做隐式覆盖。
         </p>
       </div>
@@ -68,7 +68,7 @@ export function EngineTaskEditorSection({
             />
           </div>
           {editDisabledReason ? (
-            <div className="rounded-2xl border border-[rgba(183,121,31,0.2)] bg-[rgba(183,121,31,0.08)] px-4 py-3 text-sm text-[var(--accent-warning)]">
+            <div className="callout-warning px-4 py-3 text-sm text-accent-warning">
               {editDisabledReason}
             </div>
           ) : null}
@@ -142,12 +142,12 @@ export function EngineTaskRegenerateSection({
     <section className="panel-muted space-y-4 p-5">
       <div className="space-y-1">
         <h3 className="font-serif text-lg font-semibold">重建章节任务</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+        <p className="text-sm leading-6 text-text-secondary">
           这里会覆盖当前活跃 workflow 的章节计划。提交前请确认章节号、标题与摘要已经完整。
         </p>
       </div>
       {disabledReason ? (
-        <div className="rounded-2xl border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.52)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+        <div className="rounded-2xl bg-muted shadow-sm px-4 py-3 text-sm text-text-secondary">
           {disabledReason}
         </div>
       ) : (
@@ -176,7 +176,7 @@ export function EngineTaskRegenerateSection({
           {draftRows.length === 0 ? (
             <EmptyState
               title="还没有重建草稿"
-              description="载入当前计划或新建章节任务。"
+              description="载入计划或新建任务。"
             />
           ) : (
             <div className="space-y-3">
@@ -209,9 +209,9 @@ function DraftRowEditor({
   onRemove: () => void;
 }>) {
   return (
-    <article className="rounded-2xl border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.52)] p-4">
+    <article className="rounded-2xl bg-muted shadow-sm p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium text-[var(--text-primary)]">重建草稿 #{index + 1}</p>
+        <p className="text-sm font-medium text-text-primary">重建草稿 #{index + 1}</p>
         <button className="ink-button-secondary" onClick={onRemove}>
           移除此章
         </button>

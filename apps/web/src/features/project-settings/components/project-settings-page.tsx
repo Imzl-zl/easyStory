@@ -88,7 +88,7 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
 
   return (
     <>
-      <div className="grid gap-gap-lg grid-cols-[280px_1fr] min-h-[calc(100vh-4rem)] p-card-xl max-w-[1600px] mx-auto">
+      <div className="grid gap-gap-lg grid-cols-1 lg:grid-cols-[280px_1fr] min-h-[calc(100vh-4rem)] p-card-xl max-w-[1600px] mx-auto">
         <div className="h-fit animate-[slideInLeft_0.35s_cubic-bezier(0.16,1,0.3,1)]">
           <ProjectSettingsSidebar
             dirtyState={{

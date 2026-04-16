@@ -61,7 +61,6 @@ export function AssistantMcpEditor({
   return (
     <form className="panel-muted space-y-10 p-10" onSubmit={(event) => submitDraft(event, draft, onSubmit)}>
       <AssistantDocumentModeToggle
-        description="可以继续用可视化方式维护连接，也可以直接按 MCP.yaml 来写。"
         fileLabel={ASSISTANT_MCP_FILE_LABEL}
         guidedDisabled={Boolean(documentError)}
         mode={editorMode}
@@ -70,7 +69,7 @@ export function AssistantMcpEditor({
       {editorMode === "guided" ? (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.92fr)]">
           <div className="space-y-4">
-            <div className="rounded-2xl bg-[rgba(248,243,235,0.92)] px-4 py-3 text-xs leading-6 text-[var(--text-secondary)]">
+            <div className="rounded-2xl bg-glass-heavy px-4 py-3 text-xs leading-6 text-text-secondary">
               MCP 用来保存你自己的外部工具连接。创建好以后，就可以在 Hooks 里直接选它来执行。
             </div>
             <TextField label="名称" maxLength={80} placeholder="例如：资料检索" value={draft.name} onChange={(value) => applyDraft({ ...draft, name: value }, detail?.id ?? null, setDraft, setDocumentValue, setDocumentError)} />
@@ -82,9 +81,9 @@ export function AssistantMcpEditor({
           </div>
           <div className="space-y-3">
             <PreviewCard fileLabel={ASSISTANT_MCP_FILE_LABEL} preview={documentValue} />
-            <div className="rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-3">
-              <p className="text-sm font-medium text-[var(--text-primary)]">当前效果</p>
-              <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">这个 MCP 会通过 `streamable_http` 方式连接，保存后可以在 Hooks 里直接选用。</p>
+            <div className="rounded-3xl bg-glass shadow-glass px-4 py-3">
+              <p className="text-sm font-medium text-text-primary">当前效果</p>
+              <p className="mt-1 text-[12px] leading-5 text-text-secondary">这个 MCP 会通过 `streamable_http` 方式连接，保存后可以在 Hooks 里直接选用。</p>
             </div>
           </div>
         </div>
@@ -98,7 +97,7 @@ export function AssistantMcpEditor({
       )}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {hasFieldError || documentError ? (
-          <p className="mr-auto rounded-2xl bg-[rgba(178,65,46,0.08)] px-3 py-2 text-[12px] leading-5 text-[var(--accent-danger)]">
+          <p className="mr-auto rounded-2xl bg-accent-danger/10 px-3 py-2 text-[12px] leading-5 text-accent-danger">
             {documentError ?? "请先修正请求头格式，再保存。"}
           </p>
         ) : null}
@@ -126,15 +125,15 @@ function PreviewCard({
   preview: string;
 }>) {
   return (
-    <div className="rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] p-4">
+    <div className="rounded-3xl bg-glass shadow-glass p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-[var(--text-primary)]">保存后的文件</p>
-          <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">右侧会同步预览这条 MCP 最终保存成什么样。</p>
+          <p className="text-sm font-medium text-text-primary">保存后的文件</p>
+          <p className="mt-1 text-[12px] leading-5 text-text-secondary">右侧会同步预览这条 MCP 最终保存成什么样。</p>
         </div>
-        <span className="rounded-full bg-[rgba(248,243,235,0.92)] px-3 py-1 text-[12px] font-medium text-[var(--text-secondary)]">{fileLabel}</span>
+        <span className="rounded-pill bg-glass-heavy px-3 py-1 text-[12px] font-medium text-text-secondary">{fileLabel}</span>
       </div>
-      <pre className="mt-3 max-h-[320px] overflow-auto rounded-[18px] bg-[rgba(248,243,235,0.84)] px-4 py-4 text-[12px] leading-6 text-[var(--text-primary)]">{preview}</pre>
+      <pre className="mt-3 max-h-[320px] overflow-auto rounded-2xl bg-glass px-4 py-4 text-[12px] leading-6 text-text-primary">{preview}</pre>
     </div>
   );
 }
@@ -152,7 +151,7 @@ function TextField({
   value: string;
   onChange: (value: string) => void;
 }>) {
-  return <label className="block space-y-2"><span className="text-sm font-medium text-[var(--text-primary)]">{label}</span><input className="ink-input" maxLength={maxLength} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+  return <label className="block space-y-2"><span className="text-sm font-medium text-text-primary">{label}</span><input className="ink-input" maxLength={maxLength} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function TextareaField({
@@ -168,7 +167,7 @@ function TextareaField({
   value: string;
   onChange: (value: string) => void;
 }>) {
-  return <label className="block space-y-2"><span className="text-sm font-medium text-[var(--text-primary)]">{label}</span><textarea className="ink-input min-h-[88px]" maxLength={maxLength} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+  return <label className="block space-y-2"><span className="text-sm font-medium text-text-primary">{label}</span><textarea className="ink-input min-h-[88px]" maxLength={maxLength} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function ToggleField({
@@ -182,7 +181,7 @@ function ToggleField({
   label: string;
   onChange: (value: boolean) => void;
 }>) {
-  return <label className="flex items-start gap-3 rounded-2xl border border-[var(--line-soft)] bg-[rgba(255,255,255,0.7)] px-4 py-3"><input checked={checked} className="mt-1 size-4 shrink-0 accent-[var(--accent-ink)]" type="checkbox" onChange={(event) => onChange(event.target.checked)} /><span className="space-y-1"><span className="block text-sm font-medium text-[var(--text-primary)]">{label}</span><span className="block text-[12px] leading-5 text-[var(--text-secondary)]">{description}</span></span></label>;
+  return <label className="flex items-start gap-3 rounded-2xl bg-glass shadow-glass px-4 py-3"><input checked={checked} className="mt-1 size-4 shrink-0 accent-accent-primary" type="checkbox" onChange={(event) => onChange(event.target.checked)} /><span className="space-y-1"><span className="block text-sm font-medium text-text-primary">{label}</span><span className="block text-[12px] leading-5 text-text-secondary">{description}</span></span></label>;
 }
 
 function buildInitialDraft(detail: AssistantMcpDetail | null) {

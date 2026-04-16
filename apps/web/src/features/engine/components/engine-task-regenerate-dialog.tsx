@@ -42,12 +42,12 @@ export function EngineTaskRegenerateDialog({
         <section className="panel-muted space-y-4 p-5">
           <div className="space-y-3">
             <StatusBadge status="failed" label="二次确认" />
-            <div className="rounded-2xl border border-[rgba(178,65,46,0.16)] bg-[rgba(178,65,46,0.08)] px-4 py-4 text-sm leading-6 text-[var(--accent-danger)]">
+            <div className="rounded-2xl border border-accent-danger/15 bg-accent-danger/10 px-4 py-4 text-sm leading-6 text-accent-danger">
               {REGENERATE_CONFIRMATION_MESSAGE}
             </div>
           </div>
           {errorMessage ? (
-            <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+            <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
               {errorMessage}
             </div>
           ) : null}
@@ -73,17 +73,17 @@ export function EngineTaskRegenerateDialog({
         <section className="panel-muted space-y-4 p-5">
           <div className="space-y-1">
             <h3 className="font-serif text-lg font-semibold">覆盖影响</h3>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="text-sm leading-6 text-text-secondary">
               这里只列出本次重建对当前任务真值的直接影响，不替你静默兜底。
             </p>
           </div>
           <div className="space-y-3">
             {items.map((item) => (
               <article
-                className="rounded-[18px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.68)] px-4 py-3"
+                className="rounded-2xl bg-glass shadow-glass px-4 py-3"
                 key={item}
               >
-                <p className="text-sm leading-6 text-[var(--text-secondary)]">{item}</p>
+                <p className="text-sm leading-6 text-text-secondary">{item}</p>
               </article>
             ))}
           </div>

@@ -20,11 +20,11 @@ export function FormSection({
   title: string;
 }>) {
   return (
-    <section className="space-y-3 rounded-[28px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.5)] p-4">
+    <section className="space-y-3 rounded-3xl bg-muted shadow-sm p-4">
       <div className="space-y-1">
-        <h4 className="font-serif text-lg font-semibold text-[var(--text-primary)]">{title}</h4>
+        <h4 className="font-serif text-lg font-semibold text-text-primary">{title}</h4>
         {description ? (
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
+          <p className="text-sm leading-6 text-text-secondary">{description}</p>
         ) : null}
       </div>
       {children}
@@ -44,8 +44,8 @@ export function StaticField({
   return (
     <div className="space-y-2">
       <span className="label-text">{label}</span>
-      <div className="panel-muted px-4 py-3 text-sm text-[var(--text-primary)]">{value}</div>
-      {description ? <p className="text-xs text-[var(--text-secondary)]">{description}</p> : null}
+      <div className="panel-muted px-4 py-3 text-sm text-text-primary">{value}</div>
+      {description ? <p className="text-xs text-text-secondary">{description}</p> : null}
     </div>
   );
 }
@@ -146,7 +146,7 @@ export function RadioGroupField({
         {options.map((option) => (
           <label
             key={option.value}
-            className="rounded-full border border-[rgba(101,92,82,0.16)] bg-white/70 px-3 py-2 text-sm text-[var(--text-primary)]"
+            className="rounded-full bg-surface shadow-xs px-3 py-2 text-sm text-text-primary"
           >
             <input
               checked={value === option.value}
@@ -182,15 +182,15 @@ export function CheckboxListField({
   return (
     <fieldset className="space-y-2">
       <legend className="label-text">{label}</legend>
-      {description ? <p className="text-sm leading-6 text-[var(--text-secondary)]">{description}</p> : null}
+      {description ? <p className="text-sm leading-6 text-text-secondary">{description}</p> : null}
       {options.length === 0 ? (
-        <div className="panel-muted px-4 py-3 text-sm text-[var(--text-secondary)]">{emptyMessage}</div>
+        <div className="panel-muted px-4 py-3 text-sm text-text-secondary">{emptyMessage}</div>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
           {options.map((option) => (
             <label
               key={option.value}
-              className="rounded-2xl border border-[rgba(101,92,82,0.12)] bg-white/70 px-4 py-3 text-sm text-[var(--text-primary)]"
+              className="rounded-2xl bg-surface shadow-xs px-4 py-3 text-sm text-text-primary"
             >
               <input
                 checked={values.includes(option.value)}
@@ -201,7 +201,7 @@ export function CheckboxListField({
               />
               {option.label}
               {option.description ? (
-                <span className="mt-1 block text-xs text-[var(--text-secondary)]">{option.description}</span>
+                <span className="mt-1 block text-xs text-text-secondary">{option.description}</span>
               ) : null}
             </label>
           ))}
@@ -220,8 +220,8 @@ export function FormNotice({
 }>) {
   const className =
     tone === "danger"
-      ? "rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]"
-      : "panel-muted px-4 py-3 text-sm text-[var(--text-secondary)]";
+      ? "rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger"
+      : "panel-muted px-4 py-3 text-sm text-text-secondary";
   return <div className={className}>{message}</div>;
 }
 

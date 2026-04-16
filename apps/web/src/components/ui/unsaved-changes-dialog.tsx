@@ -28,7 +28,7 @@ export function UnsavedChangesDialog({
       onClose={onClose}
     >
       <div className="space-y-5">
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">{message}</p>
+        <p className="text-sm leading-6 text-text-secondary">{message}</p>
         <div className="flex flex-wrap justify-end gap-3">
           <button className="ink-button-secondary" disabled={isPending} onClick={onClose} type="button">
             继续编辑

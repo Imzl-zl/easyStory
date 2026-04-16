@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { CodeBlock } from "@/components/ui/code-block";
 import { EmptyState } from "@/components/ui/empty-state";
+import { MetricCard } from "@/components/ui/metric-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { previewWorkflowContext } from "@/lib/api/context";
 import { getErrorMessage } from "@/lib/api/client";
@@ -54,7 +55,7 @@ export function EngineContextPanel({
     return (
       <EmptyState
         title="尚未载入工作流"
-        description="启动工作流后，可以预览节点上下文。"
+        description="启动工作流后查看。"
       />
     );
   }
@@ -64,9 +65,8 @@ export function EngineContextPanel({
       <section className="panel-muted space-y-4 p-4">
         <header className="space-y-1">
           <h3 className="font-serif text-lg font-semibold">预览请求</h3>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
-            直接试跑节点上下文，必要时附带 request-level <code>extra_inject</code> 验证
-            style_reference。
+          <p className="text-sm leading-6 text-text-secondary">
+            试运行节点上下文。
           </p>
         </header>
 
@@ -154,8 +154,8 @@ function ContextPreviewResult({ preview }: Readonly<{ preview: ContextPreview }>
         <section className="panel-muted space-y-3 p-4">
           <header className="space-y-1">
             <h3 className="font-serif text-lg font-semibold">最终 Prompt</h3>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              这里显示真正渲染后的 prompt，不再需要手工拿 variables 套模板。
+            <p className="text-sm leading-6 text-text-secondary">
+              渲染后的提示词预览。
             </p>
           </header>
           <pre className="mono-block whitespace-pre-wrap break-words">{preview.rendered_prompt}</pre>
@@ -165,8 +165,8 @@ function ContextPreviewResult({ preview }: Readonly<{ preview: ContextPreview }>
           <section className="panel-muted space-y-3 p-4">
             <header className="space-y-1">
               <h3 className="font-serif text-lg font-semibold">上下文 Sections</h3>
-              <p className="text-sm leading-6 text-[var(--text-secondary)]">
-                先看哪些来源被注入、降级或裁剪，再决定是调 prompt 还是调注入规则。
+              <p className="text-sm leading-6 text-text-secondary">
+                查看上下文注入情况。
               </p>
             </header>
             {preview.context_report.sections.length > 0 ? (
@@ -176,15 +176,15 @@ function ContextPreviewResult({ preview }: Readonly<{ preview: ContextPreview }>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-[var(--text-secondary)]">当前 preview 没有 section 详情。</p>
+              <p className="text-sm text-text-secondary">暂无分节详情。</p>
             )}
           </section>
 
           <section className="panel-muted space-y-3 p-4">
             <header className="space-y-1">
               <h3 className="font-serif text-lg font-semibold">变量快照</h3>
-              <p className="text-sm leading-6 text-[var(--text-secondary)]">
-                需要排查模板引用或 request-level override 时，再看原始变量字典。
+              <p className="text-sm leading-6 text-text-secondary">
+                查看原始变量。
               </p>
             </header>
             <CodeBlock value={preview.variables} />
@@ -199,13 +199,13 @@ function ContextSectionCard({ section }: Readonly<{ section: ContextPreviewSecti
   const details = buildSectionDetail(section);
 
   return (
-    <div className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
+    <div className="rounded-2xl bg-muted shadow-sm p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
-          <p className="text-sm font-medium text-[var(--text-primary)]">
+          <p className="text-sm font-medium text-text-primary">
             {formatSectionLabel(section.type)}
           </p>
-          <p className="text-xs uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+          <p className="text-xs uppercase tracking-[0.12em] text-text-secondary">
             {section.type}
           </p>
         </div>
@@ -216,29 +216,11 @@ function ContextSectionCard({ section }: Readonly<{ section: ContextPreviewSecti
       </div>
       <div className="mt-3 space-y-1">
         {details.map((detail) => (
-          <p key={`${section.type}-${detail}`} className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p key={`${section.type}-${detail}`} className="text-sm leading-6 text-text-secondary">
             {detail}
           </p>
         ))}
       </div>
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  detail,
-}: Readonly<{
-  label: string;
-  value: string;
-  detail: string;
-}>) {
-  return (
-    <div className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
-      <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">{label}</p>
-      <p className="mt-3 font-serif text-xl leading-8 text-[var(--text-primary)] break-words">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{detail}</p>
     </div>
   );
 }
@@ -251,7 +233,7 @@ function FeedbackMessage({
   message: string;
 }>) {
   return (
-    <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+    <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
       {message}
     </div>
   );

@@ -24,7 +24,6 @@ export function CredentialTokenFields({
       <FieldInput
         autoComplete="off"
         className={className}
-        description="多数平台也叫最大输入 token，用来表示这条连接可容纳的上下文规模。"
         inputMode="numeric"
         label="上下文窗口"
         name="contextWindowTokens"
@@ -40,7 +39,7 @@ export function CredentialTokenFields({
       <FieldInput
         autoComplete="off"
         className={className}
-        description="留空则按聊天页或上游默认值处理；填写后会作为这条连接的默认回复上限。"
+        description="留空则按上游默认值处理。"
         inputMode="numeric"
         label="默认单次回复上限"
         name="defaultMaxOutputTokens"

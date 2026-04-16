@@ -70,10 +70,10 @@ export function CredentialCenterForm({
 function FormIntro({ mode }: { mode: CredentialCenterFormMode }) {
   return (
     <div className="space-y-1">
-      <h3 className="text-[1.02rem] font-semibold text-[var(--text-primary)]">
+      <h3 className="text-[1.02rem] font-semibold text-text-primary">
         {mode === "edit" ? "修改模型连接" : "添加模型连接"}
       </h3>
-      <p className="text-[13px] leading-6 text-[var(--text-secondary)]">
+      <p className="text-[13px] leading-6 text-text-secondary">
         填好下面几项就能保存一条连接。以后想再接别的模型，继续添加新的连接即可。
       </p>
     </div>
@@ -127,7 +127,6 @@ function BasicFields({
       <FieldInput
         autoComplete="off"
         className={fieldClassName}
-        description="这个名字会显示在列表和聊天页里。"
         label="显示名称"
         name="displayName"
         placeholder="例如：薄荷 Gemini"
@@ -149,7 +148,6 @@ function BasicFields({
       <FieldInput
         autoComplete="url"
         className={fieldClassName}
-        description="官方服务通常保持默认地址即可。自建代理如果使用特殊地址，请先确认后端已允许该地址类型。"
         label="服务地址"
         name="baseUrl"
         placeholder="https://api.openai.com"
@@ -160,7 +158,6 @@ function BasicFields({
       <FieldInput
         autoComplete="off"
         className={fieldClassName}
-        description="保存后，验证和聊天会默认使用这个模型。"
         label="默认模型"
         name="defaultModel"
         placeholder="例如：gpt-4.1 / gemini-2.5-pro"
@@ -190,10 +187,10 @@ function ClientIdentityPanel({
   const descriptionClassName = layout === "full" ? "xl:col-span-2" : undefined;
 
   return (
-    <section className="rounded-[22px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
+    <section className="rounded-2xl bg-muted shadow-sm p-4">
       <div className="space-y-1">
-        <h4 className="text-[13px] font-medium leading-5 text-[var(--text-primary)]">客户端标识</h4>
-        <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+        <h4 className="text-[13px] font-medium leading-5 text-text-primary">客户端标识</h4>
+        <p className="text-[12px] leading-5 text-text-secondary">
           某些中转站会按客户端标识分流。需要伪装成 Codex CLI、Claude Code、Gemini CLI 或浏览器时，优先在这里设置。
         </p>
       </div>
@@ -217,8 +214,8 @@ function FeedbackNotice({ feedback }: { feedback: CredentialCenterFeedback }) {
     <div
       className={
         feedback.tone === "danger"
-          ? "rounded-xl bg-[rgba(178,65,46,0.12)] px-3.5 py-2.5 text-[13px] leading-5 text-[var(--accent-danger)]"
-          : "rounded-xl bg-[rgba(58,124,165,0.1)] px-3.5 py-2.5 text-[13px] leading-5 text-[var(--accent-info)]"
+          ? "rounded-2xl bg-accent-danger/10 px-3.5 py-2.5 text-[13px] leading-5 text-accent-danger"
+          : "callout-info px-3.5 py-2.5 text-[13px] leading-5 text-accent-info"
       }
       data-tone={feedback.tone}
     >

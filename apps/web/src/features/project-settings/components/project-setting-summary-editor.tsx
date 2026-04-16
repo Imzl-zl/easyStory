@@ -47,7 +47,7 @@ type ProjectSettingSummaryEditorProps = {
 };
 
 const SETTINGS_LINK_CLASS =
-  "inline-flex items-center text-sm text-[var(--accent-primary)] underline decoration-[rgba(90,122,107,0.28)] underline-offset-4 hover:text-[var(--text-primary)]";
+  "inline-flex items-center text-sm text-accent-primary underline decoration-accent-primary/25 underline-offset-4 hover:text-text-primary";
 
 export function ProjectSettingSummaryEditor({
   initialSetting,
@@ -195,12 +195,12 @@ export function ProjectSettingSummaryEditor({
   };
 
   return (
-    <section className="space-y-4 rounded-[24px] border border-[rgba(90,122,107,0.12)] bg-[rgba(255,255,255,0.82)] p-5 shadow-sm">
+    <section className="space-y-4 rounded-3xl border border-accent-primary-muted bg-glass p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1.5">
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-primary)]">更新摘要</p>
-          <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">直接从项目说明提取结构化摘要</h3>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-xs uppercase tracking-[0.18em] text-accent-primary">更新摘要</p>
+          <h3 className="font-serif text-lg font-semibold text-text-primary">直接从项目说明提取结构化摘要</h3>
+          <p className="text-sm leading-6 text-text-secondary">
             这里会读取最新的项目说明内容交给 AI 提炼，不需要再手动复制人物、世界观、剧情走向和约束要求。
           </p>
         </div>
@@ -209,12 +209,12 @@ export function ProjectSettingSummaryEditor({
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
         <div className="space-y-3">
-          <section className="space-y-3 rounded-[20px] border border-[var(--line-soft)] bg-[rgba(248,243,235,0.52)] p-4">
+          <section className="space-y-3 rounded-2xl bg-muted shadow-sm p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-[var(--text-primary)]">提取来源</p>
-                <p className="text-sm leading-6 text-[var(--text-secondary)]">
-                  每次提取都会直接读取 <span className="font-medium text-[var(--text-primary)]">项目说明.md</span> 的最新内容。
+                <p className="text-sm font-medium text-text-primary">提取来源</p>
+                <p className="text-sm leading-6 text-text-secondary">
+                  每次提取都会直接读取 <span className="font-medium text-text-primary">项目说明.md</span> 的最新内容。
                 </p>
               </div>
               <Link className={SETTINGS_LINK_CLASS} href={studioDocumentHref}>
@@ -222,31 +222,31 @@ export function ProjectSettingSummaryEditor({
               </Link>
             </div>
             {sourceDocumentQuery.isLoading ? (
-              <p className="text-sm text-[var(--text-secondary)]">正在读取项目说明...</p>
+              <p className="text-sm text-text-secondary">正在读取项目说明...</p>
             ) : sourceDocumentQuery.error ? (
-              <p className="text-sm leading-6 text-[var(--accent-danger)]">
+              <p className="text-sm leading-6 text-accent-danger">
                 {getErrorMessage(sourceDocumentQuery.error)}
               </p>
             ) : hasSourceContent ? (
               <div className="space-y-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+                <p className="text-xs uppercase tracking-[0.16em] text-text-secondary">
                   {PROJECT_SETTING_SUMMARY_SOURCE_DOCUMENT_PATH} · {sourceCharacterCount} 字
                 </p>
-                <div className="rounded-[16px] border border-[rgba(101,92,82,0.08)] bg-[var(--bg-surface)] px-4 py-3">
-                  <p className="break-words text-sm leading-7 text-[var(--text-primary)]">
+                <div className="rounded-2xl bg-surface shadow-sm px-4 py-3">
+                  <p className="break-words text-sm leading-7 text-text-primary">
                     {sourceExcerpt}
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="rounded-[16px] border border-[rgba(196,136,61,0.16)] bg-[rgba(196,136,61,0.08)] px-4 py-3 text-sm leading-6 text-[var(--accent-warning)]">
+              <div className="callout-warning px-4 py-3 text-sm leading-6 text-accent-warning">
                 项目说明还是空的。先去文稿里写清楚故事背景、人物关系和约束，再回来提取摘要。
               </div>
             )}
           </section>
           <div className="grid gap-3 md:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-[var(--text-primary)]">模型连接</span>
+              <span className="text-sm font-medium text-text-primary">模型连接</span>
               <AppSelect
                 ariaLabel="摘要提炼连接"
                 density="roomy"
@@ -262,9 +262,9 @@ export function ProjectSettingSummaryEditor({
               />
             </label>
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-[var(--text-primary)]">模型名（可选）</span>
+              <span className="text-sm font-medium text-text-primary">模型名（可选）</span>
               <input
-                className="ink-input min-h-[2.9rem] rounded-[16px]"
+                className="ink-input min-h-[2.9rem] rounded-2xl"
                 placeholder={selectedOption?.defaultModel || "留空则使用连接默认模型"}
                 value={resolvedModelName}
                 onChange={(event) => {
@@ -302,25 +302,25 @@ export function ProjectSettingSummaryEditor({
           </div>
         </div>
 
-        <aside className="space-y-3 rounded-[20px] border border-[var(--line-soft)] bg-[rgba(248,243,235,0.62)] p-4">
+        <aside className="space-y-3 rounded-2xl bg-muted shadow-sm p-4">
           {resourcesQuery.isLoading ? (
-            <p className="text-sm text-[var(--text-secondary)]">正在读取项目偏好和模型连接...</p>
+            <p className="text-sm text-text-secondary">正在读取项目偏好和模型连接...</p>
           ) : resourcesQuery.error ? (
-            <p className="text-sm leading-6 text-[var(--accent-danger)]">{getErrorMessage(resourcesQuery.error)}</p>
+            <p className="text-sm leading-6 text-accent-danger">{getErrorMessage(resourcesQuery.error)}</p>
           ) : hasAvailableProvider ? (
             <>
-              <p className="text-sm font-medium text-[var(--text-primary)]">当前默认连接</p>
-              <p className="text-sm leading-6 text-[var(--text-secondary)]">
+              <p className="text-sm font-medium text-text-primary">当前默认连接</p>
+              <p className="text-sm leading-6 text-text-secondary">
                 {selectedOption ? `${selectedOption.provider} · ${selectedOption.displayLabel}` : "将按可用连接自动回退。"}
               </p>
-              <p className="text-sm leading-6 text-[var(--text-secondary)]">
+              <p className="text-sm leading-6 text-text-secondary">
                 提取时会自动读取最新项目说明，不需要再手动整理一份自由描述。
               </p>
             </>
           ) : (
             <>
-              <p className="text-sm font-medium text-[var(--text-primary)]">还没有可用连接</p>
-              <div className="space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
+              <p className="text-sm font-medium text-text-primary">还没有可用连接</p>
+              <div className="space-y-2 text-sm leading-6 text-text-secondary">
                 <p>先去启用项目或全局模型连接，再回来提取项目说明里的摘要。</p>
                 <Link
                   className={SETTINGS_LINK_CLASS}

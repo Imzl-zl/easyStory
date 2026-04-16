@@ -55,7 +55,7 @@ function ConfigRegistryEditorPanelBody({
         <header className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
-              <p className="text-xs tracking-[0.16em] text-[var(--accent-ink)]">当前编辑</p>
+              <p className="text-xs tracking-[0.16em] text-accent-primary">当前编辑</p>
               <h3 className="font-serif text-lg font-semibold">{getEditorTitle(type)}</h3>
             </div>
             {supportsForm ? (
@@ -79,12 +79,12 @@ function ConfigRegistryEditorPanelBody({
                 />
               </div>
             ) : (
-              <div className="rounded-full bg-[rgba(46,111,106,0.08)] px-3 py-2 text-sm text-[var(--accent-ink)]">
+              <div className="rounded-full bg-accent-soft px-3 py-2 text-sm text-accent-primary">
                 Workflows 当前仅支持原始配置
               </div>
             )}
           </div>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-sm leading-6 text-text-secondary">
             {getEditorDescription(type, mode)}
           </p>
         </header>
@@ -169,7 +169,7 @@ function ModeButton({
 
 function ErrorBanner({ message }: Readonly<{ message: string }>) {
   return (
-    <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+    <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
       {message}
     </div>
   );

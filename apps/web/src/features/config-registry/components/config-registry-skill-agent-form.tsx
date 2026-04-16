@@ -96,11 +96,11 @@ function SkillFormEditorBody({
         <TextAreaField label="描述" name="skill-description" value={draft.description ?? ""} onChange={(value) => setDraft({ ...draft, description: value || null })} />
       </FormSection>
 
-      <FormSection title="提示词" description="填写该 Skill 的提示词内容。">
+      <FormSection title="提示词">
         <TextAreaField label="主要提示词" minHeightClassName="min-h-64" name="skill-prompt" value={draft.prompt} onChange={(value) => setDraft({ ...draft, prompt: value })} />
       </FormSection>
 
-      <FormSection title="输入与输出" description="按需填写变量、输入和输出。">
+      <FormSection title="输入与输出">
         <JsonTextAreaField
           emptyValue={{}}
           label="可用变量"
@@ -230,18 +230,18 @@ function AgentFormEditorBody({
         />
       </FormSection>
 
-      <FormSection title="系统说明" description="填写 Agent 的系统提示词。">
+      <FormSection title="系统说明">
         <TextAreaField label="系统说明" minHeightClassName="min-h-48" name="agent-system-prompt" value={draft.system_prompt} onChange={(value) => setDraft({ ...draft, system_prompt: value })} />
       </FormSection>
 
       {skillReferenceField.bannerMessage && skillReferenceField.bannerTone ? (
         <FormNotice message={skillReferenceField.bannerMessage} tone={skillReferenceField.bannerTone} />
       ) : null}
-      <CheckboxListField label="Skills" description="选择要绑定的 Skills。" emptyMessage={skillReferenceField.emptyMessage} options={skillReferenceField.options} values={draft.skill_ids} onChange={(values) => setDraft({ ...draft, skill_ids: values })} />
+      <CheckboxListField label="Skills" emptyMessage={skillReferenceField.emptyMessage} options={skillReferenceField.options} values={draft.skill_ids} onChange={(values) => setDraft({ ...draft, skill_ids: values })} />
       {mcpReferenceField.bannerMessage && mcpReferenceField.bannerTone ? (
         <FormNotice message={mcpReferenceField.bannerMessage} tone={mcpReferenceField.bannerTone} />
       ) : null}
-      <CheckboxListField label="MCP" description="选择允许调用的 MCP。" emptyMessage={mcpReferenceField.emptyMessage} options={mcpReferenceField.options} values={draft.mcp_servers} onChange={(values) => setDraft({ ...draft, mcp_servers: values })} />
+      <CheckboxListField label="MCP" emptyMessage={mcpReferenceField.emptyMessage} options={mcpReferenceField.options} values={draft.mcp_servers} onChange={(values) => setDraft({ ...draft, mcp_servers: values })} />
 
       {draft.agent_type !== "reviewer" ? (
         <JsonTextAreaField
@@ -255,7 +255,7 @@ function AgentFormEditorBody({
         />
       ) : (
         <FormSection title="输出格式">
-          <StaticField label="当前状态" description="Reviewer 默认不单独限制输出格式。" value="当前类型无需设置" />
+          <StaticField label="当前状态" value="当前类型无需设置" />
         </FormSection>
       )}
 
@@ -296,7 +296,7 @@ function FormActions({
 }>) {
   return (
     <div className="space-y-3">
-      {errorMessage ? <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">{errorMessage}</div> : null}
+      {errorMessage ? <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">{errorMessage}</div> : null}
       <div className="flex flex-wrap items-center gap-2.5 pt-1">
         <button className="ink-button h-9 px-4 text-[13px]" disabled={isPending || !isDirty || Boolean(errorMessage)} type="button" onClick={onSave}>
           {isPending ? "保存中…" : "保存修改"}

@@ -88,7 +88,7 @@ export function AssistantPreferencesForm({
         onSubmit(buildAssistantPreferencesPayload(draft, reasoningControl));
       }}
     >
-      <div className="rounded-2xl bg-[rgba(248,243,235,0.92)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">
+      <div className="rounded-2xl bg-glass-heavy px-4 py-3 text-sm leading-6 text-text-secondary">
         {formDescription}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -112,7 +112,7 @@ export function AssistantPreferencesForm({
         />
       </div>
       {showCredentialEmptyState ? (
-        <div className="rounded-2xl bg-[rgba(183,121,31,0.08)] px-4 py-3 text-sm text-[var(--accent-warning)]">
+        <div className="callout-warning px-4 py-3 text-sm text-accent-warning">
           {emptyStateText}
         </div>
       ) : null}
@@ -152,7 +152,7 @@ function AssistantProviderField({
 }>) {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-[var(--text-primary)]" htmlFor="assistant-default-provider">
+      <label className="text-sm font-medium text-text-primary" htmlFor="assistant-default-provider">
         默认连接
       </label>
       <AppSelect
@@ -168,7 +168,7 @@ function AssistantProviderField({
           }))
         }
       />
-      <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+      <p className="text-[12px] leading-5 text-text-secondary">
         建议直接从可用连接里选择，不需要自己记任何渠道标识。
       </p>
     </div>
@@ -190,7 +190,7 @@ function AssistantModelField({
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-[var(--text-primary)]" htmlFor="assistant-default-model-name">
+      <label className="text-sm font-medium text-text-primary" htmlFor="assistant-default-model-name">
         默认模型
       </label>
       <input
@@ -205,7 +205,7 @@ function AssistantModelField({
         placeholder={placeholder}
         value={draft.defaultModelName}
       />
-      <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+      <p className="text-[12px] leading-5 text-text-secondary">
         通常留空即可。只有你想固定某个模型时，再单独填写。
       </p>
     </div>
@@ -229,7 +229,7 @@ function AssistantMaxOutputTokensField({
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-[var(--text-primary)]" htmlFor="assistant-default-max-output-tokens">
+      <label className="text-sm font-medium text-text-primary" htmlFor="assistant-default-max-output-tokens">
         默认单次回复上限
       </label>
       <input
@@ -246,7 +246,7 @@ function AssistantMaxOutputTokensField({
         placeholder={placeholder}
         value={draft.defaultMaxOutputTokens}
       />
-      <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+      <p className="text-[12px] leading-5 text-text-secondary">
         只控制显式默认的单次回复长度，不影响模型本身的输入容量。留空时不单独覆写，继续沿用当前作用域的默认处理。
       </p>
     </div>
@@ -265,7 +265,7 @@ function AssistantReasoningField({
   updateDraft: (updater: (current: AssistantPreferencesDraft) => AssistantPreferencesDraft) => void;
 }>) {
   const conflictNotice = reasoningShapeError ? (
-    <div className="rounded-2xl bg-[rgba(183,121,31,0.08)] px-4 py-3 text-[12px] leading-5 text-[var(--accent-warning)]">
+    <div className="callout-warning px-4 py-3 text-[12px] leading-5 text-accent-warning">
       当前偏好里存在历史冲突字段：{reasoningShapeError}。先清掉冲突项，再保存新的思考设置。
       <div className="mt-2">
         <button
@@ -287,9 +287,9 @@ function AssistantReasoningField({
   if (reasoningControl.kind === "none") {
     return (
       <div className="space-y-2 lg:col-span-2">
-        <p className="text-sm font-medium text-[var(--text-primary)]">思考设置</p>
+        <p className="text-sm font-medium text-text-primary">思考设置</p>
         {conflictNotice}
-        <div className="rounded-2xl bg-[rgba(248,243,235,0.92)] px-4 py-3 text-[12px] leading-5 text-[var(--text-secondary)]">
+        <div className="rounded-2xl bg-glass-heavy px-4 py-3 text-[12px] leading-5 text-text-secondary">
           {reasoningControl.description}
         </div>
       </div>
@@ -298,7 +298,7 @@ function AssistantReasoningField({
   if (reasoningControl.kind === "gemini_budget") {
     return (
       <div className="space-y-2 lg:col-span-2">
-        <label className="text-sm font-medium text-[var(--text-primary)]" htmlFor="assistant-default-thinking-budget">
+        <label className="text-sm font-medium text-text-primary" htmlFor="assistant-default-thinking-budget">
           {reasoningControl.title}
         </label>
         {conflictNotice}
@@ -347,7 +347,7 @@ function AssistantReasoningField({
           placeholder={reasoningControl.placeholder}
           value={draft.defaultThinkingBudget}
         />
-        <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+        <p className="text-[12px] leading-5 text-text-secondary">
           {reasoningControl.description}
         </p>
       </div>
@@ -359,7 +359,7 @@ function AssistantReasoningField({
 
   return (
     <div className="space-y-2 lg:col-span-2">
-      <label className="text-sm font-medium text-[var(--text-primary)]" htmlFor="assistant-default-reasoning">
+      <label className="text-sm font-medium text-text-primary" htmlFor="assistant-default-reasoning">
         {reasoningControl.title}
       </label>
       {conflictNotice}
@@ -376,7 +376,7 @@ function AssistantReasoningField({
               : { defaultThinkingLevel: value }),
           }))}
       />
-      <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+      <p className="text-[12px] leading-5 text-text-secondary">
         {reasoningControl.description}
       </p>
     </div>
@@ -394,10 +394,10 @@ function ReasoningPresetButton({
 }>) {
   return (
     <button
-      className={`rounded-full border px-3 py-1.5 text-[12px] transition ${
+      className={`rounded-full px-3 py-1.5 text-[12px] transition ${
         active
-          ? "border-[rgba(46,111,106,0.24)] bg-[rgba(46,111,106,0.1)] text-[var(--accent-ink)]"
-          : "border-[rgba(101,92,82,0.12)] bg-white text-[var(--text-secondary)] hover:border-[rgba(46,111,106,0.18)]"
+          ? "bg-accent-primary/10 text-accent-primary shadow-sm"
+          : "bg-surface text-text-secondary shadow-xs hover:bg-surface-hover"
       }`}
       type="button"
       onClick={onClick}

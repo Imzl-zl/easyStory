@@ -101,8 +101,8 @@ export function HookSelectionField({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-medium text-[var(--text-primary)]">自动动作</span>
-        <span className="text-[11px] leading-5 text-[var(--text-secondary)]">仅对当前聊天生效</span>
+        <span className="text-sm font-medium text-text-primary">自动动作</span>
+        <span className="text-[11px] leading-5 text-text-secondary">仅对当前聊天生效</span>
       </div>
       <div className="grid gap-2 md:grid-cols-2">
         {hookOptions.map((hook) => {
@@ -110,10 +110,10 @@ export function HookSelectionField({
           return (
             <button
               aria-pressed={active}
-              className={`rounded-[16px] border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-offset-2 focus-visible:ring-offset-[rgba(248,243,235,0.88)] ${
+              className={`rounded-2xl px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 focus-visible:ring-offset-2 focus-visible:ring-offset-glass-heavy ${
                 active
-                  ? "border-[rgba(46,111,106,0.22)] bg-[rgba(46,111,106,0.1)]"
-                  : "border-[rgba(101,92,82,0.1)] bg-[rgba(255,255,255,0.82)] hover:border-[rgba(46,111,106,0.16)] hover:bg-[rgba(248,243,235,0.88)]"
+                  ? "bg-accent-primary/10 shadow-sm"
+                  : "bg-glass shadow-xs hover:bg-glass-heavy hover:shadow-sm"
               }`}
               key={hook.value}
               type="button"
@@ -125,17 +125,17 @@ export function HookSelectionField({
                 )}
             >
               <span className="flex items-start gap-3">
-                <span className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                <span className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full ${
                   active
-                    ? "border-[rgba(46,111,106,0.28)] bg-[rgba(46,111,106,0.14)] text-[var(--accent-ink)]"
-                    : "border-[rgba(101,92,82,0.16)] bg-[rgba(255,255,255,0.88)] text-transparent"
+                    ? "bg-accent-primary-muted text-accent-primary"
+                    : "bg-muted text-transparent"
                 }`}>
                   ✓
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[12px] font-medium text-[var(--text-primary)]">{hook.label}</span>
+                  <span className="block text-[12px] font-medium text-text-primary">{hook.label}</span>
                   {hook.description ? (
-                    <span className="mt-0.5 block text-[11px] leading-5 text-[var(--text-secondary)]">
+                    <span className="mt-0.5 block text-[11px] leading-5 text-text-secondary">
                       {hook.description}
                     </span>
                   ) : null}
@@ -184,11 +184,11 @@ export function TextSettingField({
 
 export function OutputModeField({ model }: { model: IncubatorChatModel }) {
   return (
-    <div className="rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-3 py-2.5">
+    <div className="rounded-2xl bg-glass shadow-glass px-3 py-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[12px] font-medium text-[var(--text-primary)]">回复显示方式</p>
-          <p className="text-[11px] leading-4 text-[var(--text-secondary)]">仅对当前聊天生效</p>
+          <p className="text-[12px] font-medium text-text-primary">回复显示方式</p>
+          <p className="text-[11px] leading-4 text-text-secondary">仅对当前聊天生效</p>
         </div>
         <Radio.Group
           aria-label="回复方式"
@@ -208,16 +208,16 @@ export function OutputModeField({ model }: { model: IncubatorChatModel }) {
 
 export function SystemCredentialPoolField({ model }: { model: IncubatorChatModel }) {
   return (
-    <div className="rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-3 py-2.5">
+    <div className="rounded-2xl bg-glass shadow-glass px-3 py-2.5">
       <Checkbox
         checked={model.settings.allowSystemCredentialPool}
         onChange={(checked) => updateIncubatorChatSetting(model, "allowSystemCredentialPool", checked)}
       >
         <span className="block min-w-0">
-          <span className="block text-[12px] font-medium text-[var(--text-primary)]">
+          <span className="block text-[12px] font-medium text-text-primary">
             创建项目后沿用默认模型连接
           </span>
-          <span className="mt-0.5 block text-[11px] leading-4 text-[var(--text-secondary)]">
+          <span className="mt-0.5 block text-[11px] leading-4 text-text-secondary">
             仅影响创建后的项目。
           </span>
         </span>
@@ -240,11 +240,11 @@ export function CredentialSettingsEmptyState({
       : "当前没有可用模型连接，请先启用。";
 
   return (
-    <div className="rounded-[14px] bg-[rgba(248,243,235,0.92)] px-3 py-2.5 text-[12px] leading-5 text-[var(--text-secondary)]">
+    <div className="rounded-2xl bg-glass-heavy px-3 py-2.5 text-[12px] leading-5 text-text-secondary">
       <p>{message}</p>
       {credentialState === "loading" ? null : (
         <Link
-          className="mt-2 inline-flex text-[12px] font-medium text-[var(--accent-ink)] underline-offset-4 hover:underline"
+          className="mt-2 inline-flex text-[12px] font-medium text-accent-primary underline-offset-4 hover:underline"
           href={credentialSettingsHref}
         >
           前往模型连接

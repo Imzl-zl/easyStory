@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@arco-design/web-react";
 
 import { renderFloatingPanel, useFloatingPanelStyle } from "@/components/ui/floating-panel-support";
 import type { IncubatorChatModel } from "@/features/lobby/components/incubator/incubator-page-model";
@@ -70,15 +69,15 @@ export function ChatHistoryPanel({ model }: { model: IncubatorChatModel }) {
   const popup = isOpen && panelStyle
     ? renderFloatingPanel(
       <div
-        className="overflow-hidden rounded-[18px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.98)] p-1.5 shadow-[0_18px_38px_rgba(58,45,29,0.12)]"
+        className="overflow-hidden rounded-2xl border border-line-soft bg-elevated/98 p-1.5 shadow-float"
         id={historyPanelId}
         ref={panelRef}
         style={panelStyle}
       >
         <div className="mb-1 flex items-center justify-between gap-2 px-1.5">
-          <p className="text-[10.5px] leading-5 text-[var(--text-secondary)]">最近对话</p>
+          <p className="text-[10.5px] leading-5 text-text-secondary">最近对话</p>
           <button
-            className="rounded-full px-2 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)] transition hover:bg-[rgba(248,243,235,0.92)]"
+            className="rounded-full px-2 py-0.5 text-[10px] leading-4 text-text-secondary transition hover:bg-muted"
             type="button"
             onClick={() => setIsOpen(false)}
           >
@@ -91,10 +90,10 @@ export function ChatHistoryPanel({ model }: { model: IncubatorChatModel }) {
             return (
               <li key={conversation.id}>
                 <div
-                  className={`flex items-center gap-1.5 rounded-[14px] border px-1 py-1 ${isActive ? "border-[rgba(46,111,106,0.18)] bg-[rgba(46,111,106,0.08)]" : "border-transparent bg-[rgba(248,243,235,0.52)] hover:border-[rgba(101,92,82,0.1)] hover:bg-[rgba(255,255,255,0.92)]"}`}
+                  className={`flex items-center gap-1.5 rounded-2xl border px-1 py-1 ${isActive ? "border-accent-primary-muted bg-accent-soft" : "border-transparent bg-glass hover:border-line-soft hover:bg-elevated"}`}
                 >
                   <button
-                    className="min-w-0 flex-1 rounded-[12px] px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.18)]"
+                    className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15"
                     type="button"
                     onClick={() => {
                       model.selectConversation(conversation.id);
@@ -102,34 +101,32 @@ export function ChatHistoryPanel({ model }: { model: IncubatorChatModel }) {
                     }}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-[12px] font-medium leading-5 text-[var(--text-primary)]">
+                      <span className="truncate text-[12px] font-medium leading-5 text-text-primary">
                         {conversation.title}
                       </span>
                       {isActive ? (
-                        <span className="inline-flex shrink-0 items-center rounded-full bg-[rgba(255,255,255,0.88)] px-1.5 py-0.5 text-[9.5px] leading-4 text-[var(--accent-ink)]">
+                        <span className="inline-flex shrink-0 items-center rounded-full bg-elevated px-1.5 py-0.5 text-[9.5px] leading-4 text-accent-ink">
                           当前
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-0.5 text-[10.5px] leading-4 text-[var(--text-secondary)]">
+                    <p className="mt-0.5 text-[10.5px] leading-4 text-text-secondary">
                       {formatConversationUpdatedAt(conversation.updatedAt)}
                     </p>
                   </button>
-                  <Button
+                  <button
                     aria-label={`删除对话：${conversation.title}`}
-                    className="shrink-0"
-                    icon={<TrashIcon />}
-                    shape="circle"
-                    size="mini"
-                    status="danger"
-                    type="text"
+                    className="ink-icon-button text-accent-danger shrink-0"
+                    type="button"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
                       model.deleteConversation(conversation.id);
                       setIsOpen(false);
                     }}
-                  />
+                  >
+                    <TrashIcon />
+                  </button>
                 </div>
               </li>
             );
@@ -146,31 +143,30 @@ export function ChatHistoryPanel({ model }: { model: IncubatorChatModel }) {
           aria-controls={historyPanelId}
           aria-expanded={isOpen}
           ref={triggerRef}
-          className="group flex max-w-[240px] items-center gap-2 rounded-full border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.82)] px-2.5 py-1.5 text-left transition-[border-color,background-color,box-shadow] hover:border-[rgba(46,111,106,0.18)] hover:bg-[rgba(255,255,255,0.96)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)]"
+          className="group flex max-w-[240px] items-center gap-2 rounded-full border border-line-soft bg-surface px-2.5 py-1.5 text-left transition-[border-color,background-color,box-shadow] hover:border-accent-primary-muted hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15"
           onClick={() => setIsOpen((current) => !current)}
           type="button"
         >
-          <span className="text-[10px] font-medium tracking-[0.08em] text-[var(--text-secondary)]">
+          <span className="text-[10px] font-medium tracking-[0.08em] text-text-secondary">
             历史
           </span>
-          <span className="min-w-0 flex-1 truncate text-[11.5px] font-medium leading-5 text-[var(--text-primary)]">
+          <span className="min-w-0 flex-1 truncate text-[11.5px] font-medium leading-5 text-text-primary">
             {activeConversation?.title ?? "新对话"}
           </span>
-          <span className="inline-flex shrink-0 items-center rounded-full bg-[rgba(248,243,235,0.92)] px-1.5 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)]">
+          <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary">
             {conversations.length}
           </span>
         </button>
-        <Button
-          shape="round"
-          size="mini"
-          type="secondary"
+        <button
+          className="ink-button-secondary"
+          type="button"
           onClick={() => {
             model.createConversation();
             setIsOpen(false);
           }}
         >
           新建
-        </Button>
+        </button>
       </div>
       {popup}
     </div>
@@ -181,7 +177,7 @@ function TrashIcon() {
   return (
     <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 24 24">
       <path
-        d="M5 7h14m-9 4v5m4-5v5M9 4h6l1 2H8l1-2Zm1 16h4a2 2 0 0 0 2-2V7H8v11a2 2 0 0 0 2 2Z"
+        d="M5 7h14m-9 4v5m4-5v5M9 4h6l1 2H8l1-2Zm1 16h4a2 2 0 0 0 2-2V7H8v11a2 2 2 0 0 0 2 2Z"
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"

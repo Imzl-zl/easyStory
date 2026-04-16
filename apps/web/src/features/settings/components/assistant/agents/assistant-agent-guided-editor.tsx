@@ -59,7 +59,7 @@ function AgentMainFields({
 }>) {
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-[rgba(58,124,165,0.07)] px-4 py-3 text-[12px] leading-6 text-[var(--text-secondary)]">
+      <div className="callout-info px-4 py-3 text-[12px] leading-6 text-text-secondary">
         Agent 更像“固定好的助手角色”。你只需要写清楚它应该怎么陪你，不需要写技术说明。
       </div>
       <AssistantTextField

@@ -1,27 +1,27 @@
 const STATUS_CLASSNAMES: Record<string, string> = {
-  ready: "bg-accent-ink/10 text-accent-ink",
+  ready: "bg-accent-primary/10 text-accent-primary",
   draft: "bg-text-tertiary/10 text-text-secondary",
-  active: "bg-accent-ink/10 text-accent-ink",
+  active: "bg-accent-primary/10 text-accent-primary",
   completed: "bg-accent-success/10 text-accent-success",
   passed: "bg-accent-success/10 text-accent-success",
   archived: "bg-text-tertiary/10 text-text-secondary",
   approved: "bg-accent-success/10 text-accent-success",
   stale: "bg-accent-warning/10 text-accent-warning",
   warning: "bg-accent-warning/10 text-accent-warning",
-  running: "bg-accent-ink/10 text-accent-ink",
+  running: "bg-accent-primary/10 text-accent-primary",
   paused: "bg-accent-warning/10 text-accent-warning",
   failed: "bg-accent-danger/10 text-accent-danger",
   cancelled: "bg-text-tertiary/10 text-text-secondary",
   blocked: "bg-accent-danger/10 text-accent-danger",
   not_started: "bg-text-tertiary/10 text-text-secondary",
-  generating: "bg-accent-ink/10 text-accent-ink",
+  generating: "bg-accent-primary/10 text-accent-primary",
   interrupted: "bg-accent-warning/10 text-accent-warning",
-  setting: "bg-accent-ink/10 text-accent-ink",
-  outline: "bg-accent-ink/10 text-accent-ink",
-  opening_plan: "bg-accent-ink/10 text-accent-ink",
-  chapter_tasks: "bg-accent-ink/10 text-accent-ink",
-  workflow: "bg-accent-ink/10 text-accent-ink",
-  chapter: "bg-accent-ink/10 text-accent-ink",
+  setting: "bg-accent-primary/10 text-accent-primary",
+  outline: "bg-accent-primary/10 text-accent-primary",
+  opening_plan: "bg-accent-primary/10 text-accent-primary",
+  chapter_tasks: "bg-accent-primary/10 text-accent-primary",
+  workflow: "bg-accent-primary/10 text-accent-primary",
+  chapter: "bg-accent-primary/10 text-accent-primary",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -58,8 +58,8 @@ type StatusBadgeProps = {
 export function StatusBadge({ status, label }: StatusBadgeProps) {
   return (
     <span
-      className={`inline-flex rounded-full px-3 py-1 text-xs font-medium tracking-[0.08em] ${
-        STATUS_CLASSNAMES[status] ?? "bg-accent-ink/10 text-accent-ink"
+      className={`inline-flex rounded-pill px-3 py-1 text-xs font-medium tracking-[0.04em] shadow-xs ${
+        STATUS_CLASSNAMES[status] ?? "bg-accent-primary/10 text-accent-primary"
       }`}
     >
       {label ?? STATUS_LABELS[status] ?? status}

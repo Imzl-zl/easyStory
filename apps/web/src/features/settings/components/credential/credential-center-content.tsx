@@ -75,7 +75,7 @@ export function CredentialCenterContent({
           {mode === "audit" ? (
             <CredentialAuditPanel credentialId={activeAuditCredentialId} />
           ) : shouldShowEditLoadingState ? (
-            <div className="panel-muted px-4 py-4 text-[13px] leading-6 text-[var(--text-secondary)]">正在加载连接详情…</div>
+            <div className="panel-muted px-4 py-4 text-[13px] leading-6 text-text-secondary">正在加载连接详情…</div>
           ) : (
             <CredentialCenterForm
               key={activeFormKey}
@@ -104,7 +104,7 @@ export function CredentialCenterContent({
     return <EmptyState title="暂无模型连接" description="创建模型连接后可查看操作记录。" />;
   }
   if (shouldShowEditLoadingState) {
-    return <div className="panel-muted px-4 py-4 text-[13px] leading-6 text-[var(--text-secondary)]">正在加载连接详情…</div>;
+    return <div className="panel-muted px-4 py-4 text-[13px] leading-6 text-text-secondary">正在加载连接详情…</div>;
   }
   return (
     <CredentialCenterForm

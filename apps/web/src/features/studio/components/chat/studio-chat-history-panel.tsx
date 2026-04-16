@@ -2,9 +2,6 @@
 
 import { createPortal } from "react-dom";
 import {
-  Button,
-} from "@arco-design/web-react";
-import {
   useEffect,
   useCallback,
   useRef,
@@ -84,13 +81,13 @@ export function StudioChatHistoryPanel({
   const popup = isOpen && panelStyle
     ? createPortal(
       <div
-        className="overflow-hidden rounded-[20px] border border-[rgba(101,92,82,0.14)] bg-[#fffdf9] p-2 shadow-[0_18px_40px_rgba(58,45,29,0.14)] ring-1 ring-[rgba(255,255,255,0.88)] animate-[slideFromRight_0.22s_cubic-bezier(0.16,1,0.3,1)]"
+        className="overflow-hidden rounded-2xl bg-surface shadow-sm p-2 shadow-lg ring-1 ring-white/90 animate-[slideFromRight_0.22s_cubic-bezier(0.16,1,0.3,1)]"
         ref={popupRef}
         style={panelStyle}
       >
-        <div className="mb-1 flex items-center justify-between rounded-[14px] bg-[#fffdf9] px-2 py-1">
-          <span className="text-[10px] font-medium tracking-[0.08em] text-[var(--text-secondary)]">选择历史对话</span>
-          <span className="text-[10px] text-[var(--text-muted)]">{conversations.length} 条</span>
+        <div className="mb-1 flex items-center justify-between rounded-2xl bg-surface px-2 py-1">
+          <span className="text-[10px] font-medium tracking-[0.08em] text-text-secondary">选择历史对话</span>
+          <span className="text-[10px] text-text-tertiary">{conversations.length} 条</span>
         </div>
         <ul className="max-h-[260px] space-y-1 overflow-y-auto pr-0.5">
           {conversations.map((conversation) => {
@@ -98,10 +95,10 @@ export function StudioChatHistoryPanel({
             return (
               <li key={conversation.id}>
                 <div
-                  className={`flex items-center gap-1.5 rounded-[14px] border px-1 py-1 ${isActive ? "border-[rgba(46,111,106,0.18)] bg-[#eef4ea]" : "border-[rgba(101,92,82,0.08)] bg-[#f9f6ef] hover:border-[rgba(101,92,82,0.12)] hover:bg-[#fffdfa]"}`}
+                  className={`flex items-center gap-1.5 rounded-2xl px-1 py-1 ${isActive ? "bg-accent-soft shadow-sm" : "bg-muted shadow-xs hover:bg-surface hover:shadow-sm"}`}
                 >
                   <button
-                    className="min-w-0 flex-1 rounded-[12px] px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.18)] disabled:cursor-not-allowed"
+                    className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed"
                     disabled={disabled}
                     type="button"
                     onClick={() => {
@@ -110,34 +107,32 @@ export function StudioChatHistoryPanel({
                     }}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-[12px] font-medium leading-5 text-[var(--text-primary)]">
+                      <span className="truncate text-[12px] font-medium leading-5 text-text-primary">
                         {conversation.title}
                       </span>
                       {isActive ? (
-                        <span className="inline-flex shrink-0 items-center rounded-full bg-white px-1.5 py-0.5 text-[9.5px] leading-4 text-[var(--accent-ink)]">
+                        <span className="inline-flex shrink-0 items-center rounded-full bg-elevated px-1.5 py-0.5 text-[9.5px] leading-4 text-accent-primary">
                           当前
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-0.5 text-[10.5px] leading-4 text-[var(--text-secondary)]">
+                    <p className="mt-0.5 text-[10.5px] leading-4 text-text-secondary">
                       {formatConversationUpdatedAt(conversation.updatedAt)}
                     </p>
                   </button>
-                  <Button
+                  <button
                     aria-label={`删除对话：${conversation.title}`}
-                    className="shrink-0"
+                    className="ink-icon-button text-accent-danger shrink-0"
                     disabled={disabled}
-                    icon={<TrashIcon />}
-                    shape="circle"
-                    size="mini"
-                    status="danger"
-                    type="text"
+                    type="button"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
                       onDeleteConversation(conversation.id);
                     }}
-                  />
+                  >
+                    <TrashIcon />
+                  </button>
                 </div>
               </li>
             );
@@ -152,7 +147,7 @@ export function StudioChatHistoryPanel({
     <div className={`relative flex min-w-0 items-center gap-2 ${compactLayout ? "w-full justify-stretch" : "ml-auto w-[min(228px,100%)] justify-end"}`} ref={containerRef}>
       <button
         aria-label="新对话"
-        className={`inline-flex h-[30px] shrink-0 items-center rounded-full border border-[rgba(101,92,82,0.12)] bg-[#fffdfa] text-[11px] font-medium text-[var(--text-primary)] transition-[border-color,background-color] hover:border-[rgba(46,111,106,0.2)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] disabled:cursor-not-allowed disabled:opacity-60 ${iconLayout ? "w-[30px] justify-center px-0" : "gap-1.5 px-3"}`}
+        className={`inline-flex h-[30px] shrink-0 items-center rounded-full bg-surface shadow-sm text-[11px] font-medium text-text-primary transition-[border-color,background-color] hover:border-accent-primary-muted hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-60 ${iconLayout ? "w-[30px] justify-center px-0" : "gap-1.5 px-3"}`}
         disabled={disabled}
         title="新对话"
         type="button"
@@ -166,24 +161,24 @@ export function StudioChatHistoryPanel({
       </button>
       <button
         aria-expanded={isOpen}
-        className="group flex h-[30px] min-w-0 flex-1 items-center gap-2 rounded-full border border-[rgba(101,92,82,0.12)] bg-[#fffdfa] px-3 text-left transition-[border-color,background-color,box-shadow] hover:border-[rgba(46,111,106,0.18)] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] disabled:cursor-not-allowed disabled:opacity-60"
+        className="group flex h-[30px] min-w-0 flex-1 items-center gap-2 rounded-full bg-surface shadow-sm px-3 text-left transition-[border-color,background-color,box-shadow] hover:border-accent-primary-muted hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled}
         title={activeConversation?.title ?? "新对话"}
         type="button"
         onClick={() => onOpenChange(!isOpen)}
       >
-        <span className="inline-flex shrink-0 items-center rounded-full bg-[#f3ede3] px-2 py-0.5 text-[9.5px] leading-4 text-[var(--text-secondary)]">
+        <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[9.5px] leading-4 text-text-secondary">
           历史
         </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-5 text-[var(--text-primary)]">
+        <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-5 text-text-primary">
           {activeConversation?.title ?? "新对话"}
         </span>
-        <span className="inline-flex shrink-0 items-center rounded-full bg-[#f3ede3] px-1.5 py-0.5 text-[9px] leading-4 text-[var(--text-secondary)]">
+        <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 py-0.5 text-[9px] leading-4 text-text-secondary">
           {conversations.length} 条
         </span>
         <span
           aria-hidden="true"
-          className={`shrink-0 text-[10px] text-[var(--text-secondary)] transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`shrink-0 text-[10px] text-text-secondary transition-transform ${isOpen ? "rotate-180" : ""}`}
         >
           ▾
         </span>

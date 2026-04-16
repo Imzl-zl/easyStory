@@ -34,7 +34,7 @@ function EditorHeader({ mode }: { mode: TemplateLibraryModel["editorMode"] }) {
   return (
     <div className="space-y-1">
       <h2 className="font-serif text-2xl font-semibold">{getTemplateEditorTitle(mode)}</h2>
-      <p className="text-sm leading-6 text-[var(--text-secondary)]">
+      <p className="text-sm leading-6 text-text-secondary">
         保存后会同步流程节点配置。
       </p>
     </div>
@@ -79,7 +79,7 @@ function GuidedQuestionEditor({ model }: { model: TemplateLibraryModel }) {
         <h3 className="font-serif text-lg font-semibold">引导问题</h3>
         <button className="ink-button-secondary" onClick={model.addQuestion} type="button">新增问题</button>
       </div>
-      {model.form.guidedQuestions.length === 0 ? <p className="rounded-2xl bg-[rgba(255,255,255,0.52)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">未添加引导问题。</p> : null}
+      {model.form.guidedQuestions.length === 0 ? <p className="rounded-2xl bg-muted px-4 py-3 text-sm leading-6 text-text-secondary">未添加引导问题。</p> : null}
       {model.form.guidedQuestions.map((question, index) => (
         <QuestionCard key={`${index}-${question.variable}`} index={index} model={model} />
       ))}
@@ -105,7 +105,7 @@ function QuestionCard({
         <span className="label-text">变量名</span>
         <input className="ink-input" value={question.variable} onBlur={() => model.normalizeQuestionVariable(index)} onChange={(event) => model.updateQuestion(index, "variable", event.target.value)} />
       </label>
-      <div className="flex items-center justify-between gap-3 text-xs text-[var(--text-secondary)]">
+      <div className="flex items-center justify-between gap-3 text-xs text-text-secondary">
         <span>
           保存时会自动规范变量名，例如
           {" "}
@@ -124,13 +124,13 @@ function QuestionCard({
 
 function IssueList({ issues }: { issues: string[] }) {
   return (
-    <div className="space-y-2 rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+    <div className="space-y-2 rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
       {issues.map((issue) => <p key={issue}>{issue}</p>)}
     </div>
   );
 }
 
 function FeedbackBanner({ feedback }: { feedback: NonNullable<TemplateLibraryModel["feedback"]> }) {
-  const className = feedback.tone === "danger" ? "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]" : "bg-[rgba(58,124,165,0.1)] text-[var(--accent-info)]";
+  const className = feedback.tone === "danger" ? "bg-accent-danger/10 text-accent-danger" : "bg-accent-info-soft text-accent-info";
   return <div className={`rounded-2xl px-4 py-3 text-sm ${className}`}>{feedback.message}</div>;
 }

@@ -14,7 +14,7 @@ export function ConfigRegistryBanner({
   if (tone === "danger") {
     return (
       <div
-        className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]"
+        className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger"
         {...liveProps}
       >
         {message}
@@ -24,12 +24,12 @@ export function ConfigRegistryBanner({
   if (tone === "info") {
     return (
       <div
-        className="rounded-2xl bg-[rgba(58,124,165,0.1)] px-4 py-3 text-sm text-[var(--accent-info)]"
+        className="callout-info px-4 py-3 text-sm text-accent-info"
         {...liveProps}
       >
         {message}
       </div>
     );
   }
-  return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">{message}</div>;
+  return <div className="panel-muted px-4 py-5 text-sm text-text-secondary">{message}</div>;
 }

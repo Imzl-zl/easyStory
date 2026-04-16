@@ -19,11 +19,11 @@ export function CredentialAuditPanel({ credentialId }: { credentialId: string | 
     return <EmptyState title="先选一条模型连接" description="选中左侧连接后，就能查看它的操作记录。" />;
   }
   if (query.isLoading) {
-    return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载审计日志...</div>;
+    return <div className="panel-muted px-4 py-5 text-sm text-text-secondary">正在加载审计日志...</div>;
   }
   if (query.error) {
     return (
-      <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+      <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
         {getErrorMessage(query.error)}
       </div>
     );
@@ -38,11 +38,11 @@ export function CredentialAuditPanel({ credentialId }: { credentialId: string | 
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <p className="font-medium">{item.event_type}</p>
-              <p className="text-sm text-[var(--text-secondary)]">
+              <p className="text-sm text-text-secondary">
                 entity: {item.entity_type} · actor: {item.actor_user_id ?? "system"}
               </p>
             </div>
-            <span className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+            <span className="text-xs uppercase tracking-[0.16em] text-text-secondary">
               {formatAuditTime(item.created_at)}
             </span>
           </div>

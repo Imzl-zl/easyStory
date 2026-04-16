@@ -141,14 +141,13 @@ function HooksPanelBody({
 
   return (
     <SectionCard
-      description="你的自动动作配置。把回复前后的额外步骤保存下来，需要时再打开。"
       title="Hooks"
     >
       <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="space-y-3 rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.68)] p-4 xl:sticky xl:top-6 xl:self-start">
-          <div className="space-y-1 rounded-[18px] bg-[rgba(248,243,235,0.78)] px-4 py-3">
-            <p className="text-sm font-medium text-[var(--text-primary)]">我的 Hooks</p>
-            <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+        <aside className="space-y-3 rounded-3xl bg-glass shadow-glass p-4 xl:sticky xl:top-6 xl:self-start">
+          <div className="space-y-1 rounded-2xl bg-muted px-4 py-3">
+            <p className="text-sm font-medium text-text-primary">我的 Hooks</p>
+            <p className="text-[12px] leading-5 text-text-secondary">
               已启用 {enabledHookCount} 个，共 {hooks.length} 个。
             </p>
           </div>
@@ -158,15 +157,15 @@ function HooksPanelBody({
           <div className="space-y-2 xl:max-h-[28rem] xl:overflow-y-auto xl:pr-1">
             {hooks.map((hook) => (
               <button
-                className="ink-tab w-full justify-start rounded-[20px] px-4 py-3 text-left"
+                className="ink-tab w-full justify-start rounded-2xl px-4 py-3 text-left"
                 data-active={selection === hook.id}
                 key={hook.id}
                 type="button"
                 onClick={() => onSelect(hook.id)}
               >
                 <span className="flex flex-col items-start gap-1">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">{hook.name}</span>
-                  <span className="text-[12px] leading-5 text-[var(--text-secondary)]">
+                  <span className="text-sm font-medium text-text-primary">{hook.name}</span>
+                  <span className="text-[12px] leading-5 text-text-secondary">
                     {buildAssistantHookListDescription(hook, {
                       agentLabel: hook.action.action_type === "agent" ? agentLabelMap.get(hook.action.agent_id) ?? null : null,
                       mcpLabel: hook.action.action_type === "mcp" ? mcpLabelMap.get(hook.action.server_id) ?? null : null,
@@ -179,8 +178,8 @@ function HooksPanelBody({
         </aside>
         <div className="space-y-4">
           {showCreateEditor && hooks.length === 0 ? (
-            <div className="rounded-[24px] border border-dashed border-[var(--line-soft)] bg-[rgba(255,255,255,0.6)] px-5 py-6 text-sm leading-7 text-[var(--text-secondary)]">
-              先创建一个 Hook。比如“回复后自动整理”，这样每次回复完都能自动多做一步；不需要自动化时可以先跳过。
+            <div className="rounded-3xl border border-dashed border-line-soft bg-muted px-5 py-6 text-sm leading-7 text-text-secondary">
+              创建自动化步骤，如”回复后自动整理”。
             </div>
           ) : null}
           {showCreateEditor || detail ? (
@@ -199,7 +198,7 @@ function HooksPanelBody({
             />
           ) : null}
           {!showCreateEditor && !detail && !editorDirty ? (
-            <div className="rounded-[24px] border border-dashed border-[var(--line-soft)] bg-[rgba(255,255,255,0.6)] px-5 py-6 text-sm leading-7 text-[var(--text-secondary)]">
+            <div className="rounded-3xl border border-dashed border-line-soft bg-muted px-5 py-6 text-sm leading-7 text-text-secondary">
               请选择一个 Hook 查看详情。
             </div>
           ) : null}

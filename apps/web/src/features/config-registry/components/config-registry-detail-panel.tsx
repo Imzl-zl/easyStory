@@ -58,11 +58,11 @@ export function ConfigRegistryDetailPanel({
       {errorMessage ? <Banner tone="danger" message={errorMessage} /> : null}
       <section className="panel-muted space-y-4 p-5">
         <div className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">
+          <p className="text-xs uppercase tracking-[0.18em] text-accent-primary">
             当前内容
           </p>
           <h3 className="font-serif text-xl font-semibold">{detail.name}</h3>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-sm leading-6 text-text-secondary">
             {detail.description ?? "暂无描述。"}
           </p>
         </div>
@@ -79,7 +79,7 @@ export function ConfigRegistryDetailPanel({
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="rounded-full bg-[rgba(46,111,106,0.08)] px-3 py-1 text-xs text-[var(--accent-ink)]"
+                className="rounded-full bg-accent-soft px-3 py-1 text-xs text-accent-primary"
               >
                 {tag}
               </span>
@@ -90,7 +90,7 @@ export function ConfigRegistryDetailPanel({
       <section className="panel-muted space-y-3 p-5">
         <div className="space-y-1">
           <h4 className="font-serif text-lg font-semibold">完整配置</h4>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-sm leading-6 text-text-secondary">
             用于核对完整字段。
           </p>
         </div>
@@ -102,9 +102,9 @@ export function ConfigRegistryDetailPanel({
 
 function DetailRow({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
-    <div className="rounded-2xl border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.56)] px-4 py-3">
-      <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">{label}</p>
-      <p className="mt-2 text-sm leading-6 text-[var(--text-primary)]">{value}</p>
+    <div className="rounded-2xl bg-muted shadow-sm px-4 py-3">
+      <p className="text-xs uppercase tracking-[0.16em] text-text-secondary">{label}</p>
+      <p className="mt-2 text-sm leading-6 text-text-primary">{value}</p>
     </div>
   );
 }
@@ -118,10 +118,10 @@ function Banner({
 }>) {
   if (tone === "danger") {
     return (
-      <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+      <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
         {message}
       </div>
     );
   }
-  return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">{message}</div>;
+  return <div className="panel-muted px-4 py-5 text-sm text-text-secondary">{message}</div>;
 }

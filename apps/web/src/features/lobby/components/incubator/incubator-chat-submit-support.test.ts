@@ -13,7 +13,7 @@ import {
   createIncubatorInitialMessages,
   createIncubatorMessage,
 } from "@/features/lobby/components/incubator/incubator-chat-support";
-import { createEmptyIncubatorChatSession } from "@/features/lobby/components/incubator/incubator-chat-store";
+import { createEmptyIncubatorChatSession, type IncubatorChatSession } from "@/features/lobby/components/incubator/incubator-chat-store";
 
 test("incubator chat submit support records latest completed run id after success", async () => {
   const userMessage = createIncubatorMessage("user", "先给我一个故事方向");
@@ -45,8 +45,8 @@ test("incubator chat submit support records latest completed run id after succes
   };
   const assistantMutation = {
     mutateAsync: async () => result,
-  } as UseMutationResult<AssistantTurnResult, unknown, PromptSubmission>;
-  let nextSession = createEmptyIncubatorChatSession();
+  } as unknown as UseMutationResult<AssistantTurnResult, unknown, PromptSubmission>;
+  let nextSession: IncubatorChatSession = createEmptyIncubatorChatSession();
 
   await completePromptSubmission(
     assistantMutation,
@@ -73,7 +73,7 @@ test("incubator chat submit support clears latest completed run id after failure
     pendingAssistant,
     submittedMessages: [...createIncubatorInitialMessages(), userMessage],
   };
-  let nextSession = {
+  let nextSession: IncubatorChatSession = {
     ...createEmptyIncubatorChatSession(),
     latestCompletedRunId: "run-incubator-prev-1",
     messages: submission.nextMessages,
@@ -124,8 +124,8 @@ test("incubator chat submit support does not retain latest completed run id when
   };
   const assistantMutation = {
     mutateAsync: async () => result,
-  } as UseMutationResult<AssistantTurnResult, unknown, PromptSubmission>;
-  let nextSession = createEmptyIncubatorChatSession();
+  } as unknown as UseMutationResult<AssistantTurnResult, unknown, PromptSubmission>;
+  let nextSession: IncubatorChatSession = createEmptyIncubatorChatSession();
 
   await completePromptSubmission(
     assistantMutation,

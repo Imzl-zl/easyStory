@@ -46,8 +46,8 @@ export function JsonRelationGraph({
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
-      <header className="flex flex-wrap items-center gap-2 border-b border-[rgba(44,36,22,0.05)] px-5 py-3">
-        <span className="rounded-full bg-[rgba(35,96,137,0.08)] px-2.5 py-1 text-[11px] text-[#245b82]">
+      <header className="flex flex-wrap items-center gap-2 border-b border-line-soft px-5 py-3">
+        <span className="rounded-full bg-accent-info/10 px-2.5 py-1 text-[11px] text-accent-info">
           当前文件：{activeSourceLabel}
         </span>
         <StatChip label="人物" value={sourceSummary.characterCount} />
@@ -55,7 +55,7 @@ export function JsonRelationGraph({
         <StatChip label="人物关系" value={sourceSummary.characterRelationCount} />
         <StatChip label="势力关系" value={sourceSummary.factionRelationCount} />
         <StatChip label="隶属" value={sourceSummary.membershipCount} />
-        <span className="ml-auto rounded-full bg-[rgba(90,122,107,0.08)] px-2.5 py-1 text-[11px] text-[var(--accent-primary)]">
+        <span className="ml-auto rounded-full bg-accent-soft px-2.5 py-1 text-[11px] text-accent-primary">
           只读图预览
         </span>
       </header>
@@ -149,12 +149,12 @@ function JsonRelationGraphCanvas({
     };
   }, []);
 
-  return <div className="h-full w-full bg-[radial-gradient(circle_at_top,rgba(90,122,107,0.08),transparent_48%),linear-gradient(180deg,#fffdf9_0%,#f8f4ec_100%)]" ref={containerRef} />;
+  return <div className="h-full w-full bg-canvas" ref={containerRef} />;
 }
 
 function StatChip({ label, value }: Readonly<{ label: string; value: number }>) {
   return (
-    <span className="rounded-full border border-[rgba(101,92,82,0.12)] bg-white/92 px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
+    <span className="rounded-full bg-muted shadow-xs px-2.5 py-1 text-[11px] text-text-secondary">
       {label} {value}
     </span>
   );
@@ -163,11 +163,11 @@ function StatChip({ label, value }: Readonly<{ label: string; value: number }>) 
 function JsonRelationGraphHint() {
   return (
     <div className="pointer-events-none absolute inset-x-4 bottom-4 z-10 flex justify-center">
-      <div className="flex max-w-[560px] items-center gap-3 rounded-[20px] border border-[rgba(101,92,82,0.1)] bg-[rgba(255,252,247,0.9)] px-4 py-3 shadow-[0_14px_34px_rgba(58,45,29,0.09)] backdrop-blur">
-        <span className="rounded-full bg-[rgba(90,122,107,0.1)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-primary)]">
+      <div className="flex max-w-[560px] items-center gap-3 rounded-2xl bg-glass shadow-glass px-4 py-3 shadow-md backdrop-blur">
+        <span className="rounded-full bg-accent-primary/10 px-2.5 py-1 text-[11px] font-medium text-accent-primary">
           关系总览
         </span>
-        <p className="m-0 text-[12px] leading-6 text-[var(--text-secondary)]">
+        <p className="m-0 text-[12px] leading-6 text-text-secondary">
           点击节点或连线查看详情。缩放和平移只影响当前视图，不会改写任何关系。
         </p>
       </div>
@@ -188,14 +188,14 @@ function JsonRelationGraphInspectorPanel({
 }>) {
   return (
     <aside className="absolute right-4 top-4 z-10 w-[min(360px,calc(100%-2rem))] max-h-[calc(100%-2rem)]">
-      <div className="flex max-h-full flex-col overflow-hidden rounded-[30px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,252,247,0.92)] shadow-[0_28px_60px_rgba(58,45,29,0.16)] backdrop-blur-xl">
+      <div className="flex max-h-full flex-col overflow-hidden rounded-[30px] bg-glass shadow-glass-heavy shadow-lg backdrop-blur-xl">
         <div
-          className="relative overflow-hidden border-b border-[rgba(44,36,22,0.06)] px-5 py-5"
+          className="relative overflow-hidden border-b border-line-soft px-5 py-5"
           style={{
             background: `linear-gradient(180deg, color-mix(in srgb, ${inspector.accentColor} 14%, white) 0%, rgba(255,252,247,0.96) 72%)`,
           }}
         >
-          <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(44,36,22,0.18)] to-transparent" />
+          <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-line-strong to-transparent" />
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <span
@@ -207,15 +207,15 @@ function JsonRelationGraphInspectorPanel({
               >
                 {inspector.kindLabel}
               </span>
-              <h3 className="mt-3 truncate font-serif text-[1.08rem] font-bold tracking-[-0.01em] text-[var(--text-primary)]">
+              <h3 className="mt-3 truncate font-serif text-[1.08rem] font-bold tracking-[-0.01em] text-text-primary">
                 {inspector.title}
               </h3>
-              <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">
+              <p className="mt-1 text-[12px] leading-5 text-text-secondary">
                 {inspector.subtitle}
               </p>
             </div>
             <button
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(101,92,82,0.12)] bg-white/82 text-[var(--text-secondary)] transition hover:bg-white hover:text-[var(--text-primary)]"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface shadow-xs text-text-secondary transition hover:bg-elevated hover:text-text-primary"
               type="button"
               onClick={onClear}
             >
@@ -225,7 +225,7 @@ function JsonRelationGraphInspectorPanel({
           <div className="mt-4 flex flex-wrap gap-2">
             {inspector.badges.map((badge) => (
               <span
-                className="rounded-full border border-[rgba(101,92,82,0.12)] bg-white/88 px-2.5 py-1 text-[11px] text-[var(--text-secondary)]"
+                className="rounded-full bg-muted shadow-xs px-2.5 py-1 text-[11px] text-text-secondary"
                 key={badge}
               >
                 {badge}
@@ -238,31 +238,31 @@ function JsonRelationGraphInspectorPanel({
           <div className="grid gap-3 sm:grid-cols-2">
             {inspector.facts.map((fact, index) => (
               <div
-                className={`rounded-[18px] border border-[rgba(101,92,82,0.08)] bg-white/88 px-3.5 py-3 shadow-[0_8px_24px_rgba(58,45,29,0.05)] ${inspector.facts.length % 2 === 1 && index === inspector.facts.length - 1 ? "sm:col-span-2" : ""}`}
+                className={`rounded-2xl bg-muted shadow-sm px-3.5 py-3  ${inspector.facts.length % 2 === 1 && index === inspector.facts.length - 1 ? "sm:col-span-2" : ""}`}
                 key={fact.label}
               >
-                <p className="m-0 text-[11px] font-medium tracking-[0.06em] text-[var(--text-secondary)]">
+                <p className="m-0 text-[11px] font-medium tracking-[0.06em] text-text-secondary">
                   {fact.label}
                 </p>
-                <p className="mt-1.5 text-[13px] leading-6 text-[var(--text-primary)]">
+                <p className="mt-1.5 text-[13px] leading-6 text-text-primary">
                   {fact.value}
                 </p>
               </div>
             ))}
           </div>
 
-          <div className="mt-4 rounded-[22px] border border-[rgba(101,92,82,0.08)] bg-[rgba(249,246,240,0.78)] px-4 py-3.5">
+          <div className="mt-4 rounded-2xl bg-muted shadow-sm px-4 py-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="m-0 text-[11px] font-medium tracking-[0.08em] text-[var(--text-secondary)]">
+                <p className="m-0 text-[11px] font-medium tracking-[0.08em] text-text-secondary">
                   原始字段
                 </p>
-                <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">
+                <p className="mt-1 text-[12px] leading-5 text-text-secondary">
                   默认不展开，只有核对结构化字段时再查看。
                 </p>
               </div>
               <button
-                className="shrink-0 rounded-full border border-[rgba(101,92,82,0.12)] bg-white/92 px-3 py-1.5 text-[11px] font-medium text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+                className="shrink-0 rounded-full bg-surface shadow-xs px-3 py-1.5 text-[11px] font-medium text-text-secondary transition hover:text-text-primary"
                 type="button"
                 onClick={onToggleRaw}
               >
@@ -270,11 +270,11 @@ function JsonRelationGraphInspectorPanel({
               </button>
             </div>
             {showRawContent ? (
-              <div className="mt-3 rounded-[18px] border border-[rgba(44,36,22,0.06)] bg-white/88 p-3">
-                <p className="m-0 text-[11px] font-medium tracking-[0.08em] text-[var(--text-secondary)]">
+              <div className="mt-3 rounded-2xl bg-muted shadow-sm p-3">
+                <p className="m-0 text-[11px] font-medium tracking-[0.08em] text-text-secondary">
                   {inspector.rawTitle}
                 </p>
-                <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-[14px] bg-[rgba(248,244,236,0.8)] px-3 py-3 text-[11px] leading-5 text-[var(--text-primary)]">
+                <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-glass px-3 py-3 text-[11px] leading-5 text-text-primary">
                   {inspector.rawContent}
                 </pre>
               </div>

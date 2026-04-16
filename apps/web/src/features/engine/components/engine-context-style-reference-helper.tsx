@@ -85,10 +85,10 @@ export function EngineContextStyleReferenceHelper({
   };
 
   return (
-    <section className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
+    <section className="rounded-2xl bg-muted shadow-sm p-4">
       <header className="space-y-1">
         <h3 className="font-serif text-lg font-semibold">风格参考助手</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+        <p className="text-sm leading-6 text-text-secondary">
           按最新优先列出 style 分析，选中后自动写入 `style_reference`，不再手填
           `analysis_id`。
         </p>
@@ -117,7 +117,7 @@ export function EngineContextStyleReferenceHelper({
 
       <div className="mt-4 space-y-3">
         {analysesQuery.isLoading ? (
-          <p className="text-sm text-[var(--text-secondary)]">正在加载 style 分析列表…</p>
+          <p className="text-sm text-text-secondary">正在加载 style 分析列表…</p>
         ) : null}
         {analysesQuery.error ? (
           <FeedbackMessage message={getErrorMessage(analysesQuery.error)} />
@@ -156,17 +156,17 @@ export function EngineContextStyleReferenceHelper({
 
 function SelectedAnalysisCard({ analysis }: Readonly<{ analysis: AnalysisSummary }>) {
   return (
-    <div className="rounded-[18px] border border-[var(--line-soft)] bg-[rgba(247,244,238,0.86)] p-3">
+    <div className="rounded-2xl bg-muted shadow-sm p-3">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status="active" label="style" />
         {analysis.generated_skill_key ? (
           <StatusBadge status="approved" label={analysis.generated_skill_key} />
         ) : null}
       </div>
-      <p className="mt-3 text-sm font-medium text-[var(--text-primary)]">
+      <p className="mt-3 text-sm font-medium text-text-primary">
         {analysis.source_title ?? "未命名来源"}
       </p>
-      <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
+      <p className="mt-1 text-sm leading-6 text-text-secondary">
         analysis_id: {analysis.id}
       </p>
     </div>
@@ -179,7 +179,7 @@ function FeedbackMessage({
   message: string;
 }>) {
   return (
-    <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+    <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
       {message}
     </div>
   );

@@ -26,11 +26,8 @@ export function LabCreatePanel({
         onSubmit();
       }}
     >
-      <div className="space-y-1">
+      <div>
         <h2 className="font-serif text-xl font-semibold">记录新的洞察</h2>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          把一次分析、灵感拆解或文风判断保存进当前项目，后续创作时可以继续引用。
-        </p>
       </div>
       <LabCreateFields formState={formState} isPending={isPending} onFieldChange={onFieldChange} />
       <button className="ink-button w-full" disabled={isPending} type="submit">

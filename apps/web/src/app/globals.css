@@ -105,6 +105,22 @@
   /* 场景渐变 */
   --auth-bg-gradient: radial-gradient(circle at top left, rgba(196,167,125,0.18), transparent 30%), radial-gradient(circle at right 20%, rgba(90,154,170,0.16), transparent 28%), linear-gradient(180deg, #ebeef3 0%, #f4efe7 48%, #f4f5f7 100%);
   --workspace-shell-accent-gradient: radial-gradient(circle at top left, rgba(124,110,93,0.04), transparent 26%);
+
+  /* Accent soft 变体 — 统一所有 accent 色的低透明度背景 */
+  --accent-warning-soft: rgba(184, 148, 74, 0.10);
+  --accent-success-soft: rgba(107, 143, 113, 0.10);
+  --accent-danger-soft: rgba(184, 92, 92, 0.10);
+
+  /* 阴影补充 — 面板和 glass-heavy */
+  --shadow-glass-heavy: 0 12px 32px rgba(60, 50, 35, 0.07), 0 4px 12px rgba(60, 50, 35, 0.04);
+  --shadow-panel-side: 2px 0 24px rgba(60, 50, 35, 0.04);
+
+  /* 渐变补充 — 统一面板和页面背景 */
+  --bg-surface-warm-gradient: linear-gradient(180deg, rgba(255,253,249,0.985) 0%, rgba(248,244,236,0.985) 100%);
+  --bg-panel-warm-gradient: linear-gradient(180deg, rgba(251,247,239,0.92) 0%, rgba(247,242,231,0.9) 100%);
+  --bg-engine-page-gradient: radial-gradient(circle at top left, rgba(196,167,125,0.18), transparent 30%), radial-gradient(circle at right 20%, rgba(90,154,170,0.16), transparent 28%), linear-gradient(180deg, #ebeef3 0%, #f4efe7 48%, #f4f5f7 100%);
+  --bg-getting-started-gradient: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(243,240,232,0.94));
+  --bg-config-file-gradient: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(242,246,244,0.94));
 }
 
 @layer base {
@@ -658,6 +674,11 @@
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
+.ink-toolbar-chip[data-compact="true"] {
+  width: 30px;
+  justify-content: center;
+  padding: 0;
+}
 
 .ink-toolbar-toggle {
   display: inline-flex;
@@ -693,6 +714,11 @@
 .ink-toolbar-toggle:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
+}
+.ink-toolbar-toggle[data-compact="true"] {
+  width: 30px;
+  justify-content: center;
+  padding: 0;
 }
 
 .section-card {

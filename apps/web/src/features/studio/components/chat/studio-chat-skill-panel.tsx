@@ -75,10 +75,10 @@ export function StudioChatSkillPanel({
     <div className={`relative min-w-0 shrink-0 ${compactLayout ? "w-full max-w-none" : "max-w-[152px]"}`} ref={containerRef}>
       <button
         aria-expanded={isOpen}
-        className={`group flex h-[30px] min-w-0 items-center gap-2 rounded-full border px-3 text-left transition-[border-color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] disabled:cursor-not-allowed disabled:opacity-60 ${compactLayout ? "w-full max-w-none" : "min-w-[132px] max-w-[152px]"} ${
+        className={`group flex h-[30px] min-w-0 items-center gap-2 rounded-full px-3 text-left transition-[background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-60 ${compactLayout ? "w-full max-w-none" : "min-w-[132px] max-w-[152px]"} ${
           isOpen
-            ? "border-[rgba(46,111,106,0.24)] bg-white shadow-[0_10px_24px_rgba(58,45,29,0.08)]"
-            : "border-[rgba(101,92,82,0.12)] bg-[#fffdfa] hover:border-[rgba(46,111,106,0.18)] hover:bg-white"
+            ? "bg-surface shadow-md"
+            : "bg-surface shadow-xs hover:shadow-sm"
         }`}
         disabled={disabled}
         title={model.skillState.headline}
@@ -92,15 +92,15 @@ export function StudioChatSkillPanel({
           onOpenChange(true);
         }}
       >
-        <span className="inline-flex shrink-0 items-center rounded-full bg-[#f3ede3] px-2 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)]">
+        <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[10px] leading-4 text-text-secondary">
           Skill
         </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-5 text-[var(--text-primary)]">
+        <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-5 text-text-primary">
           {resolveTriggerLabel(model.skillState.headline)}
         </span>
         <span
           aria-hidden="true"
-          className={`shrink-0 text-[10px] text-[var(--text-secondary)] transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`shrink-0 text-[10px] text-text-secondary transition-transform ${isOpen ? "rotate-180" : ""}`}
         >
           ▾
         </span>
@@ -109,7 +109,7 @@ export function StudioChatSkillPanel({
         <>
           <button
             aria-label="关闭 Skill 面板"
-            className="rounded-[24px] border-0 bg-[rgba(43,33,21,0.08)] backdrop-blur-[1px]"
+            className="rounded-3xl border-0 bg-surface-hover backdrop-blur-[1px]"
             style={layout.backdropStyle}
             type="button"
             onClick={closeDrawer}
@@ -157,23 +157,23 @@ function SkillDrawer({
   return (
     <section
       aria-label="选择 Skill"
-      className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-[rgba(101,92,82,0.14)] bg-[linear-gradient(180deg,rgba(255,253,249,0.985)_0%,rgba(248,244,236,0.985)_100%)] shadow-[0_18px_44px_rgba(58,45,29,0.16)] ring-1 ring-[rgba(255,255,255,0.88)] animate-[slideFromLeft_0.24s_cubic-bezier(0.16,1,0.3,1)]"
+      className="flex min-h-0 flex-col overflow-hidden rounded-2xl bg-[var(--bg-surface-warm-gradient)] shadow-lg ring-1 ring-white/90 animate-[slideFromLeft_0.24s_cubic-bezier(0.16,1,0.3,1)]"
       role="dialog"
       style={layout.panelStyle}
     >
-      <div className="shrink-0 border-b border-[rgba(101,92,82,0.08)] px-3 pb-2 pt-3">
+      <div className="shrink-0 border-b border-line-soft px-3 pb-2 pt-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="m-0 text-[10px] font-medium tracking-[0.08em] text-[var(--text-secondary)]">Skill 模式</p>
-            <h3 className="mt-1 text-[13px] font-semibold leading-5 text-[var(--text-primary)]">
+            <p className="m-0 text-[10px] font-medium tracking-[0.08em] text-text-secondary">Skill 模式</p>
+            <h3 className="mt-1 text-[13px] font-semibold leading-5 text-text-primary">
               这轮对话怎么套 Skill
             </h3>
-            <p className="mt-0.5 text-[10.5px] leading-4 text-[var(--text-secondary)]">
+            <p className="mt-0.5 text-[10.5px] leading-4 text-text-secondary">
               {resultSummary}
             </p>
           </div>
           <button
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(101,92,82,0.12)] bg-white text-[13px] text-[var(--text-secondary)] transition hover:border-[rgba(46,111,106,0.18)] hover:text-[var(--text-primary)]"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface shadow-xs text-[13px] text-text-secondary transition hover:shadow-sm hover:text-text-primary"
             type="button"
             onClick={onClose}
           >
@@ -183,11 +183,11 @@ function SkillDrawer({
         <CurrentModeCard disabled={disabled} model={model} onClose={onClose} />
       </div>
 
-      <div className="shrink-0 border-b border-[rgba(101,92,82,0.08)] px-3 py-2">
+      <div className="shrink-0 border-b border-line-soft px-3 py-2">
         <label className="block">
           <span className="sr-only">筛选 Skill</span>
           <input
-            className="h-9 w-full rounded-[14px] border border-[rgba(101,92,82,0.12)] bg-white/90 px-3 text-[11.5px] text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[rgba(46,111,106,0.24)] focus:ring-2 focus:ring-[rgba(46,111,106,0.1)]"
+            className="h-9 w-full rounded-2xl bg-surface/90 shadow-xs px-3 text-[11.5px] text-text-primary outline-none transition placeholder:text-text-tertiary focus:shadow-sm focus:ring-2 focus:ring-accent-primary/10"
             placeholder="按名称、描述或作用域筛选 Skill"
             ref={searchInputRef}
             type="text"
@@ -246,15 +246,15 @@ function CurrentModeCard({
   onClose: () => void;
 }>) {
   return (
-    <div className="mt-2 rounded-[16px] border border-[rgba(101,92,82,0.1)] bg-[linear-gradient(180deg,rgba(251,247,239,0.92)_0%,rgba(247,242,231,0.9)_100%)] px-3 py-2">
+    <div className="mt-2 rounded-2xl bg-[var(--bg-panel-warm-gradient)] shadow-sm px-3 py-2">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="m-0 text-[10px] font-medium tracking-[0.08em] text-[var(--text-secondary)]">当前模式</p>
-          <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--text-primary)]">
+          <p className="m-0 text-[10px] font-medium tracking-[0.08em] text-text-secondary">当前模式</p>
+          <p className="mt-1 text-[12px] font-semibold leading-5 text-text-primary">
             {model.skillState.headline}
           </p>
           {model.skillState.detail ? (
-            <p className="mt-1 text-[10.5px] leading-4 text-[var(--text-secondary)]">
+            <p className="mt-1 text-[10.5px] leading-4 text-text-secondary">
               {model.skillState.detail}
             </p>
           ) : null}
@@ -262,8 +262,8 @@ function CurrentModeCard({
         <button
           className={`inline-flex h-7 shrink-0 items-center rounded-full border px-2.5 text-[10.5px] font-medium transition ${
             isPlainChatMode(model)
-              ? "border-[rgba(46,111,106,0.18)] bg-[#eef4ea] text-[var(--accent-ink)]"
-              : "border-[rgba(101,92,82,0.12)] bg-white text-[var(--text-secondary)] hover:border-[rgba(46,111,106,0.16)] hover:text-[var(--text-primary)]"
+              ? "border-accent-primary-muted bg-accent-primary-soft text-accent-primary"
+              : "bg-surface shadow-xs text-text-secondary hover:shadow-sm hover:text-text-primary"
           }`}
           disabled={disabled}
           type="button"
@@ -325,38 +325,38 @@ function SkillOptionCard({
   return (
     <li>
       <div
-        className={`rounded-[16px] border px-3 py-2 transition ${
+        className={`rounded-2xl border px-3 py-2 transition ${
           hasActiveMode
-            ? "border-[rgba(46,111,106,0.18)] bg-[rgba(238,244,234,0.86)] shadow-[0_8px_22px_rgba(70,98,73,0.08)]"
-            : "border-[rgba(101,92,82,0.08)] bg-[rgba(249,246,239,0.92)]"
+            ? "border-accent-primary-muted bg-[var(--chat-skill-option-active-bg)] shadow-sm"
+            : "bg-[var(--chat-skill-panel-bg)] shadow-xs"
         }`}
       >
         <div className="min-w-0">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[12px] font-semibold leading-5 text-[var(--text-primary)]">
+              <span className="text-[12px] font-semibold leading-5 text-text-primary">
                 {option.label}
               </span>
-              <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)]">
+              <span className="inline-flex items-center rounded-full bg-surface px-2 py-0.5 text-[10px] leading-4 text-text-secondary">
                 {option.scopeLabel}
               </span>
               {nextSelected ? (
-                <span className="inline-flex items-center rounded-full bg-[rgba(46,111,106,0.12)] px-2 py-0.5 text-[10px] leading-4 text-[var(--accent-ink)]">
+                <span className="inline-flex items-center rounded-full bg-accent-primary/10 px-2 py-0.5 text-[10px] leading-4 text-accent-primary">
                   本次
                 </span>
               ) : null}
               {conversationSelected ? (
-                <span className="inline-flex items-center rounded-full bg-[rgba(196,167,108,0.16)] px-2 py-0.5 text-[10px] leading-4 text-[#7c6232]">
+                <span className="inline-flex items-center rounded-full bg-accent-warning/15 px-2 py-0.5 text-[10px] leading-4 text-accent-tertiary">
                   会话
                 </span>
               ) : null}
             </div>
             {option.description ? (
-              <p className="mt-1.5 line-clamp-2 text-[10.5px] leading-4 text-[var(--text-secondary)]">
+              <p className="mt-1.5 line-clamp-2 text-[10.5px] leading-4 text-text-secondary">
                 {option.description}
               </p>
             ) : (
-              <p className="mt-1.5 text-[10.5px] leading-4 text-[var(--text-muted)]">
+              <p className="mt-1.5 text-[10.5px] leading-4 text-text-tertiary">
                 这个 Skill 没有补充说明，适合你已经熟悉它的用途时直接套用。
               </p>
             )}
@@ -400,10 +400,10 @@ function StateNotice({
 }>) {
   return (
     <div
-      className={`rounded-[16px] px-3 py-2.5 text-[11px] leading-5 ${
+      className={`rounded-2xl px-3 py-2.5 text-[11px] leading-5 ${
         tone === "danger"
-          ? "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]"
-          : "bg-[#f9f6ef] text-[var(--text-secondary)]"
+          ? "bg-accent-danger/10 text-accent-danger"
+          : "bg-muted text-text-secondary"
       }`}
     >
       {children}
@@ -458,7 +458,7 @@ function buildResultSummary(visibleCount: number, totalCount: number, query: str
 }
 
 const DRAWER_ACTION_BUTTON_CLASS =
-  "inline-flex h-7 items-center rounded-full border border-[rgba(101,92,82,0.12)] bg-white px-2.5 text-[10.5px] text-[var(--text-secondary)] transition hover:border-[rgba(46,111,106,0.16)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-7 items-center rounded-full bg-surface shadow-xs px-2.5 text-[10.5px] text-text-secondary transition hover:shadow-sm hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60";
 
 function isPlainChatMode(model: StudioChatSkillModel) {
   return model.skillState.conversationSkillId === null && model.skillState.nextTurnSkillId === null;
@@ -467,8 +467,8 @@ function isPlainChatMode(model: StudioChatSkillModel) {
 function resolveModeButtonClassName(active: boolean) {
   return `inline-flex h-7 items-center justify-center rounded-full px-2.5 text-[10.5px] font-medium transition ${
     active
-      ? "bg-[#eef4ea] text-[var(--accent-ink)]"
-      : "bg-white text-[var(--text-secondary)] hover:bg-[#fffdfa] hover:text-[var(--text-primary)]"
+      ? "bg-accent-primary-soft text-accent-primary"
+      : "bg-surface text-text-secondary hover:bg-surface hover:text-text-primary"
   }`;
 }
 

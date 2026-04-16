@@ -17,7 +17,6 @@ export function RecycleBinPage() {
     <div className="space-y-6">
       <SectionCard
         title="回收站"
-        description="已删除项目会保留在回收站，可恢复、彻底删除或手动清空。"
         action={<Link className="ink-button-secondary" href="/workspace/lobby">返回书架</Link>}
       >
         <div className="space-y-5">
@@ -71,13 +70,13 @@ function RecycleBinSummaryCard({
   onClear: () => void;
 }>) {
   return (
-    <section className="grid gap-4 rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,250,243,0.88)] p-5 lg:grid-cols-[1fr_auto] lg:items-center">
+    <section className="grid gap-4 rounded-3xl bg-glass shadow-glass-heavy p-5 lg:grid-cols-[1fr_auto] lg:items-center">
       <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">回收站状态</p>
-        <h3 className="font-serif text-2xl font-semibold text-[var(--text-primary)]">
+        <p className="text-xs uppercase tracking-[0.18em] text-accent-primary">回收站状态</p>
+        <h3 className="font-serif text-2xl font-semibold text-text-primary">
           当前共有 {deletedProjectCount} 个已删除项目
         </h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+        <p className="text-sm leading-6 text-text-secondary">
           删除后默认保留 30 天。到期前你可以恢复，也可以立即彻底删除。
         </p>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import type { UseMutationResult } from "@tanstack/react-query";
-import { Button, Input } from "@arco-design/web-react";
+import { Input } from "@arco-design/web-react";
 
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getErrorMessage } from "@/lib/api/client";
@@ -61,7 +61,7 @@ export function ActionCard({
           onCompleteWithAi={() => void onCompleteWithAi()}
         />
       ) : null}
-      <p className="text-[11px] leading-5 text-[var(--text-secondary)]">
+      <p className="text-[11px] leading-5 text-text-secondary">
         只缺建议项时也能继续创建项目，后面照样可以用 AI 生成大纲。
       </p>
       <NoticeList
@@ -100,9 +100,9 @@ function ActionCardHeader({ draft }: { draft: ProjectIncubatorConversationDraft 
   return (
     <div className="space-y-1.5">
       <div className="space-y-1">
-        <p className="text-[10px] tracking-[0.16em] text-[var(--accent-ink)]">项目草稿</p>
-        <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">草稿预览</h2>
-        <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+        <p className="text-[10px] tracking-[0.16em] text-accent-primary">项目草稿</p>
+        <h2 className="text-[14px] font-semibold text-text-primary">草稿预览</h2>
+        <p className="text-[12px] leading-5 text-text-secondary">
           整理结果会显示在这里。
         </p>
       </div>
@@ -116,7 +116,7 @@ function DraftStatusRow({ draft }: { draft: ProjectIncubatorConversationDraft })
   return (
     <div className="flex flex-wrap items-center gap-2">
       <StatusBadge label={guidance.statusLabel} status={draft.setting_completeness.status} />
-      <span className="text-xs leading-5 text-[var(--text-secondary)]">
+      <span className="text-xs leading-5 text-text-secondary">
         {buildSettingIssueSummary(draft.setting_completeness)}
       </span>
     </div>
@@ -164,26 +164,22 @@ function ActionButtons({
 }) {
   return (
     <div className="grid gap-2 sm:grid-cols-2">
-      <Button
+      <button
+        className="ink-button-secondary w-full"
         disabled={!canSyncDraft}
-        long
-        shape="round"
-        size="default"
-        type="secondary"
+        type="button"
         onClick={() => void onSyncDraft()}
       >
         {draftMutation.isPending ? "整理中…" : draft ? "重新整理草稿" : "整理草稿"}
-      </Button>
-      <Button
+      </button>
+      <button
+        className="ink-button w-full"
         disabled={!canCreate}
-        long
-        shape="round"
-        size="default"
-        type="primary"
+        type="button"
         onClick={() => createMutation.mutate()}
       >
         {createMutation.isPending ? "创建中…" : "创建项目"}
-      </Button>
+      </button>
     </div>
   );
 }
@@ -209,10 +205,10 @@ function NoticeList({
 function QuestionListCard({ questions }: { questions: string[] }) {
   return (
     <section className="panel-muted space-y-2 p-3">
-      <h3 className="text-sm font-semibold text-[var(--text-primary)]">待补充信息</h3>
-      <ul className="space-y-2 text-[13px] leading-5 text-[var(--text-secondary)]">
+      <h3 className="text-sm font-semibold text-text-primary">待补充信息</h3>
+      <ul className="space-y-2 text-[13px] leading-5 text-text-secondary">
         {questions.map((question) => (
-          <li className="rounded-xl bg-[rgba(255,255,255,0.72)] px-3 py-1.5" key={question}>
+          <li className="rounded-2xl bg-glass px-3 py-1.5" key={question}>
             {question}
           </li>
         ))}
@@ -224,16 +220,16 @@ function QuestionListCard({ questions }: { questions: string[] }) {
 function SectionIndexCard({ sections }: { sections: SettingPreviewSection[] }) {
   return (
     <section className="panel-muted space-y-2 p-3">
-      <h3 className="text-sm font-semibold text-[var(--text-primary)]">草稿目录</h3>
+      <h3 className="text-sm font-semibold text-text-primary">草稿目录</h3>
       <nav aria-label="项目方案目录" className="grid gap-1.5">
         {sections.map((section, index) => (
           <a
-            className="flex items-center justify-between rounded-xl bg-[rgba(255,255,255,0.72)] px-3 py-1.5 text-[12.5px] text-[var(--text-primary)] transition hover:bg-[rgba(255,255,255,0.96)]"
+            className="flex items-center justify-between rounded-2xl bg-glass px-3 py-1.5 text-[12.5px] text-text-primary transition hover:bg-glass-heavy"
             href={`#incubator-section-${index}`}
             key={section.title}
           >
             <span className="min-w-0 truncate">{section.title}</span>
-            <span className="text-xs text-[var(--text-secondary)]">查看</span>
+            <span className="text-xs text-text-secondary">查看</span>
           </a>
         ))}
       </nav>
@@ -245,16 +241,16 @@ function SettingSectionCard({ index, section }: { index: number; section: Settin
   return (
     <section className="panel-shell space-y-2 p-3 scroll-mt-4" id={`incubator-section-${index}`}>
       <header className="space-y-1">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">{section.title}</h3>
-        <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
+        <h3 className="text-sm font-semibold text-text-primary">{section.title}</h3>
+        <p className="text-[12px] leading-5 text-text-secondary">
           当前已整理内容
         </p>
       </header>
       <dl className="grid gap-2">
         {section.items.map((item) => (
           <div className="panel-muted space-y-1 p-2.5" key={`${section.title}-${item.label}`}>
-            <dt className="text-[11px] tracking-[0.12em] text-[var(--text-secondary)]">{item.label}</dt>
-            <dd className="break-words text-[13px] leading-5 text-[var(--text-primary)]">{item.value}</dd>
+            <dt className="text-[11px] tracking-[0.12em] text-text-secondary">{item.label}</dt>
+            <dd className="break-words text-[13px] leading-5 text-text-primary">{item.value}</dd>
           </div>
         ))}
       </dl>
@@ -265,17 +261,17 @@ function SettingSectionCard({ index, section }: { index: number; section: Settin
 function PlaceholderCard({ message }: { message: string }) {
   return (
     <section className="panel-muted space-y-2 p-3">
-      <h3 className="text-sm font-semibold text-[var(--text-primary)]">暂无草稿</h3>
-      <p className="text-[13px] leading-5 text-[var(--text-secondary)]">{message}</p>
+      <h3 className="text-sm font-semibold text-text-primary">暂无草稿</h3>
+      <p className="text-[13px] leading-5 text-text-secondary">{message}</p>
     </section>
   );
 }
 
 function NoticeCard({ message, tone }: { message: string; tone: "danger" | "warning" }) {
   const className = tone === "danger"
-    ? "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]"
-    : "bg-[rgba(183,121,31,0.14)] text-[var(--accent-warning)]";
-  return <div className={`rounded-[14px] px-3 py-2 text-[12.5px] leading-5 ${className}`}>{message}</div>;
+    ? "bg-accent-danger/10 text-accent-danger"
+    : "bg-accent-warning/14 text-accent-warning";
+  return <div className={`rounded-2xl px-3 py-2 text-[12.5px] leading-5 ${className}`}>{message}</div>;
 }
 
 function buildPlaceholderMessage(hasUserMessage: boolean) {

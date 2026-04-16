@@ -35,17 +35,17 @@ export function RecycleBinDeleteDialog({
       onClose={onClose}
     >
       <div className="space-y-4">
-        <div className="space-y-3 rounded-[20px] border border-[rgba(178,65,46,0.16)] bg-[rgba(178,65,46,0.08)] p-4">
+        <div className="space-y-3 rounded-2xl border border-accent-danger/15 bg-accent-danger/10 p-4">
           <div className="flex flex-wrap gap-2">
             <StatusBadge status="failed" label="不可恢复" />
             <StatusBadge status="archived" label="回收站" />
           </div>
-          <p className="text-base font-medium text-[var(--text-primary)]">{project.name}</p>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-base font-medium text-text-primary">{project.name}</p>
+          <p className="text-sm leading-6 text-text-secondary">
             删除时间：{formatProjectTrashTime(project.deleted_at)} · 保留截止：
             {formatProjectTrashDeadline(project.deleted_at)}
           </p>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-sm leading-6 text-text-secondary">
             会同时清理正文、工作流、导出、事实、账单、审计和项目级凭证。
           </p>
         </div>
@@ -75,12 +75,12 @@ export function RecycleBinClearDialog({
       onClose={onClose}
     >
       <div className="space-y-4">
-        <div className="space-y-3 rounded-[20px] border border-[rgba(178,65,46,0.16)] bg-[rgba(178,65,46,0.08)] p-4">
+        <div className="space-y-3 rounded-2xl border border-accent-danger/15 bg-accent-danger/10 p-4">
           <div className="flex flex-wrap gap-2">
             <StatusBadge status="failed" label="批量清理" />
             <StatusBadge status="archived" label={`${projectCount} 个项目`} />
           </div>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-sm leading-6 text-text-secondary">
             此操作会一次性清空回收站中的全部项目及其关联数据，无法恢复。
           </p>
         </div>

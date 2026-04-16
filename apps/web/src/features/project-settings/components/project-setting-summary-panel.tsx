@@ -42,13 +42,13 @@ export function ProjectSettingSummaryPanel({
   return (
     <div className="space-y-5">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.85fr)]">
-        <section className="panel-muted min-w-0 space-y-4 rounded-[24px] p-5">
+        <section className="panel-muted min-w-0 space-y-4 rounded-3xl p-5">
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">
+            <p className="text-xs uppercase tracking-[0.18em] text-accent-primary">
               结构化摘要
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)]">
+              <h2 className="font-serif text-xl font-semibold text-text-primary">
                 快速看主要信息
               </h2>
               <StatusBadge status={completeness?.status ?? "ready"} />
@@ -60,14 +60,14 @@ export function ProjectSettingSummaryPanel({
                 更新摘要
               </button>
             </div>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">{summaryText}</p>
+            <p className="text-sm leading-6 text-text-secondary">{summaryText}</p>
           </div>
           {completeness?.issues.length ? (
             <div className="flex flex-wrap gap-2">
               {completeness.issues.map((issue) => (
                 <span
                   key={`${issue.field}-${issue.message}`}
-                  className="rounded-full bg-[rgba(196,136,61,0.12)] px-3 py-1 text-xs font-medium text-[var(--accent-warning)]"
+                  className="rounded-full bg-accent-warning/12 px-3 py-1 text-xs font-medium text-accent-warning"
                 >
                   {formatProjectSettingFieldLabel(issue.field)}
                 </span>
@@ -76,12 +76,12 @@ export function ProjectSettingSummaryPanel({
           ) : null}
         </section>
 
-        <section className="rounded-[24px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-5 shadow-sm">
+        <section className="rounded-3xl bg-surface shadow-sm p-5">
           <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+            <p className="text-xs uppercase tracking-[0.18em] text-text-secondary">
               用法说明
             </p>
-            <div className="space-y-3 text-sm leading-6 text-[var(--text-secondary)]">
+            <div className="space-y-3 text-sm leading-6 text-text-secondary">
               <p>这里主要用来总览题材、冲突、人物入口和篇幅计划，不要求把完整设定压进固定表单。</p>
               <p>详细世界观、人物小传、伏笔和长期约束，更适合继续放在项目文档里维护。</p>
               <p>这份摘要会继续参与大纲、开篇和章节生成；如果保存了新的摘要，下游已确认内容会按影响标记为 stale，方便重新核对。</p>
@@ -118,14 +118,14 @@ export function ProjectSettingSummaryPanel({
           {sections.map((section) => (
             <section
               key={section.title}
-              className="min-w-0 rounded-[22px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-5 shadow-sm"
+              className="min-w-0 rounded-2xl bg-surface shadow-sm p-5"
             >
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+                  <p className="text-xs uppercase tracking-[0.18em] text-text-secondary">
                     项目摘要
                   </p>
-                  <h3 className="font-serif text-lg font-semibold text-[var(--text-primary)]">
+                  <h3 className="font-serif text-lg font-semibold text-text-primary">
                     {section.title}
                   </h3>
                 </div>
@@ -133,12 +133,12 @@ export function ProjectSettingSummaryPanel({
                   {section.items.map((item) => (
                     <div
                       key={`${section.title}-${item.label}`}
-                      className="grid min-w-0 gap-2 border-b border-[rgba(101,92,82,0.08)] pb-3 last:border-b-0 last:pb-0 md:grid-cols-[96px_minmax(0,1fr)]"
+                      className="grid min-w-0 gap-2 border-b border-line-soft pb-3 last:border-b-0 last:pb-0 md:grid-cols-[96px_minmax(0,1fr)]"
                     >
-                      <dt className="text-sm font-medium text-[var(--text-secondary)]">
+                      <dt className="text-sm font-medium text-text-secondary">
                         {item.label}
                       </dt>
-                      <dd className="min-w-0 break-words text-sm leading-6 text-[var(--text-primary)]">
+                      <dd className="min-w-0 break-words text-sm leading-6 text-text-primary">
                         {item.value}
                       </dd>
                     </div>
@@ -150,7 +150,7 @@ export function ProjectSettingSummaryPanel({
         </div>
       ) : (
         <EmptyState
-          description="目前还没有可展示的结构化摘要。后面可以继续用 AI 或文档逐步补充，摘要会用于快速浏览主要信息。"
+          description="可以继续用 AI 或文档补充。"
           title="还没有项目摘要"
         />
       )}
@@ -162,11 +162,11 @@ function ProjectSettingImpactCallout({
   impact,
 }: Readonly<{ impact: ProjectSettingImpactSummary }>) {
   return (
-    <section className="rounded-[22px] border border-[rgba(196,136,61,0.16)] bg-[rgba(196,136,61,0.08)] p-4">
+    <section className="callout-warning p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1.5">
-          <p className="text-sm font-medium text-[var(--text-primary)]">最近一次保存影响</p>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-sm font-medium text-text-primary">最近一次保存影响</p>
+          <p className="text-sm leading-6 text-text-secondary">
             {impact.has_impact
               ? "本次摘要更新已经同步到下游真值，相关内容已标记为 stale。"
               : "本次摘要保存没有触发新的下游 stale。"}
@@ -182,9 +182,9 @@ function ProjectSettingImpactCallout({
           {impact.items.map((item) => (
             <div
               key={item.target}
-              className="rounded-[18px] border border-[rgba(196,136,61,0.14)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]"
+              className="rounded-2xl border border-accent-warning/14 bg-glass px-4 py-3 text-sm leading-6 text-text-secondary"
             >
-              <span className="font-medium text-[var(--text-primary)]">{formatImpactTarget(item.target)}</span>
+              <span className="font-medium text-text-primary">{formatImpactTarget(item.target)}</span>
               ：{item.message}
             </div>
           ))}

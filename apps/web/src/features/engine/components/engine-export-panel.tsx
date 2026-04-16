@@ -88,16 +88,12 @@ export function EngineExportPanel({
   return (
     <DialogShell
       title="导出成稿"
-      description="导出当前工作流的成稿，支持 txt 和 markdown 格式。"
       onClose={onClose}
     >
       <div className="grid gap-4 xl:grid-cols-[0.94fr_1.06fr]">
         <section className="panel-muted space-y-4 p-5">
           <div className="space-y-1">
             <h3 className="font-serif text-lg font-semibold">导出前预检</h3>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              先核对当前 workflow 的章节任务真值，再决定是否发起导出。
-            </p>
           </div>
           {!workflowId ? (
             <EmptyState title="尚未载入工作流" description="请先载入工作流，再发起导出。" />
@@ -107,9 +103,9 @@ export function EngineExportPanel({
                 selectedFormats={selectedFormats}
                 onToggle={(value) => setSelectedFormats((current) => toggleExportFormat(current, value))}
               />
-              {tasksQuery.isPending ? <p className="text-sm text-[var(--text-secondary)]">正在检查章节状态...</p> : null}
+              {tasksQuery.isPending ? <p className="text-sm text-text-secondary">正在检查章节状态...</p> : null}
               {tasksQuery.error ? (
-                <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+                <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
                   {getErrorMessage(tasksQuery.error)}
                 </div>
               ) : null}
@@ -121,7 +117,7 @@ export function EngineExportPanel({
                   {tasks.length === 0 ? (
                     <EmptyState title="当前没有章节计划" description="工作流尚未生成章节任务。" />
                   ) : precheck.blockingItems.length === 0 ? (
-                    <div className="rounded-2xl border border-[rgba(47,107,69,0.18)] bg-[rgba(47,107,69,0.08)] px-4 py-3 text-sm text-[var(--accent-success)]">
+                    <div className="callout-success px-4 py-3 text-sm text-accent-success">
                       当前章节任务已满足导出条件。
                       {precheck.warningItems.length > 0 ? "存在 warning，导出前请确认这些章节仍可接受。" : ""}
                     </div>
@@ -142,7 +138,7 @@ export function EngineExportPanel({
                 </button>
               </div>
               {createDisabledReason ? (
-                <p className="text-sm leading-6 text-[var(--accent-warning)]">{createDisabledReason}</p>
+                <p className="text-sm leading-6 text-accent-warning">{createDisabledReason}</p>
               ) : null}
             </>
           )}
@@ -150,30 +146,30 @@ export function EngineExportPanel({
         <section className="panel-muted space-y-4 p-5">
           <div className="space-y-1">
             <h3 className="font-serif text-lg font-semibold">项目导出历史</h3>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
-              文件名、格式、体积与完成时间统一按项目维度查看。
+            <p className="text-sm leading-6 text-text-secondary">
+              按项目查看导出记录。
             </p>
           </div>
-          {exportsQuery.isPending ? <p className="text-sm text-[var(--text-secondary)]">正在加载导出历史...</p> : null}
+          {exportsQuery.isPending ? <p className="text-sm text-text-secondary">正在加载导出历史...</p> : null}
           {exportsQuery.error ? (
-            <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+            <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
               {getErrorMessage(exportsQuery.error)}
             </div>
           ) : null}
           {exports?.length ? (
             <div className="grid gap-3 md:grid-cols-2">
               {exports.map((item) => (
-                <article key={item.id} className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
+                <article key={item.id} className="rounded-2xl bg-muted shadow-sm p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <h4 className="break-all text-sm font-medium text-[var(--text-primary)]">{item.filename}</h4>
-                      <p className="text-xs uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+                      <h4 className="break-all text-sm font-medium text-text-primary">{item.filename}</h4>
+                      <p className="text-xs uppercase tracking-[0.14em] text-text-secondary">
                         {formatExportTimestamp(item.created_at)}
                       </p>
                     </div>
                     <StatusBadge status="approved" label={item.format.toUpperCase()} />
                   </div>
-                  <div className="mt-4 grid gap-2 text-sm text-[var(--text-secondary)]">
+                  <div className="mt-4 grid gap-2 text-sm text-text-secondary">
                     <p>体积：{formatExportFileSize(item.file_size)}</p>
                     <p>格式：{item.format}</p>
                   </div>
@@ -207,8 +203,8 @@ function FormatSelection({
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <h4 className="text-sm font-medium text-[var(--text-primary)]">导出格式</h4>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">至少选择一种格式。当前能力只开放 txt 与 markdown。</p>
+        <h4 className="text-sm font-medium text-text-primary">导出格式</h4>
+        <p className="text-sm leading-6 text-text-secondary">至少选择一种格式。当前能力只开放 txt 与 markdown。</p>
       </div>
       <div className="flex flex-wrap gap-2">
         {DEFAULT_EXPORT_FORMATS.map((format) => {
@@ -248,19 +244,19 @@ function PrecheckGroup({
     <section className="space-y-3">
       <div className="flex items-center gap-2">
         <StatusBadge status={tone} label={title} />
-        <span className="text-sm text-[var(--text-secondary)]">{items.length} 项</span>
+        <span className="text-sm text-text-secondary">{items.length} 项</span>
       </div>
       <div className="space-y-2">
         {items.map((item) => (
           <article
-            className="rounded-[18px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.7)] px-4 py-3"
+            className="rounded-2xl bg-glass shadow-glass px-4 py-3"
             key={`${title}-${item.chapterNumber}-${item.title}`}
           >
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status="outline" label={`第 ${item.chapterNumber} 章`} />
-              <span className="text-sm font-medium text-[var(--text-primary)]">{item.title}</span>
+              <span className="text-sm font-medium text-text-primary">{item.title}</span>
             </div>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{item.detail}</p>
+            <p className="mt-2 text-sm leading-6 text-text-secondary">{item.detail}</p>
           </article>
         ))}
       </div>

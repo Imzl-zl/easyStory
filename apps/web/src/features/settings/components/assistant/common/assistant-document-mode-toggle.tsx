@@ -3,7 +3,6 @@
 export type AssistantDocumentEditMode = "document" | "guided";
 
 type AssistantDocumentModeToggleProps = {
-  description: string;
   fileLabel: string;
   mode: AssistantDocumentEditMode;
   onChange: (mode: AssistantDocumentEditMode) => void;
@@ -11,20 +10,18 @@ type AssistantDocumentModeToggleProps = {
 };
 
 export function AssistantDocumentModeToggle({
-  description,
   fileLabel,
   mode,
   onChange,
   guidedDisabled = false,
 }: Readonly<AssistantDocumentModeToggleProps>) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-glass shadow-glass px-4 py-4">
       <div className="min-w-0">
-        <p className="text-sm font-medium text-[var(--text-primary)]">编辑方式</p>
-        <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">{description}</p>
+        <p className="text-sm font-medium text-text-primary">编辑方式</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-[rgba(248,243,235,0.92)] px-3 py-1 text-[12px] font-medium text-[var(--text-secondary)]">
+        <span className="rounded-pill bg-glass-heavy px-3 py-1 text-[12px] font-medium text-text-secondary">
           {fileLabel}
         </span>
         <button

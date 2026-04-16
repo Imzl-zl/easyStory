@@ -1,0 +1,11 @@
+id,task,status,completed_at,notes
+1,Fix shared UI: status-badge.tsx + dialog-shell.tsx (border-line-glass → border-line-strong),TODO,,
+2,Fix globals.css: hero-card border-line-glass → border-line-strong,TODO,,
+3,Fix Engine panels: replace local MetricCards + panel-muted + inline styles (11 files),TODO,,
+4,Fix Studio components: panel-muted + inline styles (7 files),TODO,,
+5,Fix Settings components: panel-muted + inline styles (17+ files),TODO,,
+6,Fix Lobby components: panel-muted + border-line-glass + inline styles (11+ files),TODO,,
+7,Fix Lab components: inline styles (3 files),TODO,,
+8,Fix Project Settings components: panel-muted + inline styles (3 files),TODO,,
+9,Fix Config Registry components: panel-muted (6 files),TODO,,
+10,Build verification,TODO,,

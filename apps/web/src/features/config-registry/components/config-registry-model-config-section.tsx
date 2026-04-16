@@ -44,9 +44,8 @@ export function ModelConfigSection({
   return (
     <FormSection
       title="模型配置"
-      description="需要覆盖默认模型设置时再填写。"
     >
-      <label className="flex items-center gap-3 text-sm text-[var(--text-primary)]">
+      <label className="flex items-center gap-3 text-sm text-text-primary">
         <input
           checked={value !== null}
           type="checkbox"

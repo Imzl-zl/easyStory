@@ -26,15 +26,15 @@ export function ConfigRegistrySkillReader({
       <section className="panel-muted space-y-5 p-5">
         <header className="space-y-4">
           <div className="space-y-1">
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">Skill 说明视图</p>
-            <h3 className="font-serif text-xl font-semibold text-[var(--text-primary)]">{detail.name}</h3>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="text-xs uppercase tracking-[0.18em] text-accent-primary">Skill 说明视图</p>
+            <h3 className="font-serif text-xl font-semibold text-text-primary">{detail.name}</h3>
+            <p className="text-sm leading-6 text-text-secondary">
               {detail.description ?? "当前还没有补充说明。"}
             </p>
           </div>
-          <div className="rounded-[20px] border border-[rgba(58,124,165,0.16)] bg-[rgba(58,124,165,0.08)] px-4 py-3">
-            <p className="text-sm font-medium text-[var(--text-primary)]">这里优先按文件式 Skill 展示。</p>
-            <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
+          <div className="callout-info px-4 py-3">
+            <p className="text-sm font-medium text-text-primary">这里优先按文件式 Skill 展示。</p>
+            <p className="mt-1 text-sm leading-6 text-text-secondary">
               下方除 <code>SKILL.md</code> 外，其余文件都是系统根据当前运行配置生成的预览，不代表仓库里已经存在这些真实文件。
             </p>
           </div>
@@ -49,39 +49,39 @@ export function ConfigRegistrySkillReader({
 
       <section className="panel-muted p-4">
         <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="rounded-[22px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.62)] p-3">
-            <p className="px-2 pb-2 text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">说明与运行文件</p>
+          <aside className="rounded-2xl bg-muted shadow-sm p-3">
+            <p className="px-2 pb-2 text-xs uppercase tracking-[0.18em] text-text-secondary">说明与运行文件</p>
             <div className="space-y-1.5">
               {resources.map((resource) => (
                 <button
                   key={resource.key}
                   className={[
-                    "w-full rounded-[18px] border px-3 py-2.5 text-left transition-colors",
+                    "w-full rounded-2xl border px-3 py-2.5 text-left transition-colors",
                     resource.key === activeResource?.key
-                      ? "border-[rgba(46,111,106,0.18)] bg-[rgba(46,111,106,0.06)] shadow-[inset_0_0_0_1px_rgba(46,111,106,0.03)]"
-                      : "border-transparent hover:border-[rgba(46,111,106,0.16)] hover:bg-[rgba(46,111,106,0.04)]",
+                      ? "border-accent-primary-muted bg-accent-soft ring-1 ring-inset ring-line-soft"
+                      : "border-transparent hover:border-accent-primary-muted hover:bg-accent-soft",
                   ].join(" ")}
                   type="button"
                   onClick={() => setActiveKey(resource.key)}
                 >
                   <p
                     className={`text-sm font-medium ${
-                      resource.key === activeResource?.key ? "text-[var(--accent-ink)]" : "text-[var(--text-primary)]"
+                      resource.key === activeResource?.key ? "text-accent-primary" : "text-text-primary"
                     }`}
                   >
                     {resource.filename}
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{resource.description}</p>
+                  <p className="mt-1 text-xs leading-5 text-text-secondary">{resource.description}</p>
                 </button>
               ))}
             </div>
           </aside>
 
-          <div className="rounded-[22px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.7)]">
-            <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[rgba(101,92,82,0.1)] px-4 py-3">
+          <div className="rounded-2xl bg-glass shadow-glass">
+            <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line-soft px-4 py-3">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-[var(--text-primary)]">{activeResource?.filename}</p>
-                <p className="text-sm leading-6 text-[var(--text-secondary)]">{activeResource?.description}</p>
+                <p className="text-sm font-medium text-text-primary">{activeResource?.filename}</p>
+                <p className="text-sm leading-6 text-text-secondary">{activeResource?.description}</p>
               </div>
               <SkillPill
                 label={activeResource?.key === "skill-markdown" ? "主入口" : "附属资源"}
@@ -102,9 +102,9 @@ export function ConfigRegistrySkillReader({
 
 function MetaCard({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
-    <div className="rounded-[20px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.62)] px-4 py-3">
-      <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">{label}</p>
-      <p className="mt-2 text-sm leading-6 text-[var(--text-primary)]">{value}</p>
+    <div className="rounded-2xl bg-muted shadow-sm px-4 py-3">
+      <p className="text-xs uppercase tracking-[0.16em] text-text-secondary">{label}</p>
+      <p className="mt-2 text-sm leading-6 text-text-primary">{value}</p>
     </div>
   );
 }
@@ -118,8 +118,8 @@ function SkillPill({
 }>) {
   const className =
     tone === "accent"
-      ? "bg-[rgba(46,111,106,0.12)] text-[var(--accent-ink)]"
-      : "bg-[rgba(101,92,82,0.12)] text-[var(--text-secondary)]";
+      ? "bg-accent-primary/10 text-accent-primary"
+      : "bg-line-strong text-text-secondary";
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs tracking-[0.08em] ${className}`}>
       {label}

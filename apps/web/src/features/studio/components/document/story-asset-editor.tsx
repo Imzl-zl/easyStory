@@ -142,7 +142,6 @@ function StoryAssetEditorForm({
   return (
     <SectionCard
       title={assetType === "outline" ? "大纲" : "开篇设计"}
-      description="编辑大纲或开篇设计，保存后可确认。"
       action={
         <div className="flex flex-wrap gap-2">
           {asset ? <StatusBadge status={asset.status} /> : null}
@@ -155,16 +154,16 @@ function StoryAssetEditorForm({
         </div>
       }
     >
-      {queryLoading ? <p className="text-sm text-[var(--text-secondary)]">正在加载资产...</p> : null}
+      {queryLoading ? <p className="text-sm text-text-secondary">正在加载资产...</p> : null}
       {queryError && !isMissingAsset ? (
-        <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+        <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
           {getErrorMessage(queryError)}
         </div>
       ) : null}
       {isMissingAsset ? (
         <EmptyState
           title="当前还没有草稿"
-          description="填写标题和正文后保存，系统会创建首个版本。"
+          description="填写标题和正文后保存。"
         />
       ) : null}
 

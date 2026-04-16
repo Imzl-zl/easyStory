@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@arco-design/web-react";
 
 import { showAppNotice } from "@/components/ui/app-notice";
 import { matchAssistantMarkdownDocument } from "@/features/shared/assistant/assistant-markdown-document-support";
@@ -24,10 +23,10 @@ export function CredentialNoticeCard({
   message: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-[14px] border border-[rgba(183,121,31,0.16)] bg-[rgba(183,121,31,0.1)] px-2.5 py-2 text-[10.5px] leading-5 text-[var(--accent-warning)]">
+    <div className="callout-warning flex flex-wrap items-center gap-2 px-2.5 py-2 text-[10.5px] leading-5 text-accent-warning">
       <p className="min-w-0 flex-1 break-words">{message}</p>
       <Link
-        className="inline-flex shrink-0 items-center rounded-full bg-[rgba(255,255,255,0.82)] px-2 py-0.5 text-[10px] font-medium text-[var(--accent-ink)] transition hover:bg-white"
+        className="inline-flex shrink-0 items-center rounded-full bg-glass px-2 py-0.5 text-[10px] font-medium text-accent-primary transition hover:bg-elevated"
         href={credentialSettingsHref}
       >
         前往模型连接
@@ -46,17 +45,15 @@ export function PromptSuggestionBar({
   return (
     <div className="mt-1.5 flex flex-wrap gap-1.5">
       {INCUBATOR_PROMPT_SUGGESTIONS.map((prompt) => (
-        <Button
-          className="!h-auto !px-3 !py-1.5 !text-left !text-[11px] !leading-5"
+        <button
+          className="ink-button-secondary !h-auto !text-left !text-[11px] !leading-5"
           disabled={disabled}
           key={prompt}
-          shape="round"
-          size="small"
-          type="secondary"
+          type="button"
           onClick={() => onSelect(prompt)}
         >
           {prompt}
-        </Button>
+        </button>
       ))}
     </div>
   );
@@ -76,14 +73,14 @@ export function MessageBubble({
   const isAssistant = role === "assistant";
   const alignmentClassName = isAssistant ? "self-start" : "self-end";
   const className = isAssistant
-    ? "bg-[rgba(255,251,245,0.96)] text-[var(--text-primary)] shadow-[0_10px_22px_rgba(58,45,29,0.05)]"
-    : "bg-[rgba(46,111,106,0.14)] text-[var(--text-primary)] shadow-[0_10px_18px_rgba(46,111,106,0.08)]";
+    ? "bg-glass-heavy text-text-primary shadow-sm"
+    : "bg-accent-primary-muted text-text-primary shadow-sm";
   const statusClassName = resolveMessageStatusClassName(status);
   const documentMatch = isAssistant ? matchAssistantMarkdownDocument(content) : null;
 
   return (
-    <article className={`max-w-[84%] md:max-w-[80%] xl:max-w-[78%] rounded-[16px] border px-3 py-2 ${alignmentClassName} ${className} ${statusClassName}`}>
-      <p className="text-[10px] font-medium tracking-[0.12em] text-[var(--text-secondary)]">
+    <article className={`max-w-[84%] md:max-w-[80%] xl:max-w-[78%] rounded-2xl border px-3 py-2 ${alignmentClassName} ${className} ${statusClassName}`}>
+      <p className="text-[10px] font-medium tracking-[0.12em] text-text-secondary">
         {isAssistant ? "AI" : "你"}
       </p>
       {documentMatch ? (
@@ -91,14 +88,14 @@ export function MessageBubble({
           {documentMatch.leadingText ? (
             <p className="whitespace-pre-wrap break-words text-[13px] leading-6">{documentMatch.leadingText}</p>
           ) : null}
-          <section className="overflow-hidden rounded-[14px] border border-[rgba(44,36,22,0.1)] bg-[rgba(58,45,29,0.03)]">
-            <header className="flex items-center justify-between gap-3 border-b border-[rgba(44,36,22,0.08)] bg-[rgba(255,255,255,0.72)] px-3 py-2">
+          <section className="overflow-hidden rounded-2xl bg-muted shadow-sm">
+            <header className="flex items-center justify-between gap-3 border-b border-line-soft bg-glass px-3 py-2">
               <div className="min-w-0">
-                <p className="m-0 text-[10px] font-semibold tracking-[0.12em] uppercase text-[var(--text-secondary)]">Markdown 文档</p>
-                <p className="m-0 text-[10px] leading-5 text-[var(--text-muted)]">已自动识别为整段文档。</p>
+                <p className="m-0 text-[10px] font-semibold tracking-[0.12em] uppercase text-text-secondary">Markdown 文档</p>
+                <p className="m-0 text-[10px] leading-5 text-text-tertiary">已自动识别为整段文档。</p>
               </div>
               <button
-                className="shrink-0 rounded-full border border-[rgba(44,36,22,0.08)] bg-white px-2.5 py-1 text-[10.5px] font-medium text-[var(--text-secondary)] transition hover:bg-[rgba(255,255,255,0.92)]"
+                className="shrink-0 rounded-full bg-surface shadow-xs px-2.5 py-1 text-[10.5px] font-medium text-text-secondary transition hover:bg-glass-heavy hover:shadow-sm"
                 type="button"
                 onClick={() => {
                   void copyMarkdownDocument(documentMatch.body);
@@ -107,7 +104,7 @@ export function MessageBubble({
                 复制
               </button>
             </header>
-            <pre className="m-0 max-w-full overflow-x-auto whitespace-pre-wrap break-words px-3 py-2.5 text-[12px] leading-6 text-[var(--text-primary)] [overflow-wrap:anywhere]">
+            <pre className="m-0 max-w-full overflow-x-auto whitespace-pre-wrap break-words px-3 py-2.5 text-[12px] leading-6 text-text-primary [overflow-wrap:anywhere]">
               <code>{documentMatch.body}</code>
             </pre>
           </section>
@@ -119,7 +116,7 @@ export function MessageBubble({
         <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-6">{content}</p>
       )}
       {isAssistant && hookResults && hookResults.length > 0 ? (
-        <p className="mt-2 rounded-[12px] bg-[rgba(248,243,235,0.72)] px-2.5 py-1.5 text-[11px] leading-5 text-[var(--text-secondary)]">
+        <p className="mt-2 rounded-lg bg-muted px-2.5 py-1.5 text-[11px] leading-5 text-text-secondary">
           已执行 {hookResults.length} 个自动动作
         </p>
       ) : null}
@@ -170,12 +167,12 @@ export function isVisibleConversationMessage(
 
 function resolveMessageStatusClassName(status: "pending" | "error" | undefined) {
   if (status === "error") {
-    return "border-[rgba(178,65,46,0.16)] bg-[rgba(178,65,46,0.1)]";
+    return "border-accent-danger/15 bg-accent-danger/10";
   }
   if (status === "pending") {
-    return "border-[rgba(58,124,165,0.14)] bg-[rgba(58,124,165,0.08)]";
+    return "border-accent-info-muted bg-accent-info-soft";
   }
-  return "border-[var(--line-soft)]";
+  return "border-transparent shadow-xs";
 }
 
 async function copyMarkdownDocument(content: string) {

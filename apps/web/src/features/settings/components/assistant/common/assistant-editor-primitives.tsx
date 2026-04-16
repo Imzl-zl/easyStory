@@ -19,7 +19,7 @@ export function AssistantTextField({
 }>) {
   return (
     <label className="block space-y-2">
-      <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
+      <span className="text-sm font-medium text-text-primary">{label}</span>
       <input
         className="ink-input"
         maxLength={maxLength}
@@ -48,7 +48,7 @@ export function AssistantTextareaField({
 }>) {
   return (
     <label className="block space-y-2">
-      <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
+      <span className="text-sm font-medium text-text-primary">{label}</span>
       <textarea
         className={className}
         maxLength={maxLength}
@@ -72,16 +72,16 @@ export function AssistantToggleField({
   onChange: (value: boolean) => void;
 }>) {
   return (
-    <label className="flex items-start gap-3 rounded-2xl border border-[var(--line-soft)] bg-[rgba(255,255,255,0.7)] px-4 py-3">
+    <label className="flex items-start gap-3 rounded-2xl bg-glass shadow-glass px-4 py-3">
       <input
         checked={checked}
-        className="mt-1 size-4 shrink-0 accent-[var(--accent-ink)]"
+        className="mt-1 size-4 shrink-0 accent-accent-primary"
         type="checkbox"
         onChange={(event) => onChange(event.target.checked)}
       />
       <span className="space-y-1">
-        <span className="block text-sm font-medium text-[var(--text-primary)]">{label}</span>
-        <span className="block text-[12px] leading-5 text-[var(--text-secondary)]">
+        <span className="block text-sm font-medium text-text-primary">{label}</span>
+        <span className="block text-[12px] leading-5 text-text-secondary">
           {description}
         </span>
       </span>
@@ -106,14 +106,14 @@ export function AssistantSelectField({
 }>) {
   return (
     <div className="space-y-2">
-      <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
+      <span className="text-sm font-medium text-text-primary">{label}</span>
       <AppSelect className="min-w-0" options={options} value={value} onChange={onChange} />
       {description ? (
         <p
           className={
             tone === "danger"
-              ? "rounded-2xl bg-[rgba(178,65,46,0.08)] px-3 py-2 text-[12px] leading-5 text-[var(--accent-danger)]"
-              : "text-[12px] leading-5 text-[var(--text-secondary)]"
+              ? "rounded-2xl bg-accent-danger/10 px-3 py-2 text-[12px] leading-5 text-accent-danger"
+              : "text-[12px] leading-5 text-text-secondary"
           }
         >
           {description}

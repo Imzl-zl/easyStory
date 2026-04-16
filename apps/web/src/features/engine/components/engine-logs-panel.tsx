@@ -1,6 +1,7 @@
 "use client";
 
 import { EmptyState } from "@/components/ui/empty-state";
+import { MetricCard } from "@/components/ui/metric-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { ExecutionLogView, NodeExecutionView } from "@/lib/api/types";
 
@@ -46,7 +47,7 @@ export function EngineLogsPanel({
     return (
       <EmptyState
         title="暂无执行日志"
-        description="载入工作流后，可以查看执行轨迹和日志。"
+        description="载入工作流后查看。"
       />
     );
   }
@@ -57,22 +58,22 @@ export function EngineLogsPanel({
     <div className="space-y-4">
       {errorMessage ? <FeedbackMessage tone="danger" message={errorMessage} /> : null}
       <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
-        <LogsMetricCard
+        <MetricCard
           label="节点执行"
           value={formatCount(executions.length)}
           detail={`进行中 ${formatCount(summary.activeExecutionCount)}，失败 ${formatCount(summary.failedExecutionCount)}`}
         />
-        <LogsMetricCard
+        <MetricCard
           label="事件日志"
           value={formatCount(logs.length)}
-          detail="含 workflow 级与 node 级 runtime 记录"
+          detail="运行记录总数"
         />
-        <LogsMetricCard
+        <MetricCard
           label="最新活动"
           value={formatDateTime(summary.latestActivityAt)}
-          detail="按 execution 完成时间与日志时间共同判断"
+          detail="按完成时间统计"
         />
-        <LogsMetricCard
+        <MetricCard
           label="已落审查"
           value={formatCount(summary.reviewCount)}
           detail={`关联 artifacts ${formatCount(summary.artifactCount)}`}
@@ -101,8 +102,8 @@ function ExecutionSection({
     <section className="panel-muted space-y-3 p-4">
       <header className="space-y-1">
         <h3 className="font-serif text-lg font-semibold">节点执行</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          先看每个节点现在处于什么状态、跑了多久、是否已经沉淀 artifact 和 review 结果。
+        <p className="text-sm leading-6 text-text-secondary">
+          节点执行状态与产出。
         </p>
       </header>
       {executions.length > 0 ? (
@@ -126,7 +127,7 @@ function ExecutionCard({
   onOpenReplayExecution?: (executionId: string) => void;
 }>) {
   return (
-    <div className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
+    <div className="rounded-2xl bg-muted shadow-sm p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -137,25 +138,25 @@ function ExecutionCard({
             <StatusBadge status="active" label={execution.node_type} />
           </div>
           <div>
-            <p className="text-sm font-medium text-[var(--text-primary)]">
+            <p className="text-sm font-medium text-text-primary">
               {execution.node_id} · 序列 {execution.sequence} · 排序 {execution.node_order}
             </p>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="text-sm leading-6 text-text-secondary">
               开始 {formatDateTime(execution.started_at)} · 完成 {formatDateTime(execution.completed_at)}
             </p>
           </div>
         </div>
-        <div className="text-right text-sm leading-6 text-[var(--text-secondary)]">
+        <div className="text-right text-sm leading-6 text-text-secondary">
           <p>执行 ID：{formatShortId(execution.id)}</p>
           <p>耗时：{formatDuration(execution.execution_time_ms)}</p>
           <p>重试：{formatCount(execution.retry_count)}</p>
         </div>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <ExecutionMetric label="产物" value={formatCount(execution.artifacts.length)} />
-        <ExecutionMetric label="审核" value={formatCount(execution.review_actions.length)} />
-        <ExecutionMetric label="输入字段" value={formatCount(Object.keys(execution.input_summary).length)} />
-        <ExecutionMetric
+        <MetricCard label="产物" value={formatCount(execution.artifacts.length)} />
+        <MetricCard label="审核" value={formatCount(execution.review_actions.length)} />
+        <MetricCard label="输入字段" value={formatCount(Object.keys(execution.input_summary).length)} />
+        <MetricCard
           label="输出状态"
           value={execution.output_data ? "已产出" : execution.context_report ? "上下文已记录" : "暂无"}
         />
@@ -172,7 +173,7 @@ function ExecutionCard({
         </div>
       ) : null}
       {execution.error_message ? (
-        <div className="mt-4 rounded-[18px] bg-[rgba(178,65,46,0.1)] px-4 py-3 text-sm leading-6 text-[var(--accent-danger)]">
+        <div className="mt-4 rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm leading-6 text-accent-danger">
           {execution.error_message}
         </div>
       ) : null}
@@ -185,8 +186,8 @@ function ExecutionLogSection({ logs }: Readonly<{ logs: ExecutionLogView[] }>) {
     <section className="panel-muted space-y-3 p-4">
       <header className="space-y-1">
         <h3 className="font-serif text-lg font-semibold">日志事件</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          按时间倒序查看 runtime 记录，快速定位哪个节点开始、跳过或失败。
+        <p className="text-sm leading-6 text-text-secondary">
+          按时间查看运行记录。
         </p>
       </header>
       {logs.length > 0 ? (
@@ -206,15 +207,15 @@ function ExecutionLogCard({ log }: Readonly<{ log: ExecutionLogView }>) {
   const detailEntries = log.details ? Object.entries(log.details) : [];
 
   return (
-    <div className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
+    <div className="rounded-2xl bg-muted shadow-sm p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={resolveLogLevelTone(log.level)} label={formatLogLevelLabel(log.level)} />
-          <span className="text-sm font-medium text-[var(--text-primary)]">{log.message}</span>
+          <span className="text-sm font-medium text-text-primary">{log.message}</span>
         </div>
-        <span className="text-sm text-[var(--text-secondary)]">{formatDateTime(log.created_at)}</span>
+        <span className="text-sm text-text-secondary">{formatDateTime(log.created_at)}</span>
       </div>
-      <p className="mt-3 text-xs uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+      <p className="mt-3 text-xs uppercase tracking-[0.12em] text-text-secondary">
         node execution {formatShortId(log.node_execution_id)}
       </p>
       {detailEntries.length > 0 ? (
@@ -222,49 +223,16 @@ function ExecutionLogCard({ log }: Readonly<{ log: ExecutionLogView }>) {
           {detailEntries.map(([key, value]) => (
             <div
               key={`${log.id}-${key}`}
-              className="rounded-[16px] border border-[var(--line-soft)] bg-[rgba(247,244,238,0.86)] px-3 py-2"
+              className="rounded-2xl bg-muted shadow-sm px-3 py-2"
             >
-              <p className="text-xs uppercase tracking-[0.12em] text-[var(--text-secondary)]">{key}</p>
-              <p className="mt-1 break-all text-sm leading-6 text-[var(--text-primary)]">
+              <p className="text-xs uppercase tracking-[0.12em] text-text-secondary">{key}</p>
+              <p className="mt-1 break-all text-sm leading-6 text-text-primary">
                 {formatDetailValue(value)}
               </p>
             </div>
           ))}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function LogsMetricCard({
-  label,
-  value,
-  detail,
-}: Readonly<{
-  label: string;
-  value: string;
-  detail: string;
-}>) {
-  return (
-    <div className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
-      <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">{label}</p>
-      <p className="mt-3 font-serif text-xl leading-8 text-[var(--text-primary)]">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{detail}</p>
-    </div>
-  );
-}
-
-function ExecutionMetric({
-  label,
-  value,
-}: Readonly<{
-  label: string;
-  value: string;
-}>) {
-  return (
-    <div className="rounded-[18px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.58)] p-3">
-      <p className="text-xs uppercase tracking-[0.12em] text-[var(--text-secondary)]">{label}</p>
-      <p className="mt-2 font-serif text-lg text-[var(--text-primary)]">{value}</p>
     </div>
   );
 }
@@ -277,8 +245,8 @@ function FeedbackMessage({
   message: string;
 }>) {
   if (tone === "danger") {
-    return <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">{message}</div>;
+    return <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">{message}</div>;
   }
 
-  return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">{message}</div>;
+  return <div className="panel-muted px-4 py-5 text-sm text-text-secondary">{message}</div>;
 }

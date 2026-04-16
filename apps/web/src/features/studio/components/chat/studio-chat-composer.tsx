@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
-import { Button, Input, Message, Radio } from "@arco-design/web-react";
+import { Input, Message, Radio } from "@arco-design/web-react";
 
 import { AppSelect } from "@/components/ui/app-select";
 import { renderFloatingPanel, useFloatingPanelStyle } from "@/components/ui/floating-panel-support";
@@ -61,9 +61,9 @@ type StudioChatComposerProps = {
 };
 
 const MODEL_PICKER_PANEL_CLASS =
-  "overflow-y-auto rounded-2xl border border-[rgba(44,36,22,0.1)] bg-white/95 p-3.5 shadow-[0_18px_46px_rgba(44,36,22,0.18)] backdrop-blur-sm";
+  "overflow-y-auto rounded-2xl bg-surface/95 p-3.5 shadow-lg backdrop-blur-sm";
 const MODEL_PICKER_PROVIDER_LIST_CLASS =
-  "mt-2 grid gap-1 rounded-xl border border-[rgba(44,36,22,0.1)] bg-[rgba(249,247,243,0.92)] p-1 max-h-56 overflow-y-auto";
+  "mt-2 grid gap-1 rounded-2xl bg-glass shadow-glass-heavy p-1 max-h-56 overflow-y-auto";
 
 export function StudioChatComposer({
   attachments,
@@ -212,10 +212,10 @@ export function StudioChatComposer({
   );
 
   return (
-    <div className="relative z-20 shrink-0 border-t border-[rgba(44,36,22,0.08)] bg-gradient-to-b from-[var(--bg-surface)] to-[rgba(248,243,235,0.92)]">
+    <div className="relative z-20 shrink-0 border-t border-line-soft bg-gradient-to-b from-surface to-glass-heavy">
       <div className="relative z-20 px-3 py-2.5">
         {credentialNotice ? (
-          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg bg-[rgba(178,65,46,0.08)] px-3 py-2 text-sm text-[var(--accent-danger)]">
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg bg-accent-danger/10 px-3 py-2 text-sm text-accent-danger">
             <p className="min-w-0 flex-1">{credentialNotice}</p>
             <Link className="inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:no-underline" href={credentialSettingsHref}>
               模型连接
@@ -228,7 +228,7 @@ export function StudioChatComposer({
           <div className="mb-1.5 flex flex-wrap gap-1.5">
             {attachments.map((attachment) => (
               <button
-                className="inline-flex items-center gap-1.5 h-6 px-2 rounded-md bg-[rgba(107,143,113,0.12)] text-xs text-[var(--text-primary)] hover:bg-[rgba(107,143,113,0.2)] transition-colors"
+                className="inline-flex items-center gap-1.5 h-6 px-2 rounded-md bg-accent-primary/10 text-xs text-text-primary hover:bg-accent-primary-muted transition-colors"
                 key={attachment.id}
                 type="button"
                 onClick={() => onRemoveAttachment(attachment.id)}
@@ -242,7 +242,7 @@ export function StudioChatComposer({
 
         <Input.TextArea
           autoSize={{ maxRows: 5, minRows: 2 }}
-          className="w-full text-sm leading-relaxed resize-none border border-[rgba(44,36,22,0.1)] rounded-lg bg-white/80 focus:border-[var(--accent-primary)] focus:shadow-[0_0_0_3px_rgba(107,143,113,0.12)] transition-all placeholder:text-[var(--text-muted)]"
+          className="w-full text-sm leading-relaxed resize-none rounded-2xl bg-surface/80 shadow-xs focus:shadow-sm focus:ring-3 focus:ring-accent-primary/10 transition-all placeholder:text-text-tertiary"
           placeholder={canChat ? "写你的要求，或直接带文件进来一起改。" : "先启用可用模型后再开始提问"}
           value={composerText}
           onChange={onComposerTextChange}
@@ -295,17 +295,17 @@ export function StudioChatComposer({
                   style={modelPickerStyle}
                 >
                   <div className="mb-3">
-                    <p className="text-sm font-medium text-[var(--text-primary)]">切换模型</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                    <p className="text-sm font-medium text-text-primary">切换模型</p>
+                    <p className="text-xs text-text-tertiary mt-0.5">
                       {selectedCredentialLabel ?? "先选可用渠道，再决定模型名。"}
                     </p>
                   </div>
                   <label className="grid gap-1.5">
-                    <span className="text-xs font-medium text-[var(--text-secondary)]">渠道</span>
+                    <span className="text-xs font-medium text-text-secondary">渠道</span>
                     <div className="relative">
                       <button
                         aria-expanded={showProviderList}
-                        className="flex min-h-10 w-full items-center justify-between gap-3 rounded-xl border border-[rgba(44,36,22,0.1)] bg-white/92 px-3 py-2.5 text-left text-sm text-[var(--text-primary)] transition-colors hover:border-[rgba(107,143,113,0.3)] focus:outline-none focus:ring-2 focus:ring-[rgba(107,143,113,0.18)]"
+                        className="flex min-h-10 w-full items-center justify-between gap-3 rounded-2xl bg-surface/92 shadow-xs px-3 py-2.5 text-left text-sm text-text-primary transition-colors hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-primary/15"
                         type="button"
                         onClick={handleToggleProviderList}
                       >
@@ -321,7 +321,7 @@ export function StudioChatComposer({
                               const selected = option.value === settings.provider;
                               return (
                                 <button
-                                  className={`flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${selected ? "bg-[rgba(107,143,113,0.12)] text-[var(--accent-primary)]" : "text-[var(--text-primary)] hover:bg-[rgba(107,143,113,0.06)]"}`}
+                                  className={`flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${selected ? "bg-accent-primary/10 text-accent-primary" : "text-text-primary hover:bg-accent-soft"}`}
                                   key={option.value}
                                   type="button"
                                   onMouseDown={(event) => {
@@ -331,13 +331,13 @@ export function StudioChatComposer({
                                 >
                                   <span className="text-sm font-medium leading-relaxed">{option.label}</span>
                                   {option.description ? (
-                                    <span className="text-xs leading-relaxed text-[var(--text-muted)]">{option.description}</span>
+                                    <span className="text-xs leading-relaxed text-text-tertiary">{option.description}</span>
                                   ) : null}
                                 </button>
                               );
                             })
                           ) : (
-                            <p className="px-3 py-3 text-sm text-[var(--text-muted)]">
+                            <p className="px-3 py-3 text-sm text-text-tertiary">
                               {isCredentialLoading ? "正在读取渠道..." : "当前没有可用渠道"}
                             </p>
                           )}
@@ -346,7 +346,7 @@ export function StudioChatComposer({
                     </div>
                   </label>
                   <label className="mt-3 grid gap-1.5">
-                    <span className="text-xs font-medium text-[var(--text-secondary)]">模型</span>
+                    <span className="text-xs font-medium text-text-secondary">模型</span>
                     <Input
                       allowClear
                       autoComplete="off"
@@ -356,9 +356,9 @@ export function StudioChatComposer({
                       onChange={onModelNameChange}
                     />
                   </label>
-                  <div className="mt-3 rounded-[14px] border border-[rgba(44,36,22,0.08)] bg-[rgba(249,247,243,0.92)] px-3 py-2.5">
-                    <p className="m-0 text-[12px] font-medium text-[var(--text-primary)]">{reasoningControl.title}</p>
-                    <p className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">{reasoningControl.description}</p>
+                  <div className="mt-3 rounded-2xl bg-glass shadow-glass-heavy px-3 py-2.5">
+                    <p className="m-0 text-[12px] font-medium text-text-primary">{reasoningControl.title}</p>
+                    <p className="mt-1 text-[11px] leading-4 text-text-secondary">{reasoningControl.description}</p>
                     {reasoningControl.kind === "gemini_budget" ? (
                       <div className="mt-2.5 space-y-2">
                         <div className="flex flex-wrap gap-2">
@@ -407,11 +407,11 @@ export function StudioChatComposer({
                       </div>
                     )}
                   </div>
-                  <div className="mt-3 rounded-[14px] border border-[rgba(44,36,22,0.08)] bg-[rgba(249,247,243,0.92)] px-3 py-2.5">
+                  <div className="mt-3 rounded-2xl bg-glass shadow-glass-heavy px-3 py-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="m-0 text-[12px] font-medium text-[var(--text-primary)]">回复显示方式</p>
-                        <p className="m-0 text-[11px] leading-4 text-[var(--text-secondary)]">仅当前项目聊天生效</p>
+                        <p className="m-0 text-[12px] font-medium text-text-primary">回复显示方式</p>
+                        <p className="m-0 text-[11px] leading-4 text-text-secondary">仅当前项目聊天生效</p>
                       </div>
                       <Radio.Group
                         aria-label="回复显示方式"
@@ -447,20 +447,18 @@ export function StudioChatComposer({
             ) : null}
           </div>
 
-          <Button
-            className={compactLayout ? "w-full" : "shrink-0"}
+          <button
+            className={`ink-button ${compactLayout ? "w-full" : "shrink-0"}`}
             disabled={!canChat || isResponding}
-            loading={isResponding}
-            shape="round"
-            type="primary"
+            type="button"
             onClick={handleSubmit}
           >
-            发送
-          </Button>
+            {isResponding ? "发送中…" : "发送"}
+          </button>
         </div>
 
         {writeIntentNotice ? (
-          <p className={`mt-1.5 px-1 text-[11px] leading-4 ${isWriteToCurrentDocumentEnabled ? "text-[var(--accent-primary)]" : "text-[var(--text-muted)]"}`}>
+          <p className={`mt-1.5 px-1 text-[11px] leading-4 ${isWriteToCurrentDocumentEnabled ? "text-accent-primary" : "text-text-tertiary"}`}>
             {writeIntentNotice}
           </p>
         ) : null}
@@ -489,11 +487,8 @@ function ReasoningChipButton({
 }>) {
   return (
     <button
-      className={`rounded-full border px-3 py-1 text-[11px] transition ${
-        active
-          ? "border-[rgba(107,143,113,0.28)] bg-[rgba(107,143,113,0.12)] text-[var(--accent-primary)]"
-          : "border-[rgba(44,36,22,0.1)] bg-white/92 text-[var(--text-secondary)] hover:border-[rgba(107,143,113,0.24)]"
-      }`}
+      className="ink-toolbar-chip rounded-pill"
+      data-active={active ? "true" : undefined}
       type="button"
       onClick={onClick}
     >
@@ -512,7 +507,7 @@ function ToolbarIconButton({
   onClick: () => void;
 }) {
   return (
-    <button aria-label={label} className="flex h-[30px] w-[30px] items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-[rgba(107,143,113,0.1)] hover:text-[var(--text-primary)]" type="button" onClick={onClick}>
+    <button aria-label={label} className="ink-toolbar-icon" type="button" onClick={onClick}>
       {children}
     </button>
   );
@@ -539,7 +534,9 @@ function ToolbarChipButton({
     <button
       ref={buttonRef}
       aria-label={label}
-      className={`relative inline-flex h-[26px] min-w-0 max-w-full items-center rounded-lg text-[11px] font-medium transition-colors ${active ? "bg-[rgba(107,143,113,0.15)] text-[var(--accent-primary)]" : "bg-[rgba(44,36,22,0.05)] text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.1)]"} ${iconOnly ? "w-[30px] justify-center px-0" : "gap-1.5 px-2.5"}`}
+      className={`ink-toolbar-chip ${iconOnly ? "text-[0px]" : ""}`}
+      data-active={active ? "true" : undefined}
+      data-compact={iconOnly ? "true" : undefined}
       title={label}
       type="button"
       onClick={onClick}
@@ -548,7 +545,7 @@ function ToolbarChipButton({
       {!iconOnly ? <span className="min-w-0 truncate">{label}</span> : null}
       {!iconOnly ? <span className="opacity-50 text-[10px]">⌄</span> : null}
       {iconOnly && badge ? (
-        <span className="absolute -right-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-[var(--accent-primary)] px-1 text-[9px] leading-4 text-white">
+        <span className="absolute -right-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-accent-primary px-1 text-[9px] leading-4 text-white">
           {badge}
         </span>
       ) : null}
@@ -577,13 +574,8 @@ function ToolbarToggleButton({
     <button
       aria-pressed={active}
       aria-label={label}
-      className={`inline-flex h-[26px] min-w-0 max-w-full items-center rounded-lg text-[11px] font-medium transition-colors ${
-        disabled
-          ? "cursor-not-allowed bg-[rgba(44,36,22,0.04)] text-[rgba(44,36,22,0.35)]"
-          : active
-            ? "bg-[rgba(107,143,113,0.16)] text-[var(--accent-primary)]"
-            : "bg-[rgba(44,36,22,0.05)] text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.1)]"
-      } ${iconOnly ? "w-[30px] justify-center px-0" : "gap-1.5 px-2.5"}`}
+      className={`ink-toolbar-toggle ${iconOnly ? "text-[0px]" : ""}`}
+      data-compact={iconOnly ? "true" : undefined}
       disabled={disabled}
       title={title ?? label}
       type="button"

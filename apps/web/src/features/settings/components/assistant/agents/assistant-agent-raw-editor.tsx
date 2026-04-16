@@ -27,8 +27,8 @@ export function AssistantAgentRawEditor({
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.96fr)]">
       <label className="block space-y-2">
         <span className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-medium text-[var(--text-primary)]">AGENT.md</span>
-          <span className="text-[12px] leading-5 text-[var(--text-secondary)]">
+          <span className="text-sm font-medium text-text-primary">AGENT.md</span>
+          <span className="text-[12px] leading-5 text-text-secondary">
             按 `skill_id` 绑定 Skill，保存后立即生效。
           </span>
         </span>

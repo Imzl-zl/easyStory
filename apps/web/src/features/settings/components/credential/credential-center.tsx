@@ -304,7 +304,6 @@ export function CredentialCenter({
   return (
     <SectionCard
       title="模型连接"
-      description="配置并管理 AI 模型连接。可同时添加多个连接，按项目场景灵活切换。"
       action={headerAction}
     >
       <div className="space-y-4">
@@ -316,17 +315,17 @@ export function CredentialCenter({
           onScopeChange={handleScopeChange}
         />
         <CredentialModeTabs isPending={isInteractionPending} mode={mode} onModeChange={handleModeChange} />
-        {query.isLoading ? <p className="text-[13px] text-[var(--text-secondary)]">正在加载模型连接…</p> : null}
+        {query.isLoading ? <p className="text-[13px] text-text-secondary">正在加载模型连接…</p> : null}
         {query.error ? (
-          <div className="rounded-xl bg-[rgba(178,65,46,0.12)] px-3.5 py-2.5 text-[13px] leading-5 text-[var(--accent-danger)]">
+          <div className="rounded-2xl bg-accent-danger/10 px-3.5 py-2.5 text-[13px] leading-5 text-accent-danger">
             读取模型连接失败：{getErrorMessage(query.error)}
           </div>
         ) : null}
         {shouldLoadOverrideHints && overrideQuery.isLoading ? (
-          <p className="text-[13px] text-[var(--text-secondary)]">正在检查当前项目是否存在项目级覆盖连接…</p>
+          <p className="text-[13px] text-text-secondary">正在检查当前项目是否存在项目级覆盖连接…</p>
         ) : null}
         {shouldLoadOverrideHints && overrideQuery.error ? (
-          <div className="rounded-xl bg-[rgba(178,65,46,0.12)] px-3.5 py-2.5 text-[13px] leading-5 text-[var(--accent-danger)]">
+          <div className="rounded-2xl bg-accent-danger/10 px-3.5 py-2.5 text-[13px] leading-5 text-accent-danger">
             项目级覆盖提示加载失败：{getErrorMessage(overrideQuery.error)}
           </div>
         ) : null}

@@ -2,7 +2,7 @@
 
 import { useEffect, useEffectEvent, useRef } from "react";
 import type { KeyboardEvent, RefObject } from "react";
-import { Button, Input } from "@arco-design/web-react";
+import { Input } from "@arco-design/web-react";
 import type { RefTextAreaType } from "@arco-design/web-react/es/Input";
 
 import { IncubatorChatDraftPanel } from "@/features/lobby/components/incubator/incubator-chat-draft-panel";
@@ -112,12 +112,12 @@ function ChatPanelHeader({
   model: IncubatorChatModel;
 }) {
   return (
-    <header className="relative z-10 border-b border-[var(--line-soft)] px-3 py-1.5 md:px-4 md:py-2 xl:px-5">
+    <header className="relative z-10 border-b border-line-soft px-3 py-1.5 md:px-4 md:py-2 xl:px-5">
       <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
-          <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">AI 聊天</h2>
+          <h2 className="text-[13px] font-semibold text-text-primary">AI 聊天</h2>
           {model.isCredentialLoading ? (
-            <span className="rounded-full bg-[rgba(31,27,22,0.05)] px-2 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)]">
+            <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[10px] leading-4 text-text-secondary">
               正在准备
             </span>
           ) : null}
@@ -155,7 +155,7 @@ function ChatTranscript({
   return (
     <div
       aria-live="polite"
-      className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-[linear-gradient(180deg,rgba(255,255,255,0.58)_0%,rgba(247,240,229,0.3)_100%)] px-3 py-1.5 md:px-4 md:py-2 xl:px-5"
+      className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-[var(--bg-panel-warm-gradient)] px-3 py-1.5 md:px-4 md:py-2 xl:px-5"
       ref={transcriptRef}
     >
       <div className="mx-auto flex min-h-full w-full max-w-[980px] flex-col gap-1.5">
@@ -169,9 +169,9 @@ function ChatTranscript({
           />
         ))}
         {showPromptSuggestions ? (
-          <section className="mt-0.5 rounded-[18px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.82)] p-2.5 shadow-[0_10px_20px_rgba(58,45,29,0.05)]">
-            <p className="text-[12.5px] font-medium text-[var(--text-primary)]">不知道怎么开始？</p>
-            <p className="mt-1 text-[11.5px] leading-5 text-[var(--text-secondary)]">
+          <section className="mt-0.5 rounded-2xl bg-glass shadow-glass p-2.5 shadow-sm">
+            <p className="text-[12.5px] font-medium text-text-primary">不知道怎么开始？</p>
+            <p className="mt-1 text-[11.5px] leading-5 text-text-secondary">
               先选一句示例，再按你的想法继续改。
             </p>
             <PromptSuggestionBar disabled={disablePromptSuggestions} onSelect={onSelectPrompt} />
@@ -190,8 +190,8 @@ function ChatComposerSection({
   model,
 }: Readonly<ComposerSectionProps>) {
   return (
-    <footer className="border-t border-[var(--line-soft)] bg-[rgba(248,243,235,0.82)] px-3 py-1.5 md:px-4 md:py-2 xl:px-5">
-      <div className="rounded-[16px] border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.9)] px-2.5 py-1.5 shadow-[0_8px_18px_rgba(58,45,29,0.05)] transition-[border-color,box-shadow,background-color] focus-within:border-[rgba(46,111,106,0.24)] focus-within:shadow-[0_0_0_3px_rgba(46,111,106,0.1)]">
+    <footer className="border-t border-line-soft bg-glass px-3 py-1.5 md:px-4 md:py-2 xl:px-5">
+      <div className="rounded-2xl bg-glass shadow-glass-heavy px-2.5 py-1.5 shadow-sm transition-[border-color,box-shadow,background-color] focus-within:border-accent-primary/25 focus-within:ring-3 focus-within:ring-accent-primary/10">
         <label className="block">
           <span className="sr-only">继续聊</span>
           <Input.TextArea
@@ -208,7 +208,7 @@ function ChatComposerSection({
           />
         </label>
         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
-          <p className="flex-1 text-[11px] leading-5 text-[var(--text-secondary)]">
+          <p className="flex-1 text-[11px] leading-5 text-text-secondary">
             {buildComposerHint(
               model.composerText.length,
               model.credentialState,
@@ -216,15 +216,14 @@ function ChatComposerSection({
               isCredentialLoading,
             )}
           </p>
-          <Button
+          <button
+            className="ink-button"
             disabled={!canSubmit}
-            shape="round"
-            size="default"
-            type="primary"
+            type="button"
             onClick={() => submitComposerText(canSubmit, model)}
           >
             {resolveSubmitButtonLabel(isCredentialLoading, isResponding)}
-          </Button>
+          </button>
         </div>
       </div>
     </footer>

@@ -4,11 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-patchedDependencies:
-  '@arco-design/web-react@2.66.12':
-    hash: 41c2ced8ffbbe56df16e45eb9a2616177f2017f9cc4d1ded45d6c3bfc8b7a3f7
-    path: patches/@arco-design__web-react.patch
-
 importers:
 
   .:

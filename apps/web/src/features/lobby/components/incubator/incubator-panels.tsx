@@ -38,7 +38,6 @@ export function TemplateModePanel({
       </div>
       <IncubatorPreview
         title="项目草稿"
-        description="根据填写内容生成项目草稿。"
         emptyMessage={buildPreviewEmptyMessage(model)}
         completeness={model.draftMutation.data?.setting_completeness}
         setting={model.draftMutation.data?.project_setting}
@@ -56,7 +55,7 @@ function renderTemplateModeGuard(
 ): ReactNode | null {
   if (model.templatesQuery.isLoading) {
     return (
-      <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">
+      <div className="panel-muted px-4 py-5 text-sm text-text-secondary">
         正在加载模板列表…
       </div>
     );

@@ -19,11 +19,11 @@ export function StoryAssetImpactPanel({ assetType, impact }: StoryAssetImpactPan
   const assetLabel = getStoryAssetLabel(assetType);
 
   return (
-    <section className="panel-muted space-y-4 rounded-[28px] p-4">
+    <section className="panel-muted space-y-4 rounded-3xl p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
-          <p className="text-sm text-[var(--text-secondary)]">最近一次操作影响</p>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-sm text-text-secondary">最近一次操作影响</p>
+          <p className="text-sm leading-6 text-text-secondary">
             {impact.has_impact
               ? `本次${assetLabel}更新已经同步到下游真值，以下内容已被标记为 stale。`
               : "本次操作没有触发新的 stale 传播，当前下游内容保持原状。"}
@@ -38,14 +38,14 @@ export function StoryAssetImpactPanel({ assetType, impact }: StoryAssetImpactPan
       {impact.has_impact ? (
         <div className="space-y-3">
           {impact.items.map((item) => (
-            <article key={item.target} className="rounded-2xl bg-[rgba(22,28,45,0.05)] p-4">
+            <article key={item.target} className="rounded-2xl bg-muted shadow-sm p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm font-medium text-[var(--text-primary)]">
+                <p className="text-sm font-medium text-text-primary">
                   {TARGET_LABELS[item.target]}
                 </p>
                 <StatusBadge status="stale" label={`${item.count} 项`} />
               </div>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{item.message}</p>
+              <p className="mt-2 text-sm leading-6 text-text-secondary">{item.message}</p>
             </article>
           ))}
         </div>

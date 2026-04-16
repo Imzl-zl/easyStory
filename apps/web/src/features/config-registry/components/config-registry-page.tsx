@@ -172,7 +172,6 @@ export function ConfigRegistryPage() {
     <div className="space-y-6">
       <SectionCard
         title="系统配置"
-        description="维护平台内置的 Skills、Agents、Hooks、MCP 和 Workflows。这是系统运行层，不是日常写作入口。"
         action={
           <div className="flex flex-wrap items-center justify-end gap-2.5">
             <GuardedLink
@@ -196,7 +195,7 @@ export function ConfigRegistryPage() {
       >
         <div className="space-y-4">
           <ConfigRegistryBanner
-            message="这里用于维护系统内置能力。普通写作请使用聊天、个人长期规则和项目规则。"
+            message="管理内置能力配置。日常写作请使用聊天和项目设置。"
             tone="info"
           />
           {visibleFeedback ? (

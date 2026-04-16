@@ -72,7 +72,6 @@ export function AssistantHookEditor({
   return (
     <form className="panel-muted space-y-4 p-4" onSubmit={(event) => submitDraft(event, draft, onSubmit)}>
       <AssistantDocumentModeToggle
-        description="可以用可视化方式配置自动动作，也可以直接按 HOOK.yaml 的格式来写。"
         fileLabel={ASSISTANT_HOOK_FILE_LABEL}
         guidedDisabled={Boolean(documentError)}
         mode={editorMode}
@@ -109,7 +108,7 @@ export function AssistantHookEditor({
       )}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {hasFieldError || documentError ? (
-          <p className="mr-auto rounded-2xl bg-[rgba(178,65,46,0.08)] px-3 py-2 text-[12px] leading-5 text-[var(--accent-danger)]">
+          <p className="mr-auto rounded-2xl bg-accent-danger/10 px-3 py-2 text-[12px] leading-5 text-accent-danger">
             {documentError ?? "请先修正上面的格式问题，再保存。"}
           </p>
         ) : null}

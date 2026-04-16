@@ -27,8 +27,8 @@ export function AssistantHookRawEditor({
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.92fr)]">
       <label className="block space-y-2">
         <span className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-medium text-[var(--text-primary)]">HOOK.yaml</span>
-          <span className="text-[12px] leading-5 text-[var(--text-secondary)]">
+          <span className="text-sm font-medium text-text-primary">HOOK.yaml</span>
+          <span className="text-[12px] leading-5 text-text-secondary">
             按事件和动作来写，保存后立即生效。
           </span>
         </span>
@@ -45,12 +45,12 @@ export function AssistantHookRawEditor({
           <p className="mt-2">动作类型只支持 `agent` 或 `mcp`。</p>
           <p className="mt-2">`author / priority / timeout / trigger.node_types` 目前是固定字段，暂不支持自定义。</p>
           {mode === "create" ? (
-            <p className="mt-3 rounded-2xl bg-[rgba(248,243,235,0.84)] px-3 py-2 text-[12px] leading-5 text-[var(--text-secondary)]">
+            <p className="mt-3 rounded-2xl bg-glass px-3 py-2 text-[12px] leading-5 text-text-secondary">
               第一次保存后，系统会自动补上这份 Hook 的 id。
             </p>
           ) : null}
           {documentError ? (
-            <p className="mt-3 rounded-2xl bg-[rgba(178,65,46,0.08)] px-3 py-2 text-[12px] leading-5 text-[var(--accent-danger)]">
+            <p className="mt-3 rounded-2xl bg-accent-danger/10 px-3 py-2 text-[12px] leading-5 text-accent-danger">
               当前文件还没写对，修正后才能保存。
             </p>
           ) : null}
@@ -77,8 +77,8 @@ function InfoCard({
   title,
 }: Readonly<{ children: React.ReactNode; title: string }>) {
   return (
-    <div className="rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-4 text-[12px] leading-6 text-[var(--text-secondary)]">
-      <p className="text-sm font-medium text-[var(--text-primary)]">{title}</p>
+    <div className="rounded-3xl bg-glass shadow-glass px-4 py-4 text-[12px] leading-6 text-text-secondary">
+      <p className="text-sm font-medium text-text-primary">{title}</p>
       <div className="mt-2">{children}</div>
     </div>
   );
@@ -96,23 +96,23 @@ function ReferenceCard({
   title: string;
 }>) {
   return (
-    <div className="rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-4">
-      <p className="text-sm font-medium text-[var(--text-primary)]">{title}</p>
+    <div className="rounded-3xl bg-glass shadow-glass px-4 py-4">
+      <p className="text-sm font-medium text-text-primary">{title}</p>
       {errorMessage ? (
-        <p className="mt-3 rounded-2xl bg-[rgba(178,65,46,0.08)] px-3 py-2 text-[12px] leading-5 text-[var(--accent-danger)]">
+        <p className="mt-3 rounded-2xl bg-accent-danger/10 px-3 py-2 text-[12px] leading-5 text-accent-danger">
           {errorMessage}
         </p>
       ) : null}
       <div className="mt-3 space-y-2">
         {items.length === 0 ? (
-          <div className="rounded-[16px] bg-[rgba(248,243,235,0.84)] px-3 py-2.5 text-[12px] leading-5 text-[var(--text-secondary)]">
+          <div className="rounded-2xl bg-glass px-3 py-2.5 text-[12px] leading-5 text-text-secondary">
             {emptyText}
           </div>
         ) : (
           items.map((item) => (
-            <div className="rounded-[16px] bg-[rgba(248,243,235,0.84)] px-3 py-2.5" key={item.value}>
-              <p className="text-[12px] font-medium text-[var(--text-primary)]">{item.label}</p>
-              <p className="mt-1 break-all font-mono text-[11px] leading-5 text-[var(--text-secondary)]">
+            <div className="rounded-2xl bg-glass px-3 py-2.5" key={item.value}>
+              <p className="text-[12px] font-medium text-text-primary">{item.label}</p>
+              <p className="mt-1 break-all font-mono text-[11px] leading-5 text-text-secondary">
                 {item.value}
               </p>
             </div>

@@ -83,7 +83,7 @@ export function AppSelect({
       value={resolvedValue}
       renderFormat={() => (
         currentOption ? (
-          <span className={`text-[var(--text-primary)] text-[0.88rem] leading-normal ${currentOption.isInvalid ? "text-[var(--accent-warning)]" : ""}`}>
+          <span className={`text-text-primary text-[0.88rem] leading-normal ${currentOption.isInvalid ? "text-accent-warning" : ""}`}>
             {currentOption.label}
           </span>
         ) : undefined
@@ -92,10 +92,10 @@ export function AppSelect({
     >
       {resolvedOptions.map((option) => (
         <Select.Option key={option.value} disabled={option.disabled} value={option.value}>
-          <span className={`grid gap-[0.16rem] p-[0.62rem_0.82rem] rounded-3 transition-all ${option.isInvalid ? "border border-dashed rgba(183,121,31,0.28)] bg-[rgba(183,121,31,0.08)]" : ""}`}>
-            <span className="text-[var(--text-primary)] text-[0.86rem] leading-relaxed">{option.label}</span>
+          <span className={`grid gap-[0.16rem] p-[0.62rem_0.82rem] rounded-2xl transition-all ${option.isInvalid ? "callout-warning border-dashed" : ""}`}>
+            <span className="text-text-primary text-[0.86rem] leading-relaxed">{option.label}</span>
             {option.description ? (
-              <span className="text-[var(--text-secondary)] text-[0.74rem] leading-relaxed">{option.description}</span>
+              <span className="text-text-secondary text-[0.74rem] leading-relaxed">{option.description}</span>
             ) : null}
           </span>
         </Select.Option>

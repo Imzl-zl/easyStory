@@ -82,7 +82,7 @@ export function LabPage({ projectId }: LabPageProps) {
         analysesCount={analyses.length}
         hasActiveFilters={hasActiveFilters}
       />
-      <div className="hero-card grid gap-4.5 p-4.5 [grid-template-columns:minmax(260px,320px)_minmax(0,1fr)_minmax(300px,360px)]">
+      <div className="hero-card grid gap-4.5 p-4.5 [grid-template-columns:1fr] xl:[grid-template-columns:minmax(260px,320px)_minmax(0,1fr)_minmax(300px,360px)]">
         <aside className="min-w-0">
           <LabSidebar
             activeId={activeId}
@@ -148,20 +148,17 @@ function LabHero({
       <div>
         <p className="label-overline">洞察工作台</p>
         <h1 className="max-w-[900px] font-serif text-[clamp(2rem,4vw,3.6rem)] leading-tight">把灵感拆解、文风判断和结构分析留在项目语境里。</h1>
-        <p className="max-w-[760px] text-[var(--text-secondary)] text-sm leading-relaxed">
-          这里不再像分析记录后台，而更像围绕当前作品展开的一张研究桌。
-        </p>
       </div>
       <div className="grid gap-3 [grid-template-columns:repeat(3,minmax(0,1fr))]">
-        <article className="grid gap-2.5 min-h-[110px] p-4.5 rounded-5 bg-gradient-to-b from-[rgba(250,246,237,0.94)] to-[rgba(247,241,231,0.84)]">
+        <article className="grid gap-2.5 min-h-[110px] p-4.5 rounded-2xl bg-gradient-to-b from-glass-heavy to-glass shadow-glass">
           <span className="label-overline">当前记录</span>
           <strong className="font-serif text-2xl leading-tight">{analysesCount}</strong>
         </article>
-        <article className="grid gap-2.5 min-h-[110px] p-4.5 rounded-5 bg-gradient-to-b from-[rgba(250,246,237,0.94)] to-[rgba(247,241,231,0.84)]">
+        <article className="grid gap-2.5 min-h-[110px] p-4.5 rounded-2xl bg-gradient-to-b from-glass-heavy to-glass shadow-glass">
           <span className="label-overline">筛选状态</span>
           <strong className="font-serif text-2xl leading-tight">{hasActiveFilters ? "已聚焦" : "查看全部"}</strong>
         </article>
-        <article className="grid gap-2.5 min-h-[110px] p-4.5 rounded-5 bg-gradient-to-b from-[rgba(250,246,237,0.94)] to-[rgba(247,241,231,0.84)]">
+        <article className="grid gap-2.5 min-h-[110px] p-4.5 rounded-2xl bg-gradient-to-b from-glass-heavy to-glass shadow-glass">
           <span className="label-overline">当前焦点</span>
           <strong className="font-serif text-2xl leading-tight">{activeTitle ?? "选择一条洞察"}</strong>
         </article>

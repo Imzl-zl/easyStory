@@ -42,7 +42,24 @@
       "mcp__plugin_playwright_playwright__browser_wait_for",
       "mcp__augment-context-engine__codebase-retrieval",
       "mcp__plugin_playwright_playwright__browser_resize",
-      "mcp__plugin_playwright_playwright__browser_evaluate"
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "Bash(find . -name \"*.tsx\" -exec grep -l \"rounded-xl\" {} \\\\;)",
+      "Bash(sed -i 's|rounded-2xl border border-\\\\[rgba\\(47,107,69,0.18\\)\\\\] bg-\\\\[rgba\\(47,107,69,0.08\\)\\\\]|callout-success|g' apps/web/src/features/engine/components/engine-export-panel.tsx)",
+      "Bash(sed -i 's|rounded-2xl border border-\\\\[rgba\\(183,121,31,0.2\\)\\\\] bg-\\\\[rgba\\(183,121,31,0.08\\)\\\\]|callout-warning|g' apps/web/src/features/engine/components/engine-task-form-panels.tsx)",
+      "Bash(sed -i 's|rounded-2xl border border-\\\\[rgba\\(183,121,31,0.2\\)\\\\] bg-\\\\[rgba\\(183,121,31,0.08\\)\\\\]|callout-warning|g' apps/web/src/features/engine/components/engine-task-panel.tsx)",
+      "Bash(sed -i \"s|bg-\\\\[rgba\\(183,121,31,0.1\\)\\\\]|bg-accent-warning/10|g\" apps/web/src/features/engine/components/engine-workflow-status-callout.tsx)",
+      "Bash(sed -i \"s|rounded-2xl bg-\\\\[rgba\\(196,90,90,0.08\\)\\\\]|callout-danger|g\" apps/web/src/features/lobby/components/projects/lobby-project-shelf.tsx)",
+      "Bash(find apps/web/src -name \"*.tsx\" -exec sed -i 's/shadow-sm p-\\\\\\([0-9]\\\\\\) shadow-sm/shadow-sm p-\\\\1/g' {} \\\\;)",
+      "Bash(find apps/web/src -name \"*.tsx\" -exec sed -i 's/shadow-sm px-/shadow-sm px-/g; s/\\\\\\(shadow-sm\\\\\\) \\\\\\(.*\\\\\\)shadow-sm/\\\\1 \\\\2/g' {} \\\\;)",
+      "Bash(find apps/web/src -name \"*.tsx\" -exec sed -i 's/shadow-glass shadow-glass/shadow-glass/g' {} \\\\;)",
+      "Bash(python3:*)",
+      "Bash(bash:*)",
+      "Bash(tasklist)",
+      "Bash(netstat -ano)",
+      "mcp__Playwright__browser_navigate",
+      "mcp__Playwright__browser_snapshot",
+      "mcp__Playwright__browser_evaluate",
+      "mcp__Playwright__browser_take_screenshot"
     ]
   }
 }

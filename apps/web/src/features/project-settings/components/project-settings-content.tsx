@@ -43,8 +43,8 @@ export function ProjectSettingsContent({
 }: Readonly<ProjectSettingsContentProps>) {
   if (tab === "setting" && projectLoading) {
     return (
-      <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
-        <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-[var(--text-secondary)]">
+      <div className="rounded-2xl bg-surface shadow-sm p-6">
+        <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-text-secondary">
           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin opacity-50" />
           <span>正在加载项目摘要...</span>
         </div>
@@ -55,12 +55,12 @@ export function ProjectSettingsContent({
   return (
     <div className="space-y-4">
       {projectError ? (
-        <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+        <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
           <p>{getErrorMessage(projectError)}</p>
         </div>
       ) : null}
       {tab === "setting" && !projectError ? (
-        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
+        <div className="rounded-2xl bg-surface shadow-sm p-6">
           <ProjectSettingSummaryPanel
             completeness={completeness}
             onDirtyChange={onProjectSettingDirtyChange}
@@ -70,9 +70,8 @@ export function ProjectSettingsContent({
         </div>
       ) : null}
       {tab === "rules" ? (
-        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
+        <div className="rounded-2xl bg-surface shadow-sm p-6">
           <AssistantRulesEditor
-            description="只影响这个项目里的聊天和创作建议。适合写题材方向、风格限制和明确不想要的内容。"
             onDirtyChange={onProjectRulesDirtyChange}
             projectId={projectId}
             scope="project"
@@ -81,7 +80,7 @@ export function ProjectSettingsContent({
         </div>
       ) : null}
       {tab === "assistant" ? (
-        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
+        <div className="rounded-2xl bg-surface shadow-sm p-6">
           <AssistantPreferencesPanel
             onDirtyChange={onProjectPreferencesDirtyChange}
             projectId={projectId}
@@ -90,7 +89,7 @@ export function ProjectSettingsContent({
         </div>
       ) : null}
       {tab === "skills" ? (
-        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
+        <div className="rounded-2xl bg-surface shadow-sm p-6">
           <AssistantSkillsPanel
             onDirtyChange={onProjectSkillsDirtyChange}
             projectId={projectId}
@@ -99,7 +98,7 @@ export function ProjectSettingsContent({
         </div>
       ) : null}
       {tab === "mcp" ? (
-        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
+        <div className="rounded-2xl bg-surface shadow-sm p-6">
           <AssistantMcpPanel
             onDirtyChange={onProjectMcpDirtyChange}
             projectId={projectId}
@@ -108,7 +107,7 @@ export function ProjectSettingsContent({
         </div>
       ) : null}
       {tab === "audit" ? (
-        <div className="rounded-[20px] border border-[var(--line-soft)] bg-[var(--bg-surface)] p-6 shadow-sm">
+        <div className="rounded-2xl bg-surface shadow-sm p-6">
           <ProjectAuditPanel
             eventType={eventType}
             onEventTypeChange={onEventTypeChange}

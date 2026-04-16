@@ -76,7 +76,7 @@ function ReplayGateStateView({
     return (
       <EmptyState
         title="尚未载入工作流"
-        description="启动工作流后，可以查看 Prompt 回放。"
+        description="启动工作流后查看。"
       />
     );
   }
@@ -117,8 +117,8 @@ function ReplaySelection({
         value={selectedExecutionId}
         onChange={onSelectExecutionId}
       />
-      <p className="text-sm leading-6 text-[var(--text-secondary)]">
-        必须先从执行时间轴选中一个节点，回放面板才会展示对应的 Prompt 与响应文本；也可以从执行概览或日志直接进入。
+      <p className="text-sm leading-6 text-text-secondary">
+        选择一个节点查看提示词与回复。
       </p>
     </label>
   );
@@ -131,8 +131,8 @@ function ReplayExecutionSummary({
     <section className="panel-muted space-y-3 p-4">
       <header className="space-y-1">
         <h3 className="font-serif text-lg font-semibold">当前节点</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          先确认当前回放属于哪个节点、什么状态、何时开始和结束，再看具体 Prompt 往返。
+        <p className="text-sm leading-6 text-text-secondary">
+          当前节点的提示词回放。
         </p>
       </header>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -145,22 +145,22 @@ function ReplayExecutionSummary({
             <StatusBadge status="active" label={execution.node_type} />
           </div>
           <div>
-            <p className="text-sm font-medium text-[var(--text-primary)]">
+            <p className="text-sm font-medium text-text-primary">
               {execution.node_id} · 序列 {execution.sequence} · 排序 {execution.node_order}
             </p>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="text-sm leading-6 text-text-secondary">
               开始 {formatDateTime(execution.started_at)} · 完成 {formatDateTime(execution.completed_at)}
             </p>
           </div>
         </div>
-        <div className="text-right text-sm leading-6 text-[var(--text-secondary)]">
+        <div className="text-right text-sm leading-6 text-text-secondary">
           <p>执行 ID：{formatShortId(execution.id)}</p>
           <p>耗时：{formatDuration(execution.execution_time_ms)}</p>
           <p>重试：{execution.retry_count}</p>
         </div>
       </div>
       {execution.error_message ? (
-        <div className="rounded-[18px] bg-[rgba(178,65,46,0.1)] px-4 py-3 text-sm leading-6 text-[var(--accent-danger)]">
+        <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm leading-6 text-accent-danger">
           {execution.error_message}
         </div>
       ) : null}
@@ -181,7 +181,7 @@ function ReplayDetailStateView({
     return (
       <EmptyState
         title="等待选择节点"
-        description="选择节点后，可以查看对应的 Prompt 对话。"
+        description="选择节点查看 Prompt。"
       />
     );
   }
@@ -216,7 +216,7 @@ function ReplayCard({
   index: number;
 }>) {
   return (
-    <article className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
+    <article className="rounded-2xl bg-muted shadow-sm p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -224,13 +224,13 @@ function ReplayCard({
             <StatusBadge status="draft" label={formatReplayTypeLabel(replay.replay_type)} />
           </div>
           <div>
-            <p className="text-sm font-medium text-[var(--text-primary)]">{replay.model_name}</p>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="text-sm font-medium text-text-primary">{replay.model_name}</p>
+            <p className="text-sm leading-6 text-text-secondary">
               {formatReplayTokenUsage(replay)} · {formatDateTime(replay.created_at)}
             </p>
           </div>
         </div>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+        <p className="text-sm leading-6 text-text-secondary">
           回放 ID：{formatShortId(replay.id)}
         </p>
       </div>
@@ -252,14 +252,14 @@ function ReplayTextDisclosure({
   const [open, setOpen] = useState(defaultOpen);
   return (
     <details
-      className="mt-4 rounded-[18px] border border-[var(--line-soft)] bg-[rgba(247,244,238,0.86)]"
+      className="mt-4 rounded-2xl bg-muted shadow-sm"
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-[var(--text-primary)]">
+      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-text-primary">
         {title}
       </summary>
-      <div className="border-t border-[var(--line-soft)] px-4 py-4">
+      <div className="border-t border-line-soft px-4 py-4">
         <pre className="mono-block whitespace-pre-wrap break-words">{value}</pre>
       </div>
     </details>
@@ -275,10 +275,10 @@ function FeedbackMessage({
 }>) {
   if (tone === "danger") {
     return (
-      <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+      <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
         {message}
       </div>
     );
   }
-  return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">{message}</div>;
+  return <div className="panel-muted px-4 py-5 text-sm text-text-secondary">{message}</div>;
 }

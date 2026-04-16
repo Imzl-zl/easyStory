@@ -1,0 +1,163 @@
+<h2>首页布局重新设计</h2>
+<p class="subtitle">当前问题分析 → 3个改进方案对比</p>
+
+<!-- 当前布局问题标注 -->
+<div class="section">
+  <h3>当前布局 · 问题标注</h3>
+  <div class="mockup">
+    <div class="mockup-header">当前首页 /workspace/lobby</div>
+    <div class="mockup-body" style="padding:0;">
+      <!-- 全局导航栏 -->
+      <div style="background:rgba(139,105,20,0.08);padding:10px 20px;border-bottom:1px solid rgba(139,105,20,0.15);display:flex;justify-content:space-between;align-items:center;font-size:13px;">
+        <span style="font-weight:600;">easyStory · 写作空间</span>
+        <span style="color:#888;">书架 | 创作 | 推进 | 洞察</span>
+        <span style="color:#888;">我的助手 · 头像</span>
+      </div>
+      <!-- 主体两列 -->
+      <div style="display:flex;min-height:420px;">
+        <!-- 左侧 aside -->
+        <div style="width:230px;border-right:1px solid rgba(139,105,20,0.1);padding:28px 18px;display:flex;flex-direction:column;gap:14px;background:rgba(139,105,20,0.03);">
+          <!-- 大间距标注 -->
+          <div style="position:relative;">
+            <div style="border:2px dashed #e74c3c;border-radius:8px;padding:8px 10px;">
+              <div style="font-size:9px;color:#999;letter-spacing:0.1em;text-transform:uppercase;">书架</div>
+              <div style="font-family:Georgia,serif;font-size:18px;margin-top:2px;">作品空间</div>
+            </div>
+            <div style="position:absolute;top:-14px;right:-8px;background:#e74c3c;color:#fff;font-size:9px;padding:2px 6px;border-radius:4px;">间距过大 ↓ 28px padding + px-1 pt-1</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(139,105,20,0.08);border-radius:10px;border-left:3px solid #8B6914;">
+              <div style="width:28px;height:28px;border-radius:6px;background:#ddd;"></div>
+              <span style="font-size:13px;">我的作品</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;">
+              <div style="width:28px;height:28px;border-radius:6px;background:#eee;"></div>
+              <span style="font-size:13px;color:#888;">我的助手</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;">
+              <div style="width:28px;height:28px;border-radius:6px;background:#eee;"></div>
+              <span style="font-size:13px;color:#888;">模板库</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;">
+              <div style="width:28px;height:28px;border-radius:6px;background:#eee;"></div>
+              <span style="font-size:13px;color:#888;">回收站</span>
+            </div>
+          </div>
+          <div style="margin-top:auto;padding:10px;background:rgba(139,105,20,0.05);border-radius:10px;font-size:11px;color:#888;">
+            当前节奏：...
+          </div>
+        </div>
+        <!-- 右侧 main -->
+        <div style="flex:1;padding:28px 32px;display:flex;flex-direction:column;gap:22px;">
+          <!-- 页头 -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+              <div style="position:relative;">
+                <div style="font-size:9px;color:#999;letter-spacing:0.1em;text-transform:uppercase;">继续创作</div>
+                <div style="font-family:Georgia,serif;font-size:28px;margin-top:4px;">从书架回到故事现场</div>
+                <div style="position:absolute;top:-12px;left:50px;background:#e67e22;color:#fff;font-size:8px;padding:2px 5px;border-radius:3px;white-space:nowrap;">← 历史遗留？与搜索无关</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div style="padding:7px 16px;border:1px solid rgba(139,105,20,0.3);border-radius:8px;font-size:12px;">打开我的助手</div>
+              <div style="padding:7px 16px;background:#8B6914;color:#fff;border-radius:8px;font-size:12px;">新建作品</div>
+            </div>
+          </div>
+          <!-- 搜索+统计 -->
+          <div style="background:rgba(255,255,255,0.5);border:1px solid rgba(139,105,20,0.1);border-radius:14px;padding:16px 20px;display:flex;gap:16px;align-items:center;">
+            <div style="flex:1;">
+              <div style="font-size:11px;color:#888;margin-bottom:4px;">搜索作品</div>
+              <div style="background:#f5f0e8;border-radius:8px;padding:10px 14px;color:#aaa;font-size:13px;">搜索作品名、题材或模板…</div>
+            </div>
+            <div style="display:flex;gap:10px;">
+              <div style="text-align:center;padding:8px 14px;background:rgba(139,105,20,0.05);border-radius:10px;">
+                <div style="font-size:18px;font-weight:600;">3</div>
+                <div style="font-size:9px;color:#888;">当前作品</div>
+              </div>
+              <div style="text-align:center;padding:8px 14px;background:rgba(139,105,20,0.05);border-radius:10px;">
+                <div style="font-size:18px;font-weight:600;">3</div>
+                <div style="font-size:9px;color:#888;">筛选结果</div>
+              </div>
+              <div style="text-align:center;padding:8px 14px;background:rgba(139,105,20,0.05);border-radius:10px;">
+                <div style="font-size:18px;font-weight:600;">12</div>
+                <div style="font-size:9px;color:#888;">模板库</div>
+              </div>
+            </div>
+          </div>
+          <!-- 项目卡片 -->
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
+            <div style="border:1px solid rgba(139,105,20,0.1);border-radius:12px;padding:16px;height:80px;background:rgba(255,255,255,0.3);">
+              <div style="font-weight:500;font-size:13px;">作品卡片 1</div>
+              <div style="font-size:11px;color:#888;margin-top:4px;">上次编辑：2小时前</div>
+            </div>
+            <div style="border:1px solid rgba(139,105,20,0.1);border-radius:12px;padding:16px;height:80px;background:rgba(255,255,255,0.3);">
+              <div style="font-weight:500;font-size:13px;">作品卡片 2</div>
+              <div style="font-size:11px;color:#888;margin-top:4px;">上次编辑：昨天</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 方案对比 -->
+<div class="section" style="margin-top:32px;">
+  <h3>3个改进方案</h3>
+
+  <div class="options">
+    <!-- 方案 A -->
+    <div class="option" data-choice="a" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>聚焦式书架（推荐）</h3>
+        <p><strong>核心改动：</strong>去掉右侧品牌标题区，搜索框提升为首个交互元素，侧栏精简为纯导航列表</p>
+        <ul style="margin:6px 0 0 16px;font-size:13px;line-height:1.6;">
+          <li>侧栏：删除"书架/作品空间"标题区 → 导航项直接从顶部开始，间距砍半</li>
+          <li>右侧：删除"继续创作"小字 + "从书架回到故事现场"大标题 → 搜索框直接成为页面第一个元素</li>
+          <li>统计：3个 MetricCard 简化为一行小字 "共 N 部作品 · M 个筛选结果"</li>
+          <li>按钮："新建作品"移到搜索框同一行右侧，"打开我的助手"移到侧栏底部</li>
+          <li>布局：侧栏 240px → 搜索+按钮 → 项目卡片网格，视觉流更紧凑</li>
+        </ul>
+        <div style="margin-top:8px;padding:6px 10px;background:rgba(46,125,50,0.08);border-radius:6px;font-size:12px;color:#2e7d32;">
+          ✓ 用户打开首页 → 直接看到搜索框+作品卡片，减少 2 层视觉噪音
+        </div>
+      </div>
+    </div>
+
+    <!-- 方案 B -->
+    <div class="option" data-choice="b" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>紧凑双栏</h3>
+        <p><strong>核心改动：</strong>保留现有结构但压缩间距，修正信息层级</p>
+        <ul style="margin:6px 0 0 16px;font-size:13px;line-height:1.6;">
+          <li>侧栏：标题区保留但缩小为单行小标签，间距从 28px → 16px</li>
+          <li>右侧：删除"继续创作"小字，保留大标题但改为更直接的用户用语</li>
+          <li>搜索+统计：保持不变，仅微调间距</li>
+          <li>改动最小，仅做减法和间距修正</li>
+        </ul>
+        <div style="margin-top:8px;padding:6px 10px;background:rgba(255,152,0,0.08);border-radius:6px;font-size:12px;color:#e65100;">
+          ⚠ 保守方案，问题部分缓解但布局本质不变
+        </div>
+      </div>
+    </div>
+
+    <!-- 方案 C -->
+    <div class="option" data-choice="c" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>无侧栏全宽</h3>
+        <p><strong>核心改动：</strong>取消左侧边栏，所有导航整合到顶栏</p>
+        <ul style="margin:6px 0 0 16px;font-size:13px;line-height:1.6;">
+          <li>侧栏导航项（我的作品/模板库/回收站）移入顶部导航或下拉菜单</li>
+          <li>右侧变为全宽内容区，搜索+统计+卡片网格更宽敞</li>
+          <li>适合内容展示，但丢失了侧栏的快速切换能力</li>
+        </ul>
+        <div style="margin-top:8px;padding:6px 10px;background:rgba(198,40,40,0.08);border-radius:6px;font-size:12px;color:#c62828;">
+          ⚠ 导航变深，需要点击展开才能切换视图；改动范围大
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

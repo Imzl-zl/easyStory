@@ -40,13 +40,13 @@ export function LabSidebar({
   return (
     <aside className="panel-shell space-y-4 p-5">
       <div className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-ink)]">洞察书架</p>
+        <p className="text-xs uppercase tracking-[0.24em] text-accent-primary">洞察书架</p>
         <h1 className="font-serif text-2xl font-semibold">项目洞察列表</h1>
       </div>
       <LabFilters filters={filters} isPending={isPending} onFilterChange={onFilterChange} />
-      {isLoading ? <p className="text-sm text-[var(--text-secondary)]">正在加载分析列表...</p> : null}
+      {isLoading ? <p className="text-sm text-text-secondary">正在加载分析列表...</p> : null}
       {errorMessage ? (
-        <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+        <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
           {errorMessage}
         </div>
       ) : null}
@@ -72,7 +72,7 @@ function LabFilters({
   onFilterChange: (patch: Partial<LabAnalysisFilterState>) => void;
 }>) {
   return (
-    <div className="space-y-3 rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.56)] p-4">
+    <div className="space-y-3 rounded-2xl bg-muted shadow-sm p-4">
       <label className="block space-y-2">
         <span className="label-text">分析类型</span>
         <AppSelect
@@ -136,8 +136,8 @@ function LabAnalysisList({
             onClick={() => onSelect(analysis.id)}
             type="button"
           >
-            <span className="text-left font-medium text-[var(--text-primary)]">{formatLabAnalysisTitle(analysis)}</span>
-            <div className="flex w-full flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <span className="text-left font-medium text-text-primary">{formatLabAnalysisTitle(analysis)}</span>
+            <div className="flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary">
               <StatusBadge status="active" label={analysis.analysis_type} />
               {analysis.generated_skill_key ? (
                 <StatusBadge status="approved" label={analysis.generated_skill_key} />

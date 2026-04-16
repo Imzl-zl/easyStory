@@ -13,7 +13,7 @@ import {
 } from "@/features/studio/components/chat/studio-chat-context-support";
 
 const CONTEXT_PICKER_PANEL_CLASS =
-  "overflow-hidden rounded-xl border border-[rgba(44,36,22,0.1)] bg-white/95 shadow-[0_18px_46px_rgba(44,36,22,0.16)] backdrop-blur-sm";
+  "overflow-hidden rounded-2xl bg-surface/95 shadow-lg backdrop-blur-sm";
 
 type StudioChatContextSelectorContentProps = {
   availableContexts: DocumentTreeNode[];
@@ -61,12 +61,12 @@ export function StudioChatContextSelectorContent({
       ref={panelRef}
       style={panelStyle}
     >
-      <p className="border-b border-[rgba(44,36,22,0.06)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)]">
+      <p className="border-b border-line-soft px-3 py-2 text-xs font-medium text-text-secondary">
         附加文档上下文 ({selectedContextPaths.length}/{totalFileCount})
       </p>
       <input
         type="text"
-        className="w-full border-b border-[rgba(44,36,22,0.06)] bg-transparent px-3 py-2 text-sm focus:bg-[rgba(107,143,113,0.05)] focus:outline-none"
+        className="w-full border-b border-line-soft bg-transparent px-3 py-2 text-sm focus:bg-accent-soft focus:outline-none"
         placeholder="搜索文稿..."
         value={contextSearchQuery}
         onChange={(event) => setContextSearchQuery(event.target.value)}
@@ -87,7 +87,7 @@ export function StudioChatContextSelectorContent({
             />
           ))
         ) : (
-          <p className="px-3 py-3 text-sm text-[var(--text-muted)]">没有找到匹配的文稿。</p>
+          <p className="px-3 py-3 text-sm text-text-tertiary">没有找到匹配的文稿。</p>
         )}
       </div>
     </div>
@@ -122,14 +122,14 @@ function StudioChatContextTreeNode({
   if (node.type === "file") {
     return (
       <label
-        className="flex cursor-pointer items-center gap-2 py-1 pr-3 hover:bg-[rgba(107,143,113,0.05)]"
+        className="flex cursor-pointer items-center gap-2 py-1 pr-3 hover:bg-accent-soft"
         style={rowPaddingStyle}
       >
         <Checkbox
           checked={selectedContextPaths.includes(node.path)}
           onChange={() => onToggleContext(node.path)}
         />
-        <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-primary)]">
+        <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
           {node.label}
         </span>
       </label>
@@ -145,7 +145,7 @@ function StudioChatContextTreeNode({
   return (
     <div>
       <button
-        className={`flex w-full items-center gap-2 py-1.5 pr-3 text-left text-xs font-medium text-[var(--text-secondary)] hover:bg-[rgba(107,143,113,0.05)] ${isExpanded ? "bg-[rgba(107,143,113,0.08)]" : ""}`}
+        className={`flex w-full items-center gap-2 py-1.5 pr-3 text-left text-xs font-medium text-text-secondary hover:bg-accent-soft ${isExpanded ? "bg-accent-soft" : ""}`}
         style={rowPaddingStyle}
         type="button"
         onClick={() => onToggleFolder(node.path, isExpanded)}

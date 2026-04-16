@@ -172,21 +172,21 @@ export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
   const popup = isOpen && panelStyle
     ? renderFloatingPanel(
       <div
-        className="overflow-hidden rounded-[18px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.98)] shadow-[0_18px_38px_rgba(58,45,29,0.12)]"
+        className="overflow-hidden rounded-2xl bg-glass shadow-glass-heavy shadow-md"
         ref={panelRef}
         style={panelStyle}
       >
-        <div className="border-b border-[var(--line-soft)] bg-[rgba(248,243,235,0.88)] px-3 py-2.5">
+        <div className="border-b border-line-soft bg-glass px-3 py-2.5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[12px] font-medium text-[var(--text-primary)]">模型与连接</p>
-              <p className="mt-0.5 text-[10.5px] leading-4 text-[var(--text-secondary)]">
+              <p className="text-[12px] font-medium text-text-primary">模型与连接</p>
+              <p className="mt-0.5 text-[10.5px] leading-4 text-text-secondary">
                 只在需要时展开，不再长期占聊天区高度。
               </p>
             </div>
             <button
               aria-label="收起模型与连接设置"
-              className="rounded-full px-2 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)] transition hover:bg-[rgba(255,255,255,0.72)]"
+              className="rounded-full px-2 py-0.5 text-[10px] leading-4 text-text-secondary transition hover:bg-glass"
               type="button"
               onClick={() => setIsOpen(false)}
             >
@@ -220,7 +220,7 @@ export function ChatAdvancedSettings({ model }: { model: IncubatorChatModel }) {
     <div className="shrink-0">
       <button
         aria-expanded={isOpen}
-        className="list-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(46,111,106,0.16)] focus-visible:ring-inset"
+        className="list-none cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 focus-visible:ring-inset"
         ref={triggerRef}
         type="button"
         onClick={() => setIsOpen((current) => !current)}
@@ -237,13 +237,13 @@ function SettingsCollapseHeader({ summaryItems }: { summaryItems: string[] }) {
   const hiddenCount = Math.max(summaryItems.length - visibleItems.length, 0);
 
   return (
-    <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.82)] px-2.5 py-1.5">
-      <span className="text-[11px] font-medium text-[var(--text-primary)]">模型与连接</span>
+    <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-glass shadow-glass px-2.5 py-1.5">
+      <span className="text-[11px] font-medium text-text-primary">模型与连接</span>
       <div className="hidden items-center gap-1 sm:flex">
         {visibleItems.map((item) => (
           <Tag
             bordered={false}
-            className="!m-0 !rounded-full !bg-[rgba(248,243,235,0.96)] !px-2 !py-0.5 !text-[10px] !leading-4 !text-[var(--text-secondary)]"
+            className="!m-0 !rounded-full !bg-glass-heavy !px-2 !py-0.5 !text-[10px] !leading-4 !text-text-secondary"
             key={item}
             size="small"
           >
@@ -253,14 +253,14 @@ function SettingsCollapseHeader({ summaryItems }: { summaryItems: string[] }) {
         {hiddenCount > 0 ? (
           <Tag
             bordered={false}
-            className="!m-0 !rounded-full !bg-[rgba(248,243,235,0.96)] !px-2 !py-0.5 !text-[10px] !leading-4 !text-[var(--text-secondary)]"
+            className="!m-0 !rounded-full !bg-glass-heavy !px-2 !py-0.5 !text-[10px] !leading-4 !text-text-secondary"
             size="small"
           >
             +{hiddenCount}
           </Tag>
         ) : null}
       </div>
-      <span className="rounded-full bg-[rgba(248,243,235,0.92)] px-1.5 py-0.5 text-[10px] leading-4 text-[var(--text-secondary)]">
+      <span className="rounded-full bg-glass-heavy px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary">
         设置
       </span>
     </div>
@@ -299,18 +299,18 @@ function AdvancedSettingsForm({
         skillQueryError={skillQueryError}
       />
 
-      <section className="space-y-3 rounded-[16px] border border-[rgba(101,92,82,0.1)] bg-[rgba(255,255,255,0.74)] px-3 py-3">
+      <section className="space-y-3 rounded-2xl bg-glass shadow-glass px-3 py-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[12px] font-medium text-[var(--text-primary)]">回复细节</p>
-            <p className="mt-1 text-[11px] leading-5 text-[var(--text-secondary)]">
+            <p className="text-[12px] font-medium text-text-primary">回复细节</p>
+            <p className="mt-1 text-[11px] leading-5 text-text-secondary">
               {helperMaxOutputTokens == null
                 ? "留空时不显式覆写单次回复上限，交给当前连接或上游模型默认处理。"
                 : `留空时不显式覆写单次回复上限；当前连接声明的默认上限为 ${helperMaxOutputTokens}。`}
             </p>
           </div>
           {prefersBufferedOutput(currentOption) ? (
-            <span className="rounded-full bg-[rgba(58,124,165,0.08)] px-2.5 py-1 text-[10.5px] text-[var(--accent-info)]">
+            <span className="rounded-full bg-accent-info-soft px-2.5 py-1 text-[10.5px] text-accent-info">
               当前连接更适合生成后整体显示
             </span>
           ) : null}
@@ -383,17 +383,17 @@ function IncubatorReasoningField({ model }: { model: IncubatorChatModel }) {
 
   if (control.kind === "none") {
     return (
-      <div className="rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-3 py-2.5 text-[11px] leading-5 text-[var(--text-secondary)]">
+      <div className="rounded-2xl bg-glass shadow-glass px-3 py-2.5 text-[11px] leading-5 text-text-secondary">
         {control.description}
       </div>
     );
   }
   if (control.kind === "gemini_budget") {
     return (
-      <div className="space-y-2 rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-3 py-2.5">
+      <div className="space-y-2 rounded-2xl bg-glass shadow-glass px-3 py-2.5">
         <div>
-          <p className="text-[12px] font-medium text-[var(--text-primary)]">{control.title}</p>
-          <p className="mt-0.5 text-[11px] leading-5 text-[var(--text-secondary)]">{control.description}</p>
+          <p className="text-[12px] font-medium text-text-primary">{control.title}</p>
+          <p className="mt-0.5 text-[11px] leading-5 text-text-secondary">{control.description}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <ReasoningChoiceButton
@@ -433,8 +433,8 @@ function IncubatorReasoningField({ model }: { model: IncubatorChatModel }) {
 
   const value = control.kind === "openai" ? model.settings.reasoningEffort : model.settings.thinkingLevel;
   return (
-    <div className="space-y-2 rounded-[14px] border border-[rgba(101,92,82,0.1)] bg-[rgba(248,243,235,0.88)] px-3 py-2.5">
-      <label className="text-[12px] font-medium text-[var(--text-primary)]">{control.title}</label>
+    <div className="space-y-2 rounded-2xl bg-glass shadow-glass px-3 py-2.5">
+      <label className="text-[12px] font-medium text-text-primary">{control.title}</label>
       <AppSelect
         ariaLabel={control.title}
         className="min-w-0"
@@ -449,7 +449,7 @@ function IncubatorReasoningField({ model }: { model: IncubatorChatModel }) {
               : { thinkingLevel: nextValue }),
           }))}
       />
-      <p className="text-[11px] leading-5 text-[var(--text-secondary)]">{control.description}</p>
+      <p className="text-[11px] leading-5 text-text-secondary">{control.description}</p>
     </div>
   );
 }
@@ -465,10 +465,10 @@ function ReasoningChoiceButton({
 }>) {
   return (
     <button
-      className={`rounded-full border px-3 py-1 text-[11px] transition ${
+      className={`rounded-full px-3 py-1 text-[11px] transition ${
         active
-          ? "border-[rgba(46,111,106,0.22)] bg-[rgba(46,111,106,0.1)] text-[var(--accent-ink)]"
-          : "border-[rgba(101,92,82,0.1)] bg-white text-[var(--text-secondary)]"
+          ? "bg-accent-primary/10 text-accent-primary shadow-sm"
+          : "bg-surface text-text-secondary shadow-xs hover:bg-surface-hover"
       }`}
       type="button"
       onClick={onClick}

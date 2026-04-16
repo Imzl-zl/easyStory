@@ -38,7 +38,7 @@ export function StudioDocumentTreeDialog({
       onOk={onConfirm}
     >
       <div className="flex flex-col gap-3">
-        <p className="m-0 text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
+        <p className="m-0 text-sm leading-6 text-text-secondary">{description}</p>
         {isInputMode ? (
           <Input
             autoFocus

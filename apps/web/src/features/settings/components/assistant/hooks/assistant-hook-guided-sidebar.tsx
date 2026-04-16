@@ -55,9 +55,9 @@ function HookSummaryCard({
     { agentLabel, mcpLabel },
   );
   return (
-    <div className="rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] px-4 py-3">
-      <p className="text-sm font-medium text-[var(--text-primary)]">当前效果</p>
-      <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">
+    <div className="rounded-3xl bg-glass shadow-glass px-4 py-3">
+      <p className="text-sm font-medium text-text-primary">当前效果</p>
+      <p className="mt-1 text-[12px] leading-5 text-text-secondary">
         {resolveAssistantHookEventLabel(draft.event)}时，自动调用
         {resolveAssistantHookActionLabel(draft.actionType)}：{targetLabel}
       </p>
@@ -67,19 +67,19 @@ function HookSummaryCard({
 
 function HookPreviewCard({ preview }: Readonly<{ preview: string }>) {
   return (
-    <div className="rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.72)] p-4">
+    <div className="rounded-3xl bg-glass shadow-glass p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-[var(--text-primary)]">保存后的文件</p>
-          <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">
+          <p className="text-sm font-medium text-text-primary">保存后的文件</p>
+          <p className="mt-1 text-[12px] leading-5 text-text-secondary">
             右侧会同步预览这份 Hook 最终保存成什么样。
           </p>
         </div>
-        <span className="rounded-full bg-[rgba(248,243,235,0.92)] px-3 py-1 text-[12px] font-medium text-[var(--text-secondary)]">
+        <span className="rounded-pill bg-glass-heavy px-3 py-1 text-[12px] font-medium text-text-secondary">
           {ASSISTANT_HOOK_FILE_LABEL}
         </span>
       </div>
-      <pre className="mt-3 max-h-[320px] overflow-auto rounded-[18px] bg-[rgba(248,243,235,0.84)] px-4 py-4 text-[12px] leading-6 text-[var(--text-primary)]">
+      <pre className="mt-3 max-h-[320px] overflow-auto rounded-2xl bg-glass px-4 py-4 text-[12px] leading-6 text-text-primary">
         {preview}
       </pre>
     </div>

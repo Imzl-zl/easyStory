@@ -14,7 +14,7 @@ import type { TemplateDetail } from "@/lib/api/types";
 
 export function TemplateLibraryDetailPanel({ model }: { model: TemplateLibraryModel }) {
   if (model.detailQuery.isLoading) {
-    return <section className="panel-shell min-h-0 p-5 text-sm text-[var(--text-secondary)]">正在读取模板详情…</section>;
+    return <section className="panel-shell min-h-0 p-5 text-sm text-text-secondary">正在读取模板详情…</section>;
   }
   if (model.detailQuery.error) {
     return (
@@ -33,7 +33,7 @@ export function TemplateLibraryDetailPanel({ model }: { model: TemplateLibraryMo
     return (
       <EmptyState
         title="选择模板"
-        description="从左侧查看模板详情。"
+        description="从左侧选择模板查看详情。"
       />
     );
   }
@@ -65,7 +65,7 @@ function DetailHeader({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h2 className="font-serif text-2xl font-semibold">{template.name}</h2>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">{template.description ?? "暂无说明。"}</p>
+          <p className="text-sm leading-6 text-text-secondary">{template.description ?? "暂无说明。"}</p>
         </div>
         <StatusBadge
           status={template.is_builtin ? "approved" : "draft"}
@@ -93,7 +93,7 @@ function MetaGrid({ template }: { template: TemplateDetail }) {
         ["更新时间", formatTemplateTime(template.updated_at)],
       ].map(([label, value]) => (
         <div key={label} className="panel-muted space-y-1 p-4">
-          <dt className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">{label}</dt>
+          <dt className="text-xs uppercase tracking-[0.18em] text-text-secondary">{label}</dt>
           <dd className="text-sm leading-6">{value}</dd>
         </div>
       ))}
@@ -103,7 +103,7 @@ function MetaGrid({ template }: { template: TemplateDetail }) {
 
 function GuidedQuestionSection({ template }: { template: TemplateDetail }) {
   if (template.guided_questions.length === 0) {
-    return <p className="rounded-2xl bg-[rgba(255,255,255,0.52)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">当前模板未设置引导问题。</p>;
+    return <p className="rounded-2xl bg-muted px-4 py-3 text-sm leading-6 text-text-secondary">当前模板未设置引导问题。</p>;
   }
   return (
     <div className="space-y-2">
@@ -111,7 +111,7 @@ function GuidedQuestionSection({ template }: { template: TemplateDetail }) {
       <div className="space-y-3">
         {template.guided_questions.map((question) => (
           <article key={question.variable} className="panel-muted space-y-1 p-4">
-            <p className="text-xs tracking-[0.12em] text-[var(--text-secondary)]">
+            <p className="text-xs tracking-[0.12em] text-text-secondary">
               {formatGuidedQuestionVariableLabel(question.variable)}
             </p>
             <p className="text-sm leading-6">{question.question}</p>
@@ -132,13 +132,13 @@ function NodeSection({ template }: { template: TemplateDetail }) {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
                 <p className="font-medium">{node.node_name ?? node.node_id ?? `节点 ${node.node_order + 1}`}</p>
-                <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                <p className="text-sm leading-6 text-text-secondary">
                   {node.node_type}
                   {" · "}
                   {node.skill_id ? `使用 ${node.skill_id}` : "暂未绑定技能"}
                 </p>
               </div>
-              <span className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">#{node.node_order + 1}</span>
+              <span className="text-xs uppercase tracking-[0.16em] text-text-secondary">#{node.node_order + 1}</span>
             </div>
             <CodeBlock value={node.config} />
           </article>

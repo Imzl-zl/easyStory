@@ -167,7 +167,7 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
     return (
       <EmptyState
         title="尚未载入章节任务"
-        description="启动工作流后，可以查看和管理章节任务。"
+        description="启动工作流后查看。"
       />
     );
   }
@@ -179,25 +179,25 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <h3 className="font-serif text-lg font-semibold">当前章节任务</h3>
-              <p className="text-sm leading-6 text-[var(--text-secondary)]">
-                当前载入 workflow 的任务真值。单条任务可编辑，整套计划可覆盖式重建。
+              <p className="text-sm leading-6 text-text-secondary">
+                当前章节任务列表。
               </p>
             </div>
             <StatusBadge status={workflow.status} label={workflow.status} />
           </div>
 
           {tasksQuery.isLoading ? (
-            <p className="text-sm text-[var(--text-secondary)]">正在加载章节任务...</p>
+            <p className="text-sm text-text-secondary">正在加载章节任务...</p>
           ) : null}
           {tasksQuery.error ? (
-            <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+            <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
               {getErrorMessage(tasksQuery.error)}
             </div>
           ) : null}
 
           {hasStaleTasks(tasks) ? (
-            <div className="rounded-2xl border border-[rgba(183,121,31,0.2)] bg-[rgba(183,121,31,0.08)] px-4 py-3 text-sm text-[var(--accent-warning)]">
-              当前章节任务存在 `stale` 项。根据设计约束，这不是普通警告，必须先重建章节计划再继续使用。
+            <div className="callout-warning px-4 py-3 text-sm text-accent-warning">
+              部分任务已过期，请重建章节计划后继续。
             </div>
           ) : null}
 
@@ -214,7 +214,7 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
                 return (
                   <article
                     key={task.task_id}
-                    className="rounded-2xl border border-[rgba(101,92,82,0.12)] bg-[rgba(255,255,255,0.56)] p-4"
+                    className="rounded-2xl bg-muted shadow-sm p-4"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="space-y-2">
@@ -222,7 +222,7 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
                           <StatusBadge status="outline" label={`第 ${task.chapter_number} 章`} />
                           <StatusBadge status={status.badgeStatus} label={status.badgeLabel} />
                         </div>
-                        <p className="font-medium text-[var(--text-primary)]">{task.title}</p>
+                        <p className="font-medium text-text-primary">{task.title}</p>
                       </div>
                       <button
                         className="ink-button-secondary"
@@ -233,10 +233,10 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
                         编辑此任务
                       </button>
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+                    <p className="mt-3 text-sm leading-6 text-text-secondary">
                       {task.brief}
                     </p>
-                    <p className="mt-3 text-xs uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+                    <p className="mt-3 text-xs uppercase tracking-[0.14em] text-text-secondary">
                       {status.description}
                     </p>
                   </article>

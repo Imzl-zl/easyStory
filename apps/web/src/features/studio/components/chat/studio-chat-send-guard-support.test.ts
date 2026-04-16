@@ -6,7 +6,7 @@ import { runStudioSendOnce } from "@/features/studio/components/chat/studio-chat
 test("studio send guard prevents concurrent send attempts until the first one settles", async () => {
   const guard = { current: false };
   const started: string[] = [];
-  let releaseFirst: (() => void) | null = null;
+  let releaseFirst: ((value?: void) => void) | null = null;
 
   const firstAttempt = runStudioSendOnce(guard, async () => {
     started.push("first");
@@ -24,7 +24,7 @@ test("studio send guard prevents concurrent send attempts until the first one se
   assert.deepEqual(started, ["first"]);
   assert.equal(guard.current, true);
 
-  releaseFirst?.();
+  releaseFirst!();
   assert.equal(await firstAttempt, true);
   assert.equal(guard.current, false);
 

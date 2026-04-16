@@ -32,19 +32,19 @@ export function CredentialDeleteConfirmDialog({
         <section className="panel-muted space-y-4 p-5">
           <div className="space-y-3">
             <StatusBadge status="failed" label="删除确认" />
-            <div className="rounded-2xl border border-[rgba(178,65,46,0.16)] bg-[rgba(178,65,46,0.08)] px-4 py-4 text-sm leading-6 text-[var(--accent-danger)]">
+            <div className="rounded-2xl border border-accent-danger/15 bg-accent-danger/10 px-4 py-4 text-sm leading-6 text-accent-danger">
               删除后不会自动补一条替代连接。请确认移除后，相关模型还能按你的预期继续使用。
             </div>
           </div>
-          <div className="space-y-3 rounded-[18px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.68)] px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-ink)]">{scopeLabel}</p>
-            <h3 className="font-serif text-xl font-semibold text-[var(--text-primary)]">
+          <div className="space-y-3 rounded-2xl bg-glass shadow-glass px-4 py-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-accent-primary">{scopeLabel}</p>
+            <h3 className="font-serif text-xl font-semibold text-text-primary">
               {credential.display_name}
             </h3>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="text-sm leading-6 text-text-secondary">
               连接标识：{credential.provider} · 接口类型：{credential.api_dialect}
             </p>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="text-sm leading-6 text-text-secondary">
               当前状态：{credential.is_active ? "启用中" : "已停用"} · 密钥尾号：{credential.masked_key}
             </p>
           </div>
@@ -60,17 +60,17 @@ export function CredentialDeleteConfirmDialog({
         <section className="panel-muted space-y-4 p-5">
           <div className="space-y-1">
             <h3 className="font-serif text-lg font-semibold">删除影响</h3>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="text-sm leading-6 text-text-secondary">
               这里只展示当前已经确认的影响，不会替你假设额外回退规则。
             </p>
           </div>
           <div className="space-y-3">
             {items.map((item) => (
               <article
-                className="rounded-[18px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.68)] px-4 py-3"
+                className="rounded-2xl bg-glass shadow-glass px-4 py-3"
                 key={item}
               >
-                <p className="text-sm leading-6 text-[var(--text-secondary)]">{item}</p>
+                <p className="text-sm leading-6 text-text-secondary">{item}</p>
               </article>
             ))}
           </div>

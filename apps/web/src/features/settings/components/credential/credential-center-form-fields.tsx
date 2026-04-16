@@ -63,7 +63,7 @@ export function FieldInput({
     <label className={`block ${className ?? ""}`}>
       <span className="label-text">{label}</span>
       <input className="ink-input" value={value} onChange={(event) => onChange(event.target.value)} {...props} />
-      {description ? <p className="mt-1.5 text-[12px] leading-5 text-[var(--text-secondary)]">{description}</p> : null}
+      {description ? <p className="mt-1.5 text-[12px] leading-5 text-text-secondary">{description}</p> : null}
     </label>
   );
 }
@@ -77,8 +77,8 @@ export function StaticField({
   return (
     <div className={`space-y-2 ${className ?? ""}`}>
       <span className="label-text">{label}</span>
-      <div className="panel-muted px-3.5 py-2.5 text-[13px] leading-5 text-[var(--text-primary)]">{value}</div>
-      <p className="text-[12px] leading-5 text-[var(--text-secondary)]">{description}</p>
+      <div className="panel-muted px-3.5 py-2.5 text-[13px] leading-5 text-text-primary">{value}</div>
+      <p className="text-[12px] leading-5 text-text-secondary">{description}</p>
     </div>
   );
 }
@@ -100,7 +100,7 @@ export function CredentialSelectField({
         {label}
       </label>
       <AppSelect density="roomy" disabled={disabled} id={fieldId} options={options} value={value} onChange={onChange} />
-      {description ? <p className="mt-1.5 text-[12px] leading-5 text-[var(--text-secondary)]">{description}</p> : null}
+      {description ? <p className="mt-1.5 text-[12px] leading-5 text-text-secondary">{description}</p> : null}
     </div>
   );
 }

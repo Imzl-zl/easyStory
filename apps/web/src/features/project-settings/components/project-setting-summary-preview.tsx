@@ -21,20 +21,20 @@ export function ProjectSettingSummaryPreview({
   );
 
   return (
-    <section className="space-y-4 rounded-[22px] border border-[rgba(90,122,107,0.12)] bg-[rgba(248,243,235,0.52)] p-4">
+    <section className="space-y-4 rounded-2xl border border-accent-primary-muted bg-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1.5">
-          <p className="text-sm font-medium text-[var(--text-primary)]">提炼结果预览</p>
-          <p className="text-sm leading-6 text-[var(--text-secondary)]">{summary}</p>
+          <p className="text-sm font-medium text-text-primary">提炼结果预览</p>
+          <p className="text-sm leading-6 text-text-secondary">{summary}</p>
         </div>
         <StatusBadge status={draft.setting_completeness.status} />
       </div>
       {draft.follow_up_questions.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+          <p className="text-xs uppercase tracking-[0.18em] text-text-secondary">
             建议继续补充
           </p>
-          <ul className="space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
+          <ul className="space-y-2 text-sm leading-6 text-text-secondary">
             {draft.follow_up_questions.map((question) => (
               <li key={question}>• {question}</li>
             ))}
@@ -45,17 +45,17 @@ export function ProjectSettingSummaryPreview({
         {sections.map((section) => (
           <div
             key={section.title}
-            className="rounded-[18px] border border-[rgba(101,92,82,0.08)] bg-[var(--bg-surface)] p-4"
+            className="rounded-2xl bg-surface shadow-sm p-4"
           >
-            <p className="font-medium text-[var(--text-primary)]">{section.title}</p>
+            <p className="font-medium text-text-primary">{section.title}</p>
             <dl className="mt-3 space-y-2">
               {section.items.map((item) => (
                 <div
                   key={`${section.title}-${item.label}`}
                   className="grid gap-1 md:grid-cols-[84px_minmax(0,1fr)]"
                 >
-                  <dt className="text-sm text-[var(--text-secondary)]">{item.label}</dt>
-                  <dd className="text-sm leading-6 text-[var(--text-primary)]">{item.value}</dd>
+                  <dt className="text-sm text-text-secondary">{item.label}</dt>
+                  <dd className="text-sm leading-6 text-text-primary">{item.value}</dd>
                 </div>
               ))}
             </dl>

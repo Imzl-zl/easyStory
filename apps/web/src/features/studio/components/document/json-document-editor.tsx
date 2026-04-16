@@ -75,9 +75,9 @@ export function JsonDocumentEditor({
 
   if (!documentPath) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#fefdfb]">
+      <div className="flex h-full items-center justify-center bg-surface">
         <div className="max-w-sm px-6 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[rgba(90,122,107,0.12)] to-[rgba(196,167,108,0.08)] text-[var(--accent-primary)]">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-accent-primary/12 to-accent-warning/8 text-accent-primary">
             <svg fill="none" height="48" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" width="48">
               <path d="M8 3h7l5 5v13H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
               <path d="M15 3v5h5" />
@@ -85,8 +85,8 @@ export function JsonDocumentEditor({
               <path d="M10 16h5" />
             </svg>
           </div>
-          <h3 className="m-0 mb-2 font-serif text-xl font-bold text-[var(--text-primary)]">从左侧挑一份 JSON</h3>
-          <p className="m-0 text-sm leading-relaxed text-[var(--text-muted)]">
+          <h3 className="m-0 mb-2 font-serif text-xl font-bold text-text-primary">从左侧挑一份 JSON</h3>
+          <p className="m-0 text-sm leading-relaxed text-text-secondary">
             数据层会在这里提供结构化编辑和图预览，其它 JSON 也会保留格式化查看。
           </p>
         </div>
@@ -95,35 +95,35 @@ export function JsonDocumentEditor({
   }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#fefdfb]">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-surface">
       <div className="pointer-events-none absolute inset-0 opacity-[0.015] [background-image:url('data:image/svg+xml,%3Csvg_viewBox%3D%220%200%20400%20400%22_xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cfilter_id%3D%22n%22%3E%3CfeTurbulence_type%3D%22fractalNoise%22_baseFrequency%3D%221.5%22_numOctaves%3D%224%22_stitchTiles%3D%22stitch%22%2F%3E%3C%2Ffilter%3E%3Crect_width%3D%22100%25%22_height%3D%22100%25%22_filter%3D%22url(%23n)%22%2F%3E%3C%2Fsvg%3E')]" />
 
-      <header className="relative z-10 flex shrink-0 items-center justify-between gap-3 border-b border-[rgba(44,36,22,0.05)] bg-gradient-to-b from-white/96 to-[rgba(254,253,251,0.76)] px-4 py-2.5 lg:px-5">
-        <div className="absolute bottom-0 left-5 right-5 h-px bg-gradient-to-r from-transparent via-[var(--accent-primary)] to-transparent opacity-15" />
+      <header className="relative z-10 flex shrink-0 items-center justify-between gap-3 border-b border-line-soft bg-gradient-to-b from-elevated/96 to-muted px-4 py-2.5 lg:px-5">
+        <div className="absolute bottom-0 left-5 right-5 h-px bg-gradient-to-r from-transparent via-accent-primary to-transparent opacity-15" />
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex min-w-0 items-center gap-2">
-            <h2 className="m-0 truncate font-serif text-[0.98rem] font-bold tracking-tight text-[var(--text-primary)]">
+            <h2 className="m-0 truncate font-serif text-[0.98rem] font-bold tracking-tight text-text-primary">
               {documentNode?.label ?? "未命名 JSON"}
             </h2>
-            <span className="shrink-0 rounded-full bg-[rgba(35,96,137,0.08)] px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] text-[#245b82]">
+            <span className="shrink-0 rounded-full bg-accent-info/8 px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] text-accent-info">
               {previewMode === "graph" ? "图预览" : "JSON 预览"}
             </span>
             {previewMode === "graph" ? (
-              <span className="shrink-0 rounded-full bg-[rgba(196,167,108,0.12)] px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] text-[var(--accent-warning)]">
+              <span className="shrink-0 rounded-full bg-accent-warning/12 px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] text-accent-warning">
                 整组数据层总览
               </span>
             ) : null}
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] ${hasUnsavedChanges ? "bg-[rgba(196,167,108,0.14)] text-[var(--accent-warning)]" : "bg-[rgba(90,122,107,0.08)] text-[var(--accent-primary)]"}`}>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] ${hasUnsavedChanges ? "bg-accent-warning/14 text-accent-warning" : "bg-accent-primary/8 text-accent-primary"}`}>
               {hasUnsavedChanges ? "未保存" : "已同步"}
             </span>
           </div>
-          <p className="m-0 truncate text-[0.72rem] text-[var(--text-muted)]">{documentPath}</p>
+          <p className="m-0 truncate text-[0.72rem] text-text-secondary">{documentPath}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <div className="hidden rounded-md bg-[rgba(44,36,22,0.04)] p-0.5 sm:flex">
+          <div className="hidden rounded-md bg-muted p-0.5 sm:flex">
             {(["edit", "split", "preview"] as const).map((mode) => (
               <button
-                className={`inline-flex h-[26px] items-center justify-center rounded-[5px] border-none px-2.5 text-[0.72rem] font-semibold transition-all ${viewMode === mode ? "bg-white text-[var(--text-primary)] shadow-[0_1px_3px_rgba(44,36,22,0.08)]" : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}
+                className={`inline-flex h-[26px] items-center justify-center rounded-lg border-none px-2.5 text-[0.72rem] font-semibold transition-all ${viewMode === mode ? "bg-elevated text-text-primary shadow-sm" : "bg-transparent text-text-tertiary hover:text-text-primary"}`}
                 key={mode}
                 type="button"
                 onClick={() => setViewMode(mode)}
@@ -132,17 +132,17 @@ export function JsonDocumentEditor({
               </button>
             ))}
           </div>
-          <span className="hidden text-[0.68rem] font-medium text-[var(--text-muted)] lg:inline">Ctrl/⌘+S</span>
+          <span className="hidden text-[0.68rem] font-medium text-text-secondary lg:inline">Ctrl/⌘+S</span>
         </div>
       </header>
 
       <div
-        className={`relative z-10 grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] overflow-hidden ${viewMode === "split" ? "grid-cols-2 divide-x divide-[rgba(44,36,22,0.05)]" : "grid-cols-1"}`}
+        className={`relative z-10 grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] overflow-hidden ${viewMode === "split" ? "grid-cols-2 divide-x divide-line-soft" : "grid-cols-1"}`}
       >
         {viewMode !== "preview" ? (
           <section className="h-full min-h-0 min-w-0 overflow-hidden">
             <textarea
-              className="block h-full min-h-0 w-full resize-none overflow-y-auto border-none bg-transparent px-7 pt-7 pb-12 font-mono text-[0.88rem] leading-7 tracking-[0.01em] text-[var(--text-primary)] outline-none placeholder:text-[#9f9385] lg:px-10 lg:pt-8"
+              className="block h-full min-h-0 w-full resize-none overflow-y-auto border-none bg-transparent px-7 pt-7 pb-12 font-mono text-[0.88rem] leading-7 tracking-[0.01em] text-text-primary outline-none placeholder:text-text-tertiary lg:px-10 lg:pt-8"
               placeholder={isLoading ? "正在载入 JSON…" : "写入合法 JSON。数据层文稿会自动生成图预览，其它 JSON 会保留格式化查看。"}
               readOnly={isLoading}
               spellCheck={false}
@@ -153,7 +153,7 @@ export function JsonDocumentEditor({
           </section>
         ) : null}
         {viewMode !== "edit" ? (
-          <section className="h-full min-h-0 min-w-0 overflow-hidden bg-gradient-to-r from-[rgba(44,36,22,0.02)] to-transparent">
+          <section className="h-full min-h-0 min-w-0 overflow-hidden bg-gradient-to-r from-muted/50 to-transparent">
             <div className="h-full min-h-0 overflow-y-auto">
               <JsonPreviewPanel
                 errorMessage={previewSourcesQuery.error ? getErrorMessage(previewSourcesQuery.error) : null}
@@ -168,15 +168,15 @@ export function JsonDocumentEditor({
 
       <footer
         aria-live="polite"
-        className="flex shrink-0 items-center justify-between gap-3 border-t border-[rgba(44,36,22,0.05)] bg-gradient-to-b from-[rgba(254,253,251,0.5)] to-white/80 px-4 py-1.5 lg:px-5"
+        className="flex shrink-0 items-center justify-between gap-3 border-t border-line-soft bg-gradient-to-b from-muted to-elevated/80 px-4 py-1.5 lg:px-5"
       >
-        <span className="text-xs text-[var(--text-muted)]">
+        <span className="text-xs text-text-secondary">
           {content.length} 字符 · {content.split("\n").length} 行
         </span>
-        <span className="hidden text-xs text-[var(--text-muted)] lg:inline">
+        <span className="hidden text-xs text-text-secondary lg:inline">
           {previewMode === "graph" ? "当前预览会读取同目录下的人物、势力、人物关系、势力关系和隶属 JSON。" : "当前预览只展示这份 JSON 本身。"}
         </span>
-        <span className={`text-xs ${isLoading || hasUnsavedChanges ? "text-[var(--accent-warning)]" : "text-[var(--text-muted)]"}`}>
+        <span className={`text-xs ${isLoading || hasUnsavedChanges ? "text-accent-warning" : "text-text-secondary"}`}>
           {isLoading ? `正在载入${saveNoun}` : hasUnsavedChanges ? `${saveNoun}未保存` : `${saveNoun}已同步`}
         </span>
       </footer>
@@ -286,17 +286,17 @@ function JsonPreviewIssueState({
 }>) {
   return (
     <div className="mx-auto flex h-full max-w-[960px] flex-col px-6 py-8 lg:px-8">
-      <h3 className="m-0 font-serif text-[1.2rem] font-bold text-[var(--text-primary)]">{title}</h3>
-      <p className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">{description}</p>
+      <h3 className="m-0 font-serif text-[1.2rem] font-bold text-text-primary">{title}</h3>
+      <p className="mt-2 text-[13px] leading-6 text-text-secondary">{description}</p>
       {sourceSummary ? <JsonSourceSummary summary={sourceSummary} /> : null}
       <ul className="mt-4 space-y-3">
         {issues.map((issue) => (
           <li
-            className="rounded-[18px] border border-[rgba(154,74,61,0.16)] bg-[rgba(255,243,240,0.92)] px-4 py-3"
+            className="rounded-2xl border border-accent-danger/16 bg-accent-danger-soft px-4 py-3"
             key={`${issue.path}-${issue.message}`}
           >
-            <p className="m-0 text-[12px] font-semibold text-[#8c3e2e]">{issue.path}</p>
-            <p className="mt-1 text-[12px] leading-5 text-[#6f4b41]">{issue.message}</p>
+            <p className="m-0 text-[12px] font-semibold text-accent-danger">{issue.path}</p>
+            <p className="mt-1 text-[12px] leading-5 text-accent-danger/80">{issue.message}</p>
           </li>
         ))}
       </ul>
@@ -321,9 +321,9 @@ function JsonPreviewEmptyState({
 }>) {
   return (
     <div className="flex h-full items-center justify-center px-6 py-10">
-      <div className="max-w-[520px] rounded-[28px] border border-[rgba(101,92,82,0.08)] bg-[linear-gradient(180deg,rgba(255,253,249,0.98)_0%,rgba(248,244,236,0.95)_100%)] px-7 py-7 shadow-[0_18px_46px_rgba(58,45,29,0.08)]">
-        <h3 className="m-0 font-serif text-[1.35rem] font-bold text-[var(--text-primary)]">{title}</h3>
-        <p className="mt-2 text-[13px] leading-6 text-[var(--text-secondary)]">{description}</p>
+      <div className="max-w-[520px] rounded-3xl border border-line-soft bg-[var(--bg-surface-warm-gradient)] px-7 py-7 shadow-float">
+        <h3 className="m-0 font-serif text-[1.35rem] font-bold text-text-primary">{title}</h3>
+        <p className="mt-2 text-[13px] leading-6 text-text-secondary">{description}</p>
         {sourceSummary ? <JsonSourceSummary summary={sourceSummary} /> : null}
       </div>
     </div>
@@ -352,7 +352,7 @@ function JsonSourceSummary({
     <div className="mt-4 flex flex-wrap gap-2">
       {items.map(([label, value]) => (
         <span
-          className="rounded-full border border-[rgba(101,92,82,0.12)] bg-white/88 px-2.5 py-1 text-[11px] text-[var(--text-secondary)]"
+          className="rounded-full border border-line-soft bg-surface/88 px-2.5 py-1 text-[11px] text-text-secondary"
           key={label}
         >
           {label} {value}
@@ -365,7 +365,7 @@ function JsonSourceSummary({
 function JsonRawPreview({ content }: Readonly<{ content: string }>) {
   return (
     <div className="mx-auto h-full max-w-[920px] px-6 py-8 lg:px-8">
-      <pre className="min-h-full overflow-x-auto whitespace-pre-wrap break-words rounded-[24px] border border-[rgba(44,36,22,0.06)] bg-[rgba(255,252,247,0.96)] px-5 py-5 font-mono text-[12px] leading-6 text-[var(--text-primary)] shadow-[0_18px_44px_rgba(58,45,29,0.06)]">
+      <pre className="min-h-full overflow-x-auto whitespace-pre-wrap break-words rounded-3xl border border-line-soft bg-surface/96 px-5 py-5 font-mono text-[12px] leading-6 text-text-primary shadow-lg">
         {content}
       </pre>
     </div>

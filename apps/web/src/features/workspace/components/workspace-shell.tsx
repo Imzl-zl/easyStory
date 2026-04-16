@@ -16,12 +16,9 @@ import {
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 
-type PageMode = "incubator" | "lobby" | "studio" | "project";
+type PageMode = "lobby" | "studio" | "project";
 
 function resolvePageMode(pathname: string): PageMode {
-  if (pathname === "/workspace/lobby/new") {
-    return "incubator";
-  }
   if (pathname.includes("/lobby") || pathname === "/workspace") {
     return "lobby";
   }
@@ -55,9 +52,9 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
   const currentProjectId = resolveWorkspaceProjectId(pathname);
   const workspaceItems = buildWorkspaceItems(currentProjectId, lastProjectId);
   const pageMode = resolvePageMode(pathname);
-  const shellClassName = pageMode === "studio" || pageMode === "incubator"
-    ? "flex h-[100dvh] flex-col overflow-hidden [background:radial-gradient(circle_at_top_left,rgba(93,122,107,0.06),transparent_26%),var(--bg-canvas)]"
-    : "min-h-screen pb-[max(env(safe-area-inset-bottom),0px)] [background:radial-gradient(circle_at_top_left,rgba(93,122,107,0.06),transparent_26%),var(--bg-canvas)]";
+  const shellClassName = pageMode === "studio"
+    ? "flex h-[100dvh] flex-col overflow-hidden [background:var(--workspace-shell-accent-gradient),var(--bg-canvas)]"
+    : "min-h-screen pb-[max(env(safe-area-inset-bottom),0px)] [background:var(--workspace-shell-accent-gradient),var(--bg-canvas)]";
 
   useEffect(() => {
     if (currentProjectId) {
@@ -77,25 +74,8 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
           userName={user?.username ?? "未登录"}
           workspaceItems={workspaceItems}
         />
-        <main
-          className={
-            pageMode === "studio"
-              ? "w-full flex-1 min-h-0 overflow-hidden"
-              : pageMode === "incubator"
-                ? "w-[min(100%-2.5rem,1560px)] mx-auto flex-1 min-h-0 overflow-hidden"
-                : "w-[min(100%-2.5rem,1560px)] mx-auto"
-          }
-          id="workspace-main"
-        >
-          <div
-            className={
-              pageMode === "studio" || pageMode === "incubator"
-                ? "h-full min-h-0 overflow-hidden py-5 pb-7"
-                : "min-h-[calc(100vh-72px)] py-5 pb-7"
-            }
-          >
-            {children}
-          </div>
+        <main className={pageMode === "studio" ? "w-full flex-1 min-h-0 overflow-hidden" : "w-[min(100%-2.5rem,1560px)] mx-auto"} id="workspace-main">
+          <div className={pageMode === "studio" ? "h-full min-h-0 overflow-hidden" : "min-h-[calc(100vh-72px)] py-5 pb-7"}>{children}</div>
         </main>
       </div>
     </AuthGuard>
@@ -117,10 +97,10 @@ function WorkspaceHeader({
   userName: string;
   workspaceItems: WorkspaceNavItem[];
 }>) {
-  if (pageMode === "lobby" || pageMode === "incubator") {
+  if (pageMode === "lobby") {
     return (
       <header className="sticky top-0 z-20 border-b border-line-soft bg-glass-heavy backdrop-blur-xl">
-        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-6 w-[min(100%-2.5rem,1560px)] mx-auto py-3.5">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 md:gap-6 w-[min(100%-2.5rem,1560px)] mx-auto py-3 md:py-3.5">
           <WorkspaceBrand />
           <WorkspaceNav items={workspaceItems} pathname={pathname} />
           <WorkspaceActions
@@ -136,14 +116,14 @@ function WorkspaceHeader({
 
   return (
     <header className={`sticky top-0 z-20 border-b backdrop-blur-xl ${pageMode === "studio" ? "border-line-soft/50 bg-glass-heavy" : "border-line-soft bg-glass-heavy/90"}`}>
-      <div className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 w-[min(100%-2.5rem,1560px)] mx-auto ${pageMode === "studio" ? "py-2.5" : "py-3"}`}>
+      <div className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 md:gap-5 w-[min(100%-2.5rem,1560px)] mx-auto ${pageMode === "studio" ? "py-2.5" : "py-3"}`}>
         <div className="flex items-center gap-4 min-w-0">
           <Link className="inline-flex items-center gap-1.5 text-text-secondary text-sm font-medium whitespace-nowrap hover:text-text-primary transition-colors duration-fast" href="/workspace/lobby">
             <span aria-hidden="true">←</span>
             返回书架
           </Link>
           <div className="grid gap-0.5 min-w-0">
-            <span className="text-text-tertiary text-[0.66rem] tracking-[0.12em] uppercase">当前项目</span>
+            <span className="text-text-tertiary text-[0.68rem] tracking-[0.14em] uppercase">当前项目</span>
             <span className="overflow-hidden text-text-primary text-sm font-semibold tracking-[-0.02em] text-ellipsis whitespace-nowrap">{resolveContextTitle(pathname)}</span>
           </div>
         </div>
@@ -166,7 +146,7 @@ function WorkspaceHeader({
 function WorkspaceBrand() {
   return (
     <Link className="inline-flex flex-col gap-0.5 min-w-0" href="/workspace/lobby">
-      <span className="text-text-tertiary text-[0.68rem] tracking-[0.12em] uppercase font-medium">easyStory</span>
+      <span className="text-text-tertiary text-[0.68rem] tracking-[0.14em] uppercase font-medium">easyStory</span>
       <span className="text-text-primary text-lg font-semibold tracking-[-0.03em]">写作空间</span>
     </Link>
   );
@@ -208,7 +188,7 @@ function WorkspaceNavLink({
 
   return (
     <Link
-      className="relative inline-flex items-center h-8 px-2.5 text-text-secondary text-sm font-medium whitespace-nowrap rounded-lg transition-colors duration-fast hover:text-text-primary hover:bg-surface-hover [&[data-active='true']]:text-accent-primary [&[data-active='true']]:bg-accent-soft"
+      className="relative inline-flex items-center h-8 px-2.5 text-text-secondary text-sm font-medium whitespace-nowrap rounded-2xl transition-colors duration-fast hover:text-text-primary hover:bg-surface-hover [&[data-active='true']]:text-accent-primary [&[data-active='true']]:bg-accent-soft"
       data-active={isActive ? "true" : "false"}
       href={item.href}
       title={item.meta}
@@ -230,15 +210,15 @@ function WorkspaceActions({
   userName: string;
 }>) {
   return (
-    <div className="inline-flex min-w-0 items-center justify-end gap-2.5">
-      <Link className="inline-flex items-center justify-center h-8 px-3.5 border border-line-soft rounded-pill bg-glass text-text-primary text-sm font-medium transition-all duration-fast hover:bg-surface hover:border-line-strong backdrop-blur-sm" href={settingsHref}>
+    <div className="inline-flex min-w-0 items-center justify-end gap-1.5 md:gap-2.5">
+      <Link className="hidden md:inline-flex items-center justify-center h-8 px-3.5 rounded-pill bg-surface shadow-xs text-text-primary text-sm font-medium transition-all duration-fast hover:bg-surface-hover hover:shadow-sm" href={settingsHref}>
         {settingsLabel}
       </Link>
       <div className="inline-flex min-w-0 items-center gap-2 py-1 px-2.5 rounded-pill bg-accent-soft">
         <Avatar size={28}>{resolveWorkspaceUserBadge(userName)}</Avatar>
-        <span className="max-w-[8rem] overflow-hidden text-text-primary text-sm font-semibold text-ellipsis whitespace-nowrap">{userName}</span>
+        <span className="max-w-[8rem] overflow-hidden text-text-primary text-sm font-semibold text-ellipsis whitespace-nowrap max-md:hidden">{userName}</span>
       </div>
-      <button className="inline-flex items-center justify-center h-8 px-3.5 border border-line-soft rounded-pill bg-glass text-text-secondary text-sm font-medium cursor-pointer transition-all duration-fast hover:bg-surface hover:border-line-strong hover:text-text-primary backdrop-blur-sm" onClick={onLogout} type="button">
+      <button className="inline-flex items-center justify-center h-8 px-3.5 rounded-pill bg-surface shadow-xs text-text-secondary text-sm font-medium cursor-pointer transition-all duration-fast hover:bg-surface-hover hover:shadow-sm hover:text-text-primary" onClick={onLogout} type="button">
         退出
       </button>
     </div>

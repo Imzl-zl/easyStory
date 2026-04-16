@@ -53,7 +53,7 @@ export function buildAssistantMcpPanelCopy(scope: "project" | "user"): Assistant
   return {
     createSuccess: "新的 MCP 已创建。",
     deleteSuccess: "MCP 已删除。",
-    description: "你的工具连接配置。把常用外部工具保存下来，通常配合 Hooks 一起使用。",
+    description: "外部工具连接配置。",
     detailLoading: "正在加载 MCP...",
     dirtyMessage: "当前 MCP 还有未保存的改动，请先保存或还原。",
     listLoading: "正在读取你的 MCP...",

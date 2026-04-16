@@ -40,16 +40,13 @@ export function ProjectSettingsSidebar({
   tab,
 }: Readonly<ProjectSettingsSidebarProps>) {
   return (
-    <div className="sticky top-6 h-fit max-h-[calc(100vh-4rem)] overflow-y-auto rounded-[24px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.68)] p-4 shadow-sm scrollbar-thin">
-      <div className="space-y-1 rounded-[18px] bg-[rgba(248,243,235,0.78)] px-4 py-3">
-        <h2 className="font-serif text-lg font-semibold text-[var(--text-primary)]">项目设置</h2>
-        <p className="text-[12px] leading-5 text-[var(--text-secondary)]">
-          查看项目摘要，并管理规则、AI 偏好、Skills、MCP 和操作记录
-        </p>
+    <div className="sticky top-6 h-fit max-h-[calc(100vh-4rem)] overflow-y-auto rounded-3xl bg-glass shadow-glass backdrop-blur-lg p-4 scrollbar-thin">
+      <div className="space-y-1 rounded-2xl bg-accent-soft px-4 py-3">
+        <h2 className="font-serif text-lg font-semibold text-text-primary">项目设置</h2>
       </div>
 
-      <div className="mt-4 space-y-2 rounded-[18px] bg-[rgba(248,243,235,0.78)] px-4 py-3">
-        <p className="text-sm font-medium text-[var(--text-primary)]">{projectName}</p>
+      <div className="mt-4 space-y-2 rounded-2xl bg-surface-hover px-4 py-3">
+        <p className="text-sm font-medium text-text-primary">{projectName}</p>
         {projectStatus ? (
           <div className="mt-2">
             <StatusBadge status={projectStatus} />
@@ -60,7 +57,6 @@ export function ProjectSettingsSidebar({
       <nav className="mt-4 space-y-1" role="tablist" aria-label="项目设置导航">
         <TabButton
           active={tab === "setting"}
-          description="快速浏览并更新项目主信息"
           disabled={isPending}
           dirty={dirtyState.setting}
           icon={<SettingsIcon className="w-4 h-4" />}
@@ -69,7 +65,6 @@ export function ProjectSettingsSidebar({
         />
         <TabButton
           active={tab === "rules"}
-          description="当前项目的专属要求"
           disabled={isPending}
           dirty={dirtyState.rules}
           icon={<RulesIcon className="w-4 h-4" />}
@@ -78,7 +73,6 @@ export function ProjectSettingsSidebar({
         />
         <TabButton
           active={tab === "assistant"}
-          description="这个项目的默认聊天方式"
           disabled={isPending}
           dirty={dirtyState.assistant}
           icon={<AssistantIcon className="w-4 h-4" />}
@@ -87,7 +81,6 @@ export function ProjectSettingsSidebar({
         />
         <TabButton
           active={tab === "skills"}
-          description="这个项目自己的长期写法"
           disabled={isPending}
           dirty={dirtyState.skills}
           icon={<SkillsIcon className="w-4 h-4" />}
@@ -96,7 +89,6 @@ export function ProjectSettingsSidebar({
         />
         <TabButton
           active={tab === "mcp"}
-          description="这个项目自己的外部工具"
           disabled={isPending}
           dirty={dirtyState.mcp}
           icon={<McpIcon className="w-4 h-4" />}
@@ -105,7 +97,6 @@ export function ProjectSettingsSidebar({
         />
         <TabButton
           active={tab === "audit"}
-          description="查看最近操作记录"
           disabled={isPending}
           dirty={dirtyState.audit}
           icon={<AuditIcon className="w-4 h-4" />}
@@ -153,7 +144,6 @@ export function ProjectSettingsSidebar({
 
 function TabButton({
   active,
-  description,
   disabled,
   dirty,
   icon,
@@ -161,7 +151,6 @@ function TabButton({
   onClick,
 }: Readonly<{
   active: boolean;
-  description: string;
   disabled: boolean;
   dirty: boolean;
   icon: React.ReactNode;
@@ -170,8 +159,8 @@ function TabButton({
 }>) {
   return (
     <button
-      className={`relative flex flex-col items-stretch gap-1 w-full px-3.5 py-3 border-none rounded-[var(--radius-md)] bg-transparent text-[var(--text-primary)] cursor-pointer text-left transition-colors outline-none hover:bg-[var(--bg-surface-hover)] ${
-        active ? "bg-[var(--bg-surface-active)] before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:bg-[var(--accent-primary)] before:rounded-r-[2px]" : ""
+      className={`relative flex items-center gap-2 w-full px-3.5 py-3 border-none rounded-2xl bg-transparent text-text-primary cursor-pointer text-left transition-colors duration-fast outline-none hover:bg-surface-hover ${
+        active ? "bg-accent-soft before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:bg-accent-primary before:rounded-r-sm" : ""
       }`}
       disabled={disabled}
       onClick={onClick}
@@ -180,17 +169,14 @@ function TabButton({
       tabIndex={active ? 0 : -1}
       type="button"
     >
-      <div className="flex items-center gap-2">
-        <span className="text-[var(--text-secondary)]">{icon}</span>
-        <span className="text-sm font-medium">{label}</span>
-        {dirty && (
-          <span 
-            className="ml-auto w-2 h-2 rounded-full bg-[var(--accent-warning)]" 
-            aria-label="有未保存的更改" 
-          />
-        )}
-      </div>
-      <span className="text-[12px] leading-5 text-[var(--text-secondary)] ml-6">{description}</span>
+      <span className="text-text-secondary">{icon}</span>
+      <span className="text-sm font-medium">{label}</span>
+      {dirty && (
+        <span
+          className="ml-auto w-2 h-2 rounded-full bg-accent-warning"
+          aria-label="有未保存的更改"
+        />
+      )}
     </button>
   );
 }

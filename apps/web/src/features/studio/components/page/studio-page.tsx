@@ -57,15 +57,15 @@ type StudioPageProps = {
 
 const STUDIO_TOOLBAR_BUTTON_CLASS = "ink-button-secondary whitespace-nowrap";
 const STUDIO_SAVE_BUTTON_CLASS =
-  "ink-button whitespace-nowrap h-9 px-4 text-[13px] shadow-[0_10px_18px_rgba(90,122,107,0.14)]";
+  "ink-button whitespace-nowrap h-9 px-4 text-[13px] shadow-md";
 const STUDIO_STALE_BADGE_CLASS =
-  "inline-flex items-center gap-2 h-8 px-3.5 rounded-full border border-[rgba(90,122,107,0.16)] bg-[rgba(90,122,107,0.08)] text-[0.72rem] font-semibold tracking-[0.16em] uppercase text-[var(--accent-primary)]";
+  "inline-flex items-center gap-2 h-8 px-3.5 rounded-pill border border-accent-primary-muted bg-accent-soft text-[0.72rem] font-semibold tracking-[0.16em] uppercase text-accent-primary";
 const STUDIO_STALE_BADGE_DOT_CLASS =
-  "inline-flex h-1.5 w-1.5 rounded-full bg-[var(--accent-tertiary)] shadow-[0_0_0_4px_rgba(196,167,125,0.12)]";
+  "inline-flex h-1.5 w-1.5 rounded-full bg-accent-tertiary ring-4 ring-accent-primary-muted";
 const STUDIO_GRID_WITH_CHAT_CLASS =
-  "grid [grid-template-columns:1fr] lg:[grid-template-columns:236px_minmax(0,1fr)_minmax(392px,0.72fr)] xl:[grid-template-columns:244px_minmax(0,1fr)_minmax(408px,0.76fr)] [grid-template-rows:auto_minmax(0,1fr)] h-full min-h-0 bg-[#fefdfb] relative overflow-hidden";
+  "grid [grid-template-columns:1fr] lg:[grid-template-columns:236px_minmax(0,1fr)_minmax(392px,0.72fr)] xl:[grid-template-columns:244px_minmax(0,1fr)_minmax(408px,0.76fr)] [grid-template-rows:auto_minmax(0,1fr)] h-full min-h-0 bg-canvas relative overflow-hidden";
 const STUDIO_GRID_WITHOUT_CHAT_CLASS =
-  "grid [grid-template-columns:1fr] lg:[grid-template-columns:236px_minmax(0,1fr)] [grid-template-rows:auto_minmax(0,1fr)] h-full min-h-0 bg-[#fefdfb] relative overflow-hidden";
+  "grid [grid-template-columns:1fr] lg:[grid-template-columns:236px_minmax(0,1fr)] [grid-template-rows:auto_minmax(0,1fr)] h-full min-h-0 bg-canvas relative overflow-hidden";
 
 type DocumentTreeDialogState =
   | { mode: "create-file" | "create-folder"; parentPath: string; parentLabel: string }
@@ -563,16 +563,16 @@ export function StudioPage({ projectId }: StudioPageProps) {
   return (
     <>
       <div className={studioGridClassName} ref={studioGridRef} style={studioGridStyle}>
-        <div className="fixed -top-1/2 -right-[20%] w-full h-[150%] pointer-events-none [background:radial-gradient(ellipse_at_60%_40%,rgba(107,143,113,0.15)_0%,transparent_50%),radial-gradient(ellipse_at_30%_70%,rgba(196,167,108,0.12)_0%,transparent_40%)]" />
+        <div className="fixed -top-1/2 -right-[20%] w-full h-[150%] pointer-events-none [background:radial-gradient(ellipse_at_60%_40%,rgba(124,110,93,0.05)_0%,transparent_50%),radial-gradient(ellipse_at_30%_70%,rgba(196,167,125,0.04)_0%,transparent_40%)]" />
 
-        <div className="col-span-full flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-gradient-to-b from-white/98 to-white/88 backdrop-blur-xl border-b border-[rgba(44,36,22,0.06)] relative z-10 animate-[inkFadeIn_0.4s_cubic-bezier(0.16,1,0.3,1)] lg:px-5">
-          <div className="absolute bottom-[-1px] left-0 right-0 h-px bg-gradient-to-r from-transparent via-[var(--accent-primary)] to-transparent opacity-30" />
+        <div className="col-span-full flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-glass-heavy backdrop-blur-xl border-b border-line-soft relative z-10 animate-[inkFadeIn_0.4s_cubic-bezier(0.16,1,0.3,1)] lg:px-5">
+          <div className="absolute bottom-[-1px] left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent-primary to-transparent opacity-20" />
           <h1 className="sr-only">{selectedNode?.label ?? "创作工作台"}</h1>
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="inline-flex shrink-0 items-center rounded-full border border-[rgba(90,122,107,0.16)] bg-[rgba(90,122,107,0.08)] px-3 py-1 text-[0.7rem] font-semibold tracking-[0.12em] uppercase text-[var(--accent-primary)]">
+            <span className="inline-flex shrink-0 items-center rounded-pill border border-accent-primary-muted bg-accent-soft px-3 py-1 text-[0.7rem] font-semibold tracking-[0.12em] uppercase text-accent-primary">
               {headerSectionLabel}
             </span>
-            <p className="m-0 truncate text-[0.78rem] text-[var(--text-secondary)]">{headerMeta}</p>
+            <p className="m-0 truncate text-[0.78rem] text-text-secondary">{headerMeta}</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button
@@ -607,8 +607,8 @@ export function StudioPage({ projectId }: StudioPageProps) {
         </div>
 
         <>
-          <aside className="relative z-5 flex min-h-0 flex-col overflow-hidden bg-gradient-to-b from-[rgba(254,253,251,0.95)] to-[rgba(249,247,243,0.9)] border-r border-[rgba(44,36,22,0.08)] shadow-[2px_0_20px_rgba(44,36,22,0.03),inset_-1px_0_0_rgba(255,255,255,0.5)] animate-[slideFromLeft_0.5s_cubic-bezier(0.16,1,0.3,1)]">
-            <div className="absolute top-0 right-0 w-0.5 h-full bg-gradient-to-b from-transparent via-[var(--accent-primary)] to-transparent opacity-20" />
+          <aside className="relative z-5 flex min-h-0 flex-col overflow-hidden bg-glass-heavy backdrop-blur-md shadow-panel-side animate-[slideFromLeft_0.5s_cubic-bezier(0.16,1,0.3,1)]">
+            <div className="absolute top-0 right-0 w-0.5 h-full bg-gradient-to-b from-transparent via-accent-primary to-transparent opacity-15" />
             <DocumentTree
               selectedPath={documentPath}
               selectedPathSignal={documentPathSelectionSignal}
@@ -621,8 +621,8 @@ export function StudioPage({ projectId }: StudioPageProps) {
             />
           </aside>
 
-          <main className="relative z-1 flex min-h-0 flex-col overflow-hidden bg-[#fefdfb] shadow-[0_0_80px_rgba(44,36,22,0.04),inset_0_0_100px_rgba(255,255,255,0.5)] animate-[inkFadeIn_0.6s_cubic-bezier(0.16,1,0.3,1)]">
-            <div className="absolute inset-0 border-x border-[rgba(44,36,22,0.04)] pointer-events-none" />
+          <main className="relative z-1 flex min-h-0 flex-col overflow-hidden bg-surface shadow-lg animate-[inkFadeIn_0.6s_cubic-bezier(0.16,1,0.3,1)]">
+            <div className="absolute inset-0 border-x border-line-soft pointer-events-none" />
             <StudioDocumentEditor
               availableDocumentPaths={availableDocumentPaths}
               documentPath={documentPath}
@@ -640,7 +640,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
           </main>
 
           {chatOpen ? (
-            <aside className="relative z-5 flex min-h-0 min-w-0 flex-col overflow-hidden bg-gradient-to-b from-[rgba(254,253,251,0.98)] to-[rgba(249,247,243,0.95)] border-l border-[rgba(44,36,22,0.08)] shadow-[-2px_0_20px_rgba(44,36,22,0.03),inset_1px_0_0_rgba(255,255,255,0.5)] animate-[slideFromRight_0.5s_cubic-bezier(0.16,1,0.3,1)]" ref={chatPanelRef}>
+            <aside className="relative z-5 flex min-h-0 min-w-0 flex-col overflow-hidden bg-glass-heavy backdrop-blur-md border-l border-line-soft shadow-panel-side animate-[slideFromRight_0.5s_cubic-bezier(0.16,1,0.3,1)]" ref={chatPanelRef}>
               {resolvedDesktopChatWidth !== null ? (
                 <div
                   aria-label="调整共创助手宽度"
@@ -655,12 +655,12 @@ export function StudioPage({ projectId }: StudioPageProps) {
                   onKeyDown={handleChatResizeKeyDown}
                   onPointerDown={handleChatResizePointerDown}
                 >
-                  <div className={`flex h-24 w-2 items-center justify-center rounded-full border border-[rgba(44,36,22,0.1)] bg-[rgba(254,253,251,0.92)] shadow-[0_10px_18px_rgba(44,36,22,0.08)] transition ${dragChatWidth === null ? "opacity-0 hover:opacity-100 focus-within:opacity-100 focus-visible:opacity-100" : "opacity-100"}`}>
-                    <div className="h-10 w-[3px] rounded-full bg-[rgba(90,122,107,0.55)]" />
+                  <div className={`flex h-24 w-2 items-center justify-center rounded-full border border-line-soft bg-glass-heavy shadow-glass transition ${dragChatWidth === null ? "opacity-0 hover:opacity-100 focus-within:opacity-100 focus-visible:opacity-100" : "opacity-100"}`}>
+                    <div className="h-10 w-[3px] rounded-full bg-accent-primary/55" />
                   </div>
                 </div>
               ) : null}
-              <div className="absolute top-0 left-0 w-0.5 h-full bg-gradient-to-b from-transparent via-[#c4a76c] to-transparent opacity-25" />
+              <div className="absolute top-0 left-0 w-0.5 h-full bg-gradient-to-b from-transparent via-accent-tertiary to-transparent opacity-20" />
               <AiChatPanel
                 activeConversationId={chatModel.activeConversationId}
                 attachments={chatModel.attachments}

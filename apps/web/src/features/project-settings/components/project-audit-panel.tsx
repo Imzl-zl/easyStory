@@ -44,7 +44,6 @@ export function ProjectAuditPanel({
   return (
     <SectionCard
       title="操作记录"
-      description="查看项目的操作历史与变更记录。"
     >
       <div className="space-y-4">
         <AuditFilterBar
@@ -90,7 +89,7 @@ function AuditFilterBar({
 
   return (
     <form
-      className="space-y-6 pb-6 border-b border-[var(--line-soft)]"
+      className="space-y-6 pb-6 border-b border-line-soft"
       onSubmit={(event) => {
         event.preventDefault();
         onApply();
@@ -102,8 +101,8 @@ function AuditFilterBar({
             key={preset.value}
             className={`rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
               draftEventType === preset.value
-                ? 'bg-[var(--accent-ink)] text-white shadow-sm'
-                : 'bg-[var(--bg-muted)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:shadow-sm'
+                ? 'bg-accent-primary text-white shadow-sm'
+                : 'bg-muted text-text-secondary hover:bg-surface-hover hover:shadow-sm'
             }`}
             onClick={() => onChange(preset.value)}
             type="button"
@@ -149,11 +148,11 @@ function AuditPanelBody({
   openById: Record<string, boolean>;
 }>) {
   if (isLoading) {
-    return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">正在加载项目审计日志...</div>;
+    return <div className="panel-muted px-4 py-5 text-sm text-text-secondary">正在加载项目审计日志...</div>;
   }
   if (error) {
     return (
-      <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+      <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
         {getErrorMessage(error)}
       </div>
     );
@@ -198,17 +197,17 @@ function AuditLogCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium text-[var(--text-primary)]">{item.event_type}</p>
-            <span className="rounded-full bg-[rgba(46,111,106,0.1)] px-2 py-1 text-xs text-[var(--accent-ink)]">
+            <p className="font-medium text-text-primary">{item.event_type}</p>
+            <span className="rounded-full bg-accent-primary/10 px-2 py-1 text-xs text-accent-primary">
               {formatProjectAuditTarget(item)}
             </span>
           </div>
-          <p className="text-sm text-[var(--text-secondary)]">
+          <p className="text-sm text-text-secondary">
             操作人: {item.actor_user_id ?? "系统"} · 详情: {summarizeProjectAuditDetails(item.details)}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <span className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+          <span className="text-xs uppercase tracking-[0.16em] text-text-secondary">
             {formatProjectAuditTime(item.created_at)}
           </span>
           <button className="ink-button-secondary" onClick={onToggle} type="button">

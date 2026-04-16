@@ -1,6 +1,7 @@
 "use client";
 
 import { EmptyState } from "@/components/ui/empty-state";
+import { MetricCard } from "@/components/ui/metric-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { NodeExecutionView, WorkflowExecution } from "@/lib/api/types";
 
@@ -29,7 +30,7 @@ export function EngineOverviewPanel({
     return (
       <EmptyState
         title="暂无执行概览"
-        description="载入工作流后，可以查看执行状态和时间线。"
+        description="载入工作流后查看。"
       />
     );
   }
@@ -57,7 +58,7 @@ export function EngineOverviewPanel({
       {errorMessage ? <FeedbackMessage tone="danger" message={errorMessage} /> : null}
       <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
         {overview.metrics.map((metric) => (
-          <MetricCard key={metric.label} metric={metric} />
+          <MetricCard key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} />
         ))}
       </div>
       <TimelineSection overview={overview} onOpenReplayExecution={onOpenReplayExecution} />
@@ -76,8 +77,8 @@ function TimelineSection({
     <section className="panel-muted space-y-3 p-4">
       <header className="space-y-1">
         <h3 className="font-serif text-lg font-semibold">节点时间线</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
-          先看每个节点的最新状态，再看当前节点、恢复起点和定义外 runtime 记录。
+        <p className="text-sm leading-6 text-text-secondary">
+          节点执行状态总览。
         </p>
       </header>
       <div className="space-y-3">
@@ -110,10 +111,10 @@ function TimelineItem({
       <div className="flex flex-col items-center pt-2">
         <span className={`h-3 w-3 rounded-full ${resolveTimelineDotClass(item.statusTone)}`} />
         {!isLast ? (
-          <span className="mt-2 h-full w-px bg-[rgba(101,92,82,0.18)]" />
+          <span className="mt-2 h-full w-px bg-line-strong" />
         ) : null}
       </div>
-      <div className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
+      <div className="rounded-2xl bg-muted shadow-sm p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -123,15 +124,15 @@ function TimelineItem({
               ))}
             </div>
             <div>
-              <p className="text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
-              <p className="text-sm leading-6 text-[var(--text-secondary)]">{item.subtitle}</p>
+              <p className="text-sm font-medium text-text-primary">{item.title}</p>
+              <p className="text-sm leading-6 text-text-secondary">{item.subtitle}</p>
             </div>
           </div>
-          <p className="text-right text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-right text-sm leading-6 text-text-secondary">
             {item.timeDetail}
           </p>
         </div>
-        <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">{item.detail}</p>
+        <p className="mt-3 text-sm leading-6 text-text-secondary">{item.detail}</p>
         {latestExecutionId && onOpenReplayExecution ? (
           <div className="mt-4">
             <button
@@ -144,29 +145,11 @@ function TimelineItem({
           </div>
         ) : null}
         {item.errorMessage ? (
-          <div className="mt-4 rounded-[18px] bg-[rgba(178,65,46,0.1)] px-4 py-3 text-sm leading-6 text-[var(--accent-danger)]">
+          <div className="mt-4 rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm leading-6 text-accent-danger">
             {item.errorMessage}
           </div>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-function MetricCard({
-  metric,
-}: Readonly<{
-  metric: EngineOverviewData["metrics"][number];
-}>) {
-  return (
-    <div className="rounded-[20px] border border-[var(--line-soft)] bg-[rgba(255,255,255,0.62)] p-4">
-      <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-        {metric.label}
-      </p>
-      <p className="mt-3 font-serif text-xl leading-8 text-[var(--text-primary)]">
-        {metric.value}
-      </p>
-      <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{metric.detail}</p>
     </div>
   );
 }
@@ -180,27 +163,27 @@ function FeedbackMessage({
 }>) {
   if (tone === "danger") {
     return (
-      <div className="rounded-2xl bg-[rgba(178,65,46,0.12)] px-4 py-3 text-sm text-[var(--accent-danger)]">
+      <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
         {message}
       </div>
     );
   }
 
-  return <div className="panel-muted px-4 py-5 text-sm text-[var(--text-secondary)]">{message}</div>;
+  return <div className="panel-muted px-4 py-5 text-sm text-text-secondary">{message}</div>;
 }
 
 function resolveTimelineDotClass(status: EngineOverviewTimelineItem["statusTone"]): string {
   switch (status) {
     case "completed":
-      return "bg-[var(--accent-success)]";
+      return "bg-accent-success";
     case "failed":
-      return "bg-[var(--accent-danger)]";
+      return "bg-accent-danger";
     case "warning":
     case "stale":
-      return "bg-[var(--accent-warning)]";
+      return "bg-accent-warning";
     case "active":
-      return "bg-[var(--accent-ink)]";
+      return "bg-accent-primary";
     default:
-      return "bg-[var(--text-secondary)]";
+      return "bg-text-secondary";
   }
 }

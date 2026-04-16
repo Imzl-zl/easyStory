@@ -24,7 +24,7 @@ export function TemplateControlCard({ model }: { model: IncubatorTemplateModel }
     <section className="panel-muted space-y-4 p-5">
       <div className="space-y-1">
         <h3 className="font-serif text-lg font-semibold">选择模板</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+        <p className="text-sm leading-6 text-text-secondary">
           选择模板后可继续填写项目信息。
         </p>
       </div>
@@ -63,7 +63,7 @@ export function TemplateQuestionsCard({ model }: { model: IncubatorTemplateModel
     <section className="panel-shell space-y-4 p-5">
       <div className="space-y-1">
         <h3 className="font-serif text-lg font-semibold">补充信息</h3>
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+        <p className="text-sm leading-6 text-text-secondary">
           按需填写后可生成项目草稿。
         </p>
       </div>
@@ -81,12 +81,12 @@ function TemplateMetaCard({ model }: { model: IncubatorTemplateModel }) {
   }
   if (!model.templateDetailQuery.data) return null;
   return (
-    <div className="rounded-3xl border border-[rgba(19,19,18,0.08)] bg-[rgba(255,255,255,0.54)] px-4 py-4">
+    <div className="rounded-3xl border border-line-soft bg-muted px-4 py-4">
       <p className="font-serif text-base font-semibold">{model.templateDetailQuery.data.name}</p>
-      <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
+      <p className="mt-1 text-sm leading-6 text-text-secondary">
         {model.templateDetailQuery.data.description ?? "暂无说明。"}
       </p>
-      <dl className="mt-4 grid gap-2 text-sm text-[var(--text-secondary)]">
+      <dl className="mt-4 grid gap-2 text-sm text-text-secondary">
         <DetailRow label="流程" value={model.templateDetailQuery.data.workflow_id ?? "未设置"} />
         <DetailRow label="问题数" value={String(model.templateDetailQuery.data.guided_questions.length)} />
         <DetailRow label="节点数" value={String(model.templateDetailQuery.data.nodes.length)} />
@@ -100,13 +100,13 @@ function SystemPoolField({ model }: { model: IncubatorTemplateModel }) {
     <label className="panel-shell flex items-start gap-3 p-4">
       <input
         checked={model.form.allowSystemCredentialPool}
-        className="mt-1 size-4 accent-[var(--accent-ink)]"
+        className="mt-1 size-4 accent-accent-primary"
         onChange={(event) => setTemplateFormField(model.setForm, "allowSystemCredentialPool", event.target.checked)}
         type="checkbox"
       />
       <span className="space-y-1">
         <span className="block font-medium">创建项目后沿用默认模型连接</span>
-        <span className="block text-sm leading-6 text-[var(--text-secondary)]">
+        <span className="block text-sm leading-6 text-text-secondary">
           仅影响创建后的项目。
         </span>
       </span>
@@ -147,7 +147,7 @@ function TemplateQuestionStatus({
         />
       ) : null}
       {state.isReady && state.guidedQuestions.length === 0 ? (
-        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+        <p className="text-sm leading-6 text-text-secondary">
           当前模板无需补充问题，可直接整理草稿或创建项目。
         </p>
       ) : null}
@@ -197,8 +197,8 @@ function TemplateQuestionActions({
 
 function MetaNoticeCard({ children, tone }: { children: ReactNode; tone: "danger" | "neutral" }) {
   const className = tone === "danger"
-    ? "bg-[rgba(178,65,46,0.12)] text-[var(--accent-danger)]"
-    : "bg-[rgba(255,255,255,0.52)] text-[var(--text-secondary)]";
+    ? "bg-accent-danger/10 text-accent-danger"
+    : "bg-muted text-text-secondary";
   return <div className={`rounded-2xl px-4 py-3 text-sm ${className}`}>{children}</div>;
 }
 

@@ -162,9 +162,9 @@ export function observeFloatingPanelLayoutChanges(
 
   observe(anchor);
   observe(anchor?.parentElement ?? null);
-  observe(anchor?.closest("aside"));
-  observe(anchor?.closest("section"));
-  observe(anchor?.closest("main"));
+  observe(anchor?.closest("aside") ?? null);
+  observe(anchor?.closest("section") ?? null);
+  observe(anchor?.closest("main") ?? null);
 
   return () => {
     observer.disconnect();
