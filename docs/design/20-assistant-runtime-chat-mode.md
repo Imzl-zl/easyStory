@@ -5,7 +5,7 @@
 | 文档类型 | 功能设计 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-04-03 |
-| 更新时间 | 2026-04-07 |
+| 更新时间 | 2026-04-18 |
 | 关联文档 | [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)、[21-assistant-project-document-tools](./21-assistant-project-document-tools.md)、[16-mcp-architecture](./16-mcp-architecture.md)、[系统架构设计](../specs/architecture.md) |
 
 ---
@@ -25,10 +25,20 @@
 - Skill / Agent 是显式增强，不是启动条件
 - MCP 是能力层，不是每轮都注入的 prompt 文本
 
+实现上可以复用 LangGraph / LangChain / LiteLLM，但这些框架只承担通用运行时能力，不直接定义 assistant 的业务真值。
+
 本文只负责定义 assistant 主路径的语义、分层和默认装配边界。
 
 - ordinary chat 的原生 tool-calling runtime、tool loop、run/step 真值、SSE 事件语义，统一见 [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md)
 - 项目文稿工具域、统一目录、`document_ref`、版本与 revision 约束，统一见 [21-assistant-project-document-tools](./21-assistant-project-document-tools.md)
+
+实现层补充约束：
+
+- LangGraph 可以用于 ordinary chat、内部流程和多阶段工具调用的编排，但 graph state 不是产品真值
+- LangChain 可以用于高层 agent、middleware、MCP adapter 等通用封装，但 AgentProfile、RuleBundle、document context binding 仍由 easyStory 自己定义
+- LiteLLM 属于 southbound 模型 backend，不参与 `conversation_id / messages / continuation_anchor / NormalizedInputItem[] / AssistantOutputItem[]` 这些正式真值定义
+- 未来若引入知识库/向量检索，也只能先经 `context` 模块装配成正式 context bundle，再进入 assistant runtime，不把检索后端对象直接暴露给 turn 真值
+- assistant runtime 只持久化项目内 contract，不把 framework session、provider object 或第三方消息对象写成业务主真值
 
 ---
 
@@ -115,6 +125,8 @@ Agent 的职责是封装更重的运行时组合能力，例如：
 - 绑定特定 Skill
 - 绑定模型或输出格式
 - 绑定 MCP / Hook / 额外执行策略
+
+即使内部实现复用 LangChain agent，外部正式真值仍然是 easyStory 自己的 AgentProfile 与配置文件，不是第三方 framework object。
 
 Agent 不属于小说创作主路径的默认入口。
 
