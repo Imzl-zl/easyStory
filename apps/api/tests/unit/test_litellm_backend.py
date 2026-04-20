@@ -167,6 +167,52 @@ def test_resolve_backend_selection_keeps_gemini_zero_budget_on_litellm() -> None
     assert selection.backend_key == "litellm"
 
 
+def test_build_litellm_call_spec_appends_gemini_models_path_for_root_gateway() -> None:
+    request = LLMGenerateRequest(
+        connection=LLMConnection(
+            provider="gemini",
+            api_dialect="gemini_generate_content",
+            api_key="test-key",
+            base_url="https://proxy.example.com",
+        ),
+        model_name="gemini-flash-latest",
+        prompt="hi",
+        system_prompt=None,
+        response_format="text",
+        temperature=0.0,
+        max_tokens=32,
+        top_p=1.0,
+        thinking_budget=0,
+    )
+
+    spec = build_litellm_call_spec(request)
+
+    assert spec.call_kwargs["api_base"] == "https://proxy.example.com/v1beta/models"
+
+
+def test_build_litellm_call_spec_keeps_explicit_gemini_models_path() -> None:
+    request = LLMGenerateRequest(
+        connection=LLMConnection(
+            provider="gemini",
+            api_dialect="gemini_generate_content",
+            api_key="test-key",
+            base_url="https://proxy.example.com/v1beta/models",
+        ),
+        model_name="gemini-flash-latest",
+        prompt="hi",
+        system_prompt=None,
+        response_format="text",
+        temperature=0.0,
+        max_tokens=32,
+        top_p=1.0,
+        thinking_budget=0,
+    )
+
+    spec = build_litellm_call_spec(request)
+
+    assert spec.call_kwargs["api_base"] == "https://proxy.example.com/v1beta/models"
+
+
 def test_resolve_backend_selection_uses_native_for_nonzero_gemini_budget() -> None:
     request = LLMGenerateRequest(
         connection=LLMConnection(

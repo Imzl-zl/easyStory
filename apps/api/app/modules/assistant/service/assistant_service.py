@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 import uuid
 
@@ -12,14 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.config_registry import ConfigLoader
 from app.modules.config_registry.schemas import HookConfig, ModelConfig
 from app.modules.credential.service import CredentialService
-from app.modules.project.service import (
-    ProjectDocumentCapabilityService,
-    ProjectService,
-)
+from app.modules.project.service import ProjectDocumentCapabilityService, ProjectService
 from app.shared.runtime.plugins.plugin_registry import PluginRegistry
 from app.shared.runtime.template_renderer import SkillTemplateRenderer
 from app.shared.runtime.tool_provider import ToolProvider
-from app.shared.runtime.llm.llm_tool_provider import LLMGenerateToolResponse, LLMStreamEvent
+from app.shared.runtime.llm.llm_tool_provider import LLMStreamEvent
 
 from .rules.assistant_rule_service import AssistantRuleService
 from .agents.assistant_agent_service import AssistantAgentService
@@ -30,83 +26,16 @@ from .tooling.assistant_tool_executor import AssistantToolExecutor
 from .tooling.assistant_tool_exposure_policy import AssistantToolExposurePolicy
 from .tooling.assistant_tool_loop import AssistantToolLoop
 from .tooling.assistant_tool_registry import AssistantToolDescriptorRegistry
-from .hooks_runtime.assistant_hook_providers import build_assistant_plugin_registry
-from .hooks_runtime.assistant_hook_agent_runtime import (
-    AssistantHookAgentRuntime,
-    LangGraphAssistantHookAgentRuntime,
-)
-from .hooks_runtime.assistant_hook_support import (
-    AssistantHookExecutionContext,
-)
-from .hooks_runtime.assistant_hook_runtime_support import (
-    execute_assistant_hook_with_retry,
-    run_assistant_hook_event,
-    run_assistant_on_error_hooks,
-    run_before_turn_hooks,
-    run_prepare_on_error_hooks,
-    run_prepared_on_error_hooks,
-)
-from .assistant_execution_support import (
-    AssistantExecutionSpec,
-    require_text_output,
-)
-from .assistant_runtime_terminal import (
-    AssistantRuntimeTerminalError,
-    attach_assistant_stream_error_meta,
-)
-from .assistant_runtime_claim_support import (
-    build_current_runtime_claim_snapshot,
-    resolve_runtime_claim_state,
-)
-from .turn.assistant_turn_runtime_support import (
-    PreparedAssistantTurn,
-    build_after_assistant_payload,
-    build_turn_response,
-)
-from .turn.assistant_turn_prepare_support import prepare_assistant_turn, resolve_requested_hooks
-from .turn.assistant_turn_llm_bridge_support import (
-    call_assistant_turn_llm,
-    should_stream_with_tool_loop,
-    stream_assistant_turn_llm,
-    stream_assistant_turn_with_tool_loop,
-)
-from .turn.assistant_turn_execution_runtime import LangGraphAssistantTurnExecutionRuntime
-from .turn.assistant_turn_finalize_runtime import (
-    LangGraphAssistantTurnFinalizeRuntime,
-)
-from .turn.assistant_turn_prepare_runtime import (
-    AssistantTurnPrepareRuntimeResult,
-    LangGraphAssistantTurnPrepareRuntime,
-)
-from .turn.assistant_turn_recovery_runtime import (
-    LangGraphAssistantTurnRecoveryRuntime,
-)
-from .turn.assistant_turn_stream_execution_runtime import (
-    LangGraphAssistantTurnStreamExecutionRuntime,
-)
-from .turn.assistant_turn_terminal_persist_runtime import (
-    LangGraphAssistantTurnTerminalPersistRuntime,
-)
-from .assistant_llm_runtime_support import (
-    AssistantLlmTransportMode,
-    ResolvedAssistantLlmRuntime,
-    call_assistant_llm,
-    resolve_assistant_llm_runtime,
-    stream_assistant_llm,
-)
+from .hooks_runtime.assistant_hook_agent_runtime import AssistantHookAgentRuntime, LangGraphAssistantHookAgentRuntime
+from .hooks_runtime.assistant_hook_support import AssistantHookExecutionContext
+from .assistant_runtime_claim_support import build_current_runtime_claim_snapshot
+from .turn.assistant_turn_runtime_support import PreparedAssistantTurn
+from .assistant_llm_runtime_support import AssistantLlmTransportMode, ResolvedAssistantLlmRuntime
 from .turn.assistant_turn_run_store import AssistantTurnRunStore
-from .turn.assistant_turn_run_support import (
-    build_running_turn_record,
-    build_terminal_turn_record,
-    ensure_existing_turn_matches_request,
-    recover_existing_turn,
-)
-from .dto import (
-    AssistantHookResultDTO,
-    AssistantTurnRequestDTO,
-    AssistantTurnResponseDTO,
-)
+from .dto import AssistantHookResultDTO, AssistantTurnRequestDTO, AssistantTurnResponseDTO
 from .preferences.preferences_service import AssistantPreferencesService
+from .assistant_runtime_integration_support import build_plugin_registry, call_llm, call_llm_stream, call_turn_llm, call_turn_llm_stream, execute_hook_with_retry, resolve_credential_service, resolve_llm_runtime, run_hook_event, run_on_error_hooks, stream_turn_with_tool_loop
+from .assistant_turn_service_support import execute_turn, build_running_turn_record_for_service, iterate_stream_turn, prepare_turn
 
 
 @dataclass(frozen=True)
@@ -186,17 +115,10 @@ class AssistantService:
                 assistant_preferences_service=self.assistant_preferences_service,
                 assistant_rule_service=self.assistant_rule_service,
                 template_renderer=self.template_renderer,
-                llm_caller=self._call_llm,
+                llm_caller=lambda db, **kwargs: self._call_llm(db, **kwargs),
             )
         )
-        self.plugin_registry = plugin_registry or build_assistant_plugin_registry(
-            self,
-            mcp_server_resolver=lambda context, server_id: self.assistant_mcp_service.resolve_mcp_server(
-                server_id,
-                owner_id=context.owner_id,
-                project_id=context.project_id,
-            ),
-        )
+        self.plugin_registry = plugin_registry or build_plugin_registry(self)
         self._credential_service: CredentialService | None = None
         self.runtime_claim_snapshot = build_current_runtime_claim_snapshot()
 
@@ -207,58 +129,12 @@ class AssistantService:
         *,
         owner_id: uuid.UUID,
     ) -> AssistantTurnResponseDTO:
-        turn_start = await self._prepare_or_recover_turn(
+        return await execute_turn(
+            self,
             db,
             payload,
             owner_id=owner_id,
-            transport_mode="buffered",
         )
-        prepared = turn_start.prepared
-        replayed_response = turn_start.replayed_response
-        if replayed_response is not None:
-            return replayed_response
-        runtime = LangGraphAssistantTurnExecutionRuntime(
-            run_before_hooks=lambda: self._run_before_turn_hooks(
-                db,
-                prepared,
-                owner_id=owner_id,
-            ),
-            call_turn_llm=lambda: self._call_turn_llm(
-                db,
-                prepared.hooks,
-                prompt=prepared.prompt,
-                before_payload=prepared.before_payload,
-                owner_id=owner_id,
-                project_id=prepared.project_id,
-                spec=prepared.spec,
-                system_prompt=prepared.system_prompt,
-                turn_context=prepared.turn_context,
-                run_budget=prepared.run_budget,
-                tool_policy_decisions=prepared.tool_policy_decisions,
-                visible_tool_descriptors=prepared.visible_tool_descriptors,
-                runtime_context=prepared.resolved_llm_runtime,
-            ),
-            finalize_response=lambda before_results, raw_output: self._finalize_turn(
-                db,
-                payload,
-                prepared,
-                raw_output,
-                before_results=before_results,
-                owner_id=owner_id,
-            ),
-            run_prepared_on_error_hooks=lambda error: self._run_prepared_on_error_hooks(
-                db,
-                prepared,
-                error=error,
-                owner_id=owner_id,
-            ),
-            store_terminal_turn=lambda **kwargs: self._store_terminal_turn(
-                prepared,
-                owner_id=owner_id,
-                **kwargs,
-            ),
-        )
-        return await runtime.run()
 
     async def stream_turn(
         self,
@@ -268,74 +144,13 @@ class AssistantService:
         owner_id: uuid.UUID,
         should_stop: Callable[[], Awaitable[bool]] | None = None,
     ) -> AsyncIterator[AssistantStreamEvent]:
-        turn_start = await self._prepare_or_recover_turn(
+        async for event_name, event_data in iterate_stream_turn(
+            self,
             db,
             payload,
             owner_id=owner_id,
-            transport_mode="stream",
-        )
-        prepared = turn_start.prepared
-        replayed_response = turn_start.replayed_response
-        runtime = LangGraphAssistantTurnStreamExecutionRuntime(
-            replayed_response=replayed_response,
-            build_stream_event_data=lambda event_seq, extra=None: self._build_stream_event_data(
-                prepared,
-                event_seq=event_seq,
-                extra=extra,
-            ),
-            run_started_extra={
-                "requested_write_scope": prepared.turn_context.requested_write_scope,
-                "requested_write_targets": prepared.turn_context.requested_write_targets,
-            },
-            run_before_hooks=lambda: self._run_before_turn_hooks(
-                db,
-                prepared,
-                owner_id=owner_id,
-            ),
-            should_stream_with_tool_loop=should_stream_with_tool_loop(
-                assistant_tool_loop=self.assistant_tool_loop,
-                prepared=prepared,
-            ),
-            stream_tool_loop=lambda: self._stream_turn_with_tool_loop(
-                db,
-                prepared,
-                owner_id=owner_id,
-                should_stop=should_stop,
-            ),
-            call_turn_llm_stream=lambda: self._call_turn_llm_stream(
-                db,
-                prepared.hooks,
-                prompt=prepared.prompt,
-                before_payload=prepared.before_payload,
-                owner_id=owner_id,
-                project_id=prepared.project_id,
-                spec=prepared.spec,
-                system_prompt=prepared.system_prompt,
-                runtime_context=prepared.resolved_llm_runtime,
-                should_stop=should_stop,
-            ),
-            finalize_response=lambda before_results, raw_output: self._finalize_turn(
-                db,
-                payload,
-                prepared,
-                raw_output,
-                before_results=before_results,
-                owner_id=owner_id,
-            ),
-            run_prepared_on_error_hooks=lambda error: self._run_prepared_on_error_hooks(
-                db,
-                prepared,
-                error=error,
-                owner_id=owner_id,
-            ),
-            store_terminal_turn=lambda **kwargs: self._store_terminal_turn(
-                prepared,
-                owner_id=owner_id,
-                **kwargs,
-            ),
-            attach_stream_error_meta=attach_assistant_stream_error_meta,
-        )
-        async for event_name, event_data in runtime.iterate():
+            should_stop=should_stop,
+        ):
             yield AssistantStreamEvent(event_name, event_data)
 
     async def run_agent_hook(
@@ -359,141 +174,15 @@ class AssistantService:
         owner_id: uuid.UUID,
         transport_mode: AssistantLlmTransportMode = "buffered",
         resolved_hooks: list[HookConfig] | None = None,
-    ) -> PreparedAssistantTurn:
-        return await prepare_assistant_turn(
+        ) -> PreparedAssistantTurn:
+        return await prepare_turn(
+            self,
             db,
             payload,
             owner_id=owner_id,
             transport_mode=transport_mode,
             resolved_hooks=resolved_hooks,
-            config_loader=self.config_loader,
-            template_renderer=self.template_renderer,
-            project_service=self.project_service,
-            assistant_preferences_service=self.assistant_preferences_service,
-            assistant_rule_service=self.assistant_rule_service,
-            assistant_agent_service=self.assistant_agent_service,
-            assistant_skill_service=self.assistant_skill_service,
-            assistant_hook_service=self.assistant_hook_service,
-            assistant_tool_loop=self.assistant_tool_loop,
-            turn_run_store=self.turn_run_store,
-            project_document_capability_service=self.project_document_capability_service,
-            resolve_llm_runtime=self._resolve_llm_runtime,
         )
-
-    async def _prepare_or_recover_turn(
-        self,
-        db: AsyncSession,
-        payload: AssistantTurnRequestDTO,
-        *,
-        owner_id: uuid.UUID,
-        transport_mode: AssistantLlmTransportMode = "buffered",
-    ) -> AssistantTurnPrepareRuntimeResult:
-        runtime = LangGraphAssistantTurnPrepareRuntime(
-            resolve_hooks=lambda: resolve_requested_hooks(
-                assistant_hook_service=self.assistant_hook_service,
-                hook_ids=payload.hook_ids,
-                owner_id=owner_id,
-            ),
-            prepare_turn=lambda resolved_hooks: self._prepare_turn(
-                db,
-                payload,
-                owner_id=owner_id,
-                transport_mode=transport_mode,
-                resolved_hooks=resolved_hooks,
-            ),
-            run_prepare_on_error_hooks=lambda resolved_hooks, error: self._run_prepare_on_error_hooks(
-                db,
-                payload,
-                hooks=resolved_hooks,
-                error=error,
-                owner_id=owner_id,
-            ),
-            recover_or_start_turn=lambda prepared: self._recover_or_start_turn(
-                prepared,
-                owner_id=owner_id,
-            ),
-        )
-        return await runtime.run()
-
-    async def _recover_or_start_turn(
-        self,
-        prepared: PreparedAssistantTurn,
-        *,
-        owner_id: uuid.UUID,
-    ) -> AssistantTurnResponseDTO | None:
-        if self.turn_run_store is None:
-            return None
-        runtime = LangGraphAssistantTurnRecoveryRuntime(
-            resolve_existing_run=lambda: asyncio.to_thread(
-                self.turn_run_store.get_run,
-                prepared.turn_context.run_id,
-            ),
-            recover_existing_running_turn=lambda existing_run: self._recover_existing_running_turn(
-                prepared,
-                existing_run=existing_run,
-                owner_id=owner_id,
-            ),
-            recover_existing_turn=lambda existing_run: recover_existing_turn(
-                prepared=prepared,
-                existing_run=existing_run,
-            ),
-            build_running_turn_record=lambda: build_running_turn_record(
-                prepared=prepared,
-                owner_id=owner_id,
-                runtime_claim_snapshot=self.runtime_claim_snapshot,
-            ),
-            create_run=lambda record: asyncio.to_thread(
-                self.turn_run_store.create_run,
-                record,
-            ),
-            reload_existing_run_after_conflict=lambda: asyncio.to_thread(
-                self.turn_run_store.get_run,
-                prepared.turn_context.run_id,
-            ),
-        )
-        return await runtime.run()
-
-    async def _recover_existing_running_turn(
-        self,
-        prepared: PreparedAssistantTurn,
-        *,
-        existing_run,
-        owner_id: uuid.UUID,
-    ) -> None:
-        if self.turn_run_store is None or existing_run.status != "running":
-            return
-        ensure_existing_turn_matches_request(
-            prepared=prepared,
-            existing_run=existing_run,
-        )
-        claim_state = resolve_runtime_claim_state(existing_run.runtime_claim_snapshot)
-        if claim_state != "stale":
-            return
-        error = AssistantRuntimeTerminalError(
-            code=(
-                "stale_run_write_state_unknown"
-                if existing_run.write_effective
-                else "stale_run_interrupted"
-            ),
-            message=(
-                "上次 turn 在写入后中断，当前不能安全重放，请刷新文稿状态后重新发起一次回复。"
-                if existing_run.write_effective
-                else "上次 turn 所在进程已中断，本轮已结束，请重新发起一次回复。"
-            ),
-            terminal_status="failed",
-            write_effective=existing_run.write_effective,
-        )
-        record = build_terminal_turn_record(
-            prepared=prepared,
-            owner_id=owner_id,
-            existing_run=existing_run,
-            error=error,
-        )
-        await asyncio.to_thread(
-            self.turn_run_store.save_run,
-            record,
-        )
-        raise error
 
     def _build_running_turn_record(
         self,
@@ -508,8 +197,9 @@ class AssistantService:
         updated_at: datetime | None = None,
         runtime_claim_snapshot: dict[str, Any] | None = None,
     ):
-        return build_running_turn_record(
-            prepared=prepared,
+        return build_running_turn_record_for_service(
+            self,
+            prepared,
             owner_id=owner_id,
             state_version=state_version,
             provider_continuation_state=provider_continuation_state,
@@ -517,156 +207,8 @@ class AssistantService:
             write_effective=write_effective,
             started_at=started_at,
             updated_at=updated_at,
-            runtime_claim_snapshot=runtime_claim_snapshot or self.runtime_claim_snapshot,
+            runtime_claim_snapshot=runtime_claim_snapshot,
         )
-
-    async def _run_prepare_on_error_hooks(
-        self,
-        db: AsyncSession,
-        payload: AssistantTurnRequestDTO,
-        *,
-        hooks: list[HookConfig],
-        error: Exception,
-        owner_id: uuid.UUID,
-    ) -> Exception | None:
-        return await run_prepare_on_error_hooks(
-            db,
-            payload,
-            hooks=hooks,
-            error=error,
-            owner_id=owner_id,
-            run_on_error_hooks=self._run_on_error_hooks,
-        )
-
-    async def _run_prepared_on_error_hooks(
-        self,
-        db: AsyncSession,
-        prepared: PreparedAssistantTurn,
-        *,
-        error: Exception,
-        owner_id: uuid.UUID,
-    ) -> Exception | None:
-        return await run_prepared_on_error_hooks(
-            db,
-            prepared,
-            error=error,
-            owner_id=owner_id,
-            run_on_error_hooks=self._run_on_error_hooks,
-        )
-
-    async def _run_before_turn_hooks(
-        self,
-        db: AsyncSession,
-        prepared: PreparedAssistantTurn,
-        *,
-        owner_id: uuid.UUID,
-    ) -> list[AssistantHookResultDTO]:
-        return await run_before_turn_hooks(
-            db,
-            prepared,
-            owner_id=owner_id,
-            run_hook_event=self._run_hook_event,
-        )
-
-    async def _finalize_turn(
-        self,
-        db: AsyncSession,
-        payload: AssistantTurnRequestDTO,
-        prepared: PreparedAssistantTurn,
-        raw_output: dict[str, Any],
-        *,
-        before_results: list[AssistantHookResultDTO],
-        owner_id: uuid.UUID,
-    ) -> AssistantTurnResponseDTO:
-        runtime = LangGraphAssistantTurnFinalizeRuntime(
-            resolve_content=lambda: require_text_output(raw_output.get("content")),
-            build_after_payload=lambda content: build_after_assistant_payload(
-                prepared.spec,
-                payload,
-                prepared.project_id,
-                prepared.turn_context,
-                content,
-                visible_tool_descriptors=prepared.visible_tool_descriptors,
-            ),
-            run_after_hooks=lambda after_payload: self._run_hook_event(
-                db,
-                prepared.hooks,
-                "after_assistant_response",
-                payload=after_payload,
-                owner_id=owner_id,
-                project_id=prepared.project_id,
-                agent_id=prepared.spec.agent_id,
-                skill_id=prepared.spec.skill_id,
-                assistant_model=prepared.spec.model,
-            ),
-            build_response=lambda content, after_results: build_turn_response(
-                prepared.spec,
-                raw_output,
-                content,
-                before_results + after_results,
-                prepared.turn_context,
-            ),
-        )
-        return await runtime.run()
-
-    def _build_stream_event_data(
-        self,
-        prepared: PreparedAssistantTurn,
-        *,
-        event_seq: int,
-        extra: dict[str, Any] | None = None,
-    ) -> LLMGenerateToolResponse:
-        payload: dict[str, Any] = {
-            "run_id": str(prepared.turn_context.run_id),
-            "conversation_id": prepared.turn_context.conversation_id,
-            "client_turn_id": prepared.turn_context.client_turn_id,
-            "event_seq": event_seq,
-            "state_version": self._resolve_stream_state_version(
-                prepared.turn_context.run_id,
-                fallback=event_seq,
-            ),
-            "ts": datetime.now(timezone.utc).isoformat(),
-        }
-        if extra:
-            payload.update(extra)
-        return payload
-
-    def _resolve_stream_state_version(self, run_id: uuid.UUID, *, fallback: int) -> int:
-        if self.turn_run_store is None:
-            return fallback
-        record = self.turn_run_store.get_run(run_id)
-        if record is None:
-            return fallback
-        return record.state_version
-
-    async def _store_terminal_turn(
-        self,
-        prepared: PreparedAssistantTurn,
-        *,
-        owner_id: uuid.UUID,
-        response: AssistantTurnResponseDTO | None = None,
-        error: Exception | None = None,
-    ) -> None:
-        if self.turn_run_store is None:
-            return
-        runtime = LangGraphAssistantTurnTerminalPersistRuntime(
-            resolve_existing_run=lambda: asyncio.to_thread(
-                self.turn_run_store.get_run,
-                prepared.turn_context.run_id,
-            ),
-            build_terminal_record=lambda existing_run: build_terminal_turn_record(
-                prepared=prepared,
-                owner_id=owner_id,
-                existing_run=existing_run,
-                response=response,
-                error=error,
-            ),
-            save_run=lambda record: asyncio.to_thread(
-                self.turn_run_store.save_run,
-                record,
-            ),
-        )
-        await runtime.run()
 
     async def _run_hook_event(
         self,
@@ -681,7 +223,8 @@ class AssistantService:
         skill_id: str | None,
         assistant_model: ModelConfig,
     ) -> list[AssistantHookResultDTO]:
-        return await run_assistant_hook_event(
+        return await run_hook_event(
+            self,
             db,
             hooks,
             event,
@@ -691,7 +234,6 @@ class AssistantService:
             agent_id=agent_id,
             skill_id=skill_id,
             assistant_model=assistant_model,
-            execute_hook_with_retry=self._execute_hook_with_retry,
         )
 
     async def _execute_hook_with_retry(
@@ -699,11 +241,7 @@ class AssistantService:
         context: AssistantHookExecutionContext,
         hook: HookConfig,
     ) -> Any:
-        return await execute_assistant_hook_with_retry(
-            context,
-            hook,
-            plugin_registry=self.plugin_registry,
-        )
+        return await execute_hook_with_retry(self, context, hook)
 
     async def _run_on_error_hooks(
         self,
@@ -718,7 +256,8 @@ class AssistantService:
         skill_id: str | None,
         assistant_model: ModelConfig,
     ) -> None:
-        await run_assistant_on_error_hooks(
+        await run_on_error_hooks(
+            self,
             db,
             hooks,
             payload,
@@ -728,7 +267,6 @@ class AssistantService:
             agent_id=agent_id,
             skill_id=skill_id,
             assistant_model=assistant_model,
-            run_hook_event=self._run_hook_event,
         )
 
     async def _call_turn_llm(
@@ -740,15 +278,16 @@ class AssistantService:
         before_payload: dict[str, Any],
         owner_id: uuid.UUID,
         project_id: uuid.UUID | None,
-        spec: AssistantExecutionSpec,
+        spec,
         system_prompt: str | None,
         turn_context,
         run_budget=None,
         tool_policy_decisions: tuple[Any, ...] = (),
         visible_tool_descriptors: tuple[Any, ...] = (),
         runtime_context: ResolvedAssistantLlmRuntime | None = None,
-    ) -> LLMGenerateToolResponse:
-        return await call_assistant_turn_llm(
+    ) -> Any:
+        return await call_turn_llm(
+            self,
             db,
             hooks,
             prompt=prompt,
@@ -759,13 +298,8 @@ class AssistantService:
             system_prompt=system_prompt,
             turn_context=turn_context,
             run_budget=run_budget,
-            tool_policy_decisions=tuple(tool_policy_decisions),
-            visible_tool_descriptors=tuple(visible_tool_descriptors),
-            assistant_tool_loop=self.assistant_tool_loop,
-            turn_run_store=self.turn_run_store,
-            resolve_llm_runtime=self._resolve_llm_runtime,
-            call_llm=self._call_llm,
-            run_on_error_hooks=self._run_on_error_hooks,
+            tool_policy_decisions=tool_policy_decisions,
+            visible_tool_descriptors=visible_tool_descriptors,
             runtime_context=runtime_context,
         )
 
@@ -778,13 +312,14 @@ class AssistantService:
         before_payload: dict[str, Any],
         owner_id: uuid.UUID,
         project_id: uuid.UUID | None,
-        spec: AssistantExecutionSpec,
+        spec,
         system_prompt: str | None,
         runtime_context: ResolvedAssistantLlmRuntime | None = None,
         tools: list[dict[str, Any]] | None = None,
         should_stop: Callable[[], Awaitable[bool]] | None = None,
     ) -> AsyncIterator[LLMStreamEvent]:
-        async for event in stream_assistant_turn_llm(
+        async for event in call_turn_llm_stream(
+            self,
             db,
             hooks,
             prompt=prompt,
@@ -793,12 +328,9 @@ class AssistantService:
             project_id=project_id,
             spec=spec,
             system_prompt=system_prompt,
+            runtime_context=runtime_context,
             tools=tools,
             should_stop=should_stop,
-            resolve_llm_runtime=self._resolve_llm_runtime,
-            call_llm_stream=self._call_llm_stream,
-            run_on_error_hooks=self._run_on_error_hooks,
-            runtime_context=runtime_context,
         ):
             yield event
 
@@ -810,18 +342,12 @@ class AssistantService:
         owner_id: uuid.UUID,
         should_stop: Callable[[], Awaitable[bool]] | None = None,
     ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
-        async for event_name, event_data in stream_assistant_turn_with_tool_loop(
+        async for event_name, event_data in stream_turn_with_tool_loop(
+            self,
             db,
             prepared,
             owner_id=owner_id,
             should_stop=should_stop,
-            assistant_tool_loop=self.assistant_tool_loop,
-            turn_run_store=self.turn_run_store,
-            resolve_llm_runtime=self._resolve_llm_runtime,
-            call_llm=self._call_llm,
-            call_llm_stream=self._call_llm_stream,
-            run_on_error_hooks=self._run_on_error_hooks,
-            runtime_context=prepared.resolved_llm_runtime,
         ):
             yield event_name, event_data
 
@@ -840,22 +366,19 @@ class AssistantService:
         provider_continuation_state: dict[str, Any] | None = None,
         runtime_context: ResolvedAssistantLlmRuntime | None = None,
     ) -> dict[str, Any]:
-        resolved_runtime = runtime_context or await self._resolve_llm_runtime(
+        return await call_llm(
+            self,
             db,
-            model=model,
-            owner_id=owner_id,
-            project_id=project_id,
-        )
-        return await call_assistant_llm(
-            tool_provider=self.tool_provider,
             prompt=prompt,
             system_prompt=system_prompt,
             model=model,
-            resolved_runtime=resolved_runtime,
+            owner_id=owner_id,
+            project_id=project_id,
             response_format=response_format,
             tools=tools,
             continuation_items=continuation_items,
             provider_continuation_state=provider_continuation_state,
+            runtime_context=runtime_context,
         )
 
     async def _call_llm_stream(
@@ -873,18 +396,15 @@ class AssistantService:
         provider_continuation_state: dict[str, Any] | None = None,
         should_stop: Callable[[], Awaitable[bool]] | None = None,
     ) -> AsyncIterator[LLMStreamEvent]:
-        resolved_runtime = runtime_context or await self._resolve_llm_runtime(
+        async for event in call_llm_stream(
+            self,
             db,
-            model=model,
-            owner_id=owner_id,
-            project_id=project_id,
-        )
-        async for event in stream_assistant_llm(
-            tool_provider=self.tool_provider,
             prompt=prompt,
             system_prompt=system_prompt,
             model=model,
-            resolved_runtime=resolved_runtime,
+            owner_id=owner_id,
+            project_id=project_id,
+            runtime_context=runtime_context,
             tools=tools,
             continuation_items=continuation_items,
             provider_continuation_state=provider_continuation_state,
@@ -900,15 +420,13 @@ class AssistantService:
         owner_id: uuid.UUID,
         project_id: uuid.UUID | None,
     ) -> ResolvedAssistantLlmRuntime:
-        return await resolve_assistant_llm_runtime(
+        return await resolve_llm_runtime(
+            self,
             db,
-            credential_service=self._resolve_credential_service(),
             model=model,
             owner_id=owner_id,
             project_id=project_id,
         )
 
     def _resolve_credential_service(self) -> CredentialService:
-        if self._credential_service is None:
-            self._credential_service = self.credential_service_factory()
-        return self._credential_service
+        return resolve_credential_service(self)

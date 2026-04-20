@@ -23,6 +23,14 @@ class _UsageTotals:
     total_tokens: int = 0
 
 
+def _build_usage_totals_state() -> dict[str, int]:
+    return {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+    }
+
+
 def _append_intermediate_text_item(
     output_items: list[dict[str, Any]],
     turn_context: "AssistantTurnContext",
@@ -247,13 +255,19 @@ def _build_final_output(
     *,
     turn_context: "AssistantTurnContext",
     raw_output: dict[str, Any],
-    usage: _UsageTotals,
+    usage: _UsageTotals | dict[str, int],
     output_items: list[dict[str, Any]],
 ) -> dict[str, Any]:
     final_output = dict(raw_output)
-    final_output["input_tokens"] = usage.input_tokens or raw_output.get("input_tokens")
-    final_output["output_tokens"] = usage.output_tokens or raw_output.get("output_tokens")
-    final_output["total_tokens"] = usage.total_tokens or raw_output.get("total_tokens")
+    final_output["input_tokens"] = _read_usage_total(usage, "input_tokens") or raw_output.get(
+        "input_tokens"
+    )
+    final_output["output_tokens"] = _read_usage_total(usage, "output_tokens") or raw_output.get(
+        "output_tokens"
+    )
+    final_output["total_tokens"] = _read_usage_total(usage, "total_tokens") or raw_output.get(
+        "total_tokens"
+    )
     final_output["output_items"] = _merge_final_output_items(
         turn_context=turn_context,
         raw_output=raw_output,
@@ -266,6 +280,17 @@ def _merge_usage_totals(totals: _UsageTotals, raw_output: dict[str, Any]) -> Non
     totals.input_tokens += _read_usage_value(raw_output.get("input_tokens"))
     totals.output_tokens += _read_usage_value(raw_output.get("output_tokens"))
     totals.total_tokens += _read_usage_value(raw_output.get("total_tokens"))
+
+
+def _merge_usage_totals_state(
+    totals: dict[str, int],
+    raw_output: dict[str, Any],
+) -> dict[str, int]:
+    return {
+        "input_tokens": totals.get("input_tokens", 0) + _read_usage_value(raw_output.get("input_tokens")),
+        "output_tokens": totals.get("output_tokens", 0) + _read_usage_value(raw_output.get("output_tokens")),
+        "total_tokens": totals.get("total_tokens", 0) + _read_usage_value(raw_output.get("total_tokens")),
+    }
 
 
 def _merge_final_output_items(
@@ -310,3 +335,9 @@ def _read_usage_value(value: Any) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         return 0
     return value
+
+
+def _read_usage_total(usage: _UsageTotals | dict[str, int], field_name: str) -> int:
+    if isinstance(usage, dict):
+        return _read_usage_value(usage.get(field_name))
+    return _read_usage_value(getattr(usage, field_name, None))

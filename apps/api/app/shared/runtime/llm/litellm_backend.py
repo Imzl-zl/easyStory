@@ -220,7 +220,7 @@ def _build_base_call_kwargs(
         "api_key": request.connection.api_key,
         "timeout": DEFAULT_REQUEST_TIMEOUT_SECONDS,
     }
-    api_base = normalize_custom_base_url(request.connection.base_url)
+    api_base = _normalize_litellm_api_base(request)
     if api_base is not None and not _is_official_openai_api_base(request, api_base):
         call_kwargs["api_base"] = api_base
     extra_headers = _build_litellm_extra_headers(request, prepared_headers)
@@ -355,6 +355,17 @@ def _build_litellm_extra_headers(
         if key.lower() not in auth_header_names and key.lower() != "content-type"
     }
     return headers or None
+
+
+def _normalize_litellm_api_base(request: LLMGenerateRequest) -> str | None:
+    api_base = normalize_custom_base_url(request.connection.base_url)
+    if api_base is None:
+        return None
+    if request.connection.api_dialect != "gemini_generate_content":
+        return api_base
+    if "/v1beta/models" in api_base or "/v1/models" in api_base:
+        return api_base
+    return f"{api_base.rstrip('/')}/v1beta/models"
 
 
 def _resolve_event_name(*, call_kind: str, payload: dict[str, Any]) -> str | None:
