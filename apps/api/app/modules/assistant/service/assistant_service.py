@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -414,7 +415,7 @@ class AssistantService:
         )
         return await runtime.run()
 
-    def _recover_or_start_turn(
+    async def _recover_or_start_turn(
         self,
         prepared: PreparedAssistantTurn,
         *,
@@ -423,7 +424,10 @@ class AssistantService:
         if self.turn_run_store is None:
             return None
         runtime = LangGraphAssistantTurnRecoveryRuntime(
-            resolve_existing_run=lambda: self.turn_run_store.get_run(prepared.turn_context.run_id),
+            resolve_existing_run=lambda: asyncio.to_thread(
+                self.turn_run_store.get_run,
+                prepared.turn_context.run_id,
+            ),
             recover_existing_running_turn=lambda existing_run: self._recover_existing_running_turn(
                 prepared,
                 existing_run=existing_run,
@@ -438,14 +442,18 @@ class AssistantService:
                 owner_id=owner_id,
                 runtime_claim_snapshot=self.runtime_claim_snapshot,
             ),
-            create_run=self.turn_run_store.create_run,
-            reload_existing_run_after_conflict=lambda: self.turn_run_store.get_run(
-                prepared.turn_context.run_id
+            create_run=lambda record: asyncio.to_thread(
+                self.turn_run_store.create_run,
+                record,
+            ),
+            reload_existing_run_after_conflict=lambda: asyncio.to_thread(
+                self.turn_run_store.get_run,
+                prepared.turn_context.run_id,
             ),
         )
-        return runtime.run()
+        return await runtime.run()
 
-    def _recover_existing_running_turn(
+    async def _recover_existing_running_turn(
         self,
         prepared: PreparedAssistantTurn,
         *,
@@ -475,13 +483,15 @@ class AssistantService:
             terminal_status="failed",
             write_effective=existing_run.write_effective,
         )
-        self.turn_run_store.save_run(
-            build_terminal_turn_record(
-                prepared=prepared,
-                owner_id=owner_id,
-                existing_run=existing_run,
-                error=error,
-            )
+        record = build_terminal_turn_record(
+            prepared=prepared,
+            owner_id=owner_id,
+            existing_run=existing_run,
+            error=error,
+        )
+        await asyncio.to_thread(
+            self.turn_run_store.save_run,
+            record,
         )
         raise error
 
@@ -629,7 +639,7 @@ class AssistantService:
             return fallback
         return record.state_version
 
-    def _store_terminal_turn(
+    async def _store_terminal_turn(
         self,
         prepared: PreparedAssistantTurn,
         *,
@@ -640,7 +650,10 @@ class AssistantService:
         if self.turn_run_store is None:
             return
         runtime = LangGraphAssistantTurnTerminalPersistRuntime(
-            resolve_existing_run=lambda: self.turn_run_store.get_run(prepared.turn_context.run_id),
+            resolve_existing_run=lambda: asyncio.to_thread(
+                self.turn_run_store.get_run,
+                prepared.turn_context.run_id,
+            ),
             build_terminal_record=lambda existing_run: build_terminal_turn_record(
                 prepared=prepared,
                 owner_id=owner_id,
@@ -648,9 +661,12 @@ class AssistantService:
                 response=response,
                 error=error,
             ),
-            save_run=self.turn_run_store.save_run,
+            save_run=lambda record: asyncio.to_thread(
+                self.turn_run_store.save_run,
+                record,
+            ),
         )
-        runtime.run()
+        await runtime.run()
 
     async def _run_hook_event(
         self,

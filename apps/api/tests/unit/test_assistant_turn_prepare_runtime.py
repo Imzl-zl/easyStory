@@ -20,11 +20,15 @@ async def test_assistant_turn_prepare_runtime_runs_prepare_and_recover_successfu
         call_log.append(("prepare_on_error", list(hooks), error))
         return None
 
+    async def recover_or_start_turn(value):
+        call_log.append(("recover", value))
+        return replayed_response
+
     runtime = LangGraphAssistantTurnPrepareRuntime(
         resolve_hooks=lambda: call_log.append("resolve_hooks") or list(resolved_hooks),
         prepare_turn=prepare_turn,
         run_prepare_on_error_hooks=run_prepare_on_error_hooks,
-        recover_or_start_turn=lambda value: call_log.append(("recover", value)) or replayed_response,
+        recover_or_start_turn=recover_or_start_turn,
     )
 
     result = await runtime.run()
@@ -56,7 +60,7 @@ async def test_assistant_turn_prepare_runtime_runs_prepare_on_error_hooks_for_pr
         resolve_hooks=lambda: ["hook.one"],
         prepare_turn=prepare_turn,
         run_prepare_on_error_hooks=run_prepare_on_error_hooks,
-        recover_or_start_turn=lambda prepared: prepared,
+        recover_or_start_turn=_return_async,
     )
 
     with pytest.raises(RuntimeError, match="prepare failed"):
@@ -85,7 +89,7 @@ async def test_assistant_turn_prepare_runtime_uses_hook_error_when_prepare_on_er
         resolve_hooks=lambda: (_ for _ in ()).throw(original_error),
         prepare_turn=prepare_turn,
         run_prepare_on_error_hooks=run_prepare_on_error_hooks,
-        recover_or_start_turn=lambda prepared: prepared,
+        recover_or_start_turn=_return_async,
     )
 
     with pytest.raises(ValueError, match="hook failed"):
@@ -105,7 +109,7 @@ async def test_assistant_turn_prepare_runtime_does_not_run_prepare_on_error_hook
         call_log.append(("prepare_on_error", list(hooks), error))
         return None
 
-    def recover_or_start_turn(prepared):
+    async def recover_or_start_turn(prepared):
         call_log.append(("recover", prepared))
         raise recover_error
 
@@ -122,3 +126,7 @@ async def test_assistant_turn_prepare_runtime_does_not_run_prepare_on_error_hook
     assert len(call_log) == 2
     assert call_log[0] == ("prepare", ["hook.one"])
     assert call_log[1][0] == "recover"
+
+
+async def _return_async(value):
+    return value

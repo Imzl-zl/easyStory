@@ -27,7 +27,7 @@ async def test_assistant_turn_execution_runtime_runs_success_path_and_stores_res
         call_log.append(("error_hook", error))
         return None
 
-    def store_terminal_turn(*, response=None, error=None):
+    async def store_terminal_turn(*, response=None, error=None):
         call_log.append(("store", response, error))
 
     runtime = LangGraphAssistantTurnExecutionRuntime(
@@ -70,7 +70,7 @@ async def test_assistant_turn_execution_runtime_store_failure_does_not_trigger_e
         call_log.append(("error_hook", error))
         return None
 
-    def store_terminal_turn(*, response=None, error=None):
+    async def store_terminal_turn(*, response=None, error=None):
         call_log.append(("store", response, error))
         raise store_error
 
@@ -109,7 +109,7 @@ async def test_assistant_turn_execution_runtime_uses_hook_error_for_terminal_sto
         call_log.append(("error_hook", error))
         return hook_error
 
-    def store_terminal_turn(*, response=None, error=None):
+    async def store_terminal_turn(*, response=None, error=None):
         call_log.append(("store", response, error))
 
     runtime = LangGraphAssistantTurnExecutionRuntime(

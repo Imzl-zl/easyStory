@@ -94,6 +94,23 @@ class WorkflowRuntimeService(
         )
         return await graph_runtime.run()
 
+    async def execute_node(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        *,
+        owner_id: uuid.UUID,
+    ) -> NodeOutcome:
+        return await self._execute_node(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            owner_id=owner_id,
+        )
+
     async def _execute_node(
         self,
         db: AsyncSession,
@@ -170,6 +187,20 @@ class WorkflowRuntimeService(
             ),
         )
         return await runtime.run()
+
+    def apply_outcome(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        node: NodeConfig,
+        outcome: NodeOutcome,
+    ) -> bool:
+        return self._apply_outcome(
+            db,
+            workflow,
+            node,
+            outcome,
+        )
 
     async def _dispatch_node(
         self,

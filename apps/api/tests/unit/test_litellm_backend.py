@@ -5,7 +5,7 @@ import asyncio
 import litellm
 import pytest
 
-from app.shared.runtime.errors import ConfigurationError
+from app.shared.runtime.errors import ConfigurationError, UpstreamRateLimitError
 from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import build_text_probe_request
 from app.shared.runtime.llm.llm_backend import resolve_backend_selection
@@ -292,6 +292,79 @@ def test_litellm_backend_generate_stream_raises_responses_failed_message(monkeyp
         asyncio.run(collect())
 
 
+def test_litellm_backend_generate_parses_responses_bridge_payload_as_openai_chat(monkeypatch) -> None:
+    request = build_text_probe_request(
+        LLMConnection(
+            provider="openai",
+            api_dialect="openai_responses",
+            api_key="test-key",
+            base_url="https://api.openai.com/v1",
+        ),
+        model_name="gpt-4.1-mini",
+    )
+
+    async def fake_aresponses(**kwargs):
+        return {
+            "choices": [{"message": {"content": "bridge 文本"}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
+
+    monkeypatch.setattr(litellm, "aresponses", fake_aresponses)
+
+    normalized = asyncio.run(LiteLLMBackend().generate(request))
+
+    assert normalized.content == "bridge 文本"
+    assert normalized.finish_reason == "stop"
+
+
+def test_litellm_backend_generate_stream_parses_responses_bridge_chunks_as_openai_chat(monkeypatch) -> None:
+    request = build_text_probe_request(
+        LLMConnection(
+            provider="openai",
+            api_dialect="openai_responses",
+            api_key="test-key",
+            base_url="https://api.openai.com/v1",
+        ),
+        model_name="gpt-4.1-mini",
+    )
+
+    class FakeStream:
+        def __init__(self, events):
+            self._events = list(events)
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            if not self._events:
+                raise StopAsyncIteration
+            return self._events.pop(0)
+
+    async def fake_aresponses(**kwargs):
+        return FakeStream(
+            [
+                {"choices": [{"delta": {"content": "bridge "}, "finish_reason": None}]},
+                {"choices": [{"delta": {"content": "stream"}, "finish_reason": None}]},
+                {"choices": [{"delta": {}, "finish_reason": "stop"}]},
+            ]
+        )
+
+    monkeypatch.setattr(litellm, "aresponses", fake_aresponses)
+    backend = LiteLLMBackend()
+
+    async def collect():
+        events = []
+        async for event in backend.generate_stream(request):
+            events.append(event)
+        return events
+
+    events = asyncio.run(collect())
+
+    assert [event.delta for event in events[:-1]] == ["bridge ", "stream"]
+    assert events[-1].terminal_response is not None
+    assert events[-1].terminal_response.content == "bridge stream"
+
+
 def test_resolve_backend_selection_uses_native_for_gemini_stream_endpoint() -> None:
     request = build_text_probe_request(
         LLMConnection(
@@ -348,6 +421,30 @@ def test_litellm_backend_generate_stream_keeps_local_configuration_errors(monkey
 
     with pytest.raises(ConfigurationError, match="unsupported payload object"):
         asyncio.run(collect())
+
+
+def test_litellm_backend_maps_rate_limit_error_to_specific_exception(monkeypatch) -> None:
+    request = build_text_probe_request(
+        LLMConnection(
+            provider="openai",
+            api_dialect="openai_chat_completions",
+            api_key="test-key",
+            base_url="https://api.openai.com/v1",
+        ),
+        model_name="gpt-4.1-mini",
+    )
+
+    async def fake_acompletion(**kwargs):
+        raise litellm.RateLimitError(
+            message="too many requests",
+            llm_provider="openai",
+            model="gpt-4.1-mini",
+        )
+
+    monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
+
+    with pytest.raises(UpstreamRateLimitError, match="too many requests"):
+        asyncio.run(LiteLLMBackend().generate(request))
 
 
 def test_build_litellm_call_spec_keeps_existing_openai_prefix_for_openai_compatible_gateway() -> None:

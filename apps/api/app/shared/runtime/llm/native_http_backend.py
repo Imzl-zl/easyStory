@@ -6,6 +6,7 @@ from typing import Any, Protocol
 from ..errors import ConfigurationError
 from .interop import provider_interop_stream_support as stream_support
 from .llm_backend import LLMBackendStreamEvent, StreamStopChecker
+from .llm_error_support import INCOMPLETE_STREAM_MESSAGE, build_responses_failed_message
 from .llm_protocol_requests import prepare_generation_request
 from .llm_protocol_responses import parse_generation_response
 from .llm_protocol_types import (
@@ -22,11 +23,6 @@ from .llm_response_validation import (
 from .llm_stream_events import build_truncated_stream_message, extract_stream_truncation_reason
 from .llm_terminal_assembly import build_stream_completion
 from .llm_protocol_responses import extract_response_truncation_reason
-
-INCOMPLETE_STREAM_MESSAGE = (
-    "上游在输出尚未完成时提前停止了这次回复，当前只收到部分内容。"
-    "请关闭流式，或切换更稳定的连接后重试。"
-)
 RESPONSES_TERMINAL_EVENT_NAMES = frozenset({
     "response.completed",
     "response.incomplete",
@@ -102,7 +98,7 @@ class NativeHttpLLMBackend:
         ):
             raw_event_tuples.append((event.event_name, event.payload))
             if event.event_name == "response.failed":
-                raise ConfigurationError(_build_responses_failed_message(event.payload))
+                raise ConfigurationError(build_responses_failed_message(event.payload))
             if truncation_reason is None:
                 truncation_reason = extract_stream_truncation_reason(event.stop_reason)
             if not saw_terminal_event:
@@ -148,19 +144,6 @@ class NativeHttpLLMBackend:
         if not saw_terminal_event:
             raise ConfigurationError(INCOMPLETE_STREAM_MESSAGE)
         yield LLMBackendStreamEvent(terminal_response=normalized)
-
-
-def _build_responses_failed_message(payload: dict[str, Any]) -> str:
-    response = payload.get("response")
-    if isinstance(response, dict):
-        error = response.get("error")
-        if isinstance(error, dict):
-            message = error.get("message")
-            if isinstance(message, str) and message.strip():
-                return f"LLM streaming request failed: {message.strip()}"
-        if isinstance(error, str) and error.strip():
-            return f"LLM streaming request failed: {error.strip()}"
-    return "LLM streaming request failed: response.failed"
 
 
 def _build_http_error_message(response: HttpJsonResponse) -> str:

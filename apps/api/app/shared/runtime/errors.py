@@ -45,6 +45,22 @@ class ConfigurationError(EasyStoryError):
     """Raised when repository or runtime configuration is invalid."""
 
 
+class UpstreamServiceError(ConfigurationError):
+    """Raised when an upstream LLM service returns a non-local runtime failure."""
+
+
+class UpstreamAuthenticationError(UpstreamServiceError):
+    """Raised when upstream authentication fails."""
+
+
+class UpstreamRateLimitError(UpstreamServiceError):
+    """Raised when upstream rate limiting rejects the request."""
+
+
+class UpstreamTimeoutError(UpstreamServiceError):
+    """Raised when the upstream request times out."""
+
+
 class UnknownModelError(ConfigurationError):
     def __init__(self, model: str):
         super().__init__(f"Unknown model: {model}")

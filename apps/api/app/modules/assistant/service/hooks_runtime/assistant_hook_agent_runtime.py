@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, TypedDict
+from typing import Any, Protocol
 
-from langgraph.graph import END, START, StateGraph
-
-from app.modules.config_registry.schemas import AgentConfig, ModelConfig, SkillConfig
+from app.modules.config_registry.schemas import ModelConfig
 from app.shared.runtime.template_renderer import SkillTemplateRenderer
 from app.shared.runtime.errors import ConfigurationError
 
@@ -37,20 +35,6 @@ class AssistantHookAgentLlmCaller(Protocol):
     ) -> dict[str, Any]: ...
 
 
-class AssistantHookAgentRuntimeState(TypedDict, total=False):
-    context: AssistantHookExecutionContext
-    agent_id: str
-    input_mapping: dict[str, str]
-    agent: AgentConfig
-    skill: SkillConfig
-    prompt: str
-    system_prompt: str | None
-    model: ModelConfig
-    response_format: str
-    raw_output: dict[str, Any]
-    result: Any
-
-
 class AssistantHookAgentRuntime(Protocol):
     async def run(
         self,
@@ -78,7 +62,6 @@ class LangGraphAssistantHookAgentRuntime:
         self.assistant_rule_service = assistant_rule_service
         self.template_renderer = template_renderer
         self.llm_caller = llm_caller
-        self._graph = self._build_graph()
 
     async def run(
         self,
@@ -87,37 +70,8 @@ class LangGraphAssistantHookAgentRuntime:
         agent_id: str,
         input_mapping: dict[str, str],
     ) -> Any:
-        final_state = await self._graph.ainvoke(
-            {
-                "context": context,
-                "agent_id": agent_id,
-                "input_mapping": dict(input_mapping),
-            }
-        )
-        if "result" not in final_state:
-            raise ConfigurationError("Assistant hook agent runtime completed without result")
-        return final_state["result"]
-
-    def _build_graph(self):
-        graph = StateGraph(AssistantHookAgentRuntimeState)
-        graph.add_node("resolve_agent", self._resolve_agent)
-        graph.add_node("prepare_request", self._prepare_request)
-        graph.add_node("call_llm", self._call_llm)
-        graph.add_node("resolve_output", self._resolve_output)
-        graph.add_edge(START, "resolve_agent")
-        graph.add_edge("resolve_agent", "prepare_request")
-        graph.add_edge("prepare_request", "call_llm")
-        graph.add_edge("call_llm", "resolve_output")
-        graph.add_edge("resolve_output", END)
-        return graph.compile(name="assistant_hook_agent_runtime")
-
-    def _resolve_agent(
-        self,
-        state: AssistantHookAgentRuntimeState,
-    ) -> AssistantHookAgentRuntimeState:
-        context = state["context"]
         agent = self.assistant_agent_service.resolve_agent(
-            state["agent_id"],
+            agent_id,
             owner_id=context.owner_id,
             allow_disabled=True,
         )
@@ -130,19 +84,7 @@ class LangGraphAssistantHookAgentRuntime:
             ),
             agent,
         )
-        return {
-            "agent": agent,
-            "skill": skill,
-        }
-
-    async def _prepare_request(
-        self,
-        state: AssistantHookAgentRuntimeState,
-    ) -> AssistantHookAgentRuntimeState:
-        context = state["context"]
-        agent = state["agent"]
-        skill = state["skill"]
-        variables = build_hook_agent_variables(context, state["input_mapping"])
+        variables = build_hook_agent_variables(context, input_mapping)
         prompt = self.template_renderer.render(skill.prompt, variables)
         preferences = await self.assistant_preferences_service.resolve_preferences(
             context.db,
@@ -165,33 +107,16 @@ class LangGraphAssistantHookAgentRuntime:
             user_content=rule_bundle.user_content,
             project_content=rule_bundle.project_content,
         )
-        return {
-            "prompt": prompt,
-            "system_prompt": system_prompt,
-            "model": model,
-            "response_format": hook_agent_response_format(agent),
-        }
-
-    async def _call_llm(
-        self,
-        state: AssistantHookAgentRuntimeState,
-    ) -> AssistantHookAgentRuntimeState:
-        context = state["context"]
         raw_output = await self.llm_caller(
             context.db,
-            prompt=state["prompt"],
-            system_prompt=state["system_prompt"],
-            model=state["model"],
+            prompt=prompt,
+            system_prompt=system_prompt,
+            model=model,
             owner_id=context.owner_id,
             project_id=context.project_id,
-            response_format=state["response_format"],
+            response_format=hook_agent_response_format(agent),
         )
-        return {"raw_output": raw_output}
-
-    def _resolve_output(
-        self,
-        state: AssistantHookAgentRuntimeState,
-    ) -> AssistantHookAgentRuntimeState:
-        agent = state["agent"]
-        raw_output = state["raw_output"]
-        return {"result": resolve_hook_agent_output(agent, raw_output.get("content"))}
+        result = resolve_hook_agent_output(agent, raw_output.get("content"))
+        if result is None:
+            raise ConfigurationError("Assistant hook agent runtime completed without result")
+        return result

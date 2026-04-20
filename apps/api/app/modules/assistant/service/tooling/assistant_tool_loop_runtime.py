@@ -81,6 +81,10 @@ class AssistantToolLoopGraphState(TypedDict, total=False):
     terminated: bool
 
 
+TOOL_LOOP_RECURSION_STEP_WIDTH = 5
+TOOL_LOOP_RECURSION_BUFFER = 10
+
+
 class AssistantToolLoopRuntime:
     def __init__(
         self,
@@ -147,7 +151,13 @@ class AssistantToolLoopRuntime:
             "has_tool_calls": False,
             "terminated": False,
         }
-        async for payload in self._graph.astream(initial_state, stream_mode="custom"):
+        recursion_limit = self.tool_loop.max_iterations * TOOL_LOOP_RECURSION_STEP_WIDTH
+        recursion_limit += TOOL_LOOP_RECURSION_BUFFER
+        async for payload in self._graph.astream(
+            initial_state,
+            stream_mode="custom",
+            config={"recursion_limit": recursion_limit},
+        ):
             item = _deserialize_iteration_item(payload)
             if item is not None:
                 yield item
@@ -313,7 +323,24 @@ class AssistantToolLoopRuntime:
             pending_tool_calls_snapshot=_build_pending_tool_calls_snapshot(tool_calls)
         )
         _append_intermediate_text_item(self.output_items, self.turn_context, raw_output)
-        tool_results: list[AssistantToolResultEnvelope] = []
+        planned_tool_calls = self._plan_tool_cycle_calls(tool_calls)
+        tool_results = await self._execute_planned_tool_calls(planned_tool_calls)
+        self._apply_tool_cycle_results(raw_output, tool_calls, tool_results)
+        self._record_state(pending_tool_calls_snapshot=())
+        self.tool_cycle_index += 1
+        self.current_tool_calls = []
+        self.current_raw_output = None
+        self.current_raw_output_already_streamed = False
+        return {
+            "has_tool_calls": False,
+            "has_pending_output": False,
+            "terminated": False,
+        }
+
+    def _plan_tool_cycle_calls(
+        self,
+        tool_calls: list[dict[str, Any]],
+    ) -> list[Any]:
         planned_tool_calls, self.step_index = _plan_tool_cycle_calls(
             tool_calls=tool_calls,
             policy_decision_by_name=self.policy_decision_by_name,
@@ -321,6 +348,13 @@ class AssistantToolLoopRuntime:
             run_budget=self.run_budget,
             step_index=self.step_index,
         )
+        return planned_tool_calls
+
+    async def _execute_planned_tool_calls(
+        self,
+        planned_tool_calls: list[Any],
+    ) -> list[AssistantToolResultEnvelope]:
+        tool_results: list[AssistantToolResultEnvelope] = []
         for planned_tool_call in planned_tool_calls:
             await raise_if_cancelled(self.should_stop)
             self._emit_iteration_item(
@@ -388,6 +422,14 @@ class AssistantToolLoopRuntime:
                     ),
                 )
             )
+        return tool_results
+
+    def _apply_tool_cycle_results(
+        self,
+        raw_output: LLMGenerateToolResponse,
+        tool_calls: list[dict[str, Any]],
+        tool_results: list[AssistantToolResultEnvelope],
+    ) -> None:
         cycle_output_items = _build_tool_cycle_output_items(
             turn_context=self.turn_context,
             start_index=len(self.output_items),
@@ -414,16 +456,6 @@ class AssistantToolLoopRuntime:
             latest_items=cycle_continuation_items,
             continuation_support=self.continuation_support,
         )
-        self._record_state(pending_tool_calls_snapshot=())
-        self.tool_cycle_index += 1
-        self.current_tool_calls = []
-        self.current_raw_output = None
-        self.current_raw_output_already_streamed = False
-        return {
-            "has_tool_calls": False,
-            "has_pending_output": False,
-            "terminated": False,
-        }
 
     async def _finalize_output(
         self,

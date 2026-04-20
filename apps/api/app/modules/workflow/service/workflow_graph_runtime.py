@@ -38,13 +38,17 @@ class WorkflowGraphRuntime:
         self.workflow = workflow
         self.workflow_config = workflow_config
         self.owner_id = owner_id
+        self._graph = self._build_graph()
 
     async def run(self) -> WorkflowExecution:
         current_node_id = self.workflow.current_node_id
         if not current_node_id:
             raise ConfigurationError("Workflow current node is required before runtime execution")
-        graph = self._build_graph()
-        await graph.ainvoke({"current_node_id": current_node_id, "terminated": False})
+        recursion_limit = max(25, len(self.workflow_config.nodes) * 4 + 10)
+        await self._graph.ainvoke(
+            {"current_node_id": current_node_id, "terminated": False},
+            config={"recursion_limit": recursion_limit},
+        )
         return self.workflow
 
     def _build_graph(self):
@@ -65,7 +69,7 @@ class WorkflowGraphRuntime:
 
     async def _execute_node(self, state: WorkflowGraphState) -> WorkflowGraphState:
         node = resolve_node_config(self.workflow_config, state["current_node_id"])
-        outcome = await self.runtime_service._execute_node(
+        outcome = await self.runtime_service.execute_node(
             self.db,
             self.workflow,
             self.workflow_config,
@@ -80,7 +84,7 @@ class WorkflowGraphRuntime:
         if not current_node_id or outcome is None:
             raise ConfigurationError("Workflow graph state is missing current node execution result")
         node = resolve_node_config(self.workflow_config, current_node_id)
-        terminated = self.runtime_service._apply_outcome(
+        terminated = self.runtime_service.apply_outcome(
             self.db,
             self.workflow,
             node,

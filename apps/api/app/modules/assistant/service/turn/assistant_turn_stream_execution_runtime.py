@@ -33,7 +33,7 @@ class LangGraphAssistantTurnStreamExecutionRuntime:
         call_turn_llm_stream: Callable[[], AsyncIterator[LLMStreamEvent]],
         finalize_response: Callable[[list[Any], LLMGenerateToolResponse], Awaitable[AssistantTurnResponsePayload]],
         run_prepared_on_error_hooks: Callable[[Exception], Awaitable[Exception | None]],
-        store_terminal_turn: Callable[..., None],
+        store_terminal_turn: Callable[..., Awaitable[None]],
         attach_stream_error_meta: Callable[[Exception, dict[str, Any]], None],
     ) -> None:
         self.replayed_response = replayed_response
@@ -59,7 +59,7 @@ class LangGraphAssistantTurnStreamExecutionRuntime:
                 yield event
         except Exception as exc:
             hook_error = await self.run_prepared_on_error_hooks(exc)
-            self.store_terminal_turn(error=hook_error or exc)
+            await self.store_terminal_turn(error=hook_error or exc)
             stream_error = hook_error or exc
             self.attach_stream_error_meta(
                 stream_error,
@@ -163,7 +163,7 @@ class LangGraphAssistantTurnStreamExecutionRuntime:
         state: AssistantTurnStreamExecutionGraphState,
     ) -> AssistantTurnStreamExecutionGraphState:
         response = self._require_response(state.get("response"))
-        self.store_terminal_turn(response=response)
+        await self.store_terminal_turn(response=response)
         self._emit_completed_event(response)
         return {"response": response}
 

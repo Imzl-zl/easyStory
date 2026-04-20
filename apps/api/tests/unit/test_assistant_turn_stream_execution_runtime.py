@@ -38,7 +38,7 @@ async def test_assistant_turn_stream_execution_runtime_replays_completed_respons
         run_prepared_on_error_hooks=lambda error: (_ for _ in ()).throw(
             AssertionError("error hooks should not run")
         ),
-        store_terminal_turn=lambda **kwargs: (_ for _ in ()).throw(
+        store_terminal_turn=lambda **kwargs: _fail_async(
             AssertionError("store should not run for replayed completion")
         ),
         attach_stream_error_meta=lambda error, payload: (_ for _ in ()).throw(
@@ -80,7 +80,7 @@ async def test_assistant_turn_stream_execution_runtime_streams_chunks_and_comple
         call_log.append(("finalize", before_results, raw_output))
         return _FakeResponse("final")
 
-    def store_terminal_turn(**kwargs):
+    async def store_terminal_turn(**kwargs):
         call_log.append(("store", kwargs))
 
     runtime = LangGraphAssistantTurnStreamExecutionRuntime(
@@ -137,7 +137,7 @@ async def test_assistant_turn_stream_execution_runtime_attaches_error_meta_on_fi
         call_log.append(("error_hook", error))
         return None
 
-    def store_terminal_turn(**kwargs):
+    async def store_terminal_turn(**kwargs):
         call_log.append(("store", kwargs))
 
     def attach_stream_error_meta(error: Exception, payload: dict[str, object]):
@@ -172,6 +172,10 @@ async def test_assistant_turn_stream_execution_runtime_attaches_error_meta_on_fi
 
 async def _return_async(value):
     return value
+
+
+async def _fail_async(error: Exception):
+    raise error
 
 
 async def _empty_llm_stream():
