@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import Field, model_validator
 
-from app.shared.runtime.llm.llm_protocol import GeminiThinkingLevel, OpenAIReasoningEffort
+from app.shared.runtime.llm.llm_protocol_types import GeminiThinkingLevel, OpenAIReasoningEffort
 from app.shared.runtime.llm.llm_reasoning_validation import build_provider_native_reasoning_error
 
 from .base_schema import StrictSchema

@@ -4,7 +4,7 @@ import { formatEngineDateTime } from "./engine-datetime-format";
 const NUMBER_FORMATTER = new Intl.NumberFormat("zh-CN");
 
 const SECTION_LABELS: Record<string, string> = {
-  project_setting: "项目设定",
+  project_setting: "项目摘要",
   outline: "大纲",
   opening_plan: "开篇设计",
   chapter_task: "章节任务",

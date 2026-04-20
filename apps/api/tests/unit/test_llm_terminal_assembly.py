@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from app.shared.runtime.llm.llm_protocol import NormalizedLLMResponse, parse_generation_response
+from app.shared.runtime.llm.llm_protocol_responses import parse_generation_response
+from app.shared.runtime.llm.llm_protocol_types import NormalizedLLMResponse
 from app.shared.runtime.llm.llm_terminal_assembly import build_stream_completion
 
 

@@ -12,11 +12,17 @@ from app.modules.context.engine import ContextBuilder
 from app.modules.credential.service import CredentialService
 from app.modules.export.service import ExportService
 from app.modules.workflow.models import WorkflowExecution
-from app.shared.runtime import PluginRegistry, SkillTemplateRenderer, ToolProvider
+from app.shared.runtime.plugins.plugin_registry import PluginRegistry
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
+from app.shared.runtime.tool_provider import ToolProvider
 from app.shared.runtime.errors import ConfigurationError
 
 from .workflow_hook_providers import build_workflow_plugin_registry
-from .snapshot_support import build_runtime_snapshot, load_workflow_snapshot, resolve_node_config
+from .workflow_hook_agent_runtime import LangGraphWorkflowHookAgentRuntime
+from .workflow_node_execution_runtime import LangGraphWorkflowNodeExecutionRuntime
+from .workflow_outcome_runtime import LangGraphWorkflowOutcomeRuntime
+from .snapshot_support import load_workflow_snapshot
+from .workflow_graph_runtime import WorkflowGraphRuntime
 from .workflow_runtime_chapter_candidate_mixin import WorkflowRuntimeChapterCandidateMixin
 from .workflow_runtime_execute_mixin import WorkflowRuntimeExecuteMixin
 from .workflow_runtime_export_mixin import WorkflowRuntimeExportMixin
@@ -64,6 +70,11 @@ class WorkflowRuntimeService(
         self.template_renderer = template_renderer
         self.tool_provider = tool_provider
         self.plugin_registry = plugin_registry or build_workflow_plugin_registry(self)
+        self.workflow_hook_agent_runtime = LangGraphWorkflowHookAgentRuntime(
+            template_renderer=self.template_renderer,
+            llm_caller=self._call_llm,
+            parse_json=self._parse_json,
+        )
         self._credential_service: CredentialService | None = None
 
     async def run(
@@ -74,12 +85,14 @@ class WorkflowRuntimeService(
         owner_id: uuid.UUID,
     ) -> WorkflowExecution:
         workflow_config = load_workflow_snapshot(workflow.workflow_snapshot or {})
-        while workflow.status == "running":
-            node = resolve_node_config(workflow_config, workflow.current_node_id)
-            outcome = await self._execute_node(db, workflow, workflow_config, node, owner_id=owner_id)
-            if self._apply_outcome(db, workflow, node, outcome):
-                break
-        return workflow
+        graph_runtime = WorkflowGraphRuntime(
+            self,
+            db=db,
+            workflow=workflow,
+            workflow_config=workflow_config,
+            owner_id=owner_id,
+        )
+        return await graph_runtime.run()
 
     async def _execute_node(
         self,
@@ -90,82 +103,73 @@ class WorkflowRuntimeService(
         *,
         owner_id: uuid.UUID,
     ) -> NodeOutcome:
-        before_context = self._build_hook_context(
-            db,
-            workflow,
-            workflow_config,
-            node,
-            "before_node_start",
-            owner_id=owner_id,
-            payload=self._base_hook_payload(workflow, workflow_config, node, "before_node_start"),
-        )
-        try:
-            await self._run_hook_event(before_context)
-        except Exception as exc:
-            await self._run_on_error_hooks(
-                self._build_hook_context(
+        runtime = LangGraphWorkflowNodeExecutionRuntime(
+            run_before_hook=lambda: self._run_hook_event(
+                self._build_node_event_context(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    "before_node_start",
+                    owner_id=owner_id,
+                )
+            ),
+            run_before_on_error=lambda error: self._run_on_error_hooks(
+                self._build_node_event_context(
                     db,
                     workflow,
                     workflow_config,
                     node,
                     "on_error",
                     owner_id=owner_id,
-                    payload=self._base_hook_payload(workflow, workflow_config, node, "on_error"),
                 ),
-                exc,
-            )
-            raise
-        return await self._execute_node_body(db, workflow, workflow_config, node, owner_id=owner_id)
-
-    async def _execute_node_body(
-        self,
-        db: AsyncSession,
-        workflow: WorkflowExecution,
-        workflow_config: WorkflowConfig,
-        node: NodeConfig,
-        *,
-        owner_id: uuid.UUID,
-    ) -> NodeOutcome:
-        try:
-            outcome = await self._dispatch_node(db, workflow, workflow_config, node, owner_id=owner_id)
-        except Exception as exc:
-            await self._run_on_error_hooks(
-                self._build_hook_context(
-                    db,
-                    workflow,
-                    workflow_config,
-                    node,
-                    "on_error",
-                    owner_id=owner_id,
-                    payload=self._base_hook_payload(workflow, workflow_config, node, "on_error"),
-                ),
-                exc,
-            )
-            raise
-        after_payload = self._after_node_payload(outcome)
-        after_context = self._build_hook_context(
-            db,
-            workflow,
-            workflow_config,
-            node,
-            "after_node_end",
-            owner_id=owner_id,
-            payload=self._base_hook_payload(
+                error,
+            ),
+            dispatch_node=lambda: self._dispatch_node(
+                db,
                 workflow,
                 workflow_config,
                 node,
-                "after_node_end",
-                node_execution_id=outcome.node_execution_id,
-                extra=after_payload,
+                owner_id=owner_id,
             ),
-            node_execution_id=outcome.node_execution_id,
+            run_dispatch_on_error=lambda error: self._run_on_error_hooks(
+                self._build_node_event_context(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    "on_error",
+                    owner_id=owner_id,
+                ),
+                error,
+            ),
+            run_after_hook=lambda outcome: self._run_hook_event(
+                self._build_node_event_context(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    "after_node_end",
+                    owner_id=owner_id,
+                    node_execution_id=outcome.node_execution_id,
+                    extra=self._after_node_payload(outcome),
+                )
+            ),
+            run_after_on_error=lambda outcome, error: self._run_on_error_hooks(
+                self._build_node_event_context(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    "after_node_end",
+                    owner_id=owner_id,
+                    node_execution_id=outcome.node_execution_id,
+                    extra=self._after_node_payload(outcome),
+                ),
+                error,
+            ),
         )
-        try:
-            await self._run_hook_event(after_context)
-        except Exception as exc:
-            await self._run_on_error_hooks(after_context, exc)
-            raise
-        return outcome
+        return await runtime.run()
 
     async def _dispatch_node(
         self,
@@ -206,6 +210,36 @@ class WorkflowRuntimeService(
             payload.update(outcome.hook_payload)
         return payload
 
+    def _build_node_event_context(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        event: str,
+        *,
+        owner_id: uuid.UUID,
+        node_execution_id: uuid.UUID | None = None,
+        extra: dict[str, object] | None = None,
+    ):
+        return self._build_hook_context(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            event,
+            owner_id=owner_id,
+            payload=self._base_hook_payload(
+                workflow,
+                workflow_config,
+                node,
+                event,
+                node_execution_id=node_execution_id,
+                extra=extra,
+            ),
+            node_execution_id=node_execution_id,
+        )
+
     def _apply_outcome(
         self,
         db: AsyncSession,
@@ -213,53 +247,15 @@ class WorkflowRuntimeService(
         node: NodeConfig,
         outcome: NodeOutcome,
     ) -> bool:
-        if outcome.workflow_status == "failed":
-            self.workflow_service.fail(
-                workflow,
-                current_node_id=outcome.next_node_id or node.id,
-            )
-            workflow.snapshot = build_runtime_snapshot(workflow, extra=outcome.snapshot_extra)
-            self._record_execution_log(
-                db,
-                workflow_execution_id=workflow.id,
-                node_execution_id=None,
-                level="ERROR",
-                message="Workflow failed",
-                details={"node_id": node.id},
-            )
-            return True
-        if outcome.pause_reason is not None or outcome.snapshot_extra is not None:
-            self.workflow_service.pause(
-                workflow,
-                reason=outcome.pause_reason,
-                current_node_id=node.id,
-                resume_from_node=outcome.next_node_id,
-            )
-            workflow.snapshot = build_runtime_snapshot(workflow, extra=outcome.snapshot_extra)
-            self._record_execution_log(
-                db,
-                workflow_execution_id=workflow.id,
-                node_execution_id=None,
-                level="WARNING" if outcome.pause_reason else "INFO",
-                message="Workflow paused",
-                details={"node_id": node.id, "reason": outcome.pause_reason},
-            )
-            return True
-        if outcome.next_node_id is None:
-            self.workflow_service.complete(workflow, current_node_id=node.id)
-            workflow.snapshot = None
-            self._record_execution_log(
-                db,
-                workflow_execution_id=workflow.id,
-                node_execution_id=None,
-                level="INFO",
-                message="Workflow completed",
-                details={"node_id": node.id},
-            )
-            return True
-        workflow.current_node_id = outcome.next_node_id
-        workflow.snapshot = None
-        return False
+        runtime = LangGraphWorkflowOutcomeRuntime(
+            workflow_service=self.workflow_service,
+            record_execution_log=self._record_execution_log,
+            db=db,
+            workflow=workflow,
+            node=node,
+            outcome=outcome,
+        )
+        return runtime.run()
 
     def _resolve_credential_service(self) -> CredentialService:
         if self._credential_service is None:

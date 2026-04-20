@@ -27,7 +27,7 @@ from app.modules.assistant.service.skills.assistant_skill_file_store import (
 )
 from app.modules.config_registry import ConfigLoader
 from app.modules.project.service import create_project_service
-from app.shared.runtime import SkillTemplateRenderer
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from tests.unit.async_api_support import build_sqlite_session_factories, cleanup_sqlite_session_factories
 from tests.unit.models.helpers import create_project, create_user
@@ -83,10 +83,10 @@ async def test_assistant_service_runs_user_skill(tmp_path) -> None:
                 ),
                 owner_id=owner.id,
             )
-            await service.assistant_preferences_service.update_preferences(
+            await service.assistant_preferences_service.update_user_preferences(
                 session,
-                owner.id,
-                AssistantPreferencesUpdateDTO(
+                owner_id=owner.id,
+                payload=AssistantPreferencesUpdateDTO(
                     default_provider="openai",
                     default_model_name="gpt-4o-mini",
                 ),
@@ -191,6 +191,44 @@ async def test_assistant_skill_service_creates_lists_and_resolves_project_skill(
         assert created.id.startswith("skill.project.")
         assert listed[0].id == created.id
         assert "项目口径" in resolved.prompt
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_skill_service_allows_explicit_override_id_for_project_scope(tmp_path) -> None:
+    loader = ConfigLoader(_build_config_root(tmp_path))
+    skill_service = AssistantSkillService(
+        config_loader=loader,
+        project_service=create_project_service(),
+        skill_store=AssistantSkillFileStore(tmp_path / "assistant-config"),
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-project-skill-override")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+        async with async_session_factory() as session:
+            created = await skill_service.create_project_skill(
+                session,
+                project.id,
+                AssistantSkillCreateDTO(
+                    id="skill.assistant.general_chat",
+                    name="项目聊天覆盖",
+                    content="项目层先给一句方向判断，再继续展开。\n用户输入：{{ user_input }}",
+                ),
+                owner_id=owner.id,
+            )
+            resolved = skill_service.resolve_skill(
+                "skill.assistant.general_chat",
+                owner_id=owner.id,
+                project_id=project.id,
+            )
+
+        assert created.id == "skill.assistant.general_chat"
+        assert resolved.name == "项目聊天覆盖"
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 

@@ -6,7 +6,8 @@ from app.main import create_app
 from app.modules.context.engine.context_builder import ContextBuilder
 from app.modules.review.engine.review_executor import ReviewExecutor
 from app.modules.workflow.engine.workflow_engine import WorkflowEngine
-from app.modules.workflow.service import WorkflowService, create_workflow_service
+from app.modules.workflow.service.factory import create_workflow_service
+from app.modules.workflow.service.workflow_service import WorkflowService
 from app.modules.workflow.engine import InvalidTransitionError
 from tests.unit.models.helpers import create_workflow
 

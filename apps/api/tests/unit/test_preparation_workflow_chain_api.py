@@ -86,8 +86,11 @@ async def test_preparation_chain_generate_approve_then_start_workflow(
 
     try:
         async with started_async_client(app) as client:
-            check_response = await _complete_project_setting(client, project_id, headers)
-            assert check_response["status"] == "ready"
+            status_response = await _complete_project_setting(client, project_id, headers)
+            assert status_response["outline"]["step_status"] == "not_started"
+            assert status_response["opening_plan"]["step_status"] == "not_started"
+            assert status_response["can_start_workflow"] is False
+            assert status_response["next_step"] == "outline"
 
             await _generate_and_approve_outline(client, project_id, headers)
 
@@ -155,12 +158,12 @@ async def _complete_project_setting(client, project_id: str, headers: dict[str, 
         headers=headers,
     )
     assert setting_response.status_code == 200
-    check_response = await client.post(
-        f"/api/v1/projects/{project_id}/setting/complete-check",
+    status_response = await client.get(
+        f"/api/v1/projects/{project_id}/preparation/status",
         headers=headers,
     )
-    assert check_response.status_code == 200
-    return check_response.json()
+    assert status_response.status_code == 200
+    return status_response.json()
 
 
 async def _generate_and_approve_outline(client, project_id: str, headers: dict[str, str]) -> None:

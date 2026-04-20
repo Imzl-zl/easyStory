@@ -13,9 +13,9 @@ from app.modules.project.service import (
     ProjectIncubatorDraftRequestDTO,
     create_project_incubator_service,
 )
-from app.shared.runtime.llm.llm_protocol import HttpJsonResponse
+from app.shared.runtime.llm.llm_protocol_types import HttpJsonResponse
 from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
-from app.shared.runtime import ToolProvider
+from app.shared.runtime.tool_provider import ToolProvider
 from app.modules.template.models import Template
 from app.modules.template.service import (
     create_builtin_template_sync_service,

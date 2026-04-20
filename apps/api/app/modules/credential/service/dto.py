@@ -9,10 +9,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     ConformanceProbeKind,
 )
-from app.shared.runtime.llm.llm_protocol import (
+from app.shared.runtime.llm.llm_interop_profiles import LlmInteropProfile
+from app.shared.runtime.llm.llm_protocol_types import (
     LlmApiDialect,
     LlmAuthStrategy,
-    LlmInteropProfile,
     LlmRuntimeKind,
 )
 

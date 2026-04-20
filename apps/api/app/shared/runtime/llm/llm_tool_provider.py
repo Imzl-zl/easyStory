@@ -8,7 +8,8 @@ from ..errors import ConfigurationError
 from ..tool_provider import ToolProvider
 from .llm_backend import AsyncLLMGenerateBackend, resolve_backend_selection
 from .llm_interop_profiles import normalize_interop_profile
-from .llm_protocol import (
+from .llm_interop_profiles import resolve_connection_continuation_support
+from .llm_protocol_types import (
     GeminiThinkingLevel,
     LLMConnection,
     LLMContinuationSupport,
@@ -20,7 +21,6 @@ from .llm_protocol import (
     normalize_api_dialect,
     normalize_auth_strategy,
     normalize_runtime_kind,
-    resolve_connection_continuation_support,
     resolve_model_name,
 )
 from .llm_response_validation import raise_if_empty_tool_response

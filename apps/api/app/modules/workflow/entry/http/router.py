@@ -10,21 +10,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
-from app.modules.workflow.service import (
+from app.modules.workflow.service.chapter_task_dto import (
     ChapterTaskBatchDTO,
-    ChapterTaskService,
     ChapterTaskRegenerateDTO,
     ChapterTaskUpdateDTO,
     ChapterTaskViewDTO,
-    WorkflowAppService,
+)
+from app.modules.workflow.service.chapter_task_service import ChapterTaskService
+from app.modules.workflow.service.dto import (
     WorkflowExecutionDTO,
     WorkflowExecutionStatus,
     WorkflowExecutionSummaryDTO,
     WorkflowPauseDTO,
     WorkflowStartDTO,
-    create_chapter_task_service,
-    create_workflow_app_service,
 )
+from app.modules.workflow.service.factory import create_chapter_task_service, create_workflow_app_service
+from app.modules.workflow.service.workflow_app_service import WorkflowAppService
 from app.shared.db import AsyncSessionFactory, get_async_db_session, get_async_session_factory
 
 router = APIRouter(tags=["workflow"])

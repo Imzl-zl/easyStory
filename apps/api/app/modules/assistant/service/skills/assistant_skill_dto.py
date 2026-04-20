@@ -40,7 +40,7 @@ class AssistantSkillDetailDTO(AssistantSkillSummaryDTO):
     default_max_output_tokens: int | None = None
 
 
-class AssistantSkillCreateDTO(BaseModel):
+class _AssistantSkillPayloadDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = True
@@ -57,7 +57,11 @@ class AssistantSkillCreateDTO(BaseModel):
         return normalize_assistant_skill_name(value)
 
 
-class AssistantSkillUpdateDTO(AssistantSkillCreateDTO):
+class AssistantSkillCreateDTO(_AssistantSkillPayloadDTO):
+    id: str | None = None
+
+
+class AssistantSkillUpdateDTO(_AssistantSkillPayloadDTO):
     pass
 
 

@@ -59,9 +59,11 @@ class AssistantSkillFileStore:
         *,
         reserved_ids: set[str],
     ) -> AssistantSkillDetailDTO:
+        existing_ids = self._list_existing_ids(self._user_skills_root(user_id))
         detail = create_user_skill_detail(
             payload,
-            existing_ids=reserved_ids | self._list_existing_ids(self._user_skills_root(user_id)),
+            reserved_ids=reserved_ids,
+            existing_ids=existing_ids,
         )
         self._write_skill(build_user_skill_path(self.root, user_id, detail.id), detail)
         return self.load_user_skill(user_id, detail.id)
@@ -73,9 +75,11 @@ class AssistantSkillFileStore:
         *,
         reserved_ids: set[str],
     ) -> AssistantSkillDetailDTO:
+        existing_ids = self._list_existing_ids(self._project_skills_root(project_id))
         detail = create_project_skill_detail(
             payload,
-            existing_ids=reserved_ids | self._list_existing_ids(self._project_skills_root(project_id)),
+            reserved_ids=reserved_ids,
+            existing_ids=existing_ids,
         )
         self._write_skill(build_project_skill_path(self.root, project_id, detail.id), detail)
         return self.load_project_skill(project_id, detail.id)

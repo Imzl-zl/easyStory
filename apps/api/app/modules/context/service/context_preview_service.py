@@ -19,7 +19,7 @@ from app.modules.workflow.service.snapshot_support import (
     load_workflow_snapshot,
     resolve_node_config,
 )
-from app.shared.runtime import SkillTemplateRenderer
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError, NotFoundError
 
 from .dto import ContextPreviewDTO, ContextPreviewRequestDTO

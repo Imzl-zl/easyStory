@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm.llm_protocol import (
+from app.shared.runtime.llm.llm_protocol_types import (
     LLMContinuationSupport,
     allows_provider_continuation_state,
 )

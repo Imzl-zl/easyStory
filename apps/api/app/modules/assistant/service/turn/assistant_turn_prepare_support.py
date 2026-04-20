@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.config_registry import ConfigLoader
 from app.modules.config_registry.schemas import HookConfig
 from app.modules.project.service import ProjectDocumentCapabilityService, ProjectService
-from app.shared.runtime import SkillTemplateRenderer
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 from app.shared.runtime.errors import ConfigurationError
 
 from ..agents.assistant_agent_service import AssistantAgentService
@@ -27,6 +27,8 @@ from ..context.assistant_prompt_support import (
 from ..assistant_execution_support import resolve_execution_spec
 from ..hooks.assistant_hook_service import AssistantHookService
 from ..assistant_llm_runtime_support import (
+    AssistantLlmTransportMode,
+    ensure_assistant_tool_capability,
     resolve_assistant_output_budget_tokens,
 )
 from ..preferences.preferences_service import AssistantPreferencesService
@@ -37,6 +39,7 @@ from ..skills.assistant_skill_service import AssistantSkillService
 from ..tooling.assistant_tool_loop import AssistantToolLoop
 from ..tooling.assistant_tool_catalog_support import build_tool_catalog_version
 from .assistant_turn_error_support import AssistantConversationStateMismatchError
+from .assistant_turn_preparation_runtime import LangGraphAssistantTurnPreparationRuntime
 from .assistant_turn_run_store import AssistantTurnRunStore
 from .assistant_turn_runtime_support import (
     PreparedAssistantTurn,
@@ -53,6 +56,7 @@ async def prepare_assistant_turn(
     payload: AssistantTurnRequestDTO,
     *,
     owner_id: uuid.UUID,
+    transport_mode: AssistantLlmTransportMode = "buffered",
     resolved_hooks: list[HookConfig] | None,
     config_loader: ConfigLoader,
     template_renderer: SkillTemplateRenderer,
@@ -67,6 +71,73 @@ async def prepare_assistant_turn(
     project_document_capability_service: ProjectDocumentCapabilityService | None,
     resolve_llm_runtime,
 ) -> PreparedAssistantTurn:
+    runtime = LangGraphAssistantTurnPreparationRuntime(
+        resolve_scope_and_normalize=lambda: _resolve_scope_and_normalize_request(
+            db,
+            payload,
+            owner_id=owner_id,
+            project_service=project_service,
+            project_document_capability_service=project_document_capability_service,
+        ),
+        validate_anchor=lambda project_id, normalized_payload: validate_assistant_continuation_anchor(
+            normalized_payload,
+            owner_id=owner_id,
+            project_id=project_id,
+            turn_run_store=turn_run_store,
+        ),
+        resolve_spec_and_rules=lambda project_id, normalized_payload: _resolve_spec_and_rules(
+            db,
+            config_loader=config_loader,
+            assistant_preferences_service=assistant_preferences_service,
+            assistant_rule_service=assistant_rule_service,
+            assistant_agent_service=assistant_agent_service,
+            assistant_skill_service=assistant_skill_service,
+            owner_id=owner_id,
+            project_id=project_id,
+            normalized_payload=normalized_payload,
+        ),
+        build_provisional_context=lambda project_id, normalized_turn_payload, normalized_payload, spec, rule_bundle: _build_provisional_context(
+            owner_id=owner_id,
+            project_id=project_id,
+            normalized_turn_payload=normalized_turn_payload,
+            normalized_payload=normalized_payload,
+            spec=spec,
+            rule_bundle=rule_bundle,
+        ),
+        resolve_runtime_and_projection=lambda project_id, normalized_turn_payload, normalized_payload, spec, rule_bundle, system_prompt, provisional_turn_context, document_context_recovery_snapshot, document_context_injection_snapshot: _resolve_runtime_and_projection(
+            db,
+            template_renderer=template_renderer,
+            assistant_tool_loop=assistant_tool_loop,
+            resolve_llm_runtime=resolve_llm_runtime,
+            owner_id=owner_id,
+            transport_mode=transport_mode,
+            project_id=project_id,
+            normalized_turn_payload=normalized_turn_payload,
+            normalized_payload=normalized_payload,
+            spec=spec,
+            system_prompt=system_prompt,
+            provisional_turn_context=provisional_turn_context,
+            document_context_recovery_snapshot=document_context_recovery_snapshot,
+            document_context_injection_snapshot=document_context_injection_snapshot,
+        ),
+        build_prepared_turn=lambda state: _build_prepared_turn(
+            state,
+            owner_id=owner_id,
+            assistant_hook_service=assistant_hook_service,
+            resolved_hooks=resolved_hooks,
+        ),
+    )
+    return await runtime.run()
+
+
+async def _resolve_scope_and_normalize_request(
+    db: AsyncSession,
+    payload: AssistantTurnRequestDTO,
+    *,
+    owner_id: uuid.UUID,
+    project_service: ProjectService,
+    project_document_capability_service: ProjectDocumentCapabilityService | None,
+) -> tuple[uuid.UUID | None, NormalizedAssistantTurnPayload, AssistantTurnRequestDTO]:
     project_id = await resolve_assistant_project_scope(
         db,
         project_id=payload.project_id,
@@ -80,13 +151,21 @@ async def prepare_assistant_turn(
         project_id=project_id,
         project_document_capability_service=project_document_capability_service,
     )
-    normalized_payload = normalized_turn_payload.payload
-    validate_assistant_continuation_anchor(
-        normalized_payload,
-        owner_id=owner_id,
-        project_id=project_id,
-        turn_run_store=turn_run_store,
-    )
+    return project_id, normalized_turn_payload, normalized_turn_payload.payload
+
+
+async def _resolve_spec_and_rules(
+    db: AsyncSession,
+    *,
+    config_loader: ConfigLoader,
+    assistant_preferences_service: AssistantPreferencesService,
+    assistant_rule_service: AssistantRuleService,
+    assistant_agent_service: AssistantAgentService,
+    assistant_skill_service: AssistantSkillService,
+    owner_id: uuid.UUID,
+    project_id: uuid.UUID | None,
+    normalized_payload: AssistantTurnRequestDTO,
+) -> tuple[Any, Any, str | None]:
     preferences = await assistant_preferences_service.resolve_preferences(
         db,
         owner_id=owner_id,
@@ -117,6 +196,18 @@ async def prepare_assistant_turn(
         user_content=rule_bundle.user_content,
         project_content=rule_bundle.project_content,
     )
+    return spec, rule_bundle, system_prompt
+
+
+def _build_provisional_context(
+    *,
+    owner_id: uuid.UUID,
+    project_id: uuid.UUID | None,
+    normalized_turn_payload: NormalizedAssistantTurnPayload,
+    normalized_payload: AssistantTurnRequestDTO,
+    spec,
+    rule_bundle,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, Any]:
     document_context_recovery_snapshot = build_document_context_recovery_snapshot(
         document_context=(
             normalized_payload.document_context.model_dump(mode="json")
@@ -146,16 +237,45 @@ async def prepare_assistant_turn(
         user_rule_content=rule_bundle.user_content,
         project_rule_content=rule_bundle.project_content,
     )
-    tool_policy_decisions, visible_tool_descriptors, run_budget = resolve_assistant_tool_policy_bundle(
-        assistant_tool_loop=assistant_tool_loop,
-        turn_context=provisional_turn_context,
-        project_id=project_id,
+    return (
+        document_context_recovery_snapshot,
+        document_context_injection_snapshot,
+        provisional_turn_context,
     )
+
+
+async def _resolve_runtime_and_projection(
+    db: AsyncSession,
+    *,
+    template_renderer: SkillTemplateRenderer,
+    assistant_tool_loop: AssistantToolLoop | None,
+    resolve_llm_runtime,
+    owner_id: uuid.UUID,
+    transport_mode: AssistantLlmTransportMode,
+    project_id: uuid.UUID | None,
+    normalized_turn_payload: NormalizedAssistantTurnPayload,
+    normalized_payload: AssistantTurnRequestDTO,
+    spec,
+    system_prompt: str | None,
+    provisional_turn_context,
+    document_context_recovery_snapshot: dict[str, Any] | None,
+    document_context_injection_snapshot: dict[str, Any] | None,
+) -> tuple[Any, Any, Any, Any, dict[str, Any] | None, Any, str | None]:
     resolved_llm_runtime = await resolve_llm_runtime(
         db,
         model=spec.model,
         owner_id=owner_id,
         project_id=project_id,
+    )
+    tool_policy_decisions, visible_tool_descriptors, run_budget = resolve_assistant_tool_policy_bundle(
+        assistant_tool_loop=assistant_tool_loop,
+        turn_context=provisional_turn_context,
+        project_id=project_id,
+    )
+    ensure_assistant_tool_capability(
+        resolved_llm_runtime,
+        visible_tool_names=tuple(item.name for item in visible_tool_descriptors),
+        transport_mode=transport_mode,
     )
     tool_schemas = resolve_assistant_tool_schemas(
         assistant_tool_loop=assistant_tool_loop,
@@ -206,17 +326,46 @@ async def prepare_assistant_turn(
         assistant_tool_loop=assistant_tool_loop,
         visible_tool_descriptors=visible_tool_descriptors,
     )
+    return (
+        tool_policy_decisions,
+        visible_tool_descriptors,
+        run_budget,
+        resolved_llm_runtime,
+        tool_guidance_snapshot,
+        prompt_projection,
+        tool_catalog_version,
+    )
+
+
+def _build_prepared_turn(
+    state: dict[str, Any],
+    *,
+    owner_id: uuid.UUID,
+    assistant_hook_service: AssistantHookService,
+    resolved_hooks: list[HookConfig] | None,
+) -> PreparedAssistantTurn:
+    project_id = state["project_id"]
+    normalized_turn_payload = state["normalized_turn_payload"]
+    normalized_payload = state["normalized_payload"]
+    spec = state["spec"]
+    rule_bundle = state["rule_bundle"]
+    visible_tool_descriptors = state["visible_tool_descriptors"]
+    run_budget = state["run_budget"]
+    resolved_llm_runtime = state["resolved_llm_runtime"]
+    tool_policy_decisions = state["tool_policy_decisions"]
+    tool_guidance_snapshot = state["tool_guidance_snapshot"]
+    prompt_projection = state["prompt_projection"]
     turn_context = build_turn_context(
         spec,
         normalized_payload,
         compaction_snapshot=prompt_projection.compaction_snapshot,
-        document_context_recovery_snapshot=document_context_recovery_snapshot,
-        document_context_injection_snapshot=document_context_injection_snapshot,
+        document_context_recovery_snapshot=state["document_context_recovery_snapshot"],
+        document_context_injection_snapshot=state["document_context_injection_snapshot"],
         document_context_bindings=normalized_turn_payload.document_context_bindings,
         tool_guidance_snapshot=tool_guidance_snapshot,
         owner_id=owner_id,
         project_id=project_id,
-        tool_catalog_version=tool_catalog_version,
+        tool_catalog_version=state["tool_catalog_version"],
         user_rule_content=rule_bundle.user_content,
         project_rule_content=rule_bundle.project_content,
     )
@@ -242,7 +391,7 @@ async def prepare_assistant_turn(
         run_budget=run_budget,
         resolved_llm_runtime=resolved_llm_runtime,
         spec=spec,
-        system_prompt=system_prompt,
+        system_prompt=state["system_prompt"],
         turn_context=turn_context,
         run_snapshot=freeze_turn_run_snapshot(
             turn_context,

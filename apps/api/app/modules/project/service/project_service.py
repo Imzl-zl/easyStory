@@ -29,7 +29,6 @@ from .dto import (
     ProjectPreparationStatusDTO,
     ProjectSettingSnapshotDTO,
     ProjectSettingUpdateDTO,
-    SettingCompletenessResultDTO,
 )
 from .project_document_support import (
     OPENING_PLAN_DOCUMENT_PATH,
@@ -56,8 +55,6 @@ from .project_service_support import (
     build_project_statement,
     count_chapter_tasks,
     current_version,
-    ensure_setting_allows_preparation,
-    evaluate_setting,
     mark_related_content_stale,
     resolve_asset_step_status,
     resolve_chapter_task_step_status,
@@ -244,7 +241,6 @@ class ProjectService:
                 raise BusinessRuleError("正文下只能新建章节文稿，其他区域只能新建自定义 .md 或 .json 文稿")
             chapter_number = parse_chapter_number_from_document_path(payload.path)
             if chapter_number is not None:
-                self.ensure_setting_allows_preparation(project)
                 await self._require_chapter_preparation_assets_ready(db, project.id)
                 record = await self._create_project_chapter_document_entry(
                     db,
@@ -608,19 +604,6 @@ class ProjectService:
             template_version=PROJECT_DOCUMENT_TEMPLATE_VERSION,
         )
 
-    async def check_setting_completeness(
-        self,
-        db: AsyncSession,
-        project_id: uuid.UUID,
-        *,
-        owner_id: uuid.UUID | None = None,
-    ) -> SettingCompletenessResultDTO:
-        project = await self.require_project(db, project_id, owner_id=owner_id)
-        return evaluate_setting(project)
-
-    def ensure_setting_allows_preparation(self, project: Project) -> SettingCompletenessResultDTO:
-        return ensure_setting_allows_preparation(project)
-
     async def get_preparation_status(
         self,
         db: AsyncSession,
@@ -629,7 +612,6 @@ class ProjectService:
         owner_id: uuid.UUID | None = None,
     ) -> ProjectPreparationStatusDTO:
         project = await self.require_project(db, project_id, owner_id=owner_id)
-        setting = evaluate_setting(project)
         outline = await self._get_asset_status(db, project.id, "outline")
         opening_plan = await self._get_asset_status(db, project.id, "opening_plan")
         active_workflow = await self._find_active_workflow(db, project.id)
@@ -638,9 +620,8 @@ class ProjectService:
             db,
             relevant_workflow.id if relevant_workflow is not None else None,
         )
-        can_start_workflow = self._can_start_workflow(setting, outline, opening_plan, active_workflow)
+        can_start_workflow = self._can_start_workflow(outline, opening_plan, active_workflow)
         next_step, next_step_detail = self._resolve_next_step(
-            setting,
             outline,
             opening_plan,
             chapter_tasks,
@@ -648,7 +629,6 @@ class ProjectService:
         )
         return ProjectPreparationStatusDTO(
             project_id=project.id,
-            setting=setting,
             outline=outline,
             opening_plan=opening_plan,
             chapter_tasks=chapter_tasks,
@@ -849,12 +829,10 @@ class ProjectService:
 
     def _can_start_workflow(
         self,
-        setting: SettingCompletenessResultDTO,
         outline: PreparationAssetStatusDTO,
         opening_plan: PreparationAssetStatusDTO,
         active_workflow: WorkflowExecution | None,
     ) -> bool:
-        del setting
         return (
             outline.step_status == "approved"
             and opening_plan.step_status == "approved"
@@ -863,7 +841,6 @@ class ProjectService:
 
     def _resolve_next_step(
         self,
-        setting: SettingCompletenessResultDTO,
         outline: PreparationAssetStatusDTO,
         opening_plan: PreparationAssetStatusDTO,
         chapter_tasks: PreparationChapterTaskStatusDTO,
@@ -879,6 +856,4 @@ class ProjectService:
             return "workflow", "当前已有活跃工作流，可继续推进章节任务或正文生成"
         if chapter_tasks.step_status == "completed":
             return "chapter", "章节计划已就绪，可继续推进正文生成与确认"
-        if setting.issues:
-            return "workflow", "结构化摘要还有可补充项，但这不会阻塞继续生成大纲、开篇或正文。"
         return "workflow", "前置资产已就绪，可以启动工作流"

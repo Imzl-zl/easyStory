@@ -280,6 +280,30 @@ def test_project_continuation_to_openai_chat_messages_strips_internal_tool_resul
     assert payload["tool_name"] == "project_read_documents"
 
 
+def test_project_continuation_to_openai_chat_messages_preserves_reasoning_content_for_tool_call() -> None:
+    messages = project_continuation_to_openai_chat_messages(
+        [
+            {
+                "item_type": "tool_call",
+                "call_id": "call_123",
+                "payload": {
+                    "tool_name": "project.read_documents",
+                    "arguments": {"paths": ["设定/人物.md"]},
+                    "tool_call_id": "call_123",
+                    "provider_payload": {
+                        "reasoning_content": "先分析一下再读取文稿。",
+                    },
+                },
+            }
+        ],
+        tool_name_aliases={"project.read_documents": "project_read_documents"},
+        tool_name_policy="safe_ascii_only",
+    )
+
+    assert messages[0]["reasoning_content"] == "先分析一下再读取文稿。"
+    assert messages[0]["tool_calls"][0]["function"]["name"] == "project_read_documents"
+
+
 def test_project_continuation_to_anthropic_messages_strips_internal_tool_result_metadata() -> None:
     messages = project_continuation_to_anthropic_messages(
         [

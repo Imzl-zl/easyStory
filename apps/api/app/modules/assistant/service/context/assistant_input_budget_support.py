@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.shared.runtime.llm.llm_protocol import LLMContinuationSupport
+from app.shared.runtime.llm.llm_protocol_types import LLMContinuationSupport
 from app.shared.runtime.token_counter import TokenCounter
 
 DEFAULT_TOKEN_MODEL = "default"

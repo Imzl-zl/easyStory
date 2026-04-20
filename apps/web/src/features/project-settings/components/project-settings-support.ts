@@ -1,7 +1,7 @@
-export type ProjectSettingsTab = "setting" | "rules" | "assistant" | "skills" | "mcp" | "audit";
+export type ProjectSettingsTab = "brief" | "rules" | "assistant" | "skills" | "mcp" | "audit";
 
 const PROJECT_SETTINGS_TABS: ProjectSettingsTab[] = [
-  "setting",
+  "brief",
   "rules",
   "assistant",
   "skills",
@@ -12,7 +12,7 @@ const PROJECT_SETTINGS_TABS: ProjectSettingsTab[] = [
 export function resolveProjectSettingsTab(value: string | null): ProjectSettingsTab {
   return PROJECT_SETTINGS_TABS.includes(value as ProjectSettingsTab)
     ? (value as ProjectSettingsTab)
-    : "setting";
+    : "rules";
 }
 
 export function isValidProjectSettingsTab(value: string | null): value is ProjectSettingsTab {

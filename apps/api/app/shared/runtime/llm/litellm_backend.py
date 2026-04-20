@@ -11,7 +11,8 @@ from .interop.provider_interop_stream_support import StreamInterruptedError
 from .llm_backend import LLMBackendStreamEvent, StreamStopChecker
 from .llm_endpoint_policy import normalize_custom_base_url
 from .llm_interop_profiles import resolve_interop_capabilities
-from .llm_protocol import LLMGenerateRequest, NormalizedLLMResponse, parse_generation_response
+from .llm_protocol_responses import parse_generation_response
+from .llm_protocol_types import LLMGenerateRequest, NormalizedLLMResponse
 from .llm_protocol_requests import (
     _build_openai_chat_messages,
     _compile_tool_parameters,

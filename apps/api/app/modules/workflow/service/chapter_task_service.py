@@ -41,7 +41,6 @@ class ChapterTaskService:
         owner_id: uuid.UUID,
     ) -> ChapterTaskBatchDTO:
         project = await self.project_service.require_project(db, project_id, owner_id=owner_id)
-        self.project_service.ensure_setting_allows_preparation(project)
         await self._ensure_preparation_assets_ready(db, project.id)
         workflow = await self._require_active_workflow(db, project.id)
         await self._replace_tasks(db, workflow, payload.chapters)

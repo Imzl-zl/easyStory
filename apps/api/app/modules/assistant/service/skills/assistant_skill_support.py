@@ -10,7 +10,7 @@ import yaml
 
 from app.modules.config_registry.infrastructure.skill_input_validator import validate_input_schema
 from app.modules.config_registry.schemas import ModelConfig, SchemaField, SkillConfig
-from app.shared.runtime import SkillTemplateRenderer
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 
 from ..context.assistant_prompt_support import (
@@ -136,22 +136,34 @@ def detail_to_record(
 def create_user_skill_detail(
     payload: AssistantSkillCreateDTO,
     *,
+    reserved_ids: set[str],
     existing_ids: set[str],
 ) -> AssistantSkillDetailDTO:
     return _create_skill_detail(
         payload,
-        skill_id=create_user_skill_id(payload.name, existing_ids=existing_ids),
+        skill_id=_resolve_create_skill_id(
+            payload,
+            reserved_ids=reserved_ids,
+            existing_ids=existing_ids,
+            create_id=lambda name, ids: create_user_skill_id(name, existing_ids=ids),
+        ),
     )
 
 
 def create_project_skill_detail(
     payload: AssistantSkillCreateDTO,
     *,
+    reserved_ids: set[str],
     existing_ids: set[str],
 ) -> AssistantSkillDetailDTO:
     return _create_skill_detail(
         payload,
-        skill_id=create_project_skill_id(payload.name, existing_ids=existing_ids),
+        skill_id=_resolve_create_skill_id(
+            payload,
+            reserved_ids=reserved_ids,
+            existing_ids=existing_ids,
+            create_id=lambda name, ids: create_project_skill_id(name, existing_ids=ids),
+        ),
     )
 
 
@@ -171,6 +183,22 @@ def _create_skill_detail(
         default_max_output_tokens=payload.default_max_output_tokens,
         updated_at=None,
     )
+
+
+def _resolve_create_skill_id(
+    payload: AssistantSkillCreateDTO,
+    *,
+    reserved_ids: set[str],
+    existing_ids: set[str],
+    create_id,
+) -> str:
+    explicit_id = normalize_optional_text(payload.id)
+    if explicit_id is not None:
+        validate_skill_id(explicit_id)
+        if explicit_id in existing_ids:
+            raise BusinessRuleError(f"Skill id 已存在：{explicit_id}")
+        return explicit_id
+    return create_id(payload.name, reserved_ids | existing_ids)
 
 
 def update_skill_detail(

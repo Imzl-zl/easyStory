@@ -196,7 +196,7 @@ function useTemplateCreateMutation({
       ),
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
-      router.push(`/workspace/project/${result.project.id}/studio?panel=setting&doc=${encodeURIComponent("项目说明.md")}`);
+      router.push(`/workspace/project/${result.project.id}/studio?panel=overview&doc=${encodeURIComponent("项目说明.md")}`);
     },
     onError: (error) => setFeedback(buildErrorFeedback(error)),
   });

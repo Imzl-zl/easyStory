@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.content.models import Content, ContentVersion
-from app.modules.context.service import StoryBibleService
+from app.modules.context.service.story_bible_service import StoryBibleService
 from app.modules.project.service import ProjectService
 from app.shared.runtime.errors import BusinessRuleError
 
@@ -81,7 +81,6 @@ class ChapterContentService:
             owner_id=owner_id,
             load_contents=True,
         )
-        self.project_service.ensure_setting_allows_preparation(project)
         await require_preparation_assets_ready(db, project.id, PREPARATION_ASSET_TYPES)
         content = await get_or_create_chapter(db, project, chapter_number, payload.title)
         append_chapter_version(content, payload)
@@ -98,7 +97,6 @@ class ChapterContentService:
         owner_id: uuid.UUID | None = None,
     ) -> ChapterDetailDTO:
         project = await self.project_service.require_project(db, project_id, owner_id=owner_id)
-        self.project_service.ensure_setting_allows_preparation(project)
         await require_preparation_assets_ready(db, project.id, PREPARATION_ASSET_TYPES)
         content = await require_chapter(db, project.id, chapter_number)
         require_current_version(content)
@@ -185,7 +183,6 @@ class ChapterContentService:
             owner_id=owner_id,
             load_contents=True,
         )
-        self.project_service.ensure_setting_allows_preparation(project)
         await require_preparation_assets_ready(db, project.id, PREPARATION_ASSET_TYPES)
         content = await require_chapter(db, project.id, chapter_number)
         source_version = require_version(content, version_number)
@@ -258,7 +255,6 @@ class ChapterContentService:
             project_id,
             load_contents=True,
         )
-        self.project_service.ensure_setting_allows_preparation(project)
         await require_preparation_assets_ready(db, project.id, PREPARATION_ASSET_TYPES)
         content = await get_or_create_chapter(db, project, chapter_number, title)
         append_chapter_version(

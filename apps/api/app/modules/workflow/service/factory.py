@@ -10,7 +10,8 @@ from app.modules.credential.service import create_credential_service
 from app.modules.export.service import create_export_service
 from app.modules.project.service import ProjectService, create_project_service
 from app.modules.workflow.engine import WorkflowEngine
-from app.shared.runtime import LLMToolProvider, SkillTemplateRenderer
+from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 
 from .chapter_task_service import ChapterTaskService
 from .workflow_app_service import WorkflowAppService

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 from typing import Protocol
 
-from .llm_protocol import LLMGenerateRequest, NormalizedLLMResponse, resolve_auth_strategy
+from .llm_protocol_types import LLMGenerateRequest, NormalizedLLMResponse, resolve_auth_strategy
 
 StreamStopChecker = Callable[[], Awaitable[bool]]
 

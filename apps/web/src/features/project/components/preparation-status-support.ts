@@ -12,7 +12,6 @@ export type PreparationStatusRow = {
 };
 
 const NEXT_STEP_LABELS: Record<PreparationNextStep, string> = {
-  setting: "项目设定",
   outline: "大纲",
   opening_plan: "开篇设计",
   chapter_tasks: "章节任务",
@@ -33,7 +32,6 @@ const STATUS_LABELS: Record<string, string> = {
   completed: "已确认",
   failed: "失败",
   interrupted: "已中断",
-  setting: "待设定",
   outline: "待大纲",
   opening_plan: "待开篇",
   chapter_tasks: "待任务",
@@ -45,11 +43,6 @@ export function buildPreparationStatusRows(
   preparation: ProjectPreparationStatus,
 ): PreparationStatusRow[] {
   return [
-    {
-      label: "结构化摘要",
-      status: preparation.setting.status,
-      description: describeSettingStatus(preparation.setting),
-    },
     {
       label: "大纲",
       status: preparation.outline.step_status,
@@ -74,13 +67,6 @@ export function formatPreparationNextStep(step: PreparationNextStep): string {
 
 export function formatPreparationStatusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status;
-}
-
-function describeSettingStatus(setting: ProjectPreparationStatus["setting"]): string {
-  if (setting.issues.length === 0) {
-    return "结构化摘要已覆盖主要信息，后续可继续在项目文档里维护详细设定。";
-  }
-  return setting.issues.map((issue) => issue.message).join(" / ");
 }
 
 export function describeAssetStatus(

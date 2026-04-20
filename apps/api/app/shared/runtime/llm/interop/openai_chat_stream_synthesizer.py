@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .codec_value_helpers import optional_string as _optional_string
-from ..llm_protocol import NormalizedLLMResponse
+from ..llm_protocol_types import NormalizedLLMResponse
 from ..llm_protocol_responses import parse_generation_response
 
 
@@ -14,6 +14,7 @@ class OpenAIChatSynthesisState:
     finish_reason: str | None = None
     usage: dict[str, Any] | None = None
     response_id: str | None = None
+    reasoning_content: str = ""
 
 
 def synthesize_openai_chat_terminal_response(
@@ -40,6 +41,8 @@ def synthesize_openai_chat_terminal_response(
             }
         ]
     }
+    if state.reasoning_content:
+        reconstructed_payload["choices"][0]["message"]["reasoning_content"] = state.reasoning_content
     if state.usage is not None:
         reconstructed_payload["usage"] = state.usage
     if state.response_id is not None:
@@ -72,6 +75,9 @@ def _apply_openai_chat_event(
     delta = first_choice.get("delta")
     if not isinstance(delta, dict):
         return
+    reasoning_delta = _extract_openai_chat_reasoning_delta(delta)
+    if reasoning_delta:
+        state.reasoning_content += reasoning_delta
     tool_calls = delta.get("tool_calls")
     if not isinstance(tool_calls, list):
         return
@@ -125,3 +131,16 @@ def _merge_openai_chat_tool_name_delta(previous_name: str, incoming_name: str) -
     if not previous_name or previous_name.endswith(incoming_name):
         return incoming_name
     return f"{previous_name}{incoming_name}"
+
+
+def _extract_openai_chat_reasoning_delta(delta: dict[str, Any]) -> str:
+    reasoning_content = delta.get("reasoning_content")
+    if isinstance(reasoning_content, str):
+        return reasoning_content
+    if not isinstance(reasoning_content, list):
+        return ""
+    return "".join(
+        item.get("text", "")
+        for item in reasoning_content
+        if isinstance(item, dict) and isinstance(item.get("text"), str)
+    )

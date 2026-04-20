@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,17 +13,18 @@ from app.modules.credential.service import (
     RuntimeCredentialPayload,
     build_runtime_credential_payload,
 )
-from app.shared.runtime import ToolProvider
-from app.shared.runtime.errors import ConfigurationError
+from app.shared.runtime.tool_provider import ToolProvider
+from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     ConformanceProbeKind,
+    conformance_probe_kind_satisfies,
     normalize_conformance_probe_kind,
 )
-from app.shared.runtime.llm.llm_protocol import (
+from app.shared.runtime.llm.llm_interop_profiles import resolve_connection_continuation_support
+from app.shared.runtime.llm.llm_protocol_types import (
     LLMContinuationSupport,
     allows_provider_continuation_state,
     resolve_anthropic_default_max_tokens,
-    resolve_connection_continuation_support,
 )
 from app.shared.runtime.llm.llm_tool_provider import (
     LLM_GENERATE_TOOL,
@@ -32,6 +33,8 @@ from app.shared.runtime.llm.llm_tool_provider import (
 )
 
 from .tooling.assistant_tool_loop import AssistantToolLoopModelStreamEvent
+
+AssistantLlmTransportMode = Literal["stream", "buffered"]
 
 
 @dataclass(frozen=True)
@@ -251,3 +254,29 @@ def resolve_assistant_output_budget_tokens(
     if resolved_runtime.credential_payload["api_dialect"] == "anthropic_messages":
         return resolve_anthropic_default_max_tokens(resolved_runtime.context_window_tokens)
     return None
+
+
+def ensure_assistant_tool_capability(
+    resolved_runtime: ResolvedAssistantLlmRuntime,
+    *,
+    visible_tool_names: tuple[str, ...],
+    transport_mode: AssistantLlmTransportMode,
+) -> None:
+    if not visible_tool_names:
+        return
+    verified_probe_kind = (
+        resolved_runtime.stream_tool_verified_probe_kind
+        if transport_mode == "stream"
+        else resolved_runtime.buffered_tool_verified_probe_kind
+    )
+    if conformance_probe_kind_satisfies(
+        verified_probe_kind,
+        required_probe_kind="tool_continuation_probe",
+    ):
+        return
+    transport_label = "流式" if transport_mode == "stream" else "非流"
+    tool_names = "、".join(visible_tool_names)
+    raise BusinessRuleError(
+        f"当前模型连接“{resolved_runtime.credential_display_name}”未完成{transport_label}工具调用验证，"
+        f"不能启用以下工具：{tool_names}。请先到模型连接页执行“验证{transport_label}工具”。"
+    )

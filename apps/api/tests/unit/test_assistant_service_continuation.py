@@ -14,8 +14,9 @@ from app.modules.assistant.service.factory import create_assistant_rule_service
 from app.modules.config_registry import ConfigLoader
 from app.modules.project.infrastructure import ProjectDocumentFileStore, ProjectDocumentIdentityStore
 from app.modules.project.service import ProjectDocumentCapabilityService, ProjectService
-from app.shared.runtime import LLMToolProvider, SkillTemplateRenderer
-from app.shared.runtime.llm.llm_protocol import HttpJsonResponse
+from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
+from app.shared.runtime.llm.llm_protocol_types import HttpJsonResponse
 from tests.unit.assistant_service_test_support import (
     _AnthropicCredentialService,
     _AnthropicToolLoopRequestSender,

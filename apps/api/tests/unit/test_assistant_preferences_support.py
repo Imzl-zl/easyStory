@@ -101,3 +101,23 @@ def test_merge_preferences_exposes_legacy_reasoning_conflicts_instead_of_droppin
             ),
             build_preferences_dto(default_model_name="gpt-5.4"),
         )
+
+
+def test_merge_preferences_clears_stale_provider_native_reasoning_when_target_changes() -> None:
+    merged = merge_preferences(
+        build_preferences_dto(
+            default_provider="gemini",
+            default_model_name="gemini-2.5-flash",
+            default_thinking_budget=0,
+        ),
+        build_preferences_dto(
+            default_provider="openai",
+            default_model_name="gpt-4.1",
+        ),
+    )
+
+    assert merged.default_provider == "openai"
+    assert merged.default_model_name == "gpt-4.1"
+    assert merged.default_reasoning_effort is None
+    assert merged.default_thinking_level is None
+    assert merged.default_thinking_budget is None

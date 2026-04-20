@@ -78,7 +78,6 @@ class StoryAssetService:
             owner_id=owner_id,
             load_contents=True,
         )
-        self.project_service.ensure_setting_allows_preparation(project)
         if asset_type == "opening_plan":
             await require_approved_asset(db, project_id, "outline")
         content = await self._get_asset(db, project_id, asset_type)
@@ -117,8 +116,7 @@ class StoryAssetService:
         *,
         owner_id: uuid.UUID | None = None,
     ) -> StoryAssetMutationDTO:
-        project = await self.project_service.require_project(db, project_id, owner_id=owner_id)
-        self.project_service.ensure_setting_allows_preparation(project)
+        await self.project_service.require_project(db, project_id, owner_id=owner_id)
         if asset_type == "opening_plan":
             await require_approved_asset(db, project_id, "outline")
         content = await self._require_asset(db, project_id, asset_type)

@@ -9,7 +9,7 @@ import pytest
 from app.modules.credential.infrastructure import AsyncHttpCredentialVerifier
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from app.shared.runtime.llm.llm_backend import LLMBackendStreamEvent
-from app.shared.runtime.llm.llm_protocol import (
+from app.shared.runtime.llm.llm_protocol_types import (
     LLMGenerateRequest,
     NormalizedLLMResponse,
     PreparedLLMHttpRequest,
@@ -359,7 +359,7 @@ def test_verify_tool_continuation_probe_replays_followup_request() -> None:
             lambda request: [
                 LLMBackendStreamEvent(
                     terminal_response=_ok_response(
-                        f"工具续接成功：{request.continuation_items[-1]['payload']['echoed']}。"
+                        f"工具续接成功：{request.continuation_items[-1]['payload']['echoed']}"
                     )
                 )
             ],
@@ -443,7 +443,7 @@ def test_verify_buffered_tool_probe_uses_generate_backend() -> None:
         generate_results=[
             _tool_call_response(provider_response_id="resp_123"),
             lambda request: _ok_response(
-                f"工具续接成功：{request.continuation_items[-1]['payload']['echoed']}。"
+                f"工具续接成功：{request.continuation_items[-1]['payload']['echoed']}"
             ),
         ],
     )

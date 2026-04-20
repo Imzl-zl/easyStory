@@ -5,16 +5,18 @@ from typing import TypedDict
 
 from app.modules.credential.models import ModelCredential
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm.llm_protocol import (
+from app.shared.runtime.llm.llm_interop_profiles import (
+    normalize_interop_profile,
+    resolve_default_interop_profile,
+    resolve_interop_capabilities,
+)
+from app.shared.runtime.llm.llm_protocol_types import (
     normalize_api_dialect,
     normalize_auth_strategy,
     normalize_http_header_name,
-    normalize_interop_profile,
     normalize_runtime_kind,
-    resolve_default_interop_profile,
     resolve_api_key_header_name,
     resolve_auth_strategy,
-    resolve_interop_capabilities,
 )
 
 CONTENT_TYPE_HEADER_NAME = "content-type"

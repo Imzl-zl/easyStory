@@ -122,3 +122,43 @@ async def test_assistant_mcp_service_creates_lists_and_resolves_project_mcp(tmp_
         assert resolved.url == "https://example.com/project-mcp"
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_mcp_service_allows_explicit_override_id_for_project_scope(tmp_path) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    service = AssistantMcpService(
+        config_loader=loader,
+        project_service=create_project_service(),
+        mcp_store=AssistantMcpFileStore(tmp_path / "assistant-config"),
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-project-mcp-override")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+        async with async_session_factory() as session:
+            created = await service.create_project_mcp_server(
+                session,
+                project.id,
+                AssistantMcpCreateDTO(
+                    id="mcp.news.lookup",
+                    name="项目新闻检索",
+                    url="https://example.com/project-mcp",
+                    headers={"X-Test": "project"},
+                ),
+                owner_id=owner.id,
+            )
+            resolved = service.resolve_mcp_server(
+                "mcp.news.lookup",
+                owner_id=owner.id,
+                project_id=project.id,
+            )
+
+        assert created.id == "mcp.news.lookup"
+        assert resolved.name == "项目新闻检索"
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)

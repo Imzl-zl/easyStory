@@ -11,7 +11,7 @@ from app.modules.content.models import Content
 from app.modules.export.models import Export
 from app.modules.project.models import Project
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
-from app.shared.runtime import EXPORT_ROOT_DIR as SHARED_EXPORT_ROOT_DIR
+from app.shared.runtime.storage_paths import EXPORT_ROOT_DIR as SHARED_EXPORT_ROOT_DIR
 from app.shared.runtime.errors import BusinessRuleError, NotFoundError
 
 from .dto import ExportDetailDTO, ExportViewDTO

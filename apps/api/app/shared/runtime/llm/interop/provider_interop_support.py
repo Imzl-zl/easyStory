@@ -9,7 +9,7 @@ from dotenv import dotenv_values
 
 from ...errors import ConfigurationError
 from ..llm_interop_profiles import normalize_interop_profile
-from ..llm_protocol import (
+from ..llm_protocol_types import (
     LLMConnection,
     normalize_api_dialect,
     normalize_auth_strategy,

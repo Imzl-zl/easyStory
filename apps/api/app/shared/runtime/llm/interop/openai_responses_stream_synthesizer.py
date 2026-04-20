@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .codec_value_helpers import optional_string as _optional_string
-from ..llm_protocol import NormalizedLLMResponse
+from ..llm_protocol_types import NormalizedLLMResponse
 from ..llm_protocol_responses import parse_generation_response
 
 

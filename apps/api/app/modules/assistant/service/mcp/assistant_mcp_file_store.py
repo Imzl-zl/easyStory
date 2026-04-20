@@ -59,9 +59,11 @@ class AssistantMcpFileStore:
         *,
         reserved_ids: set[str],
     ) -> AssistantMcpDetailDTO:
+        existing_ids = self._list_existing_ids(self._user_mcp_root(user_id))
         detail = create_user_mcp_detail(
             payload,
-            existing_ids=reserved_ids | self._list_existing_ids(self._user_mcp_root(user_id)),
+            reserved_ids=reserved_ids,
+            existing_ids=existing_ids,
         )
         self._write_mcp(build_user_mcp_path(self.root, user_id, detail.id), detail)
         return self.load_user_mcp_server(user_id, detail.id)
@@ -73,9 +75,11 @@ class AssistantMcpFileStore:
         *,
         reserved_ids: set[str],
     ) -> AssistantMcpDetailDTO:
+        existing_ids = self._list_existing_ids(self._project_mcp_root(project_id))
         detail = create_project_mcp_detail(
             payload,
-            existing_ids=reserved_ids | self._list_existing_ids(self._project_mcp_root(project_id)),
+            reserved_ids=reserved_ids,
+            existing_ids=existing_ids,
         )
         self._write_mcp(build_project_mcp_path(self.root, project_id, detail.id), detail)
         return self.load_project_mcp_server(project_id, detail.id)

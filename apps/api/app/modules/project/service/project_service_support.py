@@ -44,10 +44,6 @@ def build_project_statement(
     return statement
 
 
-def ensure_setting_allows_preparation(project: Project) -> SettingCompletenessResultDTO:
-    return evaluate_setting(project)
-
-
 def evaluate_setting(project: Project) -> SettingCompletenessResultDTO:
     setting = ProjectSetting.model_validate(project.project_setting or {})
     return evaluate_project_setting(setting)

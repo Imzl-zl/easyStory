@@ -121,22 +121,34 @@ def detail_to_record(
 def create_user_mcp_detail(
     payload: AssistantMcpCreateDTO,
     *,
+    reserved_ids: set[str],
     existing_ids: set[str],
 ) -> AssistantMcpDetailDTO:
     return _create_mcp_detail(
         payload,
-        server_id=create_user_mcp_id(payload.name, existing_ids=existing_ids),
+        server_id=_resolve_create_mcp_id(
+            payload,
+            reserved_ids=reserved_ids,
+            existing_ids=existing_ids,
+            create_id=lambda name, ids: create_user_mcp_id(name, existing_ids=ids),
+        ),
     )
 
 
 def create_project_mcp_detail(
     payload: AssistantMcpCreateDTO,
     *,
+    reserved_ids: set[str],
     existing_ids: set[str],
 ) -> AssistantMcpDetailDTO:
     return _create_mcp_detail(
         payload,
-        server_id=create_project_mcp_id(payload.name, existing_ids=existing_ids),
+        server_id=_resolve_create_mcp_id(
+            payload,
+            reserved_ids=reserved_ids,
+            existing_ids=existing_ids,
+            create_id=lambda name, ids: create_project_mcp_id(name, existing_ids=ids),
+        ),
     )
 
 
@@ -158,6 +170,22 @@ def _create_mcp_detail(
         header_count=len(payload.headers),
         updated_at=None,
     )
+
+
+def _resolve_create_mcp_id(
+    payload: AssistantMcpCreateDTO,
+    *,
+    reserved_ids: set[str],
+    existing_ids: set[str],
+    create_id,
+) -> str:
+    explicit_id = normalize_optional_text(payload.id)
+    if explicit_id is not None:
+        validate_mcp_id(explicit_id)
+        if explicit_id in existing_ids:
+            raise BusinessRuleError(f"MCP id 已存在：{explicit_id}")
+        return explicit_id
+    return create_id(payload.name, reserved_ids | existing_ids)
 
 
 def update_mcp_detail(

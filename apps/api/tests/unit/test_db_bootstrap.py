@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, inspect, text
 
 from app.shared.db import resolve_async_database_url
 from app.shared.db.bootstrap import (
+    create_async_database_engine,
     create_session_factory,
     is_sqlite_database_url,
     normalize_sync_database_url,
@@ -36,6 +37,22 @@ def test_normalize_sync_database_url_downshifts_async_driver() -> None:
 def test_is_sqlite_database_url_accepts_async_sqlite_driver() -> None:
     assert is_sqlite_database_url("sqlite+aiosqlite:///tmp/easystory.db") is True
     assert is_sqlite_database_url("postgresql+asyncpg://user:pass@localhost/easystory") is False
+
+
+def test_resolve_async_database_url_upgrades_postgres_driver() -> None:
+    assert (
+        resolve_async_database_url("postgresql://user:pass@localhost/easystory")
+        == "postgresql+asyncpg://user:pass@localhost/easystory"
+    )
+
+
+def test_create_async_database_engine_loads_asyncpg_driver_for_postgres_url() -> None:
+    engine = create_async_database_engine("postgresql://user:pass@localhost/easystory")
+
+    try:
+        assert engine.url.drivername == "postgresql+asyncpg"
+    finally:
+        engine.sync_engine.dispose()
 
 
 def test_create_session_factory_reconciles_legacy_model_credentials_table(tmp_path) -> None:

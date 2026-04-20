@@ -206,6 +206,14 @@ def _merge_provider_native_reasoning(
     )
     if inherited_reasoning == (None, None, None):
         return inherited_reasoning
+    shape_error = build_provider_native_reasoning_shape_error(
+        reasoning_effort=inherited_reasoning[0],
+        thinking_level=inherited_reasoning[1],
+        thinking_budget=inherited_reasoning[2],
+        field_prefix="default_",
+    )
+    if shape_error is not None:
+        raise ConfigurationError(shape_error)
     error = build_provider_native_reasoning_error(
         provider=resolved_provider,
         reasoning_effort=inherited_reasoning[0],
@@ -214,7 +222,7 @@ def _merge_provider_native_reasoning(
         field_prefix="default_",
     )
     if error is not None:
-        raise ConfigurationError(error)
+        return (None, None, None)
     return inherited_reasoning
 
 

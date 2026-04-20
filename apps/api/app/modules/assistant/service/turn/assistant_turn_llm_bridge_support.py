@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable
-from dataclasses import dataclass
 from typing import Any
 import uuid
 
@@ -13,20 +12,12 @@ from app.shared.runtime.llm.llm_tool_provider import LLMGenerateToolResponse, LL
 from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
 
 from ..assistant_execution_support import AssistantExecutionSpec
-from ..assistant_llm_runtime_support import (
-    build_tool_loop_model_caller,
-    build_tool_loop_stream_model_caller,
-)
+from ..assistant_llm_runtime_support import build_tool_loop_model_caller
 from ..tooling.assistant_tool_loop import AssistantToolLoop
 from ..tooling.assistant_tool_runtime_dto import AssistantToolLoopStateSnapshot
 from .assistant_turn_run_store import AssistantTurnRunStore
 from .assistant_turn_run_support import update_running_turn_record
 from .assistant_turn_runtime_support import PreparedAssistantTurn
-
-
-@dataclass
-class _InitialToolLoopStreamCapture:
-    raw_output: LLMGenerateToolResponse | None = None
 
 
 def build_turn_tool_loop_state_recorder(
@@ -57,20 +48,6 @@ def should_stream_with_tool_loop(
     prepared: PreparedAssistantTurn,
 ) -> bool:
     return assistant_tool_loop is not None and bool(prepared.visible_tool_descriptors)
-
-
-def has_tool_calls(raw_output: LLMGenerateToolResponse) -> bool:
-    tool_calls = raw_output.get("tool_calls")
-    return isinstance(tool_calls, list) and bool(tool_calls)
-
-
-def build_buffered_final_chunk_payload(
-    raw_output: LLMGenerateToolResponse,
-) -> dict[str, Any] | None:
-    content = raw_output.get("content")
-    if not isinstance(content, str) or not content:
-        return None
-    return {"delta": content, "chunk_kind": "buffered_final"}
 
 
 async def call_assistant_turn_llm(
@@ -220,50 +197,22 @@ async def stream_assistant_turn_with_tool_loop(
 ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
     if assistant_tool_loop is None:
         raise ConfigurationError("Assistant tool loop is not configured")
-    tool_schemas = assistant_tool_loop.resolve_tool_schemas(
-        turn_context=prepared.turn_context,
-        project_id=prepared.project_id,
-        visible_descriptors=prepared.visible_tool_descriptors,
-    )
-    if not tool_schemas:
-        raise ConfigurationError("Assistant tool loop streaming requires visible tools")
-    resolved_runtime = runtime_context or await resolve_llm_runtime(
-        db,
-        model=prepared.spec.model,
-        owner_id=owner_id,
-        project_id=prepared.project_id,
-    )
+    from .assistant_turn_tool_stream_runtime import AssistantTurnToolStreamRuntime
+
     try:
-        capture = _InitialToolLoopStreamCapture()
-        async for event_name, event_payload in _stream_initial_tool_loop_response(
-            db,
-            prepared,
-            tool_schemas=tool_schemas,
+        runtime = AssistantTurnToolStreamRuntime(
             owner_id=owner_id,
+            db=db,
+            prepared=prepared,
             should_stop=should_stop,
-            runtime_context=resolved_runtime,
-            call_llm_stream=call_llm_stream,
-            capture=capture,
-        ):
-            yield event_name, event_payload
-        raw_output = capture.raw_output
-        if raw_output is None:
-            raise ConfigurationError("Streaming response completed without initial output")
-        if not has_tool_calls(raw_output):
-            yield "final_output", raw_output
-            return
-        async for event_name, event_payload in _stream_tool_loop_followup(
-            db,
-            prepared,
             assistant_tool_loop=assistant_tool_loop,
             turn_run_store=turn_run_store,
-            owner_id=owner_id,
-            should_stop=should_stop,
-            runtime_context=resolved_runtime,
+            resolve_llm_runtime=resolve_llm_runtime,
             call_llm=call_llm,
             call_llm_stream=call_llm_stream,
-            raw_output=raw_output,
-        ):
+            runtime_context=runtime_context,
+        )
+        async for event_name, event_payload in runtime.iterate():
             yield event_name, event_payload
     except StreamInterruptedError:
         raise
@@ -280,94 +229,3 @@ async def stream_assistant_turn_with_tool_loop(
             assistant_model=prepared.spec.model,
         )
         raise
-
-
-async def _stream_initial_tool_loop_response(
-    db: AsyncSession,
-    prepared: PreparedAssistantTurn,
-    *,
-    tool_schemas: list[dict[str, Any]],
-    owner_id: uuid.UUID,
-    should_stop: Callable[[], Awaitable[bool]] | None,
-    runtime_context,
-    call_llm_stream,
-    capture: _InitialToolLoopStreamCapture,
-) -> AsyncIterator[tuple[str, dict[str, Any]]]:
-    async for event in call_llm_stream(
-        db,
-        prompt=prepared.prompt,
-        system_prompt=prepared.system_prompt,
-        model=prepared.spec.model,
-        owner_id=owner_id,
-        project_id=prepared.project_id,
-        runtime_context=runtime_context,
-        tools=tool_schemas,
-        should_stop=should_stop,
-    ):
-        if event.delta:
-            yield "chunk", {"delta": event.delta}
-            continue
-        capture.raw_output = event.response
-
-
-async def _stream_tool_loop_followup(
-    db: AsyncSession,
-    prepared: PreparedAssistantTurn,
-    *,
-    assistant_tool_loop: AssistantToolLoop,
-    turn_run_store: AssistantTurnRunStore | None,
-    owner_id: uuid.UUID,
-    should_stop: Callable[[], Awaitable[bool]] | None,
-    runtime_context,
-    call_llm,
-    call_llm_stream,
-    raw_output: LLMGenerateToolResponse,
-) -> AsyncIterator[tuple[str, dict[str, Any]]]:
-    async for item in assistant_tool_loop.iterate(
-        db,
-        turn_context=prepared.turn_context,
-        owner_id=owner_id,
-        project_id=prepared.project_id,
-        prompt=prepared.prompt,
-        system_prompt=prepared.system_prompt,
-        continuation_support=runtime_context.continuation_support,
-        model_caller=build_tool_loop_model_caller(
-            llm_caller=call_llm,
-            db=db,
-            model=prepared.spec.model,
-            owner_id=owner_id,
-            project_id=prepared.project_id,
-            runtime_context=runtime_context,
-        ),
-        stream_model_caller=build_tool_loop_stream_model_caller(
-            llm_stream_caller=call_llm_stream,
-            db=db,
-            model=prepared.spec.model,
-            owner_id=owner_id,
-            project_id=prepared.project_id,
-            runtime_context=runtime_context,
-            should_stop=should_stop,
-        ),
-        initial_raw_output=raw_output,
-        run_budget=prepared.run_budget,
-        tool_policy_decisions=prepared.tool_policy_decisions,
-        visible_descriptors=prepared.visible_tool_descriptors,
-        state_recorder=build_turn_tool_loop_state_recorder(
-            turn_run_store=turn_run_store,
-            run_id=prepared.turn_context.run_id,
-        ),
-        should_stop=should_stop,
-    ):
-        if item.event_name is not None and item.event_payload is not None:
-            yield item.event_name, item.event_payload
-            continue
-        if item.raw_output is None:
-            continue
-        buffered_chunk = (
-            None
-            if item.raw_output_already_streamed
-            else build_buffered_final_chunk_payload(item.raw_output)
-        )
-        if buffered_chunk is not None:
-            yield "chunk", buffered_chunk
-        yield "final_output", item.raw_output

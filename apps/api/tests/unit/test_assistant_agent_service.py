@@ -28,7 +28,7 @@ from app.modules.assistant.service.preferences.preferences_service import (
 )
 from app.modules.config_registry import ConfigLoader
 from app.modules.project.service import create_project_service
-from app.shared.runtime import SkillTemplateRenderer
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 from app.shared.runtime.errors import ConfigurationError
 from tests.unit.async_api_support import build_sqlite_session_factories, cleanup_sqlite_session_factories
 from tests.unit.models.helpers import create_user
@@ -95,10 +95,10 @@ async def test_assistant_service_runs_user_agent_with_disabled_user_skill(tmp_pa
                 ),
                 owner_id=owner.id,
             )
-            await service.assistant_preferences_service.update_preferences(
+            await service.assistant_preferences_service.update_user_preferences(
                 session,
-                owner.id,
-                AssistantPreferencesUpdateDTO(
+                owner_id=owner.id,
+                payload=AssistantPreferencesUpdateDTO(
                     default_provider="openai",
                     default_model_name="gpt-4o-mini",
                 ),

@@ -136,7 +136,6 @@ async def test_config_registry_api_rejects_mismatched_mcp_server_id(
                     "name": "Bad",
                     "version": "1.0.0",
                     "description": None,
-                    "author": None,
                     "transport": "streamable_http",
                     "url": "https://example.com/other",
                     "headers": {},

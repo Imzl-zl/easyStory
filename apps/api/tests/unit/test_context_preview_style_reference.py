@@ -9,7 +9,8 @@ from app.modules.analysis.models import Analysis
 from app.modules.config_registry import ConfigLoader
 from app.modules.config_registry.schemas.config_schemas import ContextInjectionItem
 from app.modules.content.models import Content, ContentVersion
-from app.modules.context.service import ContextPreviewRequestDTO, create_context_preview_service
+from app.modules.context.service.dto import ContextPreviewRequestDTO
+from app.modules.context.service.factory import create_context_preview_service
 from app.modules.context.engine.errors import ContextBuilderError
 from app.modules.workflow.models import ChapterTask
 from app.modules.workflow.service.snapshot_support import (

@@ -36,8 +36,8 @@ async def test_create_app_bootstraps_database_schema(monkeypatch):
 
     try:
         async with started_async_client(app) as client:
-            response = await client.post(
-                f"/api/v1/projects/{uuid.uuid4()}/setting/complete-check",
+            response = await client.get(
+                f"/api/v1/projects/{uuid.uuid4()}/preparation/status",
                 headers=_auth_headers(owner_id),
             )
             assert response.status_code == 404
@@ -91,7 +91,7 @@ async def test_preparation_endpoints_require_authentication(monkeypatch, tmp_pat
             async_session_factory=async_session_factory,
         )
         async with started_async_client(app) as client:
-            response = await client.post(f"/api/v1/projects/{project_id}/setting/complete-check")
+            response = await client.get(f"/api/v1/projects/{project_id}/preparation/status")
             assert response.status_code == 401
             assert response.json()["code"] == "unauthorized"
     finally:
@@ -111,8 +111,8 @@ async def test_preparation_endpoints_hide_other_users_project(monkeypatch, tmp_p
             async_session_factory=async_session_factory,
         )
         async with started_async_client(app) as client:
-            response = await client.post(
-                f"/api/v1/projects/{project_id}/setting/complete-check",
+            response = await client.get(
+                f"/api/v1/projects/{project_id}/preparation/status",
                 headers=_auth_headers(outsider_id),
             )
             assert response.status_code == 404
@@ -166,12 +166,15 @@ async def test_preparation_endpoints_drive_outline_to_opening_plan_flow(monkeypa
             assert setting_response.status_code == 200
             assert setting_response.json()["genre"] == "玄幻"
 
-            check_response = await client.post(
-                f"/api/v1/projects/{project_id}/setting/complete-check",
+            status_response = await client.get(
+                f"/api/v1/projects/{project_id}/preparation/status",
                 headers=headers,
             )
-            assert check_response.status_code == 200
-            assert check_response.json()["status"] == "ready"
+            assert status_response.status_code == 200
+            assert status_response.json()["outline"]["step_status"] == "draft"
+            assert status_response.json()["opening_plan"]["step_status"] == "not_started"
+            assert status_response.json()["can_start_workflow"] is False
+            assert status_response.json()["next_step"] == "outline"
 
             opening_plan_blocked = await client.put(
                 f"/api/v1/projects/{project_id}/opening-plan",

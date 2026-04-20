@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.credential.service import CredentialService, create_credential_resolution_service
 from app.modules.project.service import ProjectService
 
 from ..assistant_config_file_store import AssistantConfigFileStore
@@ -24,13 +22,9 @@ class AssistantPreferencesService:
         project_service: ProjectService,
         *,
         config_store: AssistantConfigFileStore | None = None,
-        credential_service_factory: Callable[[], CredentialService] | None = None,
     ) -> None:
         self.project_service = project_service
         self.config_store = config_store or build_default_assistant_config_store()
-        self.credential_service_factory = credential_service_factory or (
-            lambda: create_credential_resolution_service(project_service=self.project_service)
-        )
 
     async def get_user_preferences(
         self,
@@ -120,21 +114,6 @@ class AssistantPreferencesService:
             project_id=project.id,
             preferences=resolved_preferences,
         )
-
-    async def get_preferences(
-        self,
-        db: AsyncSession,
-        user_id: uuid.UUID,
-    ) -> AssistantPreferencesDTO:
-        return await self.get_user_preferences(db, owner_id=user_id)
-
-    async def update_preferences(
-        self,
-        db: AsyncSession,
-        user_id: uuid.UUID,
-        payload: AssistantPreferencesUpdateDTO,
-    ) -> AssistantPreferencesDTO:
-        return await self.update_user_preferences(db, owner_id=user_id, payload=payload)
 
     async def _validate_preferences_provider_native_reasoning(
         self,

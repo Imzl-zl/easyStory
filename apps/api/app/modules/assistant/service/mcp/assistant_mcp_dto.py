@@ -44,7 +44,7 @@ class AssistantMcpDetailDTO(AssistantMcpSummaryDTO):
     headers: dict[str, str] = Field(default_factory=dict)
 
 
-class AssistantMcpCreateDTO(BaseModel):
+class _AssistantMcpPayloadDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = True
@@ -66,7 +66,11 @@ class AssistantMcpCreateDTO(BaseModel):
         return normalize_assistant_mcp_name(value)
 
 
-class AssistantMcpUpdateDTO(AssistantMcpCreateDTO):
+class AssistantMcpCreateDTO(_AssistantMcpPayloadDTO):
+    id: str | None = None
+
+
+class AssistantMcpUpdateDTO(_AssistantMcpPayloadDTO):
     pass
 
 

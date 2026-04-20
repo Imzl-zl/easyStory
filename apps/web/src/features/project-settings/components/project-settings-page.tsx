@@ -14,7 +14,7 @@ import {
   resolveProjectSettingsTab,
   type ProjectSettingsTab,
 } from "@/features/project-settings/components/project-settings-support";
-import { checkProjectSetting, getProject } from "@/lib/api/projects";
+import { getProject } from "@/lib/api/projects";
 import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
 
 type ProjectSettingsPageProps = {
@@ -29,7 +29,7 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
   const [projectMcpDirty, setProjectMcpDirty] = useState(false);
   const [projectPreferencesDirty, setProjectPreferencesDirty] = useState(false);
   const [projectRulesDirty, setProjectRulesDirty] = useState(false);
-  const [projectSettingDirty, setProjectSettingDirty] = useState(false);
+  const [projectBriefDirty, setProjectBriefDirty] = useState(false);
   const [projectSkillsDirty, setProjectSkillsDirty] = useState(false);
   const routeTab = searchParams.get("tab");
   const routeEvent = searchParams.get("event");
@@ -39,19 +39,15 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
   const eventType = normalizeProjectAuditEventType(routeEvent);
   const isDirty = resolveProjectSettingsDirtyState(tab, {
     assistant: projectPreferencesDirty,
+    brief: projectBriefDirty,
     mcp: projectMcpDirty,
     rules: projectRulesDirty,
-    setting: projectSettingDirty,
     skills: projectSkillsDirty,
   });
   const navigationGuard = useUnsavedChangesGuard({ currentUrl, isDirty, router });
   const projectQuery = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => getProject(projectId),
-  });
-  const completenessQuery = useQuery({
-    queryKey: ["setting-check", projectId],
-    queryFn: () => checkProjectSetting(projectId),
   });
 
   const setParams = useCallback(
@@ -93,9 +89,9 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
           <ProjectSettingsSidebar
             dirtyState={{
               assistant: projectPreferencesDirty,
+              brief: projectBriefDirty,
               mcp: projectMcpDirty,
               rules: projectRulesDirty,
-              setting: projectSettingDirty,
               skills: projectSkillsDirty,
               audit: false,
             }}
@@ -113,13 +109,12 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
         </div>
         <div className="relative flex flex-col min-h-[600px] animate-[fadeIn_0.35s_cubic-bezier(0.16,1,0.3,1)] max-w-3xl w-full mx-auto pb-24">
           <ProjectSettingsContent
-            completeness={completenessQuery.data}
             eventType={eventType}
             onEventTypeChange={(nextEventType) => setParams({ event: nextEventType, tab: "audit" })}
             onProjectMcpDirtyChange={setProjectMcpDirty}
             onProjectPreferencesDirtyChange={setProjectPreferencesDirty}
             onProjectRulesDirtyChange={setProjectRulesDirty}
-            onProjectSettingDirtyChange={setProjectSettingDirty}
+            onProjectBriefDirtyChange={setProjectBriefDirty}
             onProjectSkillsDirtyChange={setProjectSkillsDirty}
             projectError={projectQuery.error}
             projectId={projectId}
@@ -143,14 +138,14 @@ function resolveProjectSettingsDirtyState(
   tab: ProjectSettingsTab,
   dirtyState: {
     assistant: boolean;
+    brief: boolean;
     mcp: boolean;
     rules: boolean;
-    setting: boolean;
     skills: boolean;
   },
 ) {
-  if (tab === "setting") {
-    return dirtyState.setting;
+  if (tab === "brief") {
+    return dirtyState.brief;
   }
   if (tab === "rules") {
     return dirtyState.rules;
@@ -172,12 +167,12 @@ function handleSelectTab(
   eventType: string | null,
   setParams: (patches: Record<string, string | null>) => void,
 ) {
-  if (nextTab === "setting") {
-    setParams({ event: null, tab: null });
+  if (nextTab === "brief") {
+    setParams({ event: null, tab: "brief" });
     return;
   }
   if (nextTab === "rules") {
-    setParams({ event: null, tab: "rules" });
+    setParams({ event: null, tab: null });
     return;
   }
   if (nextTab === "assistant") {

@@ -23,12 +23,10 @@ from app.modules.workflow.entry.http.router import (
     get_workflow_app_service,
     get_workflow_runtime_dispatcher,
 )
-from app.modules.workflow.service import (
-    WorkflowRuntimeService,
-    create_workflow_app_service,
-    create_workflow_service,
-)
-from app.shared.runtime import SkillTemplateRenderer, ToolProvider
+from app.modules.workflow.service.factory import create_workflow_app_service, create_workflow_service
+from app.modules.workflow.service.workflow_runtime_service import WorkflowRuntimeService
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
+from app.shared.runtime.tool_provider import ToolProvider
 from tests.unit.models.helpers import create_project, create_template, create_user, ready_project_setting
 
 TEST_JWT_SECRET = "test-jwt-secret"

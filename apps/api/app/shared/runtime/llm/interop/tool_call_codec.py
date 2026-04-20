@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from typing import Any
 
 from ...errors import ConfigurationError
@@ -25,6 +26,7 @@ def extract_openai_chat_tool_calls(
     if not raw_tool_calls:
         return []
     tool_calls = raw_tool_calls
+    reasoning_content = _extract_openai_chat_reasoning_content(message)
     items: list[NormalizedLLMToolCall] = []
     for item in tool_calls:
         if not isinstance(item, dict):
@@ -38,6 +40,11 @@ def extract_openai_chat_tool_calls(
                     tool_name_aliases=tool_name_aliases,
                 ),
                 arguments=parse_tool_arguments(function.get("arguments")),
+                provider_payload=(
+                    {"reasoning_content": deepcopy(reasoning_content)}
+                    if reasoning_content is not None
+                    else None
+                ),
             )
         )
     return items
@@ -217,3 +224,12 @@ def _copy_provider_payload(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
     return dict(value)
+
+
+def _extract_openai_chat_reasoning_content(message: dict[str, Any]) -> Any | None:
+    reasoning_content = message.get("reasoning_content")
+    if isinstance(reasoning_content, str):
+        return reasoning_content
+    if isinstance(reasoning_content, list):
+        return reasoning_content
+    return None

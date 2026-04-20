@@ -10,7 +10,7 @@ from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm.interop.provider_interop_support import ResolvedProviderInteropProfile
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import build_text_probe_request
 from app.shared.runtime.llm.llm_backend import LLMBackendStreamEvent
-from app.shared.runtime.llm.llm_protocol import LLMConnection, NormalizedLLMResponse
+from app.shared.runtime.llm.llm_protocol_types import LLMConnection, NormalizedLLMResponse
 from scripts import provider_interop_check as provider_interop_check_module
 from scripts.provider_interop_check import _execute_probe_request, _probe_text_profile, _render_staged_request, build_parser
 

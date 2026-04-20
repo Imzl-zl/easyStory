@@ -33,7 +33,7 @@ PreparationChapterTaskStepStatus = Literal[
     "stale",
     "interrupted",
 ]
-PreparationNextStep = Literal["setting", "outline", "opening_plan", "chapter_tasks", "workflow", "chapter"]
+PreparationNextStep = Literal["outline", "opening_plan", "chapter_tasks", "workflow", "chapter"]
 
 
 class ProjectCreateDTO(BaseModel):
@@ -310,7 +310,6 @@ class PreparationChapterTaskStatusDTO(BaseModel):
 
 class ProjectPreparationStatusDTO(BaseModel):
     project_id: uuid.UUID
-    setting: SettingCompletenessResultDTO
     outline: PreparationAssetStatusDTO
     opening_plan: PreparationAssetStatusDTO
     chapter_tasks: PreparationChapterTaskStatusDTO

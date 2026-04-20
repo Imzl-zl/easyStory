@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Callable
 
-from app.shared.runtime import ModelPricing
+from app.shared.runtime.token_counter import ModelPricing
 
 from .billing_query_service import BillingQueryService
 from .billing_service import BillingService

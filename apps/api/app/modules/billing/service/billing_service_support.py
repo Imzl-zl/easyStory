@@ -11,7 +11,7 @@ from app.modules.billing.service.dto import BudgetStatusDTO, TokenUsageRecordDTO
 from app.modules.config_registry.schemas.config_schemas import BudgetConfig
 from app.modules.project.models import Project
 from app.modules.workflow.models import NodeExecution
-from app.shared.runtime import ModelPricing
+from app.shared.runtime.token_counter import ModelPricing
 from app.shared.runtime.errors import ConfigurationError
 
 from .billing_query_support import ZERO_TOKENS, build_budget_status, day_window

@@ -24,12 +24,12 @@ from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
 )
 from app.shared.runtime.llm.llm_backend import AsyncLLMGenerateBackend, resolve_backend_selection
 from app.shared.runtime.llm.litellm_backend import LiteLLMBackend
-from app.shared.runtime.llm.llm_protocol import (
+from app.shared.runtime.llm.llm_protocol_requests import prepare_generation_request
+from app.shared.runtime.llm.llm_protocol_types import (
     LLMConnection,
     LLMGenerateRequest,
     NormalizedLLMResponse,
     PreparedLLMHttpRequest,
-    prepare_generation_request,
     resolve_model_name,
 )
 from app.shared.runtime.llm.native_http_backend import NativeHttpLLMBackend

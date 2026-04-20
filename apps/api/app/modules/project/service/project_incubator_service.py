@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.config_registry import ConfigLoader
 from app.modules.config_registry.schemas.config_schemas import ModelConfig, SkillConfig
 from app.modules.template.service import TemplateQueryService
-from app.shared.runtime import SkillTemplateRenderer, ToolProvider
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
+from app.shared.runtime.tool_provider import ToolProvider
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm.llm_tool_provider import LLM_GENERATE_TOOL
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from ..errors import ConfigurationError
@@ -347,6 +348,7 @@ def _build_openai_chat_output_items(
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     content = _stringify_openai_content(message.get("content"))
+    reasoning_content = _extract_openai_chat_reasoning_content(message)
     if content.strip():
         items.append(
             {
@@ -363,6 +365,11 @@ def _build_openai_chat_output_items(
             arguments_text=tool_call.arguments_text,
             tool_call_id=tool_call.tool_call_id,
             arguments_error=tool_call.arguments_error,
+            provider_payload=(
+                {"reasoning_content": deepcopy(reasoning_content)}
+                if reasoning_content is not None
+                else None
+            ),
         )
         items.append(
             {
@@ -375,6 +382,15 @@ def _build_openai_chat_output_items(
             }
         )
     return items
+
+
+def _extract_openai_chat_reasoning_content(message: dict[str, Any]) -> Any | None:
+    reasoning_content = message.get("reasoning_content")
+    if isinstance(reasoning_content, str):
+        return reasoning_content
+    if isinstance(reasoning_content, list):
+        return reasoning_content
+    return None
 
 
 def _extract_openai_responses_output(

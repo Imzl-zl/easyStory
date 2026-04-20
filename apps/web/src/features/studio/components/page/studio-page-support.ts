@@ -1,6 +1,6 @@
 import type { ChapterSummary, ProjectDocumentTreeNode } from "@/lib/api/types";
 
-export type StudioPanelKey = "setting" | "outline" | "opening-plan" | "chapter";
+export type StudioPanelKey = "overview" | "outline" | "opening-plan" | "chapter";
 export type StudioChapterListState = "loading" | "error" | "empty" | "ready";
 export type StudioDocumentEntryKind = "file" | "folder";
 export type DocumentTreeNodeOrigin = "custom" | "database" | "fixed";
@@ -29,7 +29,7 @@ const STUDIO_PANEL_OPTIONS: Array<{
   key: StudioPanelKey;
   label: string;
 }> = [
-  { key: "setting", label: "设定" },
+  { key: "overview", label: "项目说明" },
   { key: "outline", label: "大纲" },
   { key: "opening-plan", label: "开篇设计" },
   { key: "chapter", label: "章节" },
@@ -39,7 +39,7 @@ const PANEL_DEFAULT_DOCUMENT_PATHS: Record<
   Exclude<StudioPanelKey, "chapter">,
   string
 > = {
-  setting: "设定/世界观.md",
+  overview: "项目说明.md",
   outline: "大纲/总大纲.md",
   "opening-plan": "大纲/开篇设计.md",
 };
@@ -157,7 +157,7 @@ export function listStudioPanelOptions() {
 }
 
 export function getStudioPanelLabel(panel: StudioPanelKey) {
-  return STUDIO_PANEL_OPTIONS.find((item) => item.key === panel)?.label ?? "设定";
+  return STUDIO_PANEL_OPTIONS.find((item) => item.key === panel)?.label ?? "项目说明";
 }
 
 export function resolveStudioChapterListState({
@@ -202,7 +202,7 @@ export function listStaleChapters(chapters: ChapterSummary[] | undefined) {
 export function resolveStudioPanel(value: string | null): StudioPanelKey {
   return STUDIO_PANEL_OPTIONS.some((item) => item.key === value)
     ? (value as StudioPanelKey)
-    : "setting";
+    : "overview";
 }
 
 export function isStudioDesktopLayout(containerWidth: number) {

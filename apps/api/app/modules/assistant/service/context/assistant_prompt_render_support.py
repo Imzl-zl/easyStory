@@ -5,7 +5,7 @@ from typing import Any
 from jinja2.exceptions import SecurityError, UndefinedError
 
 from app.modules.config_registry.schemas import SkillConfig
-from app.shared.runtime import SkillTemplateRenderer
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 from app.shared.runtime.errors import ConfigurationError
 
 from ..dto import AssistantTurnRequestDTO

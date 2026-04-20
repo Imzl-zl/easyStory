@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from ...errors import ConfigurationError
-from ..llm_protocol import (
+from ..llm_protocol_types import (
     DEFAULT_REQUEST_TIMEOUT_SECONDS,
     NormalizedLLMResponse,
     PreparedLLMHttpRequest,

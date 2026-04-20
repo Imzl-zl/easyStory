@@ -17,7 +17,8 @@ from app.modules.workflow.service.workflow_hook_providers import (
     WebhookResponse,
     build_workflow_plugin_registry,
 )
-from app.shared.runtime import McpToolCallResult, PluginRegistry
+from app.shared.runtime.mcp.mcp_client import McpToolCallResult
+from app.shared.runtime.plugins.plugin_registry import PluginRegistry
 from app.shared.runtime.errors import ConfigurationError
 from tests.unit.async_service_support import async_db
 from tests.unit.test_workflow_runtime import (
@@ -185,6 +186,111 @@ def test_runtime_hook_condition_skip_and_retry_are_visible(db) -> None:
         assert state["retry_attempts"] == 2
         logs = db.query(ExecutionLog).filter(ExecutionLog.message == "Hook retry scheduled").all()
         assert any(item.details["hook_id"] == "hook.retry_once" for item in logs)
+        skipped_logs = db.query(ExecutionLog).filter(ExecutionLog.message == "Hook skipped").all()
+        assert any(item.details["hook_id"] == "hook.condition_skip" for item in skipped_logs)
+    finally:
+        sys.modules.pop(module_name, None)
+        shutil.rmtree(harness.export_root, ignore_errors=True)
+
+
+def test_runtime_after_node_end_webhook_hook_receives_node_outcome_payload(db) -> None:
+    captured: list[dict] = []
+
+    async def sender(*, method: str, url: str, headers: dict[str, str], json_body):
+        captured.append({"method": method, "url": url, "headers": headers, "json_body": json_body})
+        return WebhookResponse(status_code=200, json_body={"ok": True}, text='{"ok":true}')
+
+    harness = _build_runtime_harness(db)
+    try:
+        harness.runtime_service.plugin_registry = build_workflow_plugin_registry(
+            harness.runtime_service,
+            webhook_request_sender=sender,
+        )
+        _attach_hook(
+            db,
+            harness.workflow,
+            "chapter_gen",
+            "hook.after_node_probe",
+            {
+                "id": "hook.after_node_probe",
+                "name": "After Node Probe",
+                "enabled": True,
+                "trigger": {"event": "after_node_end", "node_types": ["generate"]},
+                "action": {
+                    "type": "webhook",
+                    "config": {"url": "https://example.com/after-node", "method": "POST"},
+                },
+                "priority": 6,
+                "timeout": 30,
+            },
+        )
+        _run_to_chapter_generation(db, harness)
+        assert len(captured) == 1
+        payload = captured[0]["json_body"]
+        assert payload["event"] == "after_node_end"
+        assert payload["node"]["id"] == "chapter_gen"
+        assert payload["node_execution_id"]
+        assert payload["next_node_id"] == "chapter_gen"
+        assert "pause_reason" in payload
+        assert payload["chapter"]["number"] == 1
+    finally:
+        shutil.rmtree(harness.export_root, ignore_errors=True)
+
+
+def test_runtime_on_error_hook_failure_surfaces_exception_group(db) -> None:
+    module_name = "tests.unit.dynamic_workflow_on_error"
+    module = types.ModuleType(module_name)
+
+    def before_fail(context, params):
+        del context, params
+        raise RuntimeError("before boom")
+
+    def on_error_fail(context, params):
+        del context, params
+        raise RuntimeError("on_error boom")
+
+    module.before_fail = before_fail
+    module.on_error_fail = on_error_fail
+    sys.modules[module_name] = module
+    harness = _build_runtime_harness(db)
+    try:
+        _attach_hook(
+            db,
+            harness.workflow,
+            "chapter_gen",
+            "hook.before_fail",
+            {
+                "id": "hook.before_fail",
+                "name": "Before Fail",
+                "enabled": True,
+                "trigger": {"event": "before_node_start", "node_types": ["generate"]},
+                "action": {"type": "script", "config": {"module": module_name, "function": "before_fail"}},
+                "priority": 1,
+                "timeout": 30,
+            },
+            bucket="before",
+        )
+        _attach_hook(
+            db,
+            harness.workflow,
+            "chapter_gen",
+            "hook.on_error_fail",
+            {
+                "id": "hook.on_error_fail",
+                "name": "On Error Fail",
+                "enabled": True,
+                "trigger": {"event": "on_error", "node_types": ["generate"]},
+                "action": {"type": "script", "config": {"module": module_name, "function": "on_error_fail"}},
+                "priority": 2,
+                "timeout": 30,
+            },
+        )
+        with pytest.raises(ExceptionGroup, match="Workflow runtime error and on_error hook both failed") as exc_info:
+            _run_to_chapter_generation(db, harness)
+
+        assert len(exc_info.value.exceptions) == 2
+        assert str(exc_info.value.exceptions[0]) == "before boom"
+        assert str(exc_info.value.exceptions[1]) == "on_error boom"
     finally:
         sys.modules.pop(module_name, None)
         shutil.rmtree(harness.export_root, ignore_errors=True)
@@ -276,13 +382,21 @@ def _run_to_chapter_generation(db, harness) -> None:
     _resume_and_run(db, harness)
 
 
-def _attach_hook(db, workflow, node_id: str, hook_id: str, hook_config: dict) -> None:
+def _attach_hook(
+    db,
+    workflow,
+    node_id: str,
+    hook_id: str,
+    hook_config: dict,
+    *,
+    bucket: str = "after",
+) -> None:
     snapshot = copy.deepcopy(workflow.workflow_snapshot)
     snapshot.setdefault("resolved_hooks", {})[hook_id] = copy.deepcopy(hook_config)
     for node in snapshot["nodes"]:
         if node["id"] != node_id:
             continue
-        node.setdefault("hooks", {}).setdefault("after", []).append(hook_id)
+        node.setdefault("hooks", {}).setdefault(bucket, []).append(hook_id)
         break
     workflow.workflow_snapshot = snapshot
     db.add(workflow)

@@ -4,7 +4,8 @@ import asyncio
 
 import pytest
 
-from app.modules.context.service import StoryFactCreateDTO, create_story_bible_service
+from app.modules.context.service.dto import StoryFactCreateDTO
+from app.modules.context.service.story_bible_factory import create_story_bible_service
 from app.shared.runtime.errors import NotFoundError
 from tests.unit.async_service_support import async_db
 from tests.unit.test_story_bible_service import _create_chapter_version

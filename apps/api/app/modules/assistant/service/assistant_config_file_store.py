@@ -105,16 +105,6 @@ class AssistantConfigFileStore:
             return user_preferences
         return merge_preferences(user_preferences, self.load_project_preferences(project_id))
 
-    def load_preferences(self, user_id: uuid.UUID) -> AssistantPreferencesDTO:
-        return self.load_user_preferences(user_id)
-
-    def save_preferences(
-        self,
-        user_id: uuid.UUID,
-        payload: AssistantPreferencesUpdateDTO,
-    ) -> AssistantPreferencesDTO:
-        return self.save_user_preferences(user_id, payload)
-
     def _load_rule(
         self,
         scope: str,

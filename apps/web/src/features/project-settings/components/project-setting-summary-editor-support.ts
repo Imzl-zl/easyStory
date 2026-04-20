@@ -63,7 +63,6 @@ export function invalidateProjectSettingSummaryQueries(
   impact: ProjectSettingImpactSummary,
 ) {
   queryClient.invalidateQueries({ queryKey: ["project", projectId] });
-  queryClient.invalidateQueries({ queryKey: ["setting-check", projectId] });
   queryClient.invalidateQueries({ queryKey: ["project-preparation-status", projectId] });
   if (impact.items.some((item) => item.target === "outline")) {
     queryClient.invalidateQueries({ queryKey: ["story-asset", projectId, "outline"] });

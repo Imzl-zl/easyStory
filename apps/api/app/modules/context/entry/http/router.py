@@ -5,20 +5,20 @@ import uuid
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.context.service import (
-    ContextPreviewService,
+from app.modules.context.service.context_preview_service import ContextPreviewService
+from app.modules.context.service.dto import (
     ContextPreviewDTO,
     ContextPreviewRequestDTO,
-    StoryBibleService,
     StoryFactConflictStatus,
     StoryFactCreateDTO,
     StoryFactDTO,
     StoryFactMutationResultDTO,
     StoryFactSupersedeDTO,
     StoryFactType,
-    create_context_preview_service,
-    create_story_bible_service,
 )
+from app.modules.context.service.factory import create_context_preview_service
+from app.modules.context.service.story_bible_factory import create_story_bible_service
+from app.modules.context.service.story_bible_service import StoryBibleService
 from app.modules.user.entry.http.dependencies import get_current_user
 from app.modules.user.models import User
 from app.shared.db import get_async_db_session

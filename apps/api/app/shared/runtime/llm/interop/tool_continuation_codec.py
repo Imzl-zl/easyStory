@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from ..llm_protocol_types import LLMGenerateRequest
@@ -171,7 +172,7 @@ def _build_openai_chat_tool_call_message(
         tool_name_aliases=tool_name_aliases,
         policy=tool_name_policy,
     )
-    return {
+    message = {
         "role": "assistant",
         "content": "",
         "tool_calls": [
@@ -185,6 +186,12 @@ def _build_openai_chat_tool_call_message(
             }
         ],
     }
+    provider_payload = payload.get("provider_payload")
+    if isinstance(provider_payload, dict):
+        reasoning_content = provider_payload.get("reasoning_content")
+        if isinstance(reasoning_content, str) or isinstance(reasoning_content, list):
+            message["reasoning_content"] = deepcopy(reasoning_content)
+    return message
 
 
 def _build_anthropic_text_message(item: dict[str, Any]) -> dict[str, Any] | None:

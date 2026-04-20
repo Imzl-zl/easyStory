@@ -5,7 +5,7 @@ import json
 import pytest
 
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm.llm_protocol import resolve_connection_continuation_support
+from app.shared.runtime.llm.llm_interop_profiles import resolve_connection_continuation_support
 from app.shared.runtime.llm.llm_protocol_requests import prepare_generation_request
 from app.shared.runtime.llm.llm_protocol_responses import (
     extract_response_truncation_reason,
@@ -951,6 +951,42 @@ def test_parse_generation_response_decodes_external_tool_name_alias() -> None:
 
     assert normalized.tool_calls[0].tool_name == "project.read_documents"
     assert normalized.provider_output_items[0]["payload"]["tool_name"] == "project.read_documents"
+
+
+def test_parse_generation_response_preserves_openai_chat_reasoning_content_for_tool_call_items() -> None:
+    normalized = parse_generation_response(
+        "openai_chat_completions",
+        {
+            "choices": [
+                {
+                    "finish_reason": "tool_calls",
+                    "message": {
+                        "content": "",
+                        "reasoning_content": "先分析一下再调用工具。",
+                        "tool_calls": [
+                            {
+                                "id": "call_123",
+                                "type": "function",
+                                "function": {
+                                    "name": "project_read_documents",
+                                    "arguments": '{\"paths\":[\"设定/人物.md\"]}',
+                                },
+                            }
+                        ],
+                    },
+                }
+            ]
+        },
+        tool_name_aliases={"project.read_documents": "project_read_documents"},
+    )
+
+    assert normalized.tool_calls[0].provider_payload == {
+        "reasoning_content": "先分析一下再调用工具。"
+    }
+    assert normalized.provider_output_items[0]["item_type"] == "tool_call"
+    assert normalized.provider_output_items[0]["payload"]["provider_payload"] == {
+        "reasoning_content": "先分析一下再调用工具。"
+    }
 
 
 def test_parse_stream_terminal_response_decodes_external_tool_name_alias() -> None:

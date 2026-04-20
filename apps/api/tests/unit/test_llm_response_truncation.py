@@ -5,7 +5,7 @@ import asyncio
 import pytest
 
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm.llm_protocol import HttpJsonResponse
+from app.shared.runtime.llm.llm_protocol_types import HttpJsonResponse
 from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from app.shared.runtime.llm.llm_protocol import LLMContinuationSupport
+from app.shared.runtime.llm.llm_protocol_types import LLMContinuationSupport
 from app.shared.runtime.token_counter import TokenCounter
 
 from ..context.assistant_input_budget_support import (
@@ -302,8 +302,29 @@ def _drop_redundant_content_items(items: list[dict[str, Any]]) -> list[dict[str,
     return updated if changed else items
 
 
+def _drop_redundant_resource_links(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    updated = deepcopy(items)
+    changed = False
+    for item in updated:
+        if item.get("item_type") != "tool_result":
+            continue
+        payload = item.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        structured_output = payload.get("structured_output")
+        resource_links = payload.get("resource_links")
+        if structured_output is None or not isinstance(resource_links, list) or not resource_links:
+            continue
+        payload["resource_links"] = []
+        changed = True
+    return updated if changed else items
+
+
 def _reduce_compacted_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     reduced = _drop_redundant_content_items(items)
+    if reduced != items:
+        return reduced
+    reduced = _drop_redundant_resource_links(items)
     if reduced != items:
         return reduced
     return _drop_oldest_continuation_block(items)
@@ -359,12 +380,6 @@ def _read_continuation_cycle_index(item: dict[str, Any]) -> int | None:
     value = item.get("tool_cycle_index")
     if isinstance(value, int) and value >= 0:
         return value
-    payload = item.get("payload")
-    if not isinstance(payload, dict):
-        return None
-    legacy_value = payload.get("tool_cycle_index")
-    if isinstance(legacy_value, int) and legacy_value >= 0:
-        return legacy_value
     return None
 
 

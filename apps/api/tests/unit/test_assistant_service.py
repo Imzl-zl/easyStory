@@ -73,7 +73,9 @@ from app.modules.project.service.project_document_buffer_state_support import (
     TRUSTED_ACTIVE_BUFFER_SOURCE,
     build_project_document_buffer_hash,
 )
-from app.shared.runtime import McpToolCallResult, SkillTemplateRenderer, ToolProvider
+from app.shared.runtime.mcp.mcp_client import McpToolCallResult
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
+from app.shared.runtime.tool_provider import ToolProvider
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from app.shared.runtime.llm.llm_tool_provider import LLMStreamEvent
 from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
@@ -1157,7 +1159,7 @@ async def test_assistant_service_runs_project_read_documents_tool_loop(db, tmp_p
     ]
 
 
-async def test_assistant_service_allows_project_tools_without_verified_credential(
+async def test_assistant_service_rejects_project_tools_without_verified_buffered_credential(
     db,
     tmp_path,
 ) -> None:
@@ -1209,10 +1211,69 @@ async def test_assistant_service_allows_project_tools_without_verified_credentia
         messages=[AssistantMessageDTO(role="user", content="先读一下人物设定，再给我一个悬疑开场方向。")],
     )
 
-    result = await service.turn(async_db(db), payload, owner_id=owner.id)
+    with pytest.raises(BusinessRuleError, match="未完成非流工具调用验证"):
+        await service.turn(async_db(db), payload, owner_id=owner.id)
 
-    assert "林渊" in result.content
-    assert len(tool_provider.requests) == 2
+    assert tool_provider.requests == []
+
+
+async def test_assistant_service_rejects_project_tools_without_verified_stream_credential(
+    db,
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _ToolCallingFakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    document_root = tmp_path / "project-documents"
+    file_store = ProjectDocumentFileStore(document_root)
+    identity_store = ProjectDocumentIdentityStore(document_root)
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    registry = AssistantToolDescriptorRegistry()
+    exposure_policy = AssistantToolExposurePolicy(registry=registry)
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_TextOnlyCredentialService,
+        project_service=project_service,
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        assistant_tool_descriptor_registry=registry,
+        assistant_tool_exposure_policy=exposure_policy,
+        assistant_tool_executor=executor,
+        assistant_tool_loop=AssistantToolLoop(
+            exposure_policy=exposure_policy,
+            executor=executor,
+            step_store=AssistantToolStepStore(tmp_path / "tool-steps"),
+        ),
+    )
+    owner = create_user(db)
+    project = create_project(db, owner=owner)
+    file_store.save_project_document(
+        project.id,
+        "设定/人物.md",
+        "# 人物\n\n林渊：冷静、克制，擅长从细枝末节里发现异常。",
+    )
+    payload = _build_turn_request(
+        project_id=project.id,
+        model={"provider": "openai", "name": "gpt-4o-mini"},
+        messages=[AssistantMessageDTO(role="user", content="先读一下人物设定，再给我一个悬疑开场方向。")],
+    )
+
+    with pytest.raises(BusinessRuleError, match="未完成流式工具调用验证"):
+        async for _event in service.stream_turn(async_db(db), payload, owner_id=owner.id):
+            raise AssertionError("stream_turn should fail before yielding events")
+
+    assert tool_provider.requests == []
 
 
 async def test_assistant_service_persists_continuation_compaction_snapshot_for_tool_loop(
@@ -1498,6 +1559,51 @@ async def test_assistant_service_replays_completed_turn_for_same_client_turn_id(
                 await service.turn(session, conflicting_model_payload, owner_id=owner_id)
 
             assert model_exc_info.value.code == "turn_idempotency_conflict"
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_service_stream_turn_replays_completed_turn_for_same_client_turn_id(
+    tmp_path,
+) -> None:
+    config_root = _build_config_root(tmp_path)
+    loader = ConfigLoader(config_root)
+    tool_provider = _FakeToolProvider()
+    assistant_store = AssistantConfigFileStore(tmp_path / "assistant-config")
+    turn_run_store = AssistantTurnRunStore(tmp_path / "turn-runs")
+    service = AssistantService(
+        assistant_rule_service=create_assistant_rule_service(config_store=assistant_store),
+        config_loader=loader,
+        credential_service_factory=_FakeCredentialService,
+        project_service=create_project_service(),
+        tool_provider=tool_provider,
+        template_renderer=SkillTemplateRenderer(),
+        turn_run_store=turn_run_store,
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-stream-idempotent-completed")
+    )
+
+    try:
+        with session_factory() as session:
+            owner_id = create_user(session).id
+        async with async_session_factory() as session:
+            payload = _build_turn_request(
+                stream=True,
+                messages=[AssistantMessageDTO(role="user", content="先给我一个方向。")],
+                model={"provider": "openai", "name": "gpt-4o-mini"},
+            )
+            first_events = [
+                event async for event in service.stream_turn(session, payload, owner_id=owner_id)
+            ]
+            replay_events = [
+                event async for event in service.stream_turn(session, payload, owner_id=owner_id)
+            ]
+
+            assert [event.event for event in replay_events] == ["run_started", "completed"]
+            assert replay_events[0].data["run_id"] == first_events[0].data["run_id"]
+            assert replay_events[1].data["content"] == first_events[-1].data["content"]
+            assert len(tool_provider.requests) == 1
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
 
@@ -4906,7 +5012,6 @@ async def test_assistant_service_applies_preferences_and_rules_to_agent_hook(tmp
         assistant_preferences_service=AssistantPreferencesService(
             project_service=create_project_service(),
             config_store=assistant_store,
-            credential_service_factory=_FakeCredentialService,
         ),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,
@@ -4924,10 +5029,10 @@ async def test_assistant_service_applies_preferences_and_rules_to_agent_hook(tmp
             owner = create_user(session)
             project = create_project(session, owner=owner)
         async with async_session_factory() as session:
-            await service.assistant_preferences_service.update_preferences(
+            await service.assistant_preferences_service.update_user_preferences(
                 session,
-                owner.id,
-                AssistantPreferencesUpdateDTO(
+                owner_id=owner.id,
+                payload=AssistantPreferencesUpdateDTO(
                     default_provider="anthropic",
                     default_model_name="claude-sonnet-4",
                     default_max_output_tokens=8192,
@@ -5300,7 +5405,6 @@ async def test_assistant_service_applies_user_model_preferences(tmp_path) -> Non
         assistant_preferences_service=AssistantPreferencesService(
             project_service=create_project_service(),
             config_store=assistant_store,
-            credential_service_factory=_FakeCredentialService,
         ),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,
@@ -5317,10 +5421,10 @@ async def test_assistant_service_applies_user_model_preferences(tmp_path) -> Non
         with session_factory() as session:
             owner = create_user(session)
         async with async_session_factory() as session:
-            await service.assistant_preferences_service.update_preferences(
+            await service.assistant_preferences_service.update_user_preferences(
                 session,
-                owner.id,
-                AssistantPreferencesUpdateDTO(
+                owner_id=owner.id,
+                payload=AssistantPreferencesUpdateDTO(
                     default_provider="openai",
                     default_model_name="gpt-5.4",
                     default_reasoning_effort="high",
@@ -5351,7 +5455,6 @@ async def test_assistant_service_project_preferences_override_user_preferences(t
         assistant_preferences_service=AssistantPreferencesService(
             project_service=create_project_service(),
             config_store=assistant_store,
-            credential_service_factory=_FakeCredentialService,
         ),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,
@@ -5418,7 +5521,6 @@ async def test_assistant_service_clears_stale_provider_native_reasoning_when_tar
         assistant_preferences_service=AssistantPreferencesService(
             project_service=create_project_service(),
             config_store=assistant_store,
-            credential_service_factory=_FakeCredentialService,
         ),
         config_loader=loader,
         credential_service_factory=_FakeCredentialService,

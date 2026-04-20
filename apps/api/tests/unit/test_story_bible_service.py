@@ -5,13 +5,13 @@ import asyncio
 import pytest
 
 from app.modules.context.models import StoryFact
-from app.modules.context.service import (
+from app.modules.context.service.dto import (
     StoryFactConflictStatus,
     StoryFactCreateDTO,
     StoryFactCreateResolution,
     StoryFactMutationAction,
-    create_story_bible_service,
 )
+from app.modules.context.service.story_bible_factory import create_story_bible_service
 from app.shared.runtime.errors import BusinessRuleError
 from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_content, create_content_version, create_project, create_user

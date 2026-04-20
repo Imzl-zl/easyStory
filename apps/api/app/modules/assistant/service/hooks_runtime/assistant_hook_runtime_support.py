@@ -7,15 +7,9 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.config_registry.schemas import HookConfig, ModelConfig
-from app.shared.runtime import PluginRegistry, SkillTemplateRenderer
+from app.shared.runtime.plugins.plugin_registry import PluginRegistry
 
-from ..agents.assistant_agent_service import AssistantAgentService
 from ..assistant_execution_support import (
-    build_hook_agent_variables,
-    hook_agent_response_format,
-    require_agent_skill,
-    resolve_hook_agent_model,
-    resolve_hook_agent_output,
     validate_retry_policy,
 )
 from .assistant_hook_support import (
@@ -25,9 +19,6 @@ from .assistant_hook_support import (
     resolve_assistant_hooks_for_event,
     serialize_hook_error,
 )
-from ..rules.assistant_rule_service import AssistantRuleService
-from ..rules.assistant_rule_support import build_assistant_system_prompt
-from ..skills.assistant_skill_service import AssistantSkillService
 from ..turn.assistant_turn_error_support import (
     build_request_error_hook_payload,
     mark_on_error_hooks_run,
@@ -35,68 +26,6 @@ from ..turn.assistant_turn_error_support import (
 )
 from ..turn.assistant_turn_runtime_support import PreparedAssistantTurn
 from ..dto import AssistantHookResultDTO, AssistantTurnRequestDTO
-from ..preferences.preferences_service import AssistantPreferencesService
-
-
-async def run_assistant_agent_hook(
-    context: AssistantHookExecutionContext,
-    *,
-    agent_id: str,
-    input_mapping: dict[str, str],
-    assistant_agent_service: AssistantAgentService,
-    assistant_skill_service: AssistantSkillService,
-    assistant_preferences_service: AssistantPreferencesService,
-    assistant_rule_service: AssistantRuleService,
-    template_renderer: SkillTemplateRenderer,
-    llm_caller,
-) -> Any:
-    agent = assistant_agent_service.resolve_agent(
-        agent_id,
-        owner_id=context.owner_id,
-        allow_disabled=True,
-    )
-    skill = require_agent_skill(
-        lambda skill_id: assistant_skill_service.resolve_skill(
-            skill_id,
-            owner_id=context.owner_id,
-            project_id=context.project_id,
-            allow_disabled=True,
-        ),
-        agent,
-    )
-    variables = build_hook_agent_variables(context, input_mapping)
-    prompt = template_renderer.render(skill.prompt, variables)
-    preferences = await assistant_preferences_service.resolve_preferences(
-        context.db,
-        owner_id=context.owner_id,
-        project_id=context.project_id,
-    )
-    model = resolve_hook_agent_model(
-        agent=agent,
-        skill=skill,
-        preferences=preferences,
-        assistant_model=context.assistant_model,
-    )
-    rule_bundle = await assistant_rule_service.build_rule_bundle(
-        context.db,
-        owner_id=context.owner_id,
-        project_id=context.project_id,
-    )
-    system_prompt = build_assistant_system_prompt(
-        agent.system_prompt,
-        user_content=rule_bundle.user_content,
-        project_content=rule_bundle.project_content,
-    )
-    raw_output = await llm_caller(
-        context.db,
-        prompt=prompt,
-        system_prompt=system_prompt,
-        model=model,
-        owner_id=context.owner_id,
-        project_id=context.project_id,
-        response_format=hook_agent_response_format(agent),
-    )
-    return resolve_hook_agent_output(agent, raw_output.get("content"))
 
 
 async def run_assistant_hook_event(

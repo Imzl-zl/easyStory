@@ -8,16 +8,15 @@ import { AssistantPreferencesPanel } from "@/features/settings/components/assist
 import { AssistantRulesEditor } from "@/features/settings/components/assistant/rules/assistant-rules-editor";
 import { AssistantSkillsPanel } from "@/features/settings/components/assistant/skills/assistant-skills-panel";
 import { getErrorMessage } from "@/lib/api/client";
-import { checkProjectSetting, getProject } from "@/lib/api/projects";
+import { getProject } from "@/lib/api/projects";
 
 type ProjectSettingsContentProps = {
-  completeness: Awaited<ReturnType<typeof checkProjectSetting>> | undefined;
   eventType: string | null;
   onEventTypeChange: (eventType: string | null) => void;
   onProjectMcpDirtyChange: (isDirty: boolean) => void;
   onProjectPreferencesDirtyChange: (isDirty: boolean) => void;
+  onProjectBriefDirtyChange: (isDirty: boolean) => void;
   onProjectRulesDirtyChange: (isDirty: boolean) => void;
-  onProjectSettingDirtyChange: (isDirty: boolean) => void;
   onProjectSkillsDirtyChange: (isDirty: boolean) => void;
   projectError: unknown;
   projectId: string;
@@ -27,13 +26,12 @@ type ProjectSettingsContentProps = {
 };
 
 export function ProjectSettingsContent({
-  completeness,
   eventType,
   onEventTypeChange,
   onProjectMcpDirtyChange,
   onProjectPreferencesDirtyChange,
+  onProjectBriefDirtyChange,
   onProjectRulesDirtyChange,
-  onProjectSettingDirtyChange,
   onProjectSkillsDirtyChange,
   projectError,
   projectId,
@@ -41,7 +39,7 @@ export function ProjectSettingsContent({
   projectSetting,
   tab,
 }: Readonly<ProjectSettingsContentProps>) {
-  if (tab === "setting" && projectLoading) {
+  if (tab === "brief" && projectLoading) {
     return (
       <div className="rounded-2xl bg-surface shadow-sm p-6">
         <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-text-secondary">
@@ -59,11 +57,10 @@ export function ProjectSettingsContent({
           <p>{getErrorMessage(projectError)}</p>
         </div>
       ) : null}
-      {tab === "setting" && !projectError ? (
+      {tab === "brief" && !projectError ? (
         <div className="rounded-2xl bg-surface shadow-sm p-6">
           <ProjectSettingSummaryPanel
-            completeness={completeness}
-            onDirtyChange={onProjectSettingDirtyChange}
+            onDirtyChange={onProjectBriefDirtyChange}
             projectId={projectId}
             projectSetting={projectSetting}
           />

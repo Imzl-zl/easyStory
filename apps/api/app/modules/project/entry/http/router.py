@@ -33,7 +33,6 @@ from app.modules.project.service import (
     ProjectSettingUpdateDTO,
     ProjectSummaryDTO,
     ProjectUpdateDTO,
-    SettingCompletenessResultDTO,
     create_project_deletion_service,
     create_project_document_capability_service,
     create_project_incubator_service,
@@ -388,23 +387,6 @@ async def update_project_setting(
         db,
         project_id,
         payload,
-        owner_id=current_user.id,
-    )
-
-
-@router.post(
-    "/{project_id}/setting/complete-check",
-    response_model=SettingCompletenessResultDTO,
-)
-async def check_project_setting_completeness(
-    project_id: uuid.UUID,
-    project_service: ProjectService = Depends(get_project_service),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_db_session),
-) -> SettingCompletenessResultDTO:
-    return await project_service.check_setting_completeness(
-        db,
-        project_id,
         owner_id=current_user.id,
     )
 

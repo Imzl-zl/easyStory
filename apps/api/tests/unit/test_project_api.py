@@ -129,13 +129,6 @@ async def test_project_api_manages_project_lifecycle(monkeypatch, tmp_path) -> N
             assert hidden_response.status_code == 404
             assert hidden_response.json()["code"] == "not_found"
 
-            check_response = await client.post(
-                f"/api/v1/projects/{project_id}/setting/complete-check",
-                headers=_auth_headers(owner_id),
-            )
-            assert check_response.status_code == 404
-            assert check_response.json()["code"] == "not_found"
-
             trash_response = await client.get(
                 "/api/v1/projects",
                 params={"deleted_only": "true"},

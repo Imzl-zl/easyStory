@@ -6,7 +6,7 @@ import uuid
 
 from app.modules.assistant.service.dto import AssistantTurnRequestDTO
 from app.modules.credential.models import ModelCredential
-from app.shared.runtime.llm.llm_protocol import HttpJsonResponse
+from app.shared.runtime.llm.llm_protocol_types import HttpJsonResponse
 
 
 class _FakeCrypto:

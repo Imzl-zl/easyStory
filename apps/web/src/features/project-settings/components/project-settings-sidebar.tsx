@@ -2,7 +2,6 @@
 
 import { GuardedLink } from "@/components/ui/guarded-link";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { PreparationStatusPanel } from "@/features/project/components/preparation-status-panel";
 import {
   AuditIcon,
   AssistantIcon,
@@ -56,12 +55,12 @@ export function ProjectSettingsSidebar({
 
       <nav className="mt-4 space-y-1" role="tablist" aria-label="项目设置导航">
         <TabButton
-          active={tab === "setting"}
+          active={tab === "brief"}
           disabled={isPending}
-          dirty={dirtyState.setting}
+          dirty={dirtyState.brief}
           icon={<SettingsIcon className="w-4 h-4" />}
           label="摘要"
-          onClick={() => onSelectTab("setting")}
+          onClick={() => onSelectTab("brief")}
         />
         <TabButton
           active={tab === "rules"}
@@ -108,7 +107,7 @@ export function ProjectSettingsSidebar({
       <div className="mt-4 space-y-2">
         <GuardedLink
           className="ink-link-button w-full justify-center"
-          href={`/workspace/project/${projectId}/studio?panel=setting`}
+          href={`/workspace/project/${projectId}/studio?panel=overview&doc=${encodeURIComponent("项目说明.md")}`}
           isDirty={isDirty}
           onNavigate={onNavigate}
         >
@@ -133,10 +132,6 @@ export function ProjectSettingsSidebar({
           <KeyIcon className="w-3.5 h-3.5" />
           项目凭证
         </GuardedLink>
-      </div>
-
-      <div className="mt-4">
-        <PreparationStatusPanel projectId={projectId} />
       </div>
     </div>
   );

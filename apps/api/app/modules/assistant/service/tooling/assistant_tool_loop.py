@@ -7,52 +7,33 @@ from typing import Any, TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.runtime.llm.llm_protocol import LLMContinuationSupport
+from app.shared.runtime.llm.llm_protocol_types import LLMContinuationSupport
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
 from app.shared.runtime.llm.llm_tool_provider import LLMGenerateToolResponse
 
 from ..assistant_run_budget import AssistantRunBudget, build_assistant_run_budget
-from ..assistant_runtime_terminal import (
-    AssistantRuntimeTerminalError,
-    build_cancel_requested_terminal_error,
-)
 from .assistant_tool_exposure_policy import AssistantToolExposurePolicy
 from .assistant_tool_executor import AssistantToolExecutor
 from .assistant_tool_loop_context_support import (
-    _build_continuation_request_snapshot,
-    _build_pending_tool_calls_snapshot,
     _build_tool_execution_context,
     _build_tool_exposure_context,
-    _record_tool_loop_state,
-)
-from .assistant_tool_loop_budget_support import apply_tool_loop_request_budget
-from .assistant_tool_loop_output_support import (
-    _UsageTotals,
-    _append_intermediate_text_item,
-    _build_final_response_normalized_input_items,
-    _build_final_output,
-    _build_tool_cycle_normalized_input_items,
-    _build_tool_cycle_continuation_items,
-    _build_tool_cycle_output_items,
-    _merge_usage_totals,
-    _resolve_provider_continuation_state,
 )
 from .assistant_tool_loop_plan_support import (
     _build_policy_decision_by_name,
-    _plan_tool_cycle_calls,
 )
 from .assistant_tool_loop_result_support import (
-    AssistantToolStatePersistError,
-    _build_cancelled_tool_call_result_payload,
     _coerce_recoverable_tool_error,
-    _build_failed_tool_call_result_payload,
-    _build_state_persist_failed_tool_call_result_payload,
-    _build_tool_call_result_payload,
-    _build_tool_call_start_payload,
     _execute_tool_call_with_timeout,
-    _tool_result_committed_write,
 )
+from .assistant_tool_loop_runtime import (
+    AssistantToolLoopIterationItem,
+    AssistantToolLoopModelStreamEvent,
+    AssistantToolLoopRuntime,
+    ToolModelCaller,
+    ToolStreamModelCaller,
+)
+from .assistant_tool_loop_runtime_support import raise_if_cancelled
 from .assistant_tool_loop_step_support import (
     _build_cancelled_tool_step_record,
     _build_completed_tool_step_record,
@@ -73,28 +54,12 @@ if TYPE_CHECKING:
     from ..turn.assistant_turn_runtime_support import AssistantTurnContext
 
 
-ToolModelCaller = Callable[..., Awaitable[LLMGenerateToolResponse]]
-ToolStreamModelCaller = Callable[..., AsyncIterator["AssistantToolLoopModelStreamEvent"]]
 DEFAULT_ASSISTANT_TOOL_LOOP_MAX_ITERATIONS = 8
 
 
 @dataclass(frozen=True)
 class AssistantToolLoopResult:
     raw_output: LLMGenerateToolResponse
-
-
-@dataclass(frozen=True)
-class AssistantToolLoopIterationItem:
-    event_name: str | None = None
-    event_payload: dict[str, Any] | None = None
-    raw_output: LLMGenerateToolResponse | None = None
-    raw_output_already_streamed: bool = False
-
-
-@dataclass(frozen=True)
-class AssistantToolLoopModelStreamEvent:
-    delta: str | None = None
-    raw_output: LLMGenerateToolResponse | None = None
 
 
 class AssistantToolLoop:
@@ -291,233 +256,26 @@ class AssistantToolLoop:
             )
         )
         policy_decision_by_name = _build_policy_decision_by_name(resolved_policy_decisions)
-        if not tool_schemas:
-            await _raise_if_cancelled(should_stop)
-            apply_tool_loop_request_budget(
-                prompt=prompt,
-                system_prompt=system_prompt,
-                tool_schemas=[],
-                continuation_items=(),
-                provider_continuation_state=None,
-                continuation_support=continuation_support,
-                run_budget=resolved_run_budget,
-            )
-            yield AssistantToolLoopIterationItem(
-                raw_output=initial_raw_output
-                or await model_caller(
-                    prompt=prompt,
-                    system_prompt=system_prompt,
-                    tools=[],
-                )
-            )
-            return
-        usage = _UsageTotals()
-        output_items: list[dict[str, Any]] = []
-        continuation_items: list[dict[str, Any]] = []
-        normalized_input_items = list(getattr(turn_context, "normalized_input_items", []))
-        provider_continuation_state: dict[str, Any] | None = None
-        continuation_request_snapshot: dict[str, Any] | None = None
-        continuation_compaction_snapshot: dict[str, Any] | None = None
-        write_effective = False
-        pending_output = initial_raw_output
-        pending_output_already_streamed = False
-        iteration = 0
-        step_index = 0
-        tool_cycle_index = 0
-        while True:
-            iteration += 1
-            if iteration > self.max_iterations:
-                raise AssistantRuntimeTerminalError(
-                    code="tool_loop_exhausted",
-                    message="本轮工具调用次数已达上限，已停止继续执行。",
-                )
-            await _raise_if_cancelled(
-                should_stop,
-                write_effective=write_effective,
-            )
-            if pending_output is None:
-                (
-                    request_continuation_items,
-                    request_provider_state,
-                    request_continuation_compaction_snapshot,
-                ) = apply_tool_loop_request_budget(
-                    prompt=prompt,
-                    system_prompt=system_prompt,
-                    tool_schemas=tool_schemas,
-                    continuation_items=tuple(continuation_items),
-                    provider_continuation_state=provider_continuation_state,
-                    continuation_support=continuation_support,
-                    run_budget=resolved_run_budget,
-                )
-                continuation_request_snapshot = _build_continuation_request_snapshot(
-                    continuation_items=tuple(request_continuation_items),
-                    provider_continuation_state=request_provider_state,
-                )
-                if request_continuation_compaction_snapshot is not None:
-                    continuation_compaction_snapshot = request_continuation_compaction_snapshot
-                _record_tool_loop_state(
-                    state_recorder,
-                    pending_tool_calls_snapshot=(),
-                    provider_continuation_state=request_provider_state,
-                    normalized_input_items_snapshot=tuple(normalized_input_items),
-                    continuation_request_snapshot=continuation_request_snapshot,
-                    continuation_compaction_snapshot=continuation_compaction_snapshot,
-                    write_effective=write_effective,
-                )
-                async for model_item in _iterate_model_response(
-                    prompt=prompt,
-                    system_prompt=system_prompt,
-                    tools=tool_schemas,
-                    continuation_items=tuple(request_continuation_items),
-                    provider_continuation_state=request_provider_state,
-                    model_caller=model_caller,
-                    stream_model_caller=stream_model_caller,
-                ):
-                    if model_item.raw_output is None:
-                        yield model_item
-                        continue
-                    pending_output = model_item.raw_output
-                    pending_output_already_streamed = model_item.raw_output_already_streamed
-            raw_output = pending_output
-            pending_output = None
-            raw_output_already_streamed = pending_output_already_streamed
-            pending_output_already_streamed = False
-            _merge_usage_totals(usage, raw_output)
-            tool_calls = _read_tool_calls(raw_output)
-            if not tool_calls:
-                final_normalized_items = _build_final_response_normalized_input_items(raw_output)
-                if final_normalized_items:
-                    normalized_input_items.extend(final_normalized_items)
-                _record_tool_loop_state(
-                    state_recorder,
-                    pending_tool_calls_snapshot=(),
-                    provider_continuation_state=provider_continuation_state,
-                    normalized_input_items_snapshot=tuple(normalized_input_items),
-                    continuation_request_snapshot=continuation_request_snapshot,
-                    continuation_compaction_snapshot=continuation_compaction_snapshot,
-                    write_effective=write_effective,
-                )
-                yield AssistantToolLoopIterationItem(
-                    raw_output=_build_final_output(
-                        turn_context=turn_context,
-                        raw_output=raw_output,
-                        usage=usage,
-                        output_items=output_items,
-                    ),
-                    raw_output_already_streamed=raw_output_already_streamed,
-                )
-                return
-            _record_tool_loop_state(
-                state_recorder,
-                pending_tool_calls_snapshot=_build_pending_tool_calls_snapshot(tool_calls),
-                provider_continuation_state=provider_continuation_state,
-                normalized_input_items_snapshot=tuple(normalized_input_items),
-                continuation_request_snapshot=continuation_request_snapshot,
-                continuation_compaction_snapshot=continuation_compaction_snapshot,
-                write_effective=write_effective,
-            )
-            _append_intermediate_text_item(output_items, turn_context, raw_output)
-            tool_results: list[AssistantToolResultEnvelope] = []
-            planned_tool_calls, step_index = _plan_tool_cycle_calls(
-                tool_calls=tool_calls,
-                policy_decision_by_name=policy_decision_by_name,
-                require_tool_descriptor=self._require_tool_descriptor,
-                run_budget=resolved_run_budget,
-                step_index=step_index,
-            )
-            for planned_tool_call in planned_tool_calls:
-                await _raise_if_cancelled(should_stop)
-                yield AssistantToolLoopIterationItem(
-                    event_name="tool_call_start",
-                    event_payload=_build_tool_call_start_payload(planned_tool_call.tool_call),
-                )
-                try:
-                    tool_result = await self._execute_single_tool_call(
-                        db,
-                        step_index=planned_tool_call.step_index,
-                        turn_context=turn_context,
-                        owner_id=owner_id,
-                        project_id=project_id,
-                        tool_call=planned_tool_call.tool_call,
-                        descriptor=planned_tool_call.descriptor,
-                        tool_policy_decision=planned_tool_call.tool_policy_decision,
-                        should_stop=should_stop,
-                    )
-                except StreamInterruptedError:
-                    yield AssistantToolLoopIterationItem(
-                        event_name="tool_call_result",
-                        event_payload=_build_cancelled_tool_call_result_payload(
-                            planned_tool_call.tool_call,
-                        ),
-                    )
-                    raise
-                except AssistantToolStatePersistError as exc:
-                    yield AssistantToolLoopIterationItem(
-                        event_name="tool_call_result",
-                        event_payload=_build_state_persist_failed_tool_call_result_payload(
-                            planned_tool_call.tool_call,
-                            exc,
-                        ),
-                    )
-                    raise
-                except Exception as exc:
-                    yield AssistantToolLoopIterationItem(
-                        event_name="tool_call_result",
-                        event_payload=_build_failed_tool_call_result_payload(
-                            planned_tool_call.tool_call,
-                            exc,
-                        ),
-                    )
-                    raise
-                tool_results.append(tool_result)
-                write_effective = write_effective or _tool_result_committed_write(
-                    descriptor=planned_tool_call.descriptor,
-                    result=tool_result,
-                )
-                yield AssistantToolLoopIterationItem(
-                    event_name="tool_call_result",
-                    event_payload=_build_tool_call_result_payload(
-                        planned_tool_call.tool_call,
-                        tool_result,
-                        descriptor=planned_tool_call.descriptor,
-                    ),
-                )
-            cycle_output_items = _build_tool_cycle_output_items(
-                turn_context=turn_context,
-                start_index=len(output_items),
-                tool_calls=tool_calls,
-                tool_results=tool_results,
-            )
-            output_items.extend(cycle_output_items)
-            normalized_input_items.extend(
-                _build_tool_cycle_normalized_input_items(
-                    raw_output=raw_output,
-                    tool_calls=tool_calls,
-                    tool_results=tool_results,
-                )
-            )
-            cycle_continuation_items = _build_tool_cycle_continuation_items(
-                raw_output=raw_output,
-                tool_calls=tool_calls,
-                tool_results=tool_results,
-                tool_cycle_index=tool_cycle_index,
-            )
-            continuation_items.extend(cycle_continuation_items)
-            provider_continuation_state = _resolve_provider_continuation_state(
-                raw_output=raw_output,
-                latest_items=cycle_continuation_items,
-                continuation_support=continuation_support,
-            )
-            _record_tool_loop_state(
-                state_recorder,
-                pending_tool_calls_snapshot=(),
-                provider_continuation_state=provider_continuation_state,
-                normalized_input_items_snapshot=tuple(normalized_input_items),
-                continuation_request_snapshot=continuation_request_snapshot,
-                continuation_compaction_snapshot=continuation_compaction_snapshot,
-                write_effective=write_effective,
-            )
-            tool_cycle_index += 1
+        runtime = AssistantToolLoopRuntime(
+            tool_loop=self,
+            db=db,
+            turn_context=turn_context,
+            owner_id=owner_id,
+            project_id=project_id,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            continuation_support=continuation_support,
+            model_caller=model_caller,
+            stream_model_caller=stream_model_caller,
+            initial_raw_output=initial_raw_output,
+            run_budget=resolved_run_budget,
+            tool_schemas=tool_schemas,
+            policy_decision_by_name=policy_decision_by_name,
+            state_recorder=state_recorder,
+            should_stop=should_stop,
+        )
+        async for item in runtime.iterate():
+            yield item
 
     async def _execute_single_tool_call(
         self,
@@ -559,7 +317,7 @@ class AssistantToolLoop:
             )
         )
         try:
-            await _raise_if_cancelled(should_stop)
+            await raise_if_cancelled(should_stop)
         except StreamInterruptedError:
             self._append_step_snapshot(
                 _build_cancelled_tool_step_record(
@@ -635,6 +393,14 @@ class AssistantToolLoop:
         self.step_store.append_step(record)
 
 
+__all__ = [
+    "AssistantToolLoop",
+    "AssistantToolLoopIterationItem",
+    "AssistantToolLoopModelStreamEvent",
+    "AssistantToolLoopResult",
+]
+
+
 def _serialize_tool_schema(descriptor: AssistantToolDescriptor) -> dict[str, Any]:
     return {
         "name": descriptor.name,
@@ -642,43 +408,6 @@ def _serialize_tool_schema(descriptor: AssistantToolDescriptor) -> dict[str, Any
         "parameters": descriptor.input_schema,
         "strict": descriptor.strict,
     }
-
-
-def _read_tool_calls(raw_output: dict[str, Any]) -> list[dict[str, Any]]:
-    tool_calls = raw_output.get("tool_calls")
-    if tool_calls is None:
-        return []
-    if not isinstance(tool_calls, list):
-        raise ConfigurationError("LLM tool_calls must be an array")
-    normalized: list[dict[str, Any]] = []
-    for item in tool_calls:
-        if not isinstance(item, dict):
-            raise ConfigurationError("LLM tool_calls entries must be objects")
-        tool_call_id = item.get("tool_call_id")
-        tool_name = item.get("tool_name")
-        if not isinstance(tool_call_id, str) or not tool_call_id.strip():
-            raise ConfigurationError("LLM tool_call_id must be a non-empty string")
-        if not isinstance(tool_name, str) or not tool_name.strip():
-            raise ConfigurationError("LLM tool_name must be a non-empty string")
-        normalized.append(
-            {
-                "tool_call_id": tool_call_id,
-                "tool_name": tool_name,
-                "arguments": _normalize_tool_call_arguments(item),
-                "arguments_text": _read_optional_tool_call_string(item.get("arguments_text")),
-                "arguments_error": _read_optional_tool_call_string(item.get("arguments_error")),
-                "provider_ref": item.get("provider_ref"),
-                "provider_payload": _read_optional_record(item.get("provider_payload")),
-            }
-        )
-    return normalized
-
-
-def _normalize_tool_call_arguments(item: dict[str, Any]) -> dict[str, Any]:
-    arguments = item.get("arguments")
-    if isinstance(arguments, dict):
-        return arguments
-    return {}
 
 
 def _read_optional_tool_call_string(value: Any) -> str | None:
@@ -690,70 +419,3 @@ def _read_optional_tool_call_string(value: Any) -> str | None:
 
 def _read_tool_call_arguments_error(tool_call: dict[str, Any]) -> str | None:
     return _read_optional_tool_call_string(tool_call.get("arguments_error"))
-
-
-async def _iterate_model_response(
-    *,
-    prompt: str,
-    system_prompt: str | None,
-    tools: list[dict[str, Any]],
-    continuation_items: tuple[dict[str, Any], ...],
-    provider_continuation_state: dict[str, Any] | None,
-    model_caller: ToolModelCaller,
-    stream_model_caller: ToolStreamModelCaller | None,
-) -> AsyncIterator[AssistantToolLoopIterationItem]:
-    if stream_model_caller is None:
-        yield AssistantToolLoopIterationItem(
-            raw_output=await model_caller(
-                prompt=prompt,
-                system_prompt=system_prompt,
-                tools=tools,
-                continuation_items=list(continuation_items),
-                provider_continuation_state=provider_continuation_state,
-            )
-        )
-        return
-    streamed_output = False
-    raw_output: dict[str, Any] | None = None
-    async for event in stream_model_caller(
-        prompt=prompt,
-        system_prompt=system_prompt,
-        tools=tools,
-        continuation_items=list(continuation_items),
-        provider_continuation_state=provider_continuation_state,
-    ):
-        if event.delta:
-            streamed_output = True
-            yield AssistantToolLoopIterationItem(
-                event_name="chunk",
-                event_payload={"delta": event.delta},
-            )
-        if event.raw_output is not None:
-            raw_output = event.raw_output
-    if raw_output is None:
-        raise ConfigurationError("Streaming continuation completed without final output")
-    yield AssistantToolLoopIterationItem(
-        raw_output=raw_output,
-        raw_output_already_streamed=streamed_output,
-    )
-
-
-async def _raise_if_cancelled(
-    should_stop: Callable[[], Awaitable[bool]] | None,
-    *,
-    write_effective: bool = False,
-) -> None:
-    if should_stop is None:
-        return
-    if await should_stop():
-        if write_effective:
-            raise build_cancel_requested_terminal_error(write_effective=True)
-        raise StreamInterruptedError()
-
-
-def _read_optional_string(value: Any) -> str | None:
-    return value if isinstance(value, str) and value.strip() else None
-
-
-def _read_optional_record(value: Any) -> dict[str, Any] | None:
-    return value if isinstance(value, dict) else None

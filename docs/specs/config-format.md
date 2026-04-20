@@ -251,7 +251,7 @@ model:
 
 字段说明：
 
-- `id`：必填，skill 唯一标识；用户层当前统一由后端生成 `skill.user.*`，项目层统一由后端生成 `skill.project.*`
+- `id`：必填，skill 唯一标识；若走普通创建，用户层默认由后端生成 `skill.user.*`、项目层默认生成 `skill.project.*`；若目标是覆盖同 ID 的用户层或系统层 Skill，则应显式使用要覆盖的那个 `id`
 - `name`：必填，显示名称
 - `enabled`：可选，默认 `true`；关闭后不会出现在聊天页 Skill 切换里
 - `description`：可选，一句简短说明
@@ -321,7 +321,7 @@ mcp_server:
 
 字段说明：
 
-- `id`：必填，MCP 唯一标识；用户层当前统一由后端生成 `mcp.user.*`，项目层统一由后端生成 `mcp.project.*`
+- `id`：必填，MCP 唯一标识；若走普通创建，用户层默认由后端生成 `mcp.user.*`、项目层默认生成 `mcp.project.*`；若目标是覆盖同 ID 的用户层或系统层 MCP，则应显式使用要覆盖的那个 `id`
 - `name`：必填，显示名称
 - `description`：可选，一句简短说明
 - `enabled`：可选，默认 `true`；停用后不会被 Hook 或运行时调用

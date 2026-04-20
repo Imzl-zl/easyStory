@@ -6,7 +6,11 @@ from typing import Literal
 from ..errors import ConfigurationError
 from .interop.tool_schema_compiler import ToolSchemaMode
 from .interop.tool_name_codec import ToolNamePolicy
-from .llm_protocol_types import normalize_api_dialect
+from .llm_protocol_types import (
+    LLMContinuationSupport,
+    normalize_api_dialect,
+    resolve_continuation_support,
+)
 
 LlmInteropProfile = Literal[
     "responses_strict",
@@ -83,6 +87,26 @@ def resolve_interop_capabilities(
     if dialect == "gemini_generate_content":
         return LLMInteropCapabilities(profile=None, tool_schema_mode="gemini_compatible")
     raise ConfigurationError(f"Unsupported api_dialect for interop capabilities: {dialect}")
+
+
+def resolve_connection_continuation_support(
+    api_dialect: str | None,
+    interop_profile: str | None = None,
+) -> LLMContinuationSupport:
+    support = resolve_continuation_support(api_dialect)
+    if normalize_api_dialect(api_dialect) != "openai_responses":
+        return support
+    capabilities = resolve_interop_capabilities(
+        api_dialect,
+        interop_profile,
+    )
+    if capabilities.supports_provider_response_continuation:
+        return support
+    return LLMContinuationSupport(
+        continuation_mode="runtime_replay",
+        tolerates_interleaved_tool_results=False,
+        requires_full_replay_after_local_tools=True,
+    )
 
 
 def _resolve_responses_capabilities(

@@ -21,7 +21,7 @@ from app.modules.project.service.project_document_support import (
     TIMELINE_INDEX_DOCUMENT_PATH,
     TURNING_POINTS_DOCUMENT_PATH,
 )
-from app.shared.runtime import SkillTemplateRenderer
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 from app.shared.runtime.token_counter import TokenCounter
 
 from .assistant_prompt_render_support import render_prompt

@@ -8,7 +8,6 @@ class McpServerConfigSummaryDTO(StrictSchema):
     name: str
     version: str
     description: str | None
-    author: str | None = None
     transport: str
     url: str
     timeout: int
@@ -21,7 +20,6 @@ class McpServerConfigDetailDTO(StrictSchema):
     name: str
     version: str
     description: str | None
-    author: str | None = None
     transport: str
     url: str
     headers: dict[str, str]

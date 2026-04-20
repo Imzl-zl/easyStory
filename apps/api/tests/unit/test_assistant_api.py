@@ -23,7 +23,7 @@ from app.modules.assistant.service.assistant_service import AssistantService, As
 from app.modules.assistant.service.turn.assistant_turn_run_store import AssistantTurnRunStore
 from app.modules.config_registry import ConfigLoader
 from app.modules.project.service import create_project_service
-from app.shared.runtime import SkillTemplateRenderer
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
 
 

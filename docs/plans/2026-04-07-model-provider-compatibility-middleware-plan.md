@@ -317,7 +317,7 @@ easyStory 当前不是单一模型通道，而是要同时覆盖：
 
 ### 6.3 第 2 层：协议族请求适配器
 
-在现有 [llm_protocol_requests.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm_protocol_requests.py) 基础上继续稳定 4 个 builder：
+在现有 [llm_protocol_requests.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm/llm_protocol_requests.py) 基础上继续稳定 4 个 builder：
 
 - `openai_responses`
 - `openai_chat_completions`
@@ -334,7 +334,7 @@ easyStory 当前不是单一模型通道，而是要同时覆盖：
 
 ### 6.4 第 3 层：流式协议事件归一化器
 
-在现有 [provider_interop_stream_support.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/provider_interop_stream_support.py) 基础上拆成两部分责任：
+在现有 [provider_interop_stream_support.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm/interop/provider_interop_stream_support.py) 基础上拆成两部分责任：
 
 1. **SSE reader**
    - 只负责稳定读取事件
@@ -361,7 +361,7 @@ easyStory 当前不是单一模型通道，而是要同时覆盖：
 当前真实调用链也要写清楚，避免低估 Phase 2 的影响面：
 
 - `iterate_stream_request()` 当前仍在 `provider_interop_stream_support.py`
-- [llm_tool_provider.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm_tool_provider.py) 直接消费 `build_stream_probe_request() -> iterate_stream_request() -> build_stream_completion()`
+- [llm_tool_provider.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm/llm_tool_provider.py) 直接消费 `build_stream_probe_request() -> iterate_stream_request() -> build_stream_completion()`
 - [verifier.py](/home/zl/code/easyStory/apps/api/app/modules/credential/infrastructure/verifier.py) 通过 `execute_stream_probe_request()` 复用同一条链
 - `provider_interop_support.py` / `provider_interop_check.py` 也通过这套 shared runtime contract 工作
 
@@ -533,14 +533,14 @@ apps/api/app/shared/runtime/
 
 ### 7.1 为什么不是简单拆成 `llm/ + mcp/`
 
-当前 [plugin_providers.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/plugin_providers.py) 并不是纯 MCP 代码。它同时实现：
+当前 [plugin_providers.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/plugins/plugin_providers.py) 并不是纯 MCP 代码。它同时实现：
 
 - `ScriptPluginProvider`
 - `WebhookPluginProvider`
 - `AgentPluginProvider`
 - `McpPluginProvider`
 
-而 [plugin_registry.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/plugin_registry.py) 也是通用注册器，不只服务 MCP。
+而 [plugin_registry.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/plugins/plugin_registry.py) 也是通用注册器，不只服务 MCP。
 
 因此如果把 `plugin_*` 直接塞进 `mcp/`，会重新制造“目录按名字看像 MCP，实际职责是通用 plugin runtime”的语义漂移。
 
@@ -549,9 +549,9 @@ apps/api/app/shared/runtime/
 这几条边界需要在目录迁移时保持不变：
 
 - [tool_provider.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/tool_provider.py) 是抽象契约
-- [llm_tool_provider.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm_tool_provider.py) 是 `ToolProvider` 的 LLM 实现
-- [mcp_client.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/mcp_client.py) 是 MCP 调用 contract
-- [plugin_registry.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/plugin_registry.py) / [plugin_providers.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/plugin_providers.py) 是 plugin runtime
+- [llm_tool_provider.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm/llm_tool_provider.py) 是 `ToolProvider` 的 LLM 实现
+- [mcp_client.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/mcp/mcp_client.py) 是 MCP 调用 contract
+- [plugin_registry.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/plugins/plugin_registry.py) / [plugin_providers.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/plugins/plugin_providers.py) 是 plugin runtime
 
 目录迁移只能改变文件归属，不能把这些 contract 合并成新的“大而全运行时”。
 
@@ -559,17 +559,17 @@ apps/api/app/shared/runtime/
 
 当前 `shared/runtime` 里已有几个明显超出舒适体量的高密度文件：
 
-- [llm_protocol_requests.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm_protocol_requests.py)
-- [llm_protocol_responses.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm_protocol_responses.py)
-- [provider_interop_stream_support.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/provider_interop_stream_support.py)
-- [llm_tool_provider.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm_tool_provider.py)
+- [llm_protocol_requests.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm/llm_protocol_requests.py)
+- [llm_protocol_responses.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm/llm_protocol_responses.py)
+- [provider_interop_stream_support.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm/interop/provider_interop_stream_support.py)
+- [llm_tool_provider.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm/llm_tool_provider.py)
 
 因此目录标准化不能只做“搬文件不拆职责”。后续实施时要遵守两条：
 
 - 先按子域迁移：`llm/`、`mcp/`、`plugins/`
 - 再在子域内继续拆职责，避免把 `800+` 行文件原样搬进新目录
 
-现有 [provider_interop_stream_support.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/provider_interop_stream_support.py) 最终应被拆薄，不再同时承担：
+现有 [provider_interop_stream_support.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm/interop/provider_interop_stream_support.py) 最终应被拆薄，不再同时承担：
 
 - HTTP 读流
 - 协议事件解析
@@ -578,8 +578,8 @@ apps/api/app/shared/runtime/
 
 拆分后的直接受影响调用方主要有：
 
-- [llm_tool_provider.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm_tool_provider.py)
-- [provider_interop_support.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/provider_interop_support.py)
+- [llm_tool_provider.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm/llm_tool_provider.py)
+- [provider_interop_support.py](/home/zl/code/easyStory/apps/api/app/shared/runtime/llm/interop/provider_interop_support.py)
 - [verifier.py](/home/zl/code/easyStory/apps/api/app/modules/credential/infrastructure/verifier.py)
 
 assistant 业务层原则上不直接受影响，因为它只应该继续消费 shared runtime 的统一 contract。

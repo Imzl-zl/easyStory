@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from app.modules.config_registry import ConfigLoader
 from app.modules.content.models import Content, ContentVersion
 from app.modules.workflow.models import ChapterTask, WorkflowExecution
-from app.modules.workflow.service import create_workflow_app_service, create_workflow_service
+from app.modules.workflow.service.factory import create_workflow_app_service, create_workflow_service
 from app.modules.workflow.service.dto import WorkflowStartDTO
 from app.shared.runtime.errors import NotFoundError
 from tests.unit.async_api_support import (

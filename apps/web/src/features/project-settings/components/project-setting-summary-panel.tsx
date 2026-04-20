@@ -5,27 +5,22 @@ import { useState } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
-  buildProjectSettingIssueSummary,
   buildProjectSettingSections,
-  formatProjectSettingFieldLabel,
 } from "@/features/project/components/project-setting-summary-support";
 import { ProjectSettingSummaryEditor } from "@/features/project-settings/components/project-setting-summary-editor";
 import type {
   ProjectSetting,
   ProjectSettingImpactSummary,
   ProjectSettingSnapshot,
-  SettingCompletenessResult,
 } from "@/lib/api/types";
 
 type ProjectSettingSummaryPanelProps = {
-  completeness?: SettingCompletenessResult;
   onDirtyChange?: (isDirty: boolean) => void;
   projectSetting: ProjectSetting | null;
   projectId: string;
 };
 
 export function ProjectSettingSummaryPanel({
-  completeness,
   onDirtyChange,
   projectSetting,
   projectId,
@@ -34,10 +29,9 @@ export function ProjectSettingSummaryPanel({
   const [lastImpact, setLastImpact] = useState<ProjectSettingImpactSummary | null>(null);
   const sections = projectSetting ? buildProjectSettingSections(projectSetting) : [];
   const hasSummary = sections.length > 0;
-  const summaryText = buildProjectSettingIssueSummary(
-    completeness,
-    "当前结构化摘要已覆盖主要信息。",
-  );
+  const summaryText = hasSummary
+    ? "这份项目摘要只负责快速浏览题材、冲突、人物入口和规模。长期设定仍以项目文稿为准。"
+    : "还没有结构化摘要。先把项目说明和设定文稿写清楚，再按需提炼一版项目摘要。";
 
   return (
     <div className="space-y-5">
@@ -51,7 +45,7 @@ export function ProjectSettingSummaryPanel({
               <h2 className="font-serif text-xl font-semibold text-text-primary">
                 快速看主要信息
               </h2>
-              <StatusBadge status={completeness?.status ?? "ready"} />
+              <StatusBadge status={hasSummary ? "ready" : "draft"} />
               <button
                 className="ink-button-secondary h-9 px-4"
                 type="button"
@@ -62,18 +56,6 @@ export function ProjectSettingSummaryPanel({
             </div>
             <p className="text-sm leading-6 text-text-secondary">{summaryText}</p>
           </div>
-          {completeness?.issues.length ? (
-            <div className="flex flex-wrap gap-2">
-              {completeness.issues.map((issue) => (
-                <span
-                  key={`${issue.field}-${issue.message}`}
-                  className="rounded-full bg-accent-warning/12 px-3 py-1 text-xs font-medium text-accent-warning"
-                >
-                  {formatProjectSettingFieldLabel(issue.field)}
-                </span>
-              ))}
-            </div>
-          ) : null}
         </section>
 
         <section className="rounded-3xl bg-surface shadow-sm p-5">

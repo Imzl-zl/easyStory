@@ -9,9 +9,7 @@ from .write_validation_support import validate_config_model
 
 
 def build_mcp_server_config(payload: McpServerConfigUpdateDTO) -> McpServerConfig:
-    document = payload.model_dump()
-    document.pop("author", None)
-    return validate_config_model(McpServerConfig, document)
+    return validate_config_model(McpServerConfig, payload.model_dump())
 
 
 def ensure_matching_mcp_server_id(path_server_id: str, payload_server_id: str) -> None:

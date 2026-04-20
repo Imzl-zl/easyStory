@@ -269,7 +269,6 @@ export type PreparationChapterTaskStepStatus =
   | "interrupted";
 
 export type PreparationNextStep =
-  | "setting"
   | "outline"
   | "opening_plan"
   | "chapter_tasks"
@@ -322,7 +321,6 @@ export type WorkflowExecutionSummary = {
 
 export type ProjectPreparationStatus = {
   project_id: string;
-  setting: SettingCompletenessResult;
   outline: PreparationAssetStatus;
   opening_plan: PreparationAssetStatus;
   chapter_tasks: PreparationChapterTaskStatus;

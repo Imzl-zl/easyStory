@@ -5,8 +5,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.runtime.errors import BusinessRuleError
-
+from .workflow_app_persisted_runtime import LangGraphWorkflowAppPersistedRuntime
 from .snapshot_support import build_runtime_snapshot
 
 RuntimeDispatchFn = Callable[[uuid.UUID, uuid.UUID], None]
@@ -33,7 +32,28 @@ class WorkflowAppRuntimeSupportMixin:
         *,
         owner_id: uuid.UUID,
     ) -> None:
-        await self._run_persisted_workflow(db, workflow_id, owner_id=owner_id)
+        runtime = LangGraphWorkflowAppPersistedRuntime(
+            load_workflow=lambda: self._require_workflow_for_update(
+                db,
+                workflow_id,
+                owner_id=owner_id,
+            ),
+            run_runtime=lambda workflow: self.runtime_service.run(
+                db,
+                workflow,
+                owner_id=owner_id,
+            ),
+            commit=db.commit,
+            recover_runtime_failure=lambda current_node_id, detail, reason: self._recover_runtime_failure(
+                db,
+                workflow_id=workflow_id,
+                owner_id=owner_id,
+                current_node_id=current_node_id,
+                detail=detail,
+                reason=reason,
+            ),
+        )
+        await runtime.run()
 
     async def _run_persisted_workflow(
         self,
@@ -42,31 +62,7 @@ class WorkflowAppRuntimeSupportMixin:
         *,
         owner_id: uuid.UUID,
     ) -> None:
-        workflow = await self._require_workflow_for_update(db, workflow_id, owner_id=owner_id)
-        current_node_id = workflow.current_node_id
-        try:
-            await self.runtime_service.run(db, workflow, owner_id=owner_id)
-            await db.commit()
-        except BusinessRuleError as exc:
-            await self._recover_runtime_failure(
-                db,
-                workflow_id=workflow_id,
-                owner_id=owner_id,
-                current_node_id=current_node_id,
-                detail=str(exc),
-                reason=None,
-            )
-            raise
-        except Exception as exc:
-            await self._recover_runtime_failure(
-                db,
-                workflow_id=workflow_id,
-                owner_id=owner_id,
-                current_node_id=current_node_id,
-                detail=str(exc),
-                reason="error",
-            )
-            raise
+        await self.run_workflow_runtime(db, workflow_id, owner_id=owner_id)
 
     async def _recover_runtime_failure(
         self,

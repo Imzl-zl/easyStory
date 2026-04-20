@@ -51,7 +51,7 @@ from app.modules.project.service.project_document_buffer_state_support import (
     TRUSTED_ACTIVE_BUFFER_SOURCE,
     build_project_document_buffer_hash,
 )
-from app.shared.runtime.llm.llm_protocol import resolve_continuation_support
+from app.shared.runtime.llm.llm_protocol_types import resolve_continuation_support
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, ready_project_setting

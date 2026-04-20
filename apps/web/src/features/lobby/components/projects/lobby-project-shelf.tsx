@@ -185,7 +185,7 @@ function LobbyProjectCard({
             </>
           ) : (
             <>
-              <Link className="ink-button" href={`/workspace/project/${project.id}/studio?panel=setting`}>
+              <Link className="ink-button" href={`/workspace/project/${project.id}/studio?panel=overview&doc=${encodeURIComponent("项目说明.md")}`}>
                 继续创作
               </Link>
               <button

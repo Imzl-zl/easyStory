@@ -11,13 +11,10 @@ from app.modules.project.infrastructure import (
     ProjectDocumentRevisionStore,
 )
 from app.modules.observability.service import AuditLogService, create_audit_log_service
-from app.shared.runtime import (
-    EXPORT_ROOT_DIR,
-    LLMToolProvider,
-    PROJECT_DOCUMENT_ROOT_DIR,
-    SkillTemplateRenderer,
-    ToolProvider,
-)
+from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
+from app.shared.runtime.storage_paths import EXPORT_ROOT_DIR, PROJECT_DOCUMENT_ROOT_DIR
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
+from app.shared.runtime.tool_provider import ToolProvider
 
 from .project_incubator_service import ProjectIncubatorService
 from .project_deletion_service import ProjectDeletionService

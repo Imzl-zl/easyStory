@@ -154,6 +154,56 @@ def test_synthesize_stream_terminal_response_builds_anthropic_tool_call() -> Non
     assert terminal.tool_calls[0].arguments == {"paths": ["设定/人物.md"]}
 
 
+def test_synthesize_stream_terminal_response_preserves_openai_chat_reasoning_for_tool_call() -> None:
+    terminal = synthesize_stream_terminal_response(
+        "openai_chat_completions",
+        raw_events=[
+            (
+                None,
+                {
+                    "id": "chatcmpl_123",
+                    "choices": [
+                        {
+                            "delta": {
+                                "reasoning_content": "先分析一下。",
+                            }
+                        }
+                    ],
+                },
+            ),
+            (
+                None,
+                {
+                    "choices": [
+                        {
+                            "delta": {
+                                "tool_calls": [
+                                    {
+                                        "index": 0,
+                                        "id": "call_1",
+                                        "type": "function",
+                                        "function": {
+                                            "name": "project_read_documents",
+                                            "arguments": '{\"paths\":[\"设定/人物.md\"]}',
+                                        },
+                                    }
+                                ]
+                            },
+                            "finish_reason": "tool_calls",
+                        }
+                    ],
+                },
+            ),
+        ],
+        tool_name_aliases={"project.read_documents": "project_read_documents"},
+    )
+
+    assert terminal is not None
+    assert terminal.tool_calls[0].provider_payload == {
+        "reasoning_content": "先分析一下。"
+    }
+
+
 def test_parse_raw_stream_event_accepts_openai_responses_incomplete_terminal() -> None:
     parsed = parse_raw_stream_event(
         "openai_responses",

@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 
 from ..errors import ConfigurationError
-from .llm_protocol import DEFAULT_REQUEST_TIMEOUT_SECONDS, PreparedLLMHttpRequest
+from .llm_protocol_types import DEFAULT_REQUEST_TIMEOUT_SECONDS, PreparedLLMHttpRequest
 
 STREAM_DONE_MARKER = "[DONE]"
 STREAM_STOP_CHECK_INTERVAL_SECONDS = 0.25

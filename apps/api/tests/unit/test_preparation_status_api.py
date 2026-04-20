@@ -55,7 +55,6 @@ async def test_preparation_status_api_reports_outline_gate_for_new_project(
 
         assert status_response.status_code == 200
         body = status_response.json()
-        assert body["setting"]["status"] == "ready"
         assert body["outline"]["step_status"] == "not_started"
         assert body["outline"]["content_status"] == "draft"
         assert body["opening_plan"]["step_status"] == "not_started"

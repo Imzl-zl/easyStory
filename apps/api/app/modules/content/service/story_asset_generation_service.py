@@ -14,12 +14,14 @@ from app.modules.credential.service import CredentialService, build_runtime_cred
 from app.modules.project.models import Project
 from app.modules.project.schemas import ProjectSettingProjectionError, resolve_setting_variable
 from app.modules.project.service import ProjectService
-from app.shared.runtime import SkillTemplateRenderer, ToolProvider
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
+from app.shared.runtime.tool_provider import ToolProvider
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 from app.shared.runtime.llm.llm_tool_provider import LLM_GENERATE_TOOL
 
 from .chapter_store import require_approved_asset
 from .dto import AssetType, StoryAssetGenerateDTO, StoryAssetMutationDTO, StoryAssetSaveDTO
+from .story_asset_generation_runtime import LangGraphStoryAssetGenerationRuntime
 from .story_asset_service import PREPARATION_ASSET_TITLES, StoryAssetService
 
 GENERATED_VERSION_CREATED_BY = "ai_assist"
@@ -65,33 +67,44 @@ class StoryAssetGenerationService:
             load_contents=True,
             load_template=True,
         )
-        self.project_service.ensure_setting_allows_preparation(project)
-        await self._ensure_asset_dependencies_ready(db, project.id, asset_type)
-        workflow_config = self._resolve_workflow_config(project, payload.workflow_id)
-        node = self._require_generation_node(workflow_config, asset_type)
-        skill = self.config_loader.load_skill(node.skill or "")
-        model = self._resolve_model(workflow_config, node, skill)
-        prompt = await self._build_prompt(db, project, skill)
-        generated_text = await self._generate_text(
-            db,
-            project,
-            model,
-            prompt,
-            owner_id=owner_id,
-        )
-        return await self.story_asset_service.save_asset_draft(
-            db,
-            project_id,
-            asset_type,
-            StoryAssetSaveDTO(
-                title=self._resolve_asset_title(project, asset_type),
-                content_text=generated_text,
-                created_by=GENERATED_VERSION_CREATED_BY,
-                change_source=GENERATED_VERSION_CHANGE_SOURCE,
-                change_summary=GENERATED_CHANGE_SUMMARIES[asset_type],
+        runtime = LangGraphStoryAssetGenerationRuntime(
+            ensure_dependencies=lambda: self._ensure_asset_dependencies_ready(
+                db,
+                project.id,
+                asset_type,
             ),
-            owner_id=owner_id,
+            resolve_generation_context=lambda: self._resolve_generation_context(
+                project,
+                payload.workflow_id,
+                asset_type,
+            ),
+            build_prompt=lambda skill: self._build_prompt(
+                db,
+                project,
+                skill,
+            ),
+            generate_text=lambda model, prompt: self._generate_text(
+                db,
+                project,
+                model,
+                prompt,
+                owner_id=owner_id,
+            ),
+            save_draft=lambda generated_text: self.story_asset_service.save_asset_draft(
+                db,
+                project_id,
+                asset_type,
+                StoryAssetSaveDTO(
+                    title=self._resolve_asset_title(project, asset_type),
+                    content_text=generated_text,
+                    created_by=GENERATED_VERSION_CREATED_BY,
+                    change_source=GENERATED_VERSION_CHANGE_SOURCE,
+                    change_summary=GENERATED_CHANGE_SUMMARIES[asset_type],
+                ),
+                owner_id=owner_id,
+            ),
         )
+        return await runtime.run()
 
     async def _ensure_asset_dependencies_ready(
         self,
@@ -147,6 +160,18 @@ class StoryAssetGenerationService:
                 raise ConfigurationError(f"Node {node.id} is missing skill id")
             return node
         raise ConfigurationError(f"Workflow {workflow_config.id} is missing node: {asset_type}")
+
+    def _resolve_generation_context(
+        self,
+        project: Project,
+        requested_workflow_id: str | None,
+        asset_type: AssetType,
+    ) -> tuple[SkillConfig, ModelConfig]:
+        workflow_config = self._resolve_workflow_config(project, requested_workflow_id)
+        node = self._require_generation_node(workflow_config, asset_type)
+        skill = self.config_loader.load_skill(node.skill or "")
+        model = self._resolve_model(workflow_config, node, skill)
+        return skill, model
 
     def _resolve_model(
         self,

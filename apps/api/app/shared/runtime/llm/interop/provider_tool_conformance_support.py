@@ -6,14 +6,14 @@ from uuid import uuid4
 
 from ...errors import ConfigurationError
 from .tool_call_codec import build_tool_call_payload
-from ..llm_protocol import (
+from ..llm_interop_profiles import resolve_connection_continuation_support
+from ..llm_protocol_types import (
     LLMConnection,
     LLMFunctionToolDefinition,
     LLMGenerateRequest,
     NormalizedLLMResponse,
     allows_provider_continuation_state,
     normalize_api_dialect,
-    resolve_connection_continuation_support,
 )
 from ..llm_protocol_types import NormalizedLLMToolCall, VERIFY_MAX_TOKENS, VERIFY_SYSTEM_PROMPT, VERIFY_USER_PROMPT
 
@@ -65,7 +65,7 @@ TOOL_CALL_PROBE_PROMPT = "这是工具调用探测。请调用本轮唯一可用
 TOOL_CALL_PROBE_SYSTEM_PROMPT = "你正在执行模型工具调用兼容性探测。你必须先调用唯一可用的工具，再等待工具结果。"
 TOOL_CONTINUATION_PROBE_PROMPT = (
     "工具结果已返回。请读取刚收到的工具结果中的 echoed 字段，"
-    "并严格按格式回答：工具续接成功：<echoed>。"
+    "并严格按格式回答：工具续接成功：<echoed>"
     "不要再次调用任何工具，也不要添加其他内容。"
 )
 TOOL_CONTINUATION_PROBE_SYSTEM_PROMPT = "你正在执行模型工具续接兼容性探测。你已经收到工具结果，必须直接给出最终回答。"
@@ -156,7 +156,7 @@ def build_conformance_probe_request(
             model_name=model_name,
             prompt=TOOL_CALL_PROBE_PROMPT,
             system_prompt=TOOL_CALL_PROBE_SYSTEM_PROMPT,
-            force_tool_call=True,
+            force_tool_call=_should_force_tool_call_probe(connection),
         )
     raise ConfigurationError(f"Unsupported conformance probe kind: {probe_kind}")
 
@@ -275,7 +275,7 @@ def build_tool_continuation_probe_result_echo() -> str:
 
 
 def render_tool_continuation_probe_success_text(expected_echo: str) -> str:
-    return f"工具续接成功：{expected_echo}。"
+    return f"工具续接成功：{expected_echo}"
 
 
 
@@ -322,6 +322,15 @@ def _build_generate_request(
         tools=[PROBE_TOOL_DEFINITION],
         force_tool_call=force_tool_call,
     )
+
+
+def _should_force_tool_call_probe(connection: LLMConnection) -> bool:
+    if (
+        connection.api_dialect == "openai_chat_completions"
+        and connection.interop_profile == "chat_compat_reasoning_content"
+    ):
+        return False
+    return True
 
 
 

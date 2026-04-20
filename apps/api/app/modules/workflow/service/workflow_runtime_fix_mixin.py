@@ -9,80 +9,13 @@ from app.modules.config_registry.schemas.config_schemas import ModelConfig, Node
 from app.modules.review.engine import FixExecutionRequest, FixExecutor
 from app.modules.review.engine.contracts import AggregatedReviewResult
 from app.modules.workflow.models import NodeExecution, WorkflowExecution
-from app.shared.runtime.errors import BudgetExceededError, ConfigurationError, ModelFallbackExhaustedError
+from app.shared.runtime.errors import BudgetExceededError, ConfigurationError
 
 from .snapshot_support import load_skill_snapshot
 from .workflow_runtime_shared import ReviewCycleOutcome
 
 
 class WorkflowRuntimeFixMixin:
-    async def _run_fix_cycle(
-        self,
-        db: AsyncSession,
-        workflow: WorkflowExecution,
-        workflow_config: WorkflowConfig,
-        node: NodeConfig,
-        execution: NodeExecution,
-        prompt_bundle: dict[str, Any],
-        content: str,
-        aggregated: AggregatedReviewResult,
-        reviewers: Sequence[Any],
-        owner_id: uuid.UUID,
-    ) -> ReviewCycleOutcome:
-        current_content = content
-        content_source = "generated"
-        max_fix_attempts = self._resolve_max_fix_attempts(node, workflow_config)
-        for attempt in range(1, max_fix_attempts + 1):
-            try:
-                current_content = await self._run_fix_attempt(
-                    db,
-                    workflow,
-                    workflow_config,
-                    node,
-                    execution,
-                    prompt_bundle,
-                    current_content,
-                    aggregated,
-                    owner_id,
-                    attempt=attempt,
-                    max_attempts=max_fix_attempts,
-                )
-            except ModelFallbackExhaustedError as exc:
-                return self._resolve_model_fallback_review_outcome(
-                    exc,
-                    content=current_content,
-                    content_source=content_source,
-                )
-            content_source = "auto_fix"
-            re_reviewers = self._select_re_reviewers(
-                reviewers,
-                aggregated,
-                node.review_config.re_review_scope,
-            )
-            try:
-                aggregated = await self._run_review_round(
-                    db,
-                    workflow,
-                    workflow_config,
-                    node,
-                    execution,
-                    current_content,
-                    re_reviewers,
-                    owner_id=owner_id,
-                    review_type=f"auto_re_review_{attempt}",
-                )
-            except ModelFallbackExhaustedError as exc:
-                return self._resolve_model_fallback_review_outcome(
-                    exc,
-                    content=current_content,
-                    content_source=content_source,
-                )
-            if aggregated.overall_status == "passed":
-                return ReviewCycleOutcome("passed", current_content, "auto_fix")
-            if aggregated.execution_failures:
-                return ReviewCycleOutcome("pause", current_content, "auto_fix", failure_message="自动复审执行失败")
-        return self._resolve_fix_failure(node, current_content)
-
     async def _run_fix_attempt(
         self,
         db: AsyncSession,

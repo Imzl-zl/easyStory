@@ -15,8 +15,9 @@ from app.modules.project.service import (
     ProjectDocumentCapabilityService,
     ProjectService,
 )
-from app.shared.runtime import PluginRegistry, SkillTemplateRenderer, ToolProvider
-from app.shared.runtime.errors import ConfigurationError
+from app.shared.runtime.plugins.plugin_registry import PluginRegistry
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
+from app.shared.runtime.tool_provider import ToolProvider
 from app.shared.runtime.llm.llm_tool_provider import LLMGenerateToolResponse, LLMStreamEvent
 
 from .rules.assistant_rule_service import AssistantRuleService
@@ -29,12 +30,15 @@ from .tooling.assistant_tool_exposure_policy import AssistantToolExposurePolicy
 from .tooling.assistant_tool_loop import AssistantToolLoop
 from .tooling.assistant_tool_registry import AssistantToolDescriptorRegistry
 from .hooks_runtime.assistant_hook_providers import build_assistant_plugin_registry
+from .hooks_runtime.assistant_hook_agent_runtime import (
+    AssistantHookAgentRuntime,
+    LangGraphAssistantHookAgentRuntime,
+)
 from .hooks_runtime.assistant_hook_support import (
     AssistantHookExecutionContext,
 )
 from .hooks_runtime.assistant_hook_runtime_support import (
     execute_assistant_hook_with_retry,
-    run_assistant_agent_hook,
     run_assistant_hook_event,
     run_assistant_on_error_hooks,
     run_before_turn_hooks,
@@ -65,7 +69,25 @@ from .turn.assistant_turn_llm_bridge_support import (
     stream_assistant_turn_llm,
     stream_assistant_turn_with_tool_loop,
 )
+from .turn.assistant_turn_execution_runtime import LangGraphAssistantTurnExecutionRuntime
+from .turn.assistant_turn_finalize_runtime import (
+    LangGraphAssistantTurnFinalizeRuntime,
+)
+from .turn.assistant_turn_prepare_runtime import (
+    AssistantTurnPrepareRuntimeResult,
+    LangGraphAssistantTurnPrepareRuntime,
+)
+from .turn.assistant_turn_recovery_runtime import (
+    LangGraphAssistantTurnRecoveryRuntime,
+)
+from .turn.assistant_turn_stream_execution_runtime import (
+    LangGraphAssistantTurnStreamExecutionRuntime,
+)
+from .turn.assistant_turn_terminal_persist_runtime import (
+    LangGraphAssistantTurnTerminalPersistRuntime,
+)
 from .assistant_llm_runtime_support import (
+    AssistantLlmTransportMode,
     ResolvedAssistantLlmRuntime,
     call_assistant_llm,
     resolve_assistant_llm_runtime,
@@ -114,6 +136,7 @@ class AssistantService:
         assistant_tool_loop: AssistantToolLoop | None = None,
         turn_run_store: AssistantTurnRunStore | None = None,
         project_document_capability_service: ProjectDocumentCapabilityService | None = None,
+        assistant_hook_agent_runtime: AssistantHookAgentRuntime | None = None,
     ) -> None:
         self.assistant_rule_service = assistant_rule_service
         self.config_loader = config_loader
@@ -154,6 +177,17 @@ class AssistantService:
                 else None
             )
         )
+        self.assistant_hook_agent_runtime = (
+            assistant_hook_agent_runtime
+            or LangGraphAssistantHookAgentRuntime(
+                assistant_agent_service=self.assistant_agent_service,
+                assistant_skill_service=self.assistant_skill_service,
+                assistant_preferences_service=self.assistant_preferences_service,
+                assistant_rule_service=self.assistant_rule_service,
+                template_renderer=self.template_renderer,
+                llm_caller=self._call_llm,
+            )
+        )
         self.plugin_registry = plugin_registry or build_assistant_plugin_registry(
             self,
             mcp_server_resolver=lambda context, server_id: self.assistant_mcp_service.resolve_mcp_server(
@@ -172,36 +206,23 @@ class AssistantService:
         *,
         owner_id: uuid.UUID,
     ) -> AssistantTurnResponseDTO:
-        resolved_hooks: list[HookConfig] = []
-        try:
-            resolved_hooks = resolve_requested_hooks(
-                assistant_hook_service=self.assistant_hook_service,
-                hook_ids=payload.hook_ids,
-                owner_id=owner_id,
-            )
-            prepared = await self._prepare_turn(
-                db,
-                payload,
-                owner_id=owner_id,
-                resolved_hooks=resolved_hooks,
-            )
-        except Exception as exc:
-            hook_error = await self._run_prepare_on_error_hooks(
-                db,
-                payload,
-                hooks=resolved_hooks,
-                error=exc,
-                owner_id=owner_id,
-            )
-            if hook_error is not None:
-                raise hook_error
-            raise
-        replayed_response = self._recover_or_start_turn(prepared, owner_id=owner_id)
+        turn_start = await self._prepare_or_recover_turn(
+            db,
+            payload,
+            owner_id=owner_id,
+            transport_mode="buffered",
+        )
+        prepared = turn_start.prepared
+        replayed_response = turn_start.replayed_response
         if replayed_response is not None:
             return replayed_response
-        try:
-            before_results = await self._run_before_turn_hooks(db, prepared, owner_id=owner_id)
-            raw_output = await self._call_turn_llm(
+        runtime = LangGraphAssistantTurnExecutionRuntime(
+            run_before_hooks=lambda: self._run_before_turn_hooks(
+                db,
+                prepared,
+                owner_id=owner_id,
+            ),
+            call_turn_llm=lambda: self._call_turn_llm(
                 db,
                 prepared.hooks,
                 prompt=prepared.prompt,
@@ -215,36 +236,28 @@ class AssistantService:
                 tool_policy_decisions=prepared.tool_policy_decisions,
                 visible_tool_descriptors=prepared.visible_tool_descriptors,
                 runtime_context=prepared.resolved_llm_runtime,
-            )
-            response = await self._finalize_turn(
+            ),
+            finalize_response=lambda before_results, raw_output: self._finalize_turn(
                 db,
                 payload,
                 prepared,
                 raw_output,
                 before_results=before_results,
                 owner_id=owner_id,
-            )
-        except Exception as exc:
-            hook_error = await self._run_prepared_on_error_hooks(
+            ),
+            run_prepared_on_error_hooks=lambda error: self._run_prepared_on_error_hooks(
                 db,
                 prepared,
-                error=exc,
+                error=error,
                 owner_id=owner_id,
-            )
-            self._store_terminal_turn(
+            ),
+            store_terminal_turn=lambda **kwargs: self._store_terminal_turn(
                 prepared,
                 owner_id=owner_id,
-                error=hook_error or exc,
-            )
-            if hook_error is not None:
-                raise hook_error
-            raise
-        self._store_terminal_turn(
-            prepared,
-            owner_id=owner_id,
-            response=response,
+                **kwargs,
+            ),
         )
-        return response
+        return await runtime.run()
 
     async def stream_turn(
         self,
@@ -254,167 +267,75 @@ class AssistantService:
         owner_id: uuid.UUID,
         should_stop: Callable[[], Awaitable[bool]] | None = None,
     ) -> AsyncIterator[AssistantStreamEvent]:
-        resolved_hooks: list[HookConfig] = []
-        try:
-            resolved_hooks = resolve_requested_hooks(
-                assistant_hook_service=self.assistant_hook_service,
-                hook_ids=payload.hook_ids,
-                owner_id=owner_id,
-            )
-            prepared = await self._prepare_turn(
+        turn_start = await self._prepare_or_recover_turn(
+            db,
+            payload,
+            owner_id=owner_id,
+            transport_mode="stream",
+        )
+        prepared = turn_start.prepared
+        replayed_response = turn_start.replayed_response
+        runtime = LangGraphAssistantTurnStreamExecutionRuntime(
+            replayed_response=replayed_response,
+            build_stream_event_data=lambda event_seq, extra=None: self._build_stream_event_data(
+                prepared,
+                event_seq=event_seq,
+                extra=extra,
+            ),
+            run_started_extra={
+                "requested_write_scope": prepared.turn_context.requested_write_scope,
+                "requested_write_targets": prepared.turn_context.requested_write_targets,
+            },
+            run_before_hooks=lambda: self._run_before_turn_hooks(
                 db,
-                payload,
+                prepared,
                 owner_id=owner_id,
-                resolved_hooks=resolved_hooks,
-            )
-        except Exception as exc:
-            hook_error = await self._run_prepare_on_error_hooks(
-                db,
-                payload,
-                hooks=resolved_hooks,
-                error=exc,
-                owner_id=owner_id,
-            )
-            if hook_error is not None:
-                raise hook_error
-            raise
-        replayed_response = self._recover_or_start_turn(prepared, owner_id=owner_id)
-        if replayed_response is not None:
-            event_seq = 1
-            yield AssistantStreamEvent(
-                "run_started",
-                self._build_stream_event_data(
-                    prepared,
-                    event_seq=event_seq,
-                    extra={
-                        "requested_write_scope": prepared.turn_context.requested_write_scope,
-                        "requested_write_targets": prepared.turn_context.requested_write_targets,
-                    },
-                ),
-            )
-            event_seq += 1
-            completed_payload = replayed_response.model_dump(mode="json")
-            completed_payload.update(
-                self._build_stream_event_data(
-                    prepared,
-                    event_seq=event_seq,
-                )
-            )
-            yield AssistantStreamEvent("completed", completed_payload)
-            return
-        event_seq = 0
-        try:
-            before_results = await self._run_before_turn_hooks(db, prepared, owner_id=owner_id)
-            raw_output: dict[str, Any] | None = None
-            event_seq = 1
-            yield AssistantStreamEvent(
-                "run_started",
-                self._build_stream_event_data(
-                    prepared,
-                    event_seq=event_seq,
-                    extra={
-                        "requested_write_scope": prepared.turn_context.requested_write_scope,
-                        "requested_write_targets": prepared.turn_context.requested_write_targets,
-                    },
-                ),
-            )
-            if should_stream_with_tool_loop(
+            ),
+            should_stream_with_tool_loop=should_stream_with_tool_loop(
                 assistant_tool_loop=self.assistant_tool_loop,
                 prepared=prepared,
-            ):
-                async for event_name, event_data in self._stream_turn_with_tool_loop(
-                    db,
-                    prepared,
-                    owner_id=owner_id,
-                    should_stop=should_stop,
-                ):
-                    if event_name == "final_output":
-                        raw_output = event_data
-                        continue
-                    event_seq += 1
-                    yield AssistantStreamEvent(
-                        event_name,
-                        self._build_stream_event_data(
-                            prepared,
-                            event_seq=event_seq,
-                            extra=event_data,
-                        ),
-                    )
-            else:
-                async for event in self._call_turn_llm_stream(
-                    db,
-                    prepared.hooks,
-                    prompt=prepared.prompt,
-                    before_payload=prepared.before_payload,
-                    owner_id=owner_id,
-                    project_id=prepared.project_id,
-                    spec=prepared.spec,
-                    system_prompt=prepared.system_prompt,
-                    runtime_context=prepared.resolved_llm_runtime,
-                    should_stop=should_stop,
-                ):
-                    if event.delta:
-                        event_seq += 1
-                        yield AssistantStreamEvent(
-                            "chunk",
-                            self._build_stream_event_data(
-                                prepared,
-                                event_seq=event_seq,
-                                extra={"delta": event.delta},
-                            ),
-                        )
-                        continue
-                    raw_output = event.response
-            if raw_output is None:
-                raise ConfigurationError("Streaming response completed without final output")
-            response = await self._finalize_turn(
+            ),
+            stream_tool_loop=lambda: self._stream_turn_with_tool_loop(
+                db,
+                prepared,
+                owner_id=owner_id,
+                should_stop=should_stop,
+            ),
+            call_turn_llm_stream=lambda: self._call_turn_llm_stream(
+                db,
+                prepared.hooks,
+                prompt=prepared.prompt,
+                before_payload=prepared.before_payload,
+                owner_id=owner_id,
+                project_id=prepared.project_id,
+                spec=prepared.spec,
+                system_prompt=prepared.system_prompt,
+                runtime_context=prepared.resolved_llm_runtime,
+                should_stop=should_stop,
+            ),
+            finalize_response=lambda before_results, raw_output: self._finalize_turn(
                 db,
                 payload,
                 prepared,
                 raw_output,
                 before_results=before_results,
                 owner_id=owner_id,
-            )
-            self._store_terminal_turn(
-                prepared,
-                owner_id=owner_id,
-                response=response,
-            )
-            event_seq += 1
-            completed_payload = response.model_dump(mode="json")
-            completed_payload.update(
-                self._build_stream_event_data(
-                    prepared,
-                    event_seq=event_seq,
-                )
-            )
-            yield AssistantStreamEvent(
-                "completed",
-                completed_payload,
-            )
-        except Exception as exc:
-            hook_error = await self._run_prepared_on_error_hooks(
+            ),
+            run_prepared_on_error_hooks=lambda error: self._run_prepared_on_error_hooks(
                 db,
                 prepared,
-                error=exc,
+                error=error,
                 owner_id=owner_id,
-            )
-            self._store_terminal_turn(
+            ),
+            store_terminal_turn=lambda **kwargs: self._store_terminal_turn(
                 prepared,
                 owner_id=owner_id,
-                error=hook_error or exc,
-            )
-            stream_error = hook_error or exc
-            attach_assistant_stream_error_meta(
-                stream_error,
-                self._build_stream_event_data(
-                    prepared,
-                    event_seq=event_seq + 1,
-                ),
-            )
-            if hook_error is not None:
-                raise hook_error
-            raise
+                **kwargs,
+            ),
+            attach_stream_error_meta=attach_assistant_stream_error_meta,
+        )
+        async for event_name, event_data in runtime.iterate():
+            yield AssistantStreamEvent(event_name, event_data)
 
     async def run_agent_hook(
         self,
@@ -423,16 +344,10 @@ class AssistantService:
         agent_id: str,
         input_mapping: dict[str, str],
     ) -> Any:
-        return await run_assistant_agent_hook(
+        return await self.assistant_hook_agent_runtime.run(
             context,
             agent_id=agent_id,
             input_mapping=input_mapping,
-            assistant_agent_service=self.assistant_agent_service,
-            assistant_skill_service=self.assistant_skill_service,
-            assistant_preferences_service=self.assistant_preferences_service,
-            assistant_rule_service=self.assistant_rule_service,
-            template_renderer=self.template_renderer,
-            llm_caller=self._call_llm,
         )
 
     async def _prepare_turn(
@@ -441,12 +356,14 @@ class AssistantService:
         payload: AssistantTurnRequestDTO,
         *,
         owner_id: uuid.UUID,
+        transport_mode: AssistantLlmTransportMode = "buffered",
         resolved_hooks: list[HookConfig] | None = None,
     ) -> PreparedAssistantTurn:
         return await prepare_assistant_turn(
             db,
             payload,
             owner_id=owner_id,
+            transport_mode=transport_mode,
             resolved_hooks=resolved_hooks,
             config_loader=self.config_loader,
             template_renderer=self.template_renderer,
@@ -462,6 +379,41 @@ class AssistantService:
             resolve_llm_runtime=self._resolve_llm_runtime,
         )
 
+    async def _prepare_or_recover_turn(
+        self,
+        db: AsyncSession,
+        payload: AssistantTurnRequestDTO,
+        *,
+        owner_id: uuid.UUID,
+        transport_mode: AssistantLlmTransportMode = "buffered",
+    ) -> AssistantTurnPrepareRuntimeResult:
+        runtime = LangGraphAssistantTurnPrepareRuntime(
+            resolve_hooks=lambda: resolve_requested_hooks(
+                assistant_hook_service=self.assistant_hook_service,
+                hook_ids=payload.hook_ids,
+                owner_id=owner_id,
+            ),
+            prepare_turn=lambda resolved_hooks: self._prepare_turn(
+                db,
+                payload,
+                owner_id=owner_id,
+                transport_mode=transport_mode,
+                resolved_hooks=resolved_hooks,
+            ),
+            run_prepare_on_error_hooks=lambda resolved_hooks, error: self._run_prepare_on_error_hooks(
+                db,
+                payload,
+                hooks=resolved_hooks,
+                error=error,
+                owner_id=owner_id,
+            ),
+            recover_or_start_turn=lambda prepared: self._recover_or_start_turn(
+                prepared,
+                owner_id=owner_id,
+            ),
+        )
+        return await runtime.run()
+
     def _recover_or_start_turn(
         self,
         prepared: PreparedAssistantTurn,
@@ -470,30 +422,28 @@ class AssistantService:
     ) -> AssistantTurnResponseDTO | None:
         if self.turn_run_store is None:
             return None
-        existing_run = self.turn_run_store.get_run(prepared.turn_context.run_id)
-        if existing_run is not None:
-            self._recover_existing_running_turn(
+        runtime = LangGraphAssistantTurnRecoveryRuntime(
+            resolve_existing_run=lambda: self.turn_run_store.get_run(prepared.turn_context.run_id),
+            recover_existing_running_turn=lambda existing_run: self._recover_existing_running_turn(
                 prepared,
                 existing_run=existing_run,
                 owner_id=owner_id,
-            )
-            return recover_existing_turn(prepared=prepared, existing_run=existing_run)
-        running_record = build_running_turn_record(
-            prepared=prepared,
-            owner_id=owner_id,
-            runtime_claim_snapshot=self.runtime_claim_snapshot,
+            ),
+            recover_existing_turn=lambda existing_run: recover_existing_turn(
+                prepared=prepared,
+                existing_run=existing_run,
+            ),
+            build_running_turn_record=lambda: build_running_turn_record(
+                prepared=prepared,
+                owner_id=owner_id,
+                runtime_claim_snapshot=self.runtime_claim_snapshot,
+            ),
+            create_run=self.turn_run_store.create_run,
+            reload_existing_run_after_conflict=lambda: self.turn_run_store.get_run(
+                prepared.turn_context.run_id
+            ),
         )
-        if self.turn_run_store.create_run(running_record):
-            return None
-        existing_run = self.turn_run_store.get_run(prepared.turn_context.run_id)
-        if existing_run is None:
-            raise ConfigurationError("Assistant turn run snapshot disappeared after create_run conflict")
-        self._recover_existing_running_turn(
-            prepared,
-            existing_run=existing_run,
-            owner_id=owner_id,
-        )
-        return recover_existing_turn(prepared=prepared, existing_run=existing_run)
+        return runtime.run()
 
     def _recover_existing_running_turn(
         self,
@@ -618,34 +568,36 @@ class AssistantService:
         before_results: list[AssistantHookResultDTO],
         owner_id: uuid.UUID,
     ) -> AssistantTurnResponseDTO:
-        content = require_text_output(raw_output.get("content"))
-        after_payload = build_after_assistant_payload(
-            prepared.spec,
-            payload,
-            prepared.project_id,
-            prepared.turn_context,
-            content,
-            visible_tool_descriptors=prepared.visible_tool_descriptors,
+        runtime = LangGraphAssistantTurnFinalizeRuntime(
+            resolve_content=lambda: require_text_output(raw_output.get("content")),
+            build_after_payload=lambda content: build_after_assistant_payload(
+                prepared.spec,
+                payload,
+                prepared.project_id,
+                prepared.turn_context,
+                content,
+                visible_tool_descriptors=prepared.visible_tool_descriptors,
+            ),
+            run_after_hooks=lambda after_payload: self._run_hook_event(
+                db,
+                prepared.hooks,
+                "after_assistant_response",
+                payload=after_payload,
+                owner_id=owner_id,
+                project_id=prepared.project_id,
+                agent_id=prepared.spec.agent_id,
+                skill_id=prepared.spec.skill_id,
+                assistant_model=prepared.spec.model,
+            ),
+            build_response=lambda content, after_results: build_turn_response(
+                prepared.spec,
+                raw_output,
+                content,
+                before_results + after_results,
+                prepared.turn_context,
+            ),
         )
-        after_results = await self._run_hook_event(
-            db,
-            prepared.hooks,
-            "after_assistant_response",
-            payload=after_payload,
-            owner_id=owner_id,
-            project_id=prepared.project_id,
-            agent_id=prepared.spec.agent_id,
-            skill_id=prepared.spec.skill_id,
-            assistant_model=prepared.spec.model,
-        )
-        response = build_turn_response(
-            prepared.spec,
-            raw_output,
-            content,
-            before_results + after_results,
-            prepared.turn_context,
-        )
-        return response
+        return await runtime.run()
 
     def _build_stream_event_data(
         self,
@@ -687,16 +639,18 @@ class AssistantService:
     ) -> None:
         if self.turn_run_store is None:
             return
-        existing_run = self.turn_run_store.get_run(prepared.turn_context.run_id)
-        self.turn_run_store.save_run(
-            build_terminal_turn_record(
+        runtime = LangGraphAssistantTurnTerminalPersistRuntime(
+            resolve_existing_run=lambda: self.turn_run_store.get_run(prepared.turn_context.run_id),
+            build_terminal_record=lambda existing_run: build_terminal_turn_record(
                 prepared=prepared,
                 owner_id=owner_id,
                 existing_run=existing_run,
                 response=response,
                 error=error,
             ),
+            save_run=self.turn_run_store.save_run,
         )
+        runtime.run()
 
     async def _run_hook_event(
         self,

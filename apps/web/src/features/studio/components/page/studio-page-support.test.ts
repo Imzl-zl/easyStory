@@ -19,14 +19,14 @@ import {
   resolveStudioPanel,
 } from "@/features/studio/components/page/studio-page-support";
 
-test("resolveStudioPanel falls back to setting for invalid values", () => {
+test("resolveStudioPanel falls back to overview for invalid values", () => {
   assert.equal(resolveStudioPanel("chapter"), "chapter");
-  assert.equal(resolveStudioPanel("invalid"), "setting");
-  assert.equal(resolveStudioPanel(null), "setting");
+  assert.equal(resolveStudioPanel("invalid"), "overview");
+  assert.equal(resolveStudioPanel(null), "overview");
 });
 
 test("getStudioPanelLabel returns the visible label for each panel", () => {
-  assert.equal(getStudioPanelLabel("setting"), "设定");
+  assert.equal(getStudioPanelLabel("overview"), "项目说明");
   assert.equal(getStudioPanelLabel("outline"), "大纲");
   assert.equal(getStudioPanelLabel("opening-plan"), "开篇设计");
   assert.equal(getStudioPanelLabel("chapter"), "章节");
@@ -107,7 +107,7 @@ test("resolveDefaultDocumentPathFromPanel maps explicit panel routes to canonica
     { chapter_number: 7, status: "stale" },
   ] as const;
 
-  assert.equal(resolveDefaultDocumentPathFromPanel("setting", undefined, null), "设定/世界观.md");
+  assert.equal(resolveDefaultDocumentPathFromPanel("overview", undefined, null), "项目说明.md");
   assert.equal(resolveDefaultDocumentPathFromPanel("outline", undefined, null), "大纲/总大纲.md");
   assert.equal(
     resolveDefaultDocumentPathFromPanel("opening-plan", undefined, null),
@@ -354,6 +354,6 @@ test("resolveStudioChapterListState distinguishes loading, error, empty and read
 test("listStudioPanelOptions keeps the expected top tab order", () => {
   assert.deepEqual(
     listStudioPanelOptions().map((item) => item.key),
-    ["setting", "outline", "opening-plan", "chapter"],
+    ["overview", "outline", "opening-plan", "chapter"],
   );
 });

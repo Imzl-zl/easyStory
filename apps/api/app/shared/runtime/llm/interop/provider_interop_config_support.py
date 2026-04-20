@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from ...errors import ConfigurationError
-from ..llm_protocol import normalize_http_header_name
+from ..llm_protocol_types import normalize_http_header_name
 
 
 def load_json_file(path: Path) -> dict[str, Any]:

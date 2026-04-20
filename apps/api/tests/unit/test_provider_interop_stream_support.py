@@ -5,7 +5,7 @@ import asyncio
 import pytest
 
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm.llm_protocol import PreparedLLMHttpRequest
+from app.shared.runtime.llm.llm_protocol_types import PreparedLLMHttpRequest
 from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
 
 

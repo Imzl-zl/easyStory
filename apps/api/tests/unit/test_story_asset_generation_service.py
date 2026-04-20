@@ -9,7 +9,7 @@ from app.modules.content.models import ContentVersion
 from app.modules.content.service import StoryAssetGenerateDTO, create_story_asset_generation_service
 from app.modules.credential.infrastructure import CredentialCrypto
 from app.modules.credential.models import ModelCredential
-from app.shared.runtime import ToolProvider
+from app.shared.runtime.tool_provider import ToolProvider
 from app.shared.runtime.errors import BusinessRuleError
 from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import (

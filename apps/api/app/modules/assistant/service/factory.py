@@ -3,17 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.modules.config_registry import ConfigLoader
-from app.modules.credential.service import (
-    create_credential_resolution_service,
-    create_credential_service,
-)
+from app.modules.credential.service import create_credential_service
 from app.modules.project.service import (
     ProjectDocumentCapabilityService,
     ProjectService,
     create_project_document_capability_service,
     create_project_service,
 )
-from app.shared.runtime import LLMToolProvider, SkillTemplateRenderer
+from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 
 from .assistant_config_file_store import AssistantConfigFileStore
 from .agents.assistant_agent_file_store import AssistantAgentFileStore
@@ -143,9 +141,6 @@ def create_assistant_preferences_service(
     return AssistantPreferencesService(
         project_service=resolved_project_service,
         config_store=config_store,
-        credential_service_factory=lambda: create_credential_resolution_service(
-            project_service=resolved_project_service,
-        ),
     )
 
 

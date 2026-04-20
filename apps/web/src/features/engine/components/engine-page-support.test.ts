@@ -258,8 +258,8 @@ function createPreparationStatus(
       total: 0,
       workflow_execution_id: null,
     },
-    next_step: "setting",
-    next_step_detail: "请先补齐项目设定。",
+    next_step: "outline",
+    next_step_detail: "请先整理大纲。",
     opening_plan: {
       content_id: null,
       content_status: null,
@@ -277,10 +277,6 @@ function createPreparationStatus(
       version_number: null,
     },
     project_id: "project-1",
-    setting: {
-      issues: [],
-      status: "ready",
-    },
     ...overrides,
   };
 }

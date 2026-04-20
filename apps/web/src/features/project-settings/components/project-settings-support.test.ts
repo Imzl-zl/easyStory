@@ -8,16 +8,17 @@ import {
   resolveProjectSettingsTab,
 } from "./project-settings-support";
 
-test("resolveProjectSettingsTab falls back to setting for invalid values", () => {
+test("resolveProjectSettingsTab accepts brief and falls back to rules for invalid values", () => {
   assert.equal(resolveProjectSettingsTab("assistant"), "assistant");
   assert.equal(resolveProjectSettingsTab("audit"), "audit");
+  assert.equal(resolveProjectSettingsTab("brief"), "brief");
   assert.equal(resolveProjectSettingsTab("mcp"), "mcp");
-  assert.equal(resolveProjectSettingsTab("setting"), "setting");
   assert.equal(resolveProjectSettingsTab("skills"), "skills");
-  assert.equal(resolveProjectSettingsTab("unknown"), "setting");
-  assert.equal(resolveProjectSettingsTab(null), "setting");
+  assert.equal(resolveProjectSettingsTab("unknown"), "rules");
+  assert.equal(resolveProjectSettingsTab(null), "rules");
   assert.equal(isValidProjectSettingsTab("assistant"), true);
   assert.equal(isValidProjectSettingsTab("audit"), true);
+  assert.equal(isValidProjectSettingsTab("brief"), true);
   assert.equal(isValidProjectSettingsTab("mcp"), true);
   assert.equal(isValidProjectSettingsTab("skills"), true);
   assert.equal(isValidProjectSettingsTab("invalid"), false);

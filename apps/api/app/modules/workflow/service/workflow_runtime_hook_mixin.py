@@ -5,7 +5,7 @@ from typing import Any
 
 from app.shared.runtime.errors import ConfigurationError
 
-from .snapshot_support import load_agent_snapshot, load_skill_snapshot
+from .workflow_hook_event_runtime import LangGraphWorkflowHookEventRuntime
 from .workflow_runtime_hook_support import (
     HookExecutionContext,
     build_hook_payload,
@@ -21,20 +21,18 @@ class WorkflowRuntimeHookMixin:
         self,
         context: HookExecutionContext,
     ) -> list[Any]:
-        hooks = resolve_hooks_for_event(
-            context.workflow.workflow_snapshot or {},
-            context.node,
-            context.event,
+        runtime = LangGraphWorkflowHookEventRuntime(
+            resolve_hooks=lambda: resolve_hooks_for_event(
+                context.workflow.workflow_snapshot or {},
+                context.node,
+                context.event,
+            ),
+            matches_condition=lambda hook: matches_hook_condition(hook, context.payload),
+            record_skip=lambda hook: self._record_hook_skip(context, hook.id),
+            execute_hook=lambda hook: self._execute_hook_with_retry(context, hook),
+            record_success=lambda hook, result: self._record_hook_success(context, hook, result),
         )
-        results: list[Any] = []
-        for hook in hooks:
-            if not matches_hook_condition(hook, context.payload):
-                self._record_hook_skip(context, hook.id)
-                continue
-            result = await self._execute_hook_with_retry(context, hook)
-            self._record_hook_success(context, hook, result)
-            results.append(result)
-        return results
+        return await runtime.run()
 
     async def _execute_hook_with_retry(
         self,
@@ -91,73 +89,11 @@ class WorkflowRuntimeHookMixin:
         agent_id: str,
         input_mapping: dict[str, str],
     ) -> Any:
-        agent = load_agent_snapshot(context.workflow.agents_snapshot or {}, agent_id)
-        skill = self._resolve_hook_agent_skill(context, agent)
-        prompt_bundle = self._build_hook_agent_prompt_bundle(context, agent, skill, input_mapping)
-        raw_output = await self._call_llm(
-            context.db,
-            context.workflow,
-            context.workflow_config,
-            prompt_bundle,
-            owner_id=context.owner_id,
-            node_execution_id=context.node_execution_id,
-            usage_type="analysis",
+        return await self.workflow_hook_agent_runtime.run(
+            context,
+            agent_id=agent_id,
+            input_mapping=input_mapping,
         )
-        return self._resolve_hook_agent_output(agent, raw_output.get("content"))
-
-    def _resolve_hook_agent_skill(self, context: HookExecutionContext, agent):
-        if not agent.skills:
-            raise ConfigurationError(f"Hook agent {agent.id} has no skills configured")
-        return load_skill_snapshot(context.workflow.skills_snapshot or {}, agent.skills[0])
-
-    def _build_hook_agent_prompt_bundle(
-        self,
-        context: HookExecutionContext,
-        agent,
-        skill,
-        input_mapping: dict[str, str],
-    ) -> dict[str, Any]:
-        variables = self._hook_agent_variables(context, input_mapping)
-        prompt = self.template_renderer.render(skill.prompt, variables)
-        model = agent.model or skill.model
-        if model is None or not model.provider:
-            raise ConfigurationError(f"Hook agent {agent.id} is missing model configuration")
-        return {
-            "prompt": prompt,
-            "system_prompt": agent.system_prompt,
-            "model": model,
-            "response_format": self._hook_agent_response_format(agent),
-        }
-
-    def _hook_agent_variables(
-        self,
-        context: HookExecutionContext,
-        input_mapping: dict[str, str],
-    ) -> dict[str, Any]:
-        variables: dict[str, Any] = {
-            "payload": context.payload,
-            "payload_json": context.payload_json(),
-            "event": context.event,
-            "node_id": context.node.id,
-            "node_name": context.node.name,
-            "node_type": context.node.node_type,
-            "workflow_id": context.workflow_config.id,
-        }
-        for target, source in input_mapping.items():
-            variables[target] = context.read_path(source)
-        return variables
-
-    def _hook_agent_response_format(self, agent) -> str:
-        if agent.output_schema is not None or agent.agent_type == "reviewer":
-            return "json_object"
-        return "text"
-
-    def _resolve_hook_agent_output(self, agent, content: Any) -> Any:
-        if self._hook_agent_response_format(agent) == "json_object":
-            return self._parse_json(content)
-        if not isinstance(content, str):
-            raise ConfigurationError("Hook agent output must be plain text")
-        return content
 
     def _build_hook_context(
         self,

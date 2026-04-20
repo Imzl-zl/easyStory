@@ -7,7 +7,7 @@ from app.modules.credential.service import (
     CredentialService,
     create_credential_resolution_service,
 )
-from app.shared.runtime import SkillTemplateRenderer
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
 
 from .context_preview_service import ContextPreviewService
 

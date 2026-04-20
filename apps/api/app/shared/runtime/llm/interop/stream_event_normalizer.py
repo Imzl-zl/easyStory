@@ -16,7 +16,7 @@ from .openai_responses_stream_synthesizer import (
     synthesize_openai_responses_terminal_response as codec_synthesize_openai_responses_terminal_response,
 )
 from ..llm_interop_profiles import resolve_interop_capabilities
-from ..llm_protocol import NormalizedLLMResponse
+from ..llm_protocol_types import NormalizedLLMResponse
 from ..llm_protocol_responses import parse_stream_terminal_response
 from ..llm_protocol_types import LlmApiDialect, normalize_api_dialect
 

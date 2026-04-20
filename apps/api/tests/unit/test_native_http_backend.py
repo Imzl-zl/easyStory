@@ -8,7 +8,7 @@ from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm import native_http_backend as native_http_backend_module
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import build_text_probe_request
 from app.shared.runtime.llm.interop.stream_event_normalizer import ParsedStreamEvent, parse_raw_stream_event
-from app.shared.runtime.llm.llm_protocol import LLMConnection
+from app.shared.runtime.llm.llm_protocol_types import LLMConnection
 from app.shared.runtime.llm.native_http_backend import NativeHttpLLMBackend
 
 

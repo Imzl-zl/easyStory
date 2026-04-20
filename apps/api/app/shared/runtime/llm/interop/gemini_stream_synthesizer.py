@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..llm_protocol import NormalizedLLMResponse
+from ..llm_protocol_types import NormalizedLLMResponse
 from ..llm_protocol_responses import parse_generation_response
 
 

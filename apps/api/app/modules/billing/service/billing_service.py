@@ -11,7 +11,7 @@ from app.modules.billing.service.dto import (
     UsageType,
 )
 from app.modules.config_registry.schemas.config_schemas import BudgetConfig
-from app.shared.runtime import ModelPricing
+from app.shared.runtime.token_counter import ModelPricing
 
 from .billing_query_support import utc_now
 from .billing_service_support import (

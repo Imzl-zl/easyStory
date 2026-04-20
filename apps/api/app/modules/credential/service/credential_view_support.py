@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from app.modules.credential.infrastructure import CredentialVerificationResult
 from app.modules.credential.models import ModelCredential
-from app.shared.runtime.llm.llm_protocol import normalize_api_dialect
+from app.shared.runtime.llm.llm_protocol_types import normalize_api_dialect
 
 from .credential_connection_support import copy_extra_headers
 from .dto import CredentialVerifyResultDTO, CredentialViewDTO

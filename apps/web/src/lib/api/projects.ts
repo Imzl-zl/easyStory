@@ -21,7 +21,6 @@ import type {
   ProjectSettingSnapshot,
   ProjectSummary,
   ProjectTrashCleanupResult,
-  SettingCompletenessResult,
 } from "@/lib/api/types";
 
 export function listProjects(deletedOnly = false) {
@@ -147,13 +146,6 @@ export function updateProjectSetting(projectId: string, projectSetting: ProjectS
     method: "PUT",
     body: { project_setting: projectSetting },
   });
-}
-
-export function checkProjectSetting(projectId: string) {
-  return requestJson<SettingCompletenessResult>(
-    `/api/v1/projects/${projectId}/setting/complete-check`,
-    { method: "POST" },
-  );
 }
 
 export function getProjectPreparationStatus(projectId: string) {

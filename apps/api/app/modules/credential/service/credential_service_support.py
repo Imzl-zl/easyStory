@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 from app.modules.credential.models import ModelCredential
 from app.shared.runtime.errors import ConfigurationError
-from app.shared.runtime.llm.llm_protocol import normalize_api_dialect, normalize_custom_base_url
+from app.shared.runtime.llm.llm_endpoint_policy import normalize_custom_base_url
+from app.shared.runtime.llm.llm_protocol_types import normalize_api_dialect
 
 from .credential_connection_support import (
     normalize_api_key_header_name_override,

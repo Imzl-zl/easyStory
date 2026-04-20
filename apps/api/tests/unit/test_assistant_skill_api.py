@@ -193,3 +193,36 @@ async def test_assistant_skill_api_project_crud(monkeypatch, tmp_path) -> None:
         assert final_list.json() == []
     finally:
         await cleanup_sqlite_session_factories(engine, async_engine, database_path)
+
+
+async def test_assistant_skill_api_accepts_explicit_project_override_id(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("EASYSTORY_JWT_SECRET", TEST_JWT_SECRET)
+    monkeypatch.setenv(
+        "EASYSTORY_ASSISTANT_CONFIG_ROOT",
+        str(tmp_path / "assistant-config"),
+    )
+    session_factory, async_session_factory, engine, async_engine, database_path = (
+        build_sqlite_session_factories(tmp_path, name="assistant-project-skill-api-override")
+    )
+
+    try:
+        with session_factory() as session:
+            owner = create_user(session)
+            project = create_project(session, owner=owner)
+        app = create_app(async_session_factory=async_session_factory)
+
+        async with started_async_client(app) as client:
+            created = await client.post(
+                f"/api/v1/assistant/skills/projects/{project.id}",
+                headers=auth_headers(owner.id),
+                json={
+                    "id": "skill.assistant.general_chat",
+                    "name": "项目覆盖 Skill",
+                    "content": "项目覆盖优先。\n用户输入：{{ user_input }}",
+                },
+            )
+
+        assert created.status_code == 200
+        assert created.json()["id"] == "skill.assistant.general_chat"
+    finally:
+        await cleanup_sqlite_session_factories(engine, async_engine, database_path)

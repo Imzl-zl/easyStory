@@ -13,65 +13,12 @@ from app.modules.workflow.models import NodeExecution, WorkflowExecution
 from app.shared.runtime.errors import BudgetExceededError, ConfigurationError, ModelFallbackExhaustedError
 
 from .snapshot_support import load_agent_snapshot, load_skill_snapshot
+from .workflow_review_fix_runtime import LangGraphWorkflowReviewFixRuntime
 from .workflow_runtime_budget_support import build_budget_review_outcome
 from .workflow_runtime_shared import ReviewCycleOutcome
 
 
 class WorkflowRuntimeReviewMixin:
-    async def _run_auto_review(
-        self,
-        db: AsyncSession,
-        workflow: WorkflowExecution,
-        workflow_config: WorkflowConfig,
-        node: NodeConfig,
-        execution: NodeExecution,
-        content: str,
-        *,
-        prompt_bundle: dict[str, Any],
-        owner_id: uuid.UUID,
-    ) -> ReviewCycleOutcome:
-        auto_review = node.auto_review if node.auto_review is not None else workflow_config.settings.auto_review
-        if not auto_review:
-            return ReviewCycleOutcome("passed", content, "generated")
-        reviewers = [load_agent_snapshot(workflow.agents_snapshot or {}, item) for item in node.reviewers]
-        try:
-            aggregated = await self._run_review_round(
-                db,
-                workflow,
-                workflow_config,
-                node,
-                execution,
-                content,
-                reviewers,
-                owner_id=owner_id,
-                review_type="auto_review",
-            )
-        except ModelFallbackExhaustedError as exc:
-            return self._resolve_model_fallback_review_outcome(
-                exc,
-                content=content,
-                content_source="generated",
-            )
-        if aggregated.overall_status == "passed":
-            return ReviewCycleOutcome("passed", content, "generated")
-        if aggregated.execution_failures:
-            return ReviewCycleOutcome("pause", content, "generated", failure_message="自动审核执行失败")
-        auto_fix = node.auto_fix if node.auto_fix is not None else workflow_config.settings.auto_fix
-        if not auto_fix:
-            return ReviewCycleOutcome("pause", content, "generated", failure_message="自动审核未通过")
-        return await self._run_fix_cycle(
-            db,
-            workflow,
-            workflow_config,
-            node,
-            execution,
-            prompt_bundle,
-            content,
-            aggregated,
-            reviewers,
-            owner_id,
-        )
-
     async def _resolve_review_outcome(
         self,
         db: AsyncSession,
@@ -85,24 +32,65 @@ class WorkflowRuntimeReviewMixin:
         owner_id: uuid.UUID,
         generation_budget_error: BudgetExceededError | None,
     ) -> ReviewCycleOutcome:
-        if generation_budget_error is not None:
-            return build_budget_review_outcome(
-                generation_budget_error,
-                generated_content=generated_content,
-            )
-        try:
-            return await self._run_auto_review(
+        runtime = LangGraphWorkflowReviewFixRuntime(
+            generated_content=generated_content,
+            generation_budget_error=generation_budget_error,
+            build_budget_review_outcome=lambda budget_error, content: build_budget_review_outcome(
+                budget_error,
+                generated_content=content,
+            ),
+            resolve_auto_review_enabled=lambda: (
+                node.auto_review
+                if node.auto_review is not None
+                else workflow_config.settings.auto_review
+            ),
+            load_reviewers=lambda: [
+                load_agent_snapshot(workflow.agents_snapshot or {}, item)
+                for item in node.reviewers
+            ],
+            run_review_round=lambda content, reviewers, review_type: self._run_review_round(
                 db,
                 workflow,
                 workflow_config,
                 node,
                 execution,
-                generated_content,
-                prompt_bundle=prompt_bundle,
+                content,
+                reviewers,
                 owner_id=owner_id,
-            )
-        except BudgetExceededError as exc:
-            return build_budget_review_outcome(exc, generated_content=generated_content)
+                review_type=review_type,
+            ),
+            resolve_auto_fix_enabled=lambda: (
+                node.auto_fix if node.auto_fix is not None else workflow_config.settings.auto_fix
+            ),
+            run_fix_attempt=lambda content, aggregated, attempt, max_attempts: self._run_fix_attempt(
+                db,
+                workflow,
+                workflow_config,
+                node,
+                execution,
+                prompt_bundle,
+                content,
+                aggregated,
+                owner_id,
+                attempt=attempt,
+                max_attempts=max_attempts,
+            ),
+            resolve_max_fix_attempts=lambda: self._resolve_max_fix_attempts(node, workflow_config),
+            select_re_reviewers=lambda reviewers, aggregated: self._select_re_reviewers(
+                reviewers,
+                aggregated,
+                node.review_config.re_review_scope,
+            ),
+            resolve_fix_failure=lambda content: self._resolve_fix_failure(node, content),
+            resolve_model_fallback_review_outcome=lambda exc, content, content_source: (
+                self._resolve_model_fallback_review_outcome(
+                    exc,
+                    content=content,
+                    content_source=content_source,
+                )
+            ),
+        )
+        return await runtime.run()
 
     async def _run_review_round(
         self,

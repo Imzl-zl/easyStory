@@ -10,7 +10,7 @@ from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import build_text_probe_request
 from app.shared.runtime.llm.llm_backend import resolve_backend_selection
 from app.shared.runtime.llm.litellm_backend import LiteLLMBackend, build_litellm_call_spec
-from app.shared.runtime.llm.llm_protocol import LLMConnection, LLMGenerateRequest
+from app.shared.runtime.llm.llm_protocol_types import LLMConnection, LLMGenerateRequest
 
 
 def test_build_litellm_call_spec_uses_openai_prefix_and_api_base_for_openai_compatible_gateway() -> None:

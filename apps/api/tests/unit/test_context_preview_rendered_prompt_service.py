@@ -10,7 +10,8 @@ from app.shared.runtime.errors import ConfigurationError
 from tests.unit.async_service_support import async_db
 from tests.unit.test_context_preview_style_reference import _create_preview_workflow
 from tests.unit.models.helpers import create_user
-from app.modules.context.service import ContextPreviewRequestDTO, create_context_preview_service
+from app.modules.context.service.dto import ContextPreviewRequestDTO
+from app.modules.context.service.factory import create_context_preview_service
 
 
 def test_context_preview_service_rejects_rendered_prompt_when_style_reference_is_unconfigured(

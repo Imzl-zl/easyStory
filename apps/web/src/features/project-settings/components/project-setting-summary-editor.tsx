@@ -101,7 +101,7 @@ export function ProjectSettingSummaryEditor({
   const sourceCharacterCount = sourceContent.length;
   const studioDocumentHref = `/workspace/project/${projectId}/studio?${new URLSearchParams({
     doc: PROJECT_SETTING_SUMMARY_SOURCE_DOCUMENT_PATH,
-    panel: "setting",
+    panel: "overview",
   }).toString()}`;
   const isDirty = preview !== null;
   const hasAvailableProvider = providerOptions.length > 0;
@@ -170,7 +170,6 @@ export function ProjectSettingSummaryEditor({
             }
           : current,
       );
-      queryClient.setQueryData(["setting-check", projectId], preview.setting_completeness);
       invalidateProjectSettingSummaryQueries(queryClient, projectId, snapshot.impact);
       showAppNotice({
         content: buildProjectSettingSummarySaveFeedback(snapshot.impact),

@@ -4,10 +4,13 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app.modules.config_registry import ConfigLoader
-from app.modules.context.service import StoryBibleService, create_story_bible_service
+from app.modules.context.service.story_bible_factory import create_story_bible_service
+from app.modules.context.service.story_bible_service import StoryBibleService
 from app.modules.credential.service import CredentialService, create_credential_service
 from app.modules.project.service import ProjectService, create_project_service
-from app.shared.runtime import LLMToolProvider, SkillTemplateRenderer, ToolProvider
+from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
+from app.shared.runtime.tool_provider import ToolProvider
 
 from .chapter_content_service import ChapterContentService
 from .canonical_project_document_query_service import CanonicalProjectDocumentQueryService

@@ -38,7 +38,8 @@ from app.shared.runtime.llm.interop.provider_interop_support import (
 )
 from app.shared.runtime.llm.llm_backend import AsyncLLMGenerateBackend, resolve_backend_selection
 from app.shared.runtime.llm.litellm_backend import LiteLLMBackend, preview_litellm_call_spec
-from app.shared.runtime.llm.llm_protocol import LLMGenerateRequest, NormalizedLLMResponse, prepare_generation_request
+from app.shared.runtime.llm.llm_protocol_requests import prepare_generation_request
+from app.shared.runtime.llm.llm_protocol_types import LLMGenerateRequest, NormalizedLLMResponse
 from app.shared.runtime.llm.llm_response_validation import raise_if_empty_tool_response
 from app.shared.runtime.llm.native_http_backend import NativeHttpLLMBackend
 from app.shared.settings import clear_settings_cache

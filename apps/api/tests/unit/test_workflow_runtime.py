@@ -24,11 +24,14 @@ from app.modules.export.service import ExportService
 from app.modules.observability.models import PromptReplay
 from app.modules.review.models import ReviewAction
 from app.modules.workflow.models import Artifact, ChapterTask, NodeExecution, WorkflowExecution
-from app.modules.workflow.service import WorkflowRuntimeService, WorkflowService, create_workflow_service
+from app.modules.workflow.service.factory import create_workflow_service
+from app.modules.workflow.service.workflow_runtime_service import WorkflowRuntimeService
+from app.modules.workflow.service.workflow_service import WorkflowService
 from app.modules.workflow.service.snapshot_support import (
     dump_config, freeze_agents, freeze_skills, freeze_workflow, resolve_start_node_id,
 )
-from app.shared.runtime import SkillTemplateRenderer, ToolProvider
+from app.shared.runtime.template_renderer import SkillTemplateRenderer
+from app.shared.runtime.tool_provider import ToolProvider
 from app.shared.runtime.errors import ConfigurationError
 from tests.unit.async_service_support import async_db
 from tests.unit.models.helpers import create_project, create_template, create_user, ready_project_setting

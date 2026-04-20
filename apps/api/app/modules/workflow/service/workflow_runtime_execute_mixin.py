@@ -17,6 +17,8 @@ from app.shared.runtime.errors import (
 )
 
 from .snapshot_support import resolve_next_node_id
+from .workflow_chapter_generation_runtime import LangGraphWorkflowChapterGenerationRuntime
+from .workflow_chapter_split_runtime import LangGraphWorkflowChapterSplitRuntime
 from .workflow_runtime_budget_support import (
     build_chapter_split_budget_outcome,
     build_completed_snapshot,
@@ -42,88 +44,88 @@ class WorkflowRuntimeExecuteMixin:
     ) -> NodeOutcome:
         execution = await self._create_node_execution(db, workflow, node)
         started_at = datetime.now(timezone.utc)
-        budget_error: BudgetExceededError | None = None
         try:
-            prompt_bundle, credential = await self._build_prompt_bundle(
-                db,
-                workflow,
-                workflow_config,
-                node,
-                owner_id=owner_id,
-                chapter_number=None,
-            )
-            execution.input_data = prompt_bundle["input_data"]
-            await self._run_before_generate_hook(
-                db,
-                workflow,
-                workflow_config,
-                node,
-                owner_id=owner_id,
-                execution_id=execution.id,
-            )
-            try:
-                raw_output = await self._call_llm(
+            runtime = LangGraphWorkflowChapterSplitRuntime(
+                prepare_request=lambda: self._prepare_chapter_split_request(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    owner_id=owner_id,
+                    execution=execution,
+                ),
+                run_before_generate_hook=lambda: self._run_before_generate_hook(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    owner_id=owner_id,
+                    execution_id=execution.id,
+                ),
+                call_llm=lambda prompt_bundle, credential: self._call_chapter_split_llm(
                     db,
                     workflow,
                     workflow_config,
                     prompt_bundle,
                     owner_id=owner_id,
-                    node_execution_id=execution.id,
-                    usage_type="generate",
-                    credential=credential,
-                )
-            except BudgetExceededError as exc:
-                budget_error = exc
-                raw_output = exc.raw_output
-            except ModelFallbackExhaustedError as exc:
-                self._fail_execution(db, execution, started_at, BusinessRuleError(exc.message))
-                return build_model_fallback_node_outcome(
-                    exc,
                     execution_id=execution.id,
-                    next_node_id=node.id,
-                    hook_payload={"node_id": node.id},
-                )
-            chapters = self._parse_chapter_split_output(raw_output["content"])
-            if budget_error is not None:
-                ensure_chapter_split_budget_action_supported(budget_error)
-            await self._replace_chapter_tasks(db, workflow, chapters)
-            self._append_artifact(
-                db,
-                execution,
-                "chapter_tasks",
-                {"chapters": [item.model_dump() for item in chapters]},
+                    credential=credential,
+                ),
+                parse_chapters=self._parse_chapter_split_output,
+                ensure_budget_action_supported=ensure_chapter_split_budget_action_supported,
+                replace_chapter_tasks=lambda chapters: self._replace_chapter_tasks(
+                    db,
+                    workflow,
+                    chapters,
+                ),
+                append_artifact=lambda chapters: self._append_artifact(
+                    db,
+                    execution,
+                    "chapter_tasks",
+                    {"chapters": [item.model_dump() for item in chapters]},
+                ),
+                build_hook_payload=self._chapter_split_hook_payload,
+                run_after_generate_hook=lambda chapter_payload: self._run_after_generate_hook(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    owner_id=owner_id,
+                    execution_id=execution.id,
+                    extra=chapter_payload,
+                ),
+                record_prompt_replay=lambda prompt_bundle, raw_output: self._record_prompt_replay(
+                    db,
+                    execution,
+                    prompt_bundle,
+                    raw_output,
+                ),
+                complete_execution=lambda chapters_count: self._complete_execution(
+                    db,
+                    execution,
+                    started_at,
+                    {"chapters_count": chapters_count},
+                ),
+                build_outcome=lambda budget_error, chapter_payload: self._build_chapter_split_outcome(
+                    workflow,
+                    node,
+                    execution,
+                    budget_error=budget_error,
+                    hook_payload=chapter_payload,
+                ),
             )
-            chapter_payload = self._chapter_split_hook_payload(chapters, budget_error)
-            await self._run_after_generate_hook(
-                db,
-                workflow,
-                workflow_config,
-                node,
-                owner_id=owner_id,
+            return await runtime.run()
+        except ModelFallbackExhaustedError as exc:
+            self._fail_execution(db, execution, started_at, BusinessRuleError(exc.message))
+            return build_model_fallback_node_outcome(
+                exc,
                 execution_id=execution.id,
-                extra=chapter_payload,
+                next_node_id=node.id,
+                hook_payload={"node_id": node.id},
             )
-            self._record_prompt_replay(db, execution, prompt_bundle, raw_output)
-            self._complete_execution(db, execution, started_at, {"chapters_count": len(chapters)})
         except Exception as exc:
             self._fail_execution(db, execution, started_at, exc)
             raise
-        next_node_id = resolve_next_node_id(workflow.workflow_snapshot or {}, current_node_id=node.id)
-        completed_snapshot = build_completed_snapshot(self._completed_marker(execution))
-        if budget_error is not None:
-            return build_chapter_split_budget_outcome(
-                completed_snapshot=completed_snapshot,
-                next_node_id=next_node_id,
-                budget_error=budget_error,
-                node_execution_id=execution.id,
-                hook_payload=chapter_payload,
-            )
-        return NodeOutcome(
-            next_node_id=next_node_id,
-            snapshot_extra=completed_snapshot,
-            node_execution_id=execution.id,
-            hook_payload=chapter_payload,
-        )
 
     async def _execute_chapter_gen(
         self,
@@ -143,8 +145,8 @@ class WorkflowRuntimeExecuteMixin:
         execution = await self._create_node_execution(db, workflow, node)
         started_at = datetime.now(timezone.utc)
         try:
-            prompt_bundle, credential, raw_output, generated_content, generation_budget_error = (
-                await self._generate_chapter(
+            runtime = LangGraphWorkflowChapterGenerationRuntime(
+                generate_chapter=lambda: self._generate_chapter(
                     db,
                     workflow,
                     workflow_config,
@@ -152,35 +154,38 @@ class WorkflowRuntimeExecuteMixin:
                     task,
                     execution,
                     owner_id=owner_id,
-                )
-            )
-            self._record_prompt_replay(db, execution, prompt_bundle, raw_output)
-            review_outcome = await self._resolve_review_outcome(
-                db,
-                workflow,
-                workflow_config,
-                node,
-                execution,
-                generated_content,
-                prompt_bundle=prompt_bundle,
-                owner_id=owner_id,
-                generation_budget_error=generation_budget_error,
-            )
-            candidate = await self._persist_chapter_candidate(
-                db,
-                workflow,
-                task,
-                prompt_bundle["context_snapshot_hash"],
-                review_outcome,
-            )
-            hook_payload = self._chapter_generate_hook_payload(
-                task,
-                review_outcome,
-                candidate,
-                generated_content,
-            )
-            if candidate[0] is not None:
-                await self._run_after_generate_hook(
+                ),
+                record_prompt_replay=lambda prompt_bundle, raw_output: self._record_prompt_replay(
+                    db,
+                    execution,
+                    prompt_bundle,
+                    raw_output,
+                ),
+                resolve_review_outcome=lambda generated_content, prompt_bundle, generation_budget_error: self._resolve_review_outcome(
+                    db,
+                    workflow,
+                    workflow_config,
+                    node,
+                    execution,
+                    generated_content,
+                    prompt_bundle=prompt_bundle,
+                    owner_id=owner_id,
+                    generation_budget_error=generation_budget_error,
+                ),
+                persist_candidate=lambda context_snapshot_hash, review_outcome: self._persist_chapter_candidate(
+                    db,
+                    workflow,
+                    task,
+                    context_snapshot_hash,
+                    review_outcome,
+                ),
+                build_hook_payload=lambda review_outcome, candidate, generated_content: self._chapter_generate_hook_payload(
+                    task,
+                    review_outcome,
+                    candidate,
+                    generated_content,
+                ),
+                run_after_generate_hook=lambda hook_payload: self._run_after_generate_hook(
                     db,
                     workflow,
                     workflow_config,
@@ -188,16 +193,18 @@ class WorkflowRuntimeExecuteMixin:
                     owner_id=owner_id,
                     execution_id=execution.id,
                     extra=hook_payload,
-                )
-            return self._finalize_chapter_execution(
-                db,
-                task,
-                execution,
-                started_at,
-                review_outcome,
-                candidate,
-                hook_payload,
+                ),
+                finalize_execution=lambda review_outcome, candidate, hook_payload: self._finalize_chapter_execution(
+                    db,
+                    task,
+                    execution,
+                    started_at,
+                    review_outcome,
+                    candidate,
+                    hook_payload,
+                ),
             )
+            return await runtime.run()
         except ModelFallbackExhaustedError as exc:
             task.status = "failed"
             self._fail_execution(db, execution, started_at, BusinessRuleError(exc.message))
@@ -264,6 +271,81 @@ class WorkflowRuntimeExecuteMixin:
         if not isinstance(content, str):
             raise ConfigurationError("Chapter generate output must be plain text")
         return prompt_bundle, credential, raw_output, content, budget_error
+
+    async def _prepare_chapter_split_request(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        node: NodeConfig,
+        *,
+        owner_id: uuid.UUID,
+        execution,
+    ) -> tuple[dict, ModelCredential]:
+        prompt_bundle, credential = await self._build_prompt_bundle(
+            db,
+            workflow,
+            workflow_config,
+            node,
+            owner_id=owner_id,
+            chapter_number=None,
+        )
+        execution.input_data = prompt_bundle["input_data"]
+        return prompt_bundle, credential
+
+    async def _call_chapter_split_llm(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        workflow_config: WorkflowConfig,
+        prompt_bundle: dict[str, Any],
+        *,
+        owner_id: uuid.UUID,
+        execution_id: uuid.UUID,
+        credential: ModelCredential,
+    ) -> tuple[dict, BudgetExceededError | None]:
+        try:
+            return (
+                await self._call_llm(
+                    db,
+                    workflow,
+                    workflow_config,
+                    prompt_bundle,
+                    owner_id=owner_id,
+                    node_execution_id=execution_id,
+                    usage_type="generate",
+                    credential=credential,
+                ),
+                None,
+            )
+        except BudgetExceededError as exc:
+            return exc.raw_output, exc
+
+    def _build_chapter_split_outcome(
+        self,
+        workflow: WorkflowExecution,
+        node: NodeConfig,
+        execution,
+        *,
+        budget_error: BudgetExceededError | None,
+        hook_payload: dict[str, Any],
+    ) -> NodeOutcome:
+        next_node_id = resolve_next_node_id(workflow.workflow_snapshot or {}, current_node_id=node.id)
+        completed_snapshot = build_completed_snapshot(self._completed_marker(execution))
+        if budget_error is not None:
+            return build_chapter_split_budget_outcome(
+                completed_snapshot=completed_snapshot,
+                next_node_id=next_node_id,
+                budget_error=budget_error,
+                node_execution_id=execution.id,
+                hook_payload=hook_payload,
+            )
+        return NodeOutcome(
+            next_node_id=next_node_id,
+            snapshot_extra=completed_snapshot,
+            node_execution_id=execution.id,
+            hook_payload=hook_payload,
+        )
 
     def _finalize_chapter_execution(
         self,

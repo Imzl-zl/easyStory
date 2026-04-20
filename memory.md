@@ -3,9 +3,9 @@
 
 ## 当前基线
 
-- 后端测试：最近一次已知全量 `cd apps/api && ruff check app tests && pytest -q` 通过（记录日期：2026-03-23）
-- 前端检查：最近一次已知 `pnpm --dir apps/web lint` + `pnpm --dir apps/web test:unit` 通过（记录日期：2026-04-04）
-- 最后更新：2026-04-09
+- 后端检查：`2026-04-19` 已确认 `cd apps/api && ./.venv/bin/ruff check app tests` 通过；与 framework-first runtime 拆分直接相关的定向后端回归已通过（`108 passed`）。全量 `pytest -q` 仍受 60 秒硬超时限制，当前未在本轮内跑完整轮
+- 前端检查：`2026-04-19` 已确认 `pnpm --dir apps/web lint` 与 `pnpm --dir apps/web test:unit` 通过（`342 passed`）
+- 最后更新：2026-04-19
 ## 已完成能力
 
 - 凭证与模型连接闭环：安全存储、endpoint policy、`api_dialect` 路由、`interop_profile` / auth strategy override、公网 http 显式测试开关、本地 provider interop probe、旧库 schema reconcile，以及连接级 `context_window_tokens / default_max_output_tokens`
@@ -41,6 +41,10 @@
 - 用户自定义 Hooks 最小闭环：大厅设置现已新增独立 `Hooks` 页签，用户可创建、编辑、启用/停用、删除自己的 Hook，并在聊天页“模型与连接”里按当前会话选择启用；Hook 真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/hooks/<hook_id>/HOOK.yaml`
 - 用户自定义 MCP 最小闭环：大厅设置现已新增独立 `MCP` 页签，用户可创建、编辑、启用/停用、删除自己的 MCP，并在 Hooks 里直接绑定调用；MCP 真值文件位于 `apps/api/.runtime/assistant-config/users/<user_id>/mcp_servers/<server_id>/MCP.yaml`
 - assistant 运行时一致性补丁：hook agent 现已和主回复共用同一套用户偏好与项目规则叠加逻辑，不再出现主回复与 hook agent 模型/口径不一致
+- framework-first runtime 拆分已继续收口：assistant turn prepare/execution/finalize/recovery、tool loop、workflow app start/resume、workflow graph/node/outcome、story asset generation 都已落到独立 `LangGraph*Runtime` 文件并有对应定向单测
+- assistant 工具能力门控已补齐到 prepare 阶段：visible tools 现在会按 `buffered / stream` 显式要求对应的 `tool_continuation_probe` 真值；未验证连接会在 prepare 阶段直接报业务错误，不再把失败拖到 tool loop 运行时
+- assistant 自定义 Skill / MCP 当前正式支持“显式同 ID 覆盖”创建：若目标是覆盖用户层或系统层同 ID 资源，可在创建时直接提供目标 `id`；未显式提供时仍沿用 `skill.user.* / skill.project.* / mcp.user.* / mcp.project.*` 自动生成
+- backend 运行时依赖已补齐 `asyncpg`，`resolve_async_database_url()` 与 `create_async_database_engine()` 对 PostgreSQL `asyncpg` 路径已有最小 smoke test
 - workflow runtime 模型回退闭环：已支持 candidate 构建、capability skip、retry、fallback exhausted pause/fail 语义；相关 pause reason 与 snapshot 已接入 state machine / review executor
 - context / review / billing / export / analysis 已补到查询面板或最小业务闭环
 - template + incubator 闭环：built-in sync、自定义模板、draft / create-project / conversation draft、完整度前移

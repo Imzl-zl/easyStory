@@ -6,12 +6,12 @@ from typing import Any, Protocol
 from ..errors import ConfigurationError
 from .interop import provider_interop_stream_support as stream_support
 from .llm_backend import LLMBackendStreamEvent, StreamStopChecker
-from .llm_protocol import (
+from .llm_protocol_requests import prepare_generation_request
+from .llm_protocol_responses import parse_generation_response
+from .llm_protocol_types import (
     HttpJsonResponse,
     LLMGenerateRequest,
     NormalizedLLMResponse,
-    parse_generation_response,
-    prepare_generation_request,
     send_json_http_request,
 )
 from .llm_response_validation import (

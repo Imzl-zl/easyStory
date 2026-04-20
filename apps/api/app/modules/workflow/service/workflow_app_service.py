@@ -26,7 +26,9 @@ from .snapshot_support import (
     workflow_to_dto,
     workflow_to_summary_dto,
 )
+from .workflow_app_resume_runtime import LangGraphWorkflowAppResumeRuntime
 from .workflow_app_runtime_support import RuntimeDispatchFn, WorkflowAppRuntimeSupportMixin
+from .workflow_app_start_runtime import LangGraphWorkflowAppStartRuntime
 from .workflow_app_service_base import PREPARATION_ASSET_LABELS, WorkflowAppServiceBase
 from .workflow_task_runtime_support import ensure_workflow_can_resume
 
@@ -47,19 +49,26 @@ class WorkflowAppService(WorkflowAppRuntimeSupportMixin, WorkflowAppServiceBase)
             owner_id=owner_id,
             load_template=True,
         )
-        self.project_service.ensure_setting_allows_preparation(project)
-        workflow_config = self._resolve_workflow_config(project, payload.workflow_id)
-        await self._ensure_preparation_assets_ready(db, project.id)
-        await self._ensure_no_active_workflow(db, project.id)
-        workflow = self._build_execution(project, workflow_config)
-        await self._persist_started_workflow(db, workflow, workflow_config)
-        execution_id = workflow.id
-        await self._dispatch_runtime(
-            db,
-            execution_id,
-            owner_id=owner_id,
-            runtime_dispatcher=runtime_dispatcher,
+        runtime = LangGraphWorkflowAppStartRuntime(
+            resolve_workflow_config=lambda: self._resolve_workflow_config(project, payload.workflow_id),
+            ensure_preconditions=lambda: self._ensure_start_preconditions(
+                db,
+                project.id,
+            ),
+            build_execution=lambda workflow_config: self._build_execution(project, workflow_config),
+            persist_started_workflow=lambda workflow, workflow_config: self._persist_started_workflow(
+                db,
+                workflow,
+                workflow_config,
+            ),
+            dispatch_runtime=lambda execution_id: self._dispatch_runtime(
+                db,
+                execution_id,
+                owner_id=owner_id,
+                runtime_dispatcher=runtime_dispatcher,
+            ),
         )
+        execution_id = await runtime.run()
         db.expire_all()
         workflow = await self._require_workflow(db, execution_id, owner_id=owner_id)
         return workflow_to_dto(workflow)
@@ -107,20 +116,17 @@ class WorkflowAppService(WorkflowAppRuntimeSupportMixin, WorkflowAppServiceBase)
         workflow = await self._require_workflow_for_update(db, workflow_id, owner_id=owner_id)
         if workflow.status == "running":
             return workflow_to_dto(workflow)
-        await self._ensure_resume_allowed(db, workflow.id)
-        execution_id = workflow.id
-        try:
-            self.workflow_service.resume(workflow)
-        except InvalidTransitionError as exc:
-            raise ConflictError(f"当前状态不允许恢复工作流: {workflow.status}") from exc
-        self._record_workflow_log(db, workflow, level="INFO", message="Workflow resumed")
-        await db.commit()
-        await self._dispatch_runtime(
-            db,
-            execution_id,
-            owner_id=owner_id,
-            runtime_dispatcher=runtime_dispatcher,
+        runtime = LangGraphWorkflowAppResumeRuntime(
+            ensure_resume_allowed=lambda: self._ensure_resume_allowed(db, workflow.id),
+            resume_workflow=lambda: self._resume_workflow_and_commit(db, workflow),
+            dispatch_runtime=lambda execution_id: self._dispatch_runtime(
+                db,
+                execution_id,
+                owner_id=owner_id,
+                runtime_dispatcher=runtime_dispatcher,
+            ),
         )
+        execution_id = await runtime.run()
         db.expire_all()
         workflow = await self._require_workflow(db, execution_id, owner_id=owner_id)
         return workflow_to_dto(workflow)
@@ -212,12 +218,33 @@ class WorkflowAppService(WorkflowAppRuntimeSupportMixin, WorkflowAppServiceBase)
         if existing is not None:
             raise ConflictError("项目已存在未结束的工作流，必须先恢复或取消当前执行")
 
+    async def _ensure_start_preconditions(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+    ) -> None:
+        await self._ensure_preparation_assets_ready(db, project_id)
+        await self._ensure_no_active_workflow(db, project_id)
+
     async def _ensure_resume_allowed(
         self,
         db: AsyncSession,
         workflow_id: uuid.UUID,
     ) -> None:
         await ensure_workflow_can_resume(db, workflow_id)
+
+    async def _resume_workflow_and_commit(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+    ) -> WorkflowExecution:
+        try:
+            self.workflow_service.resume(workflow)
+        except InvalidTransitionError as exc:
+            raise ConflictError(f"当前状态不允许恢复工作流: {workflow.status}") from exc
+        self._record_workflow_log(db, workflow, level="INFO", message="Workflow resumed")
+        await db.commit()
+        return workflow
 
     async def _persist_started_workflow(
         self,

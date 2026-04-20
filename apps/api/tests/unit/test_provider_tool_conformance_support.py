@@ -18,7 +18,8 @@ from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     validate_tool_continuation_probe_response,
     validate_tool_definition_probe_response,
 )
-from app.shared.runtime.llm.llm_protocol import LLMConnection, NormalizedLLMResponse, prepare_generation_request
+from app.shared.runtime.llm.llm_protocol_requests import prepare_generation_request
+from app.shared.runtime.llm.llm_protocol_types import LLMConnection, NormalizedLLMResponse
 from app.shared.runtime.llm.llm_protocol_types import NormalizedLLMToolCall
 
 
@@ -130,6 +131,23 @@ def test_build_conformance_probe_request_uses_safe_tool_alias() -> None:
     assert prepared.json_body["tools"][0]["name"] == "probe_echo_payload"
     assert prepared.json_body["tool_choice"] == "required"
     assert prepared.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
+
+
+def test_build_conformance_probe_request_does_not_force_tool_choice_for_chat_reasoning_profile() -> None:
+    request = build_conformance_probe_request(
+        LLMConnection(
+            api_dialect="openai_chat_completions",
+            api_key="test-key",
+            base_url="https://gateway.example.com/v1/chat/completions",
+            interop_profile="chat_compat_reasoning_content",
+        ),
+        model_name="kimi-coding",
+        probe_kind="tool_call_probe",
+    )
+    prepared = prepare_generation_request(request)
+
+    assert request.force_tool_call is False
+    assert "tool_choice" not in prepared.json_body
 
 
 def test_build_conformance_probe_request_keeps_gemini_probe_shape_aligned_with_runtime() -> None:
