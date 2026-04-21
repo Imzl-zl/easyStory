@@ -3,10 +3,14 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Protocol
 
-from ..errors import ConfigurationError
+from ..errors import ConfigurationError, UpstreamServiceError
 from .interop import provider_interop_stream_support as stream_support
 from .llm_backend import LLMBackendStreamEvent, StreamStopChecker
-from .llm_error_support import INCOMPLETE_STREAM_MESSAGE, build_responses_failed_message
+from .llm_error_support import (
+    INCOMPLETE_STREAM_MESSAGE,
+    build_responses_failed_message,
+    raise_http_status_error,
+)
 from .llm_protocol_requests import prepare_generation_request
 from .llm_protocol_responses import parse_generation_response
 from .llm_protocol_types import (
@@ -14,6 +18,7 @@ from .llm_protocol_types import (
     LLMGenerateRequest,
     NormalizedLLMResponse,
     OPENAI_RESPONSES_TERMINAL_EVENT_NAMES,
+    PreparedLLMHttpRequest,
     send_json_http_request,
 )
 from .llm_response_validation import (
@@ -30,7 +35,7 @@ from .llm_protocol_responses import extract_response_truncation_reason
 
 
 class AsyncLlmRequestSender(Protocol):
-    async def __call__(self, request) -> HttpJsonResponse: ...
+    async def __call__(self, request: PreparedLLMHttpRequest) -> HttpJsonResponse: ...
 
 
 class NativeHttpLLMBackend:
@@ -45,8 +50,13 @@ class NativeHttpLLMBackend:
         prepared_request = prepare_generation_request(request)
         response = await self.request_sender(prepared_request)
         if response.status_code >= 400:
-            raise ConfigurationError(_build_http_error_message(response))
-        payload = response.json_body or {}
+            raise_http_status_error(
+                status_code=response.status_code,
+                message=_build_http_error_message(response),
+            )
+        payload = response.json_body
+        if payload is None:
+            raise UpstreamServiceError("LLM request failed: upstream returned a non-JSON response body")
         try:
             normalized = parse_generation_response(
                 request.connection.api_dialect,
@@ -65,7 +75,7 @@ class NativeHttpLLMBackend:
             raise
         raise_if_truncated_response(
             api_dialect=request.connection.api_dialect,
-            payload=response.json_body or {},
+            payload=payload,
             response_format=request.response_format,
             content=normalized.content,
         )
@@ -94,7 +104,7 @@ class NativeHttpLLMBackend:
             should_stop=should_stop,
         ):
             if event.event_name == "response.failed":
-                raise ConfigurationError(build_responses_failed_message(event.payload))
+                raise UpstreamServiceError(build_responses_failed_message(event.payload))
             delta = record_backend_stream_event(
                 completion_state,
                 recorded_event_name=event.event_name,

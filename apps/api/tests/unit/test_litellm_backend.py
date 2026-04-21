@@ -352,7 +352,7 @@ def test_litellm_backend_generate_stream_raises_responses_failed_message(monkeyp
             events.append(event)
         return events
 
-    with pytest.raises(ConfigurationError, match="上游失败"):
+    with pytest.raises(UpstreamServiceError, match="上游失败"):
         asyncio.run(collect())
 
 
@@ -598,6 +598,26 @@ def test_litellm_backend_maps_generic_api_error_to_upstream_service_error(monkey
     monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
 
     with pytest.raises(UpstreamServiceError, match="gateway exploded"):
+        asyncio.run(LiteLLMBackend().generate(request))
+
+
+def test_litellm_backend_maps_unclassified_error_to_upstream_service_error(monkeypatch) -> None:
+    request = build_text_probe_request(
+        LLMConnection(
+            provider="openai",
+            api_dialect="openai_chat_completions",
+            api_key="test-key",
+            base_url="https://api.openai.com/v1",
+        ),
+        model_name="gpt-4.1-mini",
+    )
+
+    async def fake_acompletion(**kwargs):
+        raise RuntimeError("unexpected gateway state")
+
+    monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
+
+    with pytest.raises(UpstreamServiceError, match="unexpected gateway state"):
         asyncio.run(LiteLLMBackend().generate(request))
 
 

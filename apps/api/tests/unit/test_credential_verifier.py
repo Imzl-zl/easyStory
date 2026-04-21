@@ -7,7 +7,11 @@ import httpx
 import pytest
 
 from app.modules.credential.infrastructure import AsyncHttpCredentialVerifier
-from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
+from app.shared.runtime.errors import (
+    BusinessRuleError,
+    ConfigurationError,
+    UpstreamAuthenticationError,
+)
 from app.shared.runtime.llm.llm_backend import LLMBackendStreamEvent
 from app.shared.runtime.llm.llm_protocol_types import (
     LLMGenerateRequest,
@@ -474,6 +478,26 @@ def test_verify_buffered_tool_probe_uses_generate_backend() -> None:
 def test_verify_credential_maps_authentication_error() -> None:
     backend = RecordingBackend(
         stream_sequences=[ConfigurationError("LLM streaming request failed: HTTP 401 - bad key")],
+    )
+
+    verifier = AsyncHttpCredentialVerifier(backend=backend)
+
+    with pytest.raises(BusinessRuleError, match="API Key 无效"):
+        asyncio.run(
+            verifier.verify(
+                provider="openai",
+                api_key="test-key",
+                base_url=None,
+                api_dialect="openai_chat_completions",
+                default_model="gpt-4o-mini",
+                client_name="easyStory",
+            )
+        )
+
+
+def test_verify_credential_maps_upstream_authentication_error_subclass() -> None:
+    backend = RecordingBackend(
+        stream_sequences=[UpstreamAuthenticationError("LLM streaming request failed: HTTP 401 - bad key")],
     )
 
     verifier = AsyncHttpCredentialVerifier(backend=backend)

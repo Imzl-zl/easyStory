@@ -115,7 +115,7 @@ class LiteLLMBackend:
                     current_api_dialect=stream_api_dialect,
                 )
                 if event_name == "response.failed":
-                    raise ConfigurationError(build_responses_failed_message(payload))
+                    raise UpstreamServiceError(build_responses_failed_message(payload))
                 parsed = parse_raw_stream_event(
                     stream_api_dialect,
                     event_name=event_name,
@@ -449,7 +449,7 @@ def _raise_litellm_request_error(error: Exception, *, streaming: bool) -> NoRetu
         raise ConfigurationError(message) from error
     if isinstance(error, litellm.APIError):
         raise UpstreamServiceError(message) from error
-    raise ConfigurationError(message) from error
+    raise UpstreamServiceError(message) from error
 
 
 def _format_litellm_error(error: Exception, *, streaming: bool) -> str:

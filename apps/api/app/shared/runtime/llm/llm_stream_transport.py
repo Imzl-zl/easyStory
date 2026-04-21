@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 
 from ..errors import ConfigurationError
+from .llm_error_support import raise_http_status_error
 from .llm_protocol_types import DEFAULT_REQUEST_TIMEOUT_SECONDS, PreparedLLMHttpRequest
 
 STREAM_DONE_MARKER = "[DONE]"
@@ -52,11 +53,12 @@ async def iterate_raw_stream_events(
                 print(f"HTTP {response.status_code}")
             if response.status_code >= 400:
                 body = await response.aread()
-                raise ConfigurationError(
-                    _build_stream_http_error_message(
+                raise_http_status_error(
+                    status_code=response.status_code,
+                    message=_build_stream_http_error_message(
                         response.status_code,
                         body.decode("utf-8", errors="replace"),
-                    )
+                    ),
                 )
             async for raw_event in _iterate_response_events(
                 response,

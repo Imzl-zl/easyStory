@@ -498,13 +498,12 @@ def _build_characters_data_document(setting_payload: dict[str, Any] | None) -> s
         if isinstance(setting_payload, dict)
         else []
     )
-    entries: list[str] = []
+    entries: list[dict[str, Any]] = []
     if protagonist:
-        entries.append(_build_character_data_entry("char_001", protagonist, role="protagonist"))
+        entries.append(_build_character_data_item("char_001", protagonist, role="protagonist"))
     for index, role in enumerate(supporting_roles, start=2):
-        entries.append(_build_character_data_entry(f"char_{index:03d}", role, role="supporting"))
-    body = ",\n".join(entries)
-    return "{\n  \"characters\": [\n" + _indent_block(body) + "\n  ]\n}"
+        entries.append(_build_character_data_item(f"char_{index:03d}", role, role="supporting"))
+    return json.dumps({"characters": entries}, ensure_ascii=False, indent=2)
 
 
 def _read_legacy_relations_collection(value: Any) -> list[dict[str, Any]]:
@@ -522,19 +521,16 @@ def _dump_json_collection(collection_name: str, items: list[dict[str, Any]]) -> 
     return json.dumps({collection_name: items}, ensure_ascii=False, indent=2)
 
 
-def _build_character_data_entry(entry_id: str, payload: dict[str, Any], *, role: str) -> str:
-    lines = [
-        "    {",
-        f'      "id": "{entry_id}",',
-        f'      "name": {_json_string(payload.get("name"))},',
-        f'      "role": "{role}",',
-        f'      "identity": {_json_string(payload.get("identity"))},',
-        f'      "initial_situation": {_json_string(payload.get("initial_situation"))},',
-        f'      "goal": {_json_string(payload.get("goal"))},',
-        '      "status": "alive"',
-        "    }",
-    ]
-    return "\n".join(lines)
+def _build_character_data_item(entry_id: str, payload: dict[str, Any], *, role: str) -> dict[str, Any]:
+    return {
+        "id": entry_id,
+        "name": _stringify(payload.get("name")),
+        "role": role,
+        "identity": _stringify(payload.get("identity")),
+        "initial_situation": _stringify(payload.get("initial_situation")),
+        "goal": _stringify(payload.get("goal")),
+        "status": "alive",
+    }
 
 
 def _build_empty_json_document(collection_name: str) -> str:
@@ -603,15 +599,3 @@ def _stringify(value: Any) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     return ""
-
-
-def _json_string(value: Any) -> str:
-    text = _stringify(value)
-    escaped = text.replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'
-
-
-def _indent_block(content: str) -> str:
-    if not content:
-        return ""
-    return "\n".join(f"  {line}" if line else "" for line in content.splitlines())

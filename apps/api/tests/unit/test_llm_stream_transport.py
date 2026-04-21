@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from app.shared.runtime.errors import ConfigurationError
+from app.shared.runtime.errors import ConfigurationError, UpstreamAuthenticationError
 from app.shared.runtime.llm import llm_stream_transport as transport_module
 from app.shared.runtime.llm.llm_protocol_types import PreparedLLMHttpRequest
 from app.shared.runtime.llm.llm_stream_transport import (
@@ -85,4 +85,51 @@ async def test_iterate_raw_stream_events_interrupts_pending_line_read(monkeypatc
             request,
             should_stop=should_stop,
         ):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_iterate_raw_stream_events_maps_http_401_to_upstream_authentication_error(
+    monkeypatch,
+) -> None:
+    request = PreparedLLMHttpRequest(
+        method="POST",
+        url="https://proxy.example.com/v1/responses",
+        headers={"Accept": "text/event-stream"},
+        json_body={"model": "gpt-test", "stream": True},
+    )
+
+    class FakeResponse:
+        status_code = 401
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b"bad key"
+
+        async def aiter_lines(self):
+            if False:
+                yield ""
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(transport_module.httpx, "AsyncClient", FakeClient)
+
+    with pytest.raises(UpstreamAuthenticationError, match="HTTP 401 - bad key"):
+        async for _event in iterate_raw_stream_events(request):
             pass
