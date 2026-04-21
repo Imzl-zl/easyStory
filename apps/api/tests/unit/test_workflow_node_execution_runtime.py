@@ -1,7 +1,7 @@
 import pytest
 
 from app.modules.workflow.service.workflow_node_execution_runtime import (
-    LangGraphWorkflowNodeExecutionRuntime,
+    WorkflowNodeExecutionRuntime,
 )
 from app.modules.workflow.service.workflow_runtime_shared import NodeOutcome
 
@@ -30,7 +30,7 @@ async def test_workflow_node_execution_runtime_runs_success_path() -> None:
     async def run_after_on_error(resolved_outcome: NodeOutcome, error: Exception):
         call_log.append(("after_on_error", resolved_outcome, error))
 
-    runtime = LangGraphWorkflowNodeExecutionRuntime(
+    runtime = WorkflowNodeExecutionRuntime(
         run_before_hook=run_before_hook,
         run_before_on_error=run_before_on_error,
         dispatch_node=dispatch_node,
@@ -60,7 +60,7 @@ async def test_workflow_node_execution_runtime_runs_on_error_for_before_failure(
     async def run_before_on_error(error: Exception):
         call_log.append(("before_on_error", error))
 
-    runtime = LangGraphWorkflowNodeExecutionRuntime(
+    runtime = WorkflowNodeExecutionRuntime(
         run_before_hook=run_before_hook,
         run_before_on_error=run_before_on_error,
         dispatch_node=lambda: _return_async(NodeOutcome(next_node_id="chapter_gen")),
@@ -86,7 +86,7 @@ async def test_workflow_node_execution_runtime_runs_on_error_for_dispatch_failur
     async def run_dispatch_on_error(error: Exception):
         call_log.append(("dispatch_on_error", error))
 
-    runtime = LangGraphWorkflowNodeExecutionRuntime(
+    runtime = WorkflowNodeExecutionRuntime(
         run_before_hook=lambda: _return_async(None),
         run_before_on_error=lambda error: _return_async(None),
         dispatch_node=dispatch_node,
@@ -114,7 +114,7 @@ async def test_workflow_node_execution_runtime_runs_on_error_for_after_failure()
     async def run_after_on_error(resolved_outcome: NodeOutcome, error: Exception):
         call_log.append(("after_on_error", resolved_outcome, error))
 
-    runtime = LangGraphWorkflowNodeExecutionRuntime(
+    runtime = WorkflowNodeExecutionRuntime(
         run_before_hook=lambda: _return_async(None),
         run_before_on_error=lambda error: _return_async(None),
         dispatch_node=lambda: _return_async(outcome),

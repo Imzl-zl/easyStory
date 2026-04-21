@@ -7,7 +7,7 @@ import uuid
 import pytest
 
 from app.modules.workflow.service.workflow_hook_agent_runtime import (
-    LangGraphWorkflowHookAgentRuntime,
+    WorkflowHookAgentRuntime,
 )
 from app.modules.workflow.service.workflow_runtime_hook_support import HookExecutionContext
 from app.shared.runtime.template_renderer import SkillTemplateRenderer
@@ -66,7 +66,7 @@ async def test_workflow_hook_agent_runtime_runs_text_agent_chain() -> None:
         call_log.append((prompt_bundle, kwargs))
         return {"content": "第1章摘要：主角踏上逃亡之路。"}
 
-    runtime = LangGraphWorkflowHookAgentRuntime(
+    runtime = WorkflowHookAgentRuntime(
         template_renderer=SkillTemplateRenderer(),
         llm_caller=llm_caller,
         parse_json=lambda value: (_ for _ in ()).throw(AssertionError("should not parse json")),
@@ -113,7 +113,7 @@ async def test_workflow_hook_agent_runtime_runs_json_agent_chain() -> None:
         },
     )
 
-    runtime = LangGraphWorkflowHookAgentRuntime(
+    runtime = WorkflowHookAgentRuntime(
         template_renderer=SkillTemplateRenderer(),
         llm_caller=lambda db, workflow, workflow_config, prompt_bundle, **kwargs: _return_async(
             {"content": '{"score": 1, "summary": "ok"}'}
@@ -152,7 +152,7 @@ async def test_workflow_hook_agent_runtime_requires_agent_model_configuration() 
         },
     )
 
-    runtime = LangGraphWorkflowHookAgentRuntime(
+    runtime = WorkflowHookAgentRuntime(
         template_renderer=SkillTemplateRenderer(),
         llm_caller=lambda db, workflow, workflow_config, prompt_bundle, **kwargs: _return_async(
             {"content": "unused"}

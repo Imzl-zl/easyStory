@@ -26,9 +26,9 @@ from .snapshot_support import (
     workflow_to_dto,
     workflow_to_summary_dto,
 )
-from .workflow_app_resume_runtime import LangGraphWorkflowAppResumeRuntime
+from .workflow_app_resume_runtime import WorkflowAppResumeRuntime
 from .workflow_app_runtime_support import RuntimeDispatchFn, WorkflowAppRuntimeSupportMixin
-from .workflow_app_start_runtime import LangGraphWorkflowAppStartRuntime
+from .workflow_app_start_runtime import WorkflowAppStartRuntime
 from .workflow_app_service_base import PREPARATION_ASSET_LABELS, WorkflowAppServiceBase
 from .workflow_task_runtime_support import ensure_workflow_can_resume
 
@@ -49,7 +49,7 @@ class WorkflowAppService(WorkflowAppRuntimeSupportMixin, WorkflowAppServiceBase)
             owner_id=owner_id,
             load_template=True,
         )
-        runtime = LangGraphWorkflowAppStartRuntime(
+        runtime = WorkflowAppStartRuntime(
             resolve_workflow_config=lambda: self._resolve_workflow_config(project, payload.workflow_id),
             ensure_preconditions=lambda: self._ensure_start_preconditions(
                 db,
@@ -116,7 +116,7 @@ class WorkflowAppService(WorkflowAppRuntimeSupportMixin, WorkflowAppServiceBase)
         workflow = await self._require_workflow_for_update(db, workflow_id, owner_id=owner_id)
         if workflow.status == "running":
             return workflow_to_dto(workflow)
-        runtime = LangGraphWorkflowAppResumeRuntime(
+        runtime = WorkflowAppResumeRuntime(
             ensure_resume_allowed=lambda: self._ensure_resume_allowed(db, workflow.id),
             resume_workflow=lambda: self._resume_workflow_and_commit(db, workflow),
             dispatch_runtime=lambda execution_id: self._dispatch_runtime(

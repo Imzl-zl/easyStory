@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.modules.workflow.service.workflow_app_persisted_runtime import (
-    LangGraphWorkflowAppPersistedRuntime,
+    WorkflowAppPersistedRuntime,
 )
 from app.shared.runtime.errors import BusinessRuleError
 
@@ -13,7 +13,7 @@ async def test_workflow_app_persisted_runtime_runs_success_path() -> None:
     call_log: list[object] = []
     workflow = SimpleNamespace(current_node_id="chapter_split")
 
-    runtime = LangGraphWorkflowAppPersistedRuntime(
+    runtime = WorkflowAppPersistedRuntime(
         load_workflow=lambda: _return_async(call_log.append("load") or workflow),
         run_runtime=lambda loaded_workflow: _return_async(call_log.append(("run", loaded_workflow))),
         commit=lambda: _return_async(call_log.append("commit")),
@@ -40,7 +40,7 @@ async def test_workflow_app_persisted_runtime_recovers_business_rule_failure_wit
     async def run_runtime(loaded_workflow):
         raise failure
 
-    runtime = LangGraphWorkflowAppPersistedRuntime(
+    runtime = WorkflowAppPersistedRuntime(
         load_workflow=lambda: _return_async(workflow),
         run_runtime=run_runtime,
         commit=lambda: _return_async(None),
@@ -63,7 +63,7 @@ async def test_workflow_app_persisted_runtime_recovers_generic_failure_with_erro
     async def run_runtime(loaded_workflow):
         raise RuntimeError("boom")
 
-    runtime = LangGraphWorkflowAppPersistedRuntime(
+    runtime = WorkflowAppPersistedRuntime(
         load_workflow=lambda: _return_async(workflow),
         run_runtime=run_runtime,
         commit=lambda: _return_async(None),

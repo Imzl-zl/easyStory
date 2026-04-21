@@ -1,7 +1,7 @@
 import pytest
 
 from app.modules.assistant.service.turn.assistant_turn_preparation_runtime import (
-    LangGraphAssistantTurnPreparationRuntime,
+    AssistantTurnPreparationRuntime,
 )
 
 
@@ -14,7 +14,7 @@ async def test_assistant_turn_preparation_runtime_runs_stages_in_order() -> None
     call_log: list[object] = []
     prepared_turn = object()
 
-    runtime = LangGraphAssistantTurnPreparationRuntime(
+    runtime = AssistantTurnPreparationRuntime(
         resolve_scope_and_normalize=lambda: _return_async(
             call_log.append("normalize") or ("project-1", "normalized-turn", "normalized-payload")
         ),

@@ -1,7 +1,7 @@
 import pytest
 
 from app.modules.assistant.service.turn.assistant_turn_finalize_runtime import (
-    LangGraphAssistantTurnFinalizeRuntime,
+    AssistantTurnFinalizeRuntime,
 )
 from app.shared.runtime.errors import ConfigurationError
 
@@ -11,7 +11,7 @@ async def test_assistant_turn_finalize_runtime_runs_success_path() -> None:
     call_log: list[object] = []
     response = object()
 
-    runtime = LangGraphAssistantTurnFinalizeRuntime(
+    runtime = AssistantTurnFinalizeRuntime(
         resolve_content=lambda: call_log.append("resolve_content") or "主回复正文",
         build_after_payload=lambda content: call_log.append(("after_payload", content)) or {
             "response": {"content": content}
@@ -38,7 +38,7 @@ async def test_assistant_turn_finalize_runtime_runs_success_path() -> None:
 
 @pytest.mark.asyncio
 async def test_assistant_turn_finalize_runtime_requires_response() -> None:
-    runtime = LangGraphAssistantTurnFinalizeRuntime(
+    runtime = AssistantTurnFinalizeRuntime(
         resolve_content=lambda: "主回复正文",
         build_after_payload=lambda content: {"response": {"content": content}},
         run_after_hooks=lambda payload: _return_async([]),

@@ -466,7 +466,7 @@ def test_save_project_document_rejects_non_mutable_project_file_path(db, tmp_pat
     project = create_project(db, project_setting=ready_project_setting())
     service = ProjectService(document_file_store=ProjectDocumentFileStore(tmp_path))
 
-    with pytest.raises(BusinessRuleError, match="可写项目文件文稿"):
+    with pytest.raises(BusinessRuleError, match="目标文稿不存在于当前项目目录，无法写回。"):
         asyncio.run(
             service.save_project_document(
                 async_db(db),
@@ -485,7 +485,7 @@ def test_save_project_document_rejects_directory_path(db, tmp_path):
     service = ProjectService(document_file_store=ProjectDocumentFileStore(tmp_path))
     asyncio.run(service.ensure_project_document_template(async_db(db), project.id))
 
-    with pytest.raises(BusinessRuleError, match="可写项目文件文稿"):
+    with pytest.raises(BusinessRuleError, match="目标文稿不存在于当前项目目录，无法写回。"):
         asyncio.run(
             service.save_project_document(
                 async_db(db),

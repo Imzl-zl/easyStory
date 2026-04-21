@@ -1,7 +1,7 @@
 import pytest
 
 from app.modules.assistant.service.turn.assistant_turn_terminal_persist_runtime import (
-    LangGraphAssistantTurnTerminalPersistRuntime,
+    AssistantTurnTerminalPersistRuntime,
 )
 from app.shared.runtime.errors import ConfigurationError
 
@@ -12,7 +12,7 @@ async def test_assistant_turn_terminal_persist_runtime_builds_and_saves_record()
     existing_run = object()
     record = object()
 
-    runtime = LangGraphAssistantTurnTerminalPersistRuntime(
+    runtime = AssistantTurnTerminalPersistRuntime(
         resolve_existing_run=lambda: _return_async(
             call_log.append("resolve_existing_run") or existing_run
         ),
@@ -31,7 +31,7 @@ async def test_assistant_turn_terminal_persist_runtime_builds_and_saves_record()
 
 @pytest.mark.asyncio
 async def test_assistant_turn_terminal_persist_runtime_requires_record() -> None:
-    runtime = LangGraphAssistantTurnTerminalPersistRuntime(
+    runtime = AssistantTurnTerminalPersistRuntime(
         resolve_existing_run=lambda: _return_async(None),
         build_terminal_record=lambda value: None,
         save_run=lambda value: _return_async(None),

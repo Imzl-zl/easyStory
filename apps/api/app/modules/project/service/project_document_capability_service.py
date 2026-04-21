@@ -64,6 +64,7 @@ from .project_document_support import (
     OPENING_PLAN_DOCUMENT_PATH,
     OUTLINE_DOCUMENT_PATH,
     is_canonical_project_document_path,
+    is_supported_file_project_document_path,
     is_mutable_project_document_file_path,
     parse_chapter_number_from_document_path,
 )
@@ -651,6 +652,8 @@ class ProjectDocumentCapabilityService:
         path: str,
         owner_id: uuid.UUID | None = None,
     ) -> ResolvedProjectDocument | None:
+        if not is_canonical_project_document_path(path) and not is_supported_file_project_document_path(path):
+            return None
         documents = await self._resolve_documents_by_paths(
             db,
             project_id,

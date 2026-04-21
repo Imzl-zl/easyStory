@@ -15,7 +15,7 @@ from app.shared.runtime.llm.llm_tool_provider import LLMGenerateToolResponse
 from ..assistant_run_budget import AssistantRunBudget
 from ..assistant_runtime_terminal import AssistantRuntimeTerminalError
 from .assistant_tool_loop_context_support import _build_continuation_request_snapshot, _build_pending_tool_calls_snapshot
-from .assistant_tool_loop_execution_support import execute_planned_tool_calls
+from .assistant_tool_loop_execution_support import build_post_tool_cycle_state, execute_planned_tool_calls
 from .assistant_tool_loop_graph_state_support import (
     INITIAL_TOOL_LOOP_STATE_VERSION,
     TOOL_LOOP_RECURSION_BUFFER,
@@ -32,11 +32,7 @@ from .assistant_tool_loop_output_support import (
     _append_intermediate_text_item,
     _build_final_output,
     _build_final_response_normalized_input_items,
-    _build_tool_cycle_continuation_items,
-    _build_tool_cycle_normalized_input_items,
-    _build_tool_cycle_output_items,
     _merge_usage_totals_state,
-    _resolve_provider_continuation_state,
 )
 from .assistant_tool_loop_plan_support import _plan_tool_cycle_calls
 from .assistant_tool_loop_runtime_support import ToolModelCaller, ToolStreamModelCaller, iterate_model_response, raise_if_cancelled, read_tool_calls
@@ -100,6 +96,8 @@ class AssistantToolLoopRuntime:
         self._graph = self._build_graph()
 
     async def iterate(self) -> AsyncIterator[AssistantToolLoopIterationItem]:
+        # This runtime relies on LangGraph's custom stream context.
+        # Calling it via ainvoke()/invoke() would make get_stream_writer() unavailable.
         if not self.tool_schemas:
             async for item in self._iterate_without_tools():
                 yield item
@@ -343,37 +341,22 @@ class AssistantToolLoopRuntime:
             emit_iteration_item=self._emit_iteration_item,
             build_iteration_item=AssistantToolLoopIterationItem,
         )
-        cycle_output_items = _build_tool_cycle_output_items(
+        post_cycle_state = build_post_tool_cycle_state(
+            state=state,
+            raw_output=raw_output,
+            tool_calls=tool_calls,
+            tool_results=tool_results,
             turn_context=self.turn_context,
-            start_index=len(output_items),
-            tool_calls=tool_calls,
-            tool_results=tool_results,
-        )
-        normalized_input_items = [
-            *state.get("normalized_input_items", []),
-            *_build_tool_cycle_normalized_input_items(
-                raw_output=raw_output,
-                tool_calls=tool_calls,
-                tool_results=tool_results,
-            ),
-        ]
-        cycle_continuation_items = _build_tool_cycle_continuation_items(
-            raw_output=raw_output,
-            tool_calls=tool_calls,
-            tool_results=tool_results,
-            tool_cycle_index=state.get("tool_cycle_index", 0),
-        )
-        continuation_items = [*state.get("continuation_items", []), *cycle_continuation_items]
-        provider_continuation_state = _resolve_provider_continuation_state(
-            raw_output=raw_output,
-            latest_items=cycle_continuation_items,
             continuation_support=self.continuation_support,
+            output_items=output_items,
+            write_effective=write_effective,
+            step_index=step_index,
         )
         post_execution_state_version = record_graph_state(
             self.state_recorder,
             current_state_version=pre_execution_state_version,
-            provider_continuation_state=provider_continuation_state,
-            normalized_input_items=normalized_input_items,
+            provider_continuation_state=post_cycle_state["provider_continuation_state"],
+            normalized_input_items=post_cycle_state["normalized_input_items"],
             continuation_request_snapshot=state.get("continuation_request_snapshot"),
             continuation_compaction_snapshot=state.get("continuation_compaction_snapshot"),
             write_effective=write_effective,
@@ -381,16 +364,7 @@ class AssistantToolLoopRuntime:
         )
         return {
             "state_version": post_execution_state_version,
-            "output_items": [*output_items, *cycle_output_items],
-            "normalized_input_items": normalized_input_items,
-            "continuation_items": continuation_items,
-            "provider_continuation_state": provider_continuation_state,
-            "write_effective": write_effective,
-            "step_index": step_index,
-            "tool_cycle_index": state.get("tool_cycle_index", 0) + 1,
-            "current_tool_calls": [],
-            "current_raw_output": None,
-            "current_raw_output_already_streamed": False,
+            **post_cycle_state,
         }
 
     async def _finalize_output(
@@ -439,6 +413,10 @@ class AssistantToolLoopRuntime:
         state_version: int,
     ) -> None:
         writer = get_stream_writer()
+        if writer is None:
+            raise ConfigurationError(
+                "Assistant tool loop runtime requires astream(stream_mode='custom') to emit iteration events"
+            )
         writer(
             serialize_iteration_item(
                 item,

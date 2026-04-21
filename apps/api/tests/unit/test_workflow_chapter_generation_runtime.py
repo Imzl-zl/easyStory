@@ -1,7 +1,7 @@
 import pytest
 
 from app.modules.workflow.service.workflow_chapter_generation_runtime import (
-    LangGraphWorkflowChapterGenerationRuntime,
+    WorkflowChapterGenerationRuntime,
 )
 from app.modules.workflow.service.workflow_runtime_shared import NodeOutcome, ReviewCycleOutcome
 
@@ -17,7 +17,7 @@ async def test_workflow_chapter_generation_runtime_runs_success_path() -> None:
     candidate = ("content-1", "version-1", 1234)
     outcome = NodeOutcome(next_node_id="chapter_gen")
 
-    runtime = LangGraphWorkflowChapterGenerationRuntime(
+    runtime = WorkflowChapterGenerationRuntime(
         generate_chapter=lambda: _return_async(
             (
                 {"context_snapshot_hash": "hash-1"},
@@ -77,7 +77,7 @@ async def test_workflow_chapter_generation_runtime_skips_after_generate_without_
     candidate = (None, None, None)
     outcome = NodeOutcome(next_node_id="chapter_gen")
 
-    runtime = LangGraphWorkflowChapterGenerationRuntime(
+    runtime = WorkflowChapterGenerationRuntime(
         generate_chapter=lambda: _return_async(
             (
                 {"context_snapshot_hash": "hash-1"},

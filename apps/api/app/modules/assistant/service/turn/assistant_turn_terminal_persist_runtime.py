@@ -6,7 +6,7 @@ from typing import Any
 from app.shared.runtime.errors import ConfigurationError
 
 
-class LangGraphAssistantTurnTerminalPersistRuntime:
+class AssistantTurnTerminalPersistRuntime:
     def __init__(
         self,
         *,
@@ -24,3 +24,6 @@ class LangGraphAssistantTurnTerminalPersistRuntime:
         if record is None:
             raise ConfigurationError("Assistant terminal persist runtime missing terminal record")
         await self.save_run(record)
+
+
+LangGraphAssistantTurnTerminalPersistRuntime = AssistantTurnTerminalPersistRuntime

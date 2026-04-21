@@ -5,7 +5,7 @@ from typing import Any
 
 from app.shared.runtime.errors import ConfigurationError
 
-from .workflow_hook_event_runtime import LangGraphWorkflowHookEventRuntime
+from .workflow_hook_event_runtime import WorkflowHookEventRuntime
 from .workflow_runtime_hook_support import (
     HookExecutionContext,
     build_hook_payload,
@@ -21,7 +21,7 @@ class WorkflowRuntimeHookMixin:
         self,
         context: HookExecutionContext,
     ) -> list[Any]:
-        runtime = LangGraphWorkflowHookEventRuntime(
+        runtime = WorkflowHookEventRuntime(
             resolve_hooks=lambda: resolve_hooks_for_event(
                 context.workflow.workflow_snapshot or {},
                 context.node,

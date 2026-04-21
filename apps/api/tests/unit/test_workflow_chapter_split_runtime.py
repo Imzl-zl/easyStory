@@ -2,7 +2,7 @@ import pytest
 
 from app.shared.runtime.errors import BudgetExceededError
 from app.modules.workflow.service.workflow_chapter_split_runtime import (
-    LangGraphWorkflowChapterSplitRuntime,
+    WorkflowChapterSplitRuntime,
 )
 from app.modules.workflow.service.workflow_runtime_shared import NodeOutcome
 
@@ -17,7 +17,7 @@ async def test_workflow_chapter_split_runtime_runs_success_path() -> None:
     chapters = [type("Chapter", (), {"model_dump": lambda self: {"chapter_number": 1}})()]
     outcome = NodeOutcome(next_node_id="chapter_gen")
 
-    runtime = LangGraphWorkflowChapterSplitRuntime(
+    runtime = WorkflowChapterSplitRuntime(
         prepare_request=lambda: _return_async(({"input_data": {}, "context_snapshot_hash": "x"}, object())),
         run_before_generate_hook=lambda: _return_async(call_log.append("before")),
         call_llm=lambda prompt_bundle, credential: _return_async(({"content": "{}"}, None)),
@@ -73,7 +73,7 @@ async def test_workflow_chapter_split_runtime_propagates_budget_pause() -> None:
     )
     outcome = NodeOutcome(next_node_id="chapter_gen", pause_reason="budget_exceeded")
 
-    runtime = LangGraphWorkflowChapterSplitRuntime(
+    runtime = WorkflowChapterSplitRuntime(
         prepare_request=lambda: _return_async(({"input_data": {}}, object())),
         run_before_generate_hook=lambda: _return_async(None),
         call_llm=lambda prompt_bundle, credential: _return_async(({"content": "{}"}, budget_error)),

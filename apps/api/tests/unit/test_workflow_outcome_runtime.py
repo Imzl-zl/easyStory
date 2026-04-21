@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 import uuid
 
-from app.modules.workflow.service.workflow_outcome_runtime import LangGraphWorkflowOutcomeRuntime
+from app.modules.workflow.service.workflow_outcome_runtime import WorkflowOutcomeRuntime
 from app.modules.workflow.service.workflow_runtime_shared import NodeOutcome
 
 
@@ -57,7 +57,7 @@ def test_workflow_outcome_runtime_applies_failed_outcome() -> None:
         snapshot_extra={"current_node_execution_id": "exec-1"},
     )
 
-    runtime = LangGraphWorkflowOutcomeRuntime(
+    runtime = WorkflowOutcomeRuntime(
         workflow_service=_FakeWorkflowService(),
         record_execution_log=lambda db, **kwargs: logs.append(kwargs),
         db=None,
@@ -66,7 +66,9 @@ def test_workflow_outcome_runtime_applies_failed_outcome() -> None:
         outcome=outcome,
     )
 
-    terminated = runtime.run()
+    import asyncio
+
+    terminated = asyncio.run(runtime.run())
 
     assert terminated is True
     assert workflow.status == "failed"
@@ -92,7 +94,7 @@ def test_workflow_outcome_runtime_applies_paused_outcome() -> None:
         snapshot_extra={"current_node_execution_id": "exec-1"},
     )
 
-    runtime = LangGraphWorkflowOutcomeRuntime(
+    runtime = WorkflowOutcomeRuntime(
         workflow_service=_FakeWorkflowService(),
         record_execution_log=lambda db, **kwargs: logs.append(kwargs),
         db=None,
@@ -101,7 +103,9 @@ def test_workflow_outcome_runtime_applies_paused_outcome() -> None:
         outcome=outcome,
     )
 
-    terminated = runtime.run()
+    import asyncio
+
+    terminated = asyncio.run(runtime.run())
 
     assert terminated is True
     assert workflow.status == "paused"
@@ -126,7 +130,7 @@ def test_workflow_outcome_runtime_applies_completed_outcome() -> None:
     logs: list[dict] = []
     outcome = NodeOutcome(next_node_id=None)
 
-    runtime = LangGraphWorkflowOutcomeRuntime(
+    runtime = WorkflowOutcomeRuntime(
         workflow_service=_FakeWorkflowService(),
         record_execution_log=lambda db, **kwargs: logs.append(kwargs),
         db=None,
@@ -135,7 +139,9 @@ def test_workflow_outcome_runtime_applies_completed_outcome() -> None:
         outcome=outcome,
     )
 
-    terminated = runtime.run()
+    import asyncio
+
+    terminated = asyncio.run(runtime.run())
 
     assert terminated is True
     assert workflow.status == "completed"
@@ -158,7 +164,7 @@ def test_workflow_outcome_runtime_applies_continue_outcome() -> None:
     logs: list[dict] = []
     outcome = NodeOutcome(next_node_id="export")
 
-    runtime = LangGraphWorkflowOutcomeRuntime(
+    runtime = WorkflowOutcomeRuntime(
         workflow_service=_FakeWorkflowService(),
         record_execution_log=lambda db, **kwargs: logs.append(kwargs),
         db=None,
@@ -167,7 +173,9 @@ def test_workflow_outcome_runtime_applies_continue_outcome() -> None:
         outcome=outcome,
     )
 
-    terminated = runtime.run()
+    import asyncio
+
+    terminated = asyncio.run(runtime.run())
 
     assert terminated is False
     assert workflow.status == "running"

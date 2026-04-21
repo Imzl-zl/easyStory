@@ -17,7 +17,7 @@ class AssistantTurnPrepareRuntimeResult:
     replayed_response: AssistantTurnResponseDTO | None
 
 
-class LangGraphAssistantTurnPrepareRuntime:
+class AssistantTurnPrepareRuntime:
     def __init__(
         self,
         *,
@@ -49,3 +49,6 @@ class LangGraphAssistantTurnPrepareRuntime:
             prepared=prepared,
             replayed_response=replayed_response,
         )
+
+
+LangGraphAssistantTurnPrepareRuntime = AssistantTurnPrepareRuntime

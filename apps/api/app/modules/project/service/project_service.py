@@ -55,6 +55,7 @@ from .project_service_support import (
     build_project_statement,
     count_chapter_tasks,
     current_version,
+    evaluate_setting,
     mark_related_content_stale,
     resolve_asset_step_status,
     resolve_chapter_task_step_status,
@@ -132,6 +133,16 @@ class ProjectService:
         await db.refresh(project)
         return to_snapshot(project, impact=impact)
 
+    async def check_setting_completeness(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        *,
+        owner_id: uuid.UUID | None = None,
+    ):
+        project = await self.require_project(db, project_id, owner_id=owner_id)
+        return evaluate_setting(project)
+
     async def get_project_document(
         self,
         db: AsyncSession,
@@ -187,10 +198,18 @@ class ProjectService:
         if is_canonical_project_document_path(document_path):
             raise BusinessRuleError("该文稿属于正式内容真值，请通过大纲或正文保存链路更新")
         if not is_supported_file_project_document_path(document_path):
-            self.document_file_store.find_project_document(project.id, document_path)
+            entry = self.document_file_store.find_project_document_entry(project.id, document_path)
+            if entry is not None:
+                raise _ProjectDocumentWriteError(
+                    "document_not_found",
+                    "目标文稿不存在于当前项目目录，无法写回。",
+                )
             raise BusinessRuleError("当前路径不是可写项目文件文稿")
         if not is_mutable_project_document_file_path(document_path):
-            raise BusinessRuleError("当前路径不是可写项目文件文稿")
+            raise _ProjectDocumentWriteError(
+                "document_not_found",
+                "目标文稿不存在于当前项目目录，无法写回。",
+            )
         with self.document_file_store.project_document_tree_lock(project.id):
             record = self.document_file_store.save_project_document(
                 project.id,
@@ -406,9 +425,9 @@ class ProjectService:
         )
 
     def _should_include_tree_node(self, node: "ProjectDocumentTreeNodeRecord") -> bool:
-        if not is_supported_file_project_document_path(node.path):
-            return False
         if node.node_type == "file":
+            if not is_supported_file_project_document_path(node.path):
+                return False
             return is_visible_project_document_tree_file_path(node.path)
         children = tuple(child for child in node.children if self._should_include_tree_node(child))
         return (
@@ -612,6 +631,7 @@ class ProjectService:
         owner_id: uuid.UUID | None = None,
     ) -> ProjectPreparationStatusDTO:
         project = await self.require_project(db, project_id, owner_id=owner_id)
+        setting = evaluate_setting(project)
         outline = await self._get_asset_status(db, project.id, "outline")
         opening_plan = await self._get_asset_status(db, project.id, "opening_plan")
         active_workflow = await self._find_active_workflow(db, project.id)
@@ -629,6 +649,7 @@ class ProjectService:
         )
         return ProjectPreparationStatusDTO(
             project_id=project.id,
+            setting=setting,
             outline=outline,
             opening_plan=opening_plan,
             chapter_tasks=chapter_tasks,
@@ -857,3 +878,9 @@ class ProjectService:
         if chapter_tasks.step_status == "completed":
             return "chapter", "章节计划已就绪，可继续推进正文生成与确认"
         return "workflow", "前置资产已就绪，可以启动工作流"
+
+
+class _ProjectDocumentWriteError(BusinessRuleError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code

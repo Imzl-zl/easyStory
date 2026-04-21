@@ -1,7 +1,7 @@
 import pytest
 
 from app.modules.content.service.story_asset_generation_runtime import (
-    LangGraphStoryAssetGenerationRuntime,
+    StoryAssetGenerationRuntime,
 )
 
 
@@ -16,7 +16,7 @@ async def test_story_asset_generation_runtime_runs_generation_chain() -> None:
     model = object()
     result = object()
 
-    runtime = LangGraphStoryAssetGenerationRuntime(
+    runtime = StoryAssetGenerationRuntime(
         ensure_dependencies=lambda: _return_async(call_log.append("deps")),
         resolve_generation_context=lambda: call_log.append("context") or (skill, model),
         build_prompt=lambda resolved_skill: _return_async(

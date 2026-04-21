@@ -15,19 +15,19 @@ from .assistant_execution_support import require_text_output
 from .assistant_runtime_claim_support import resolve_runtime_claim_state
 from .assistant_runtime_terminal import attach_assistant_stream_error_meta
 from .assistant_runtime_terminal import AssistantRuntimeTerminalError
-from .turn.assistant_turn_execution_runtime import LangGraphAssistantTurnExecutionRuntime
+from .turn.assistant_turn_execution_runtime import AssistantTurnExecutionRuntime
 from .dto import (
     AssistantHookResultDTO,
     AssistantTurnRequestDTO,
     AssistantTurnResponseDTO,
 )
-from .turn.assistant_turn_finalize_runtime import LangGraphAssistantTurnFinalizeRuntime
+from .turn.assistant_turn_finalize_runtime import AssistantTurnFinalizeRuntime
 from .turn.assistant_turn_prepare_runtime import (
     AssistantTurnPrepareRuntimeResult,
-    LangGraphAssistantTurnPrepareRuntime,
+    AssistantTurnPrepareRuntime,
 )
 from .turn.assistant_turn_prepare_support import prepare_assistant_turn, resolve_requested_hooks
-from .turn.assistant_turn_recovery_runtime import LangGraphAssistantTurnRecoveryRuntime
+from .turn.assistant_turn_recovery_runtime import AssistantTurnRecoveryRuntime
 from .turn.assistant_turn_run_support import (
     build_running_turn_record,
     build_terminal_turn_record,
@@ -39,7 +39,7 @@ from .turn.assistant_turn_runtime_support import (
     build_after_assistant_payload,
     build_turn_response,
 )
-from .turn.assistant_turn_terminal_persist_runtime import LangGraphAssistantTurnTerminalPersistRuntime
+from .turn.assistant_turn_terminal_persist_runtime import AssistantTurnTerminalPersistRuntime
 from .turn.assistant_turn_stream_execution_runtime import (
     LangGraphAssistantTurnStreamExecutionRuntime,
 )
@@ -98,7 +98,7 @@ async def execute_turn(
     replayed_response = turn_start.replayed_response
     if replayed_response is not None:
         return replayed_response
-    runtime = LangGraphAssistantTurnExecutionRuntime(
+    runtime = AssistantTurnExecutionRuntime(
         run_before_hooks=lambda: run_before_turn_hooks(
             service,
             db,
@@ -239,7 +239,7 @@ async def prepare_or_recover_turn(
     owner_id: uuid.UUID,
     transport_mode: "AssistantLlmTransportMode" = "buffered",
 ) -> AssistantTurnPrepareRuntimeResult:
-    runtime = LangGraphAssistantTurnPrepareRuntime(
+    runtime = AssistantTurnPrepareRuntime(
         resolve_hooks=lambda: resolve_requested_hooks(
             assistant_hook_service=service.assistant_hook_service,
             hook_ids=payload.hook_ids,
@@ -277,7 +277,7 @@ async def recover_or_start_turn(
 ) -> AssistantTurnResponseDTO | None:
     if service.turn_run_store is None:
         return None
-    runtime = LangGraphAssistantTurnRecoveryRuntime(
+    runtime = AssistantTurnRecoveryRuntime(
         resolve_existing_run=lambda: asyncio.to_thread(
             service.turn_run_store.get_run,
             prepared.turn_context.run_id,
@@ -445,7 +445,7 @@ async def finalize_turn(
     before_results: list[AssistantHookResultDTO],
     owner_id: uuid.UUID,
 ) -> AssistantTurnResponseDTO:
-    runtime = LangGraphAssistantTurnFinalizeRuntime(
+    runtime = AssistantTurnFinalizeRuntime(
         resolve_content=lambda: require_text_output(raw_output.get("content")),
         build_after_payload=lambda content: build_after_assistant_payload(
             prepared.spec,
@@ -525,7 +525,7 @@ async def store_terminal_turn(
 ) -> None:
     if service.turn_run_store is None:
         return
-    runtime = LangGraphAssistantTurnTerminalPersistRuntime(
+    runtime = AssistantTurnTerminalPersistRuntime(
         resolve_existing_run=lambda: asyncio.to_thread(
             service.turn_run_store.get_run,
             prepared.turn_context.run_id,

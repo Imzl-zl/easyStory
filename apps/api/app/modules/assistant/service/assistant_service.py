@@ -26,7 +26,7 @@ from .tooling.assistant_tool_executor import AssistantToolExecutor
 from .tooling.assistant_tool_exposure_policy import AssistantToolExposurePolicy
 from .tooling.assistant_tool_loop import AssistantToolLoop
 from .tooling.assistant_tool_registry import AssistantToolDescriptorRegistry
-from .hooks_runtime.assistant_hook_agent_runtime import AssistantHookAgentRuntime, LangGraphAssistantHookAgentRuntime
+from .hooks_runtime.assistant_hook_agent_runtime import AssistantHookAgentRuntime, AssistantHookAgentRuntimeImpl
 from .hooks_runtime.assistant_hook_support import AssistantHookExecutionContext
 from .assistant_runtime_claim_support import build_current_runtime_claim_snapshot
 from .turn.assistant_turn_runtime_support import PreparedAssistantTurn
@@ -109,7 +109,7 @@ class AssistantService:
         )
         self.assistant_hook_agent_runtime = (
             assistant_hook_agent_runtime
-            or LangGraphAssistantHookAgentRuntime(
+            or AssistantHookAgentRuntimeImpl(
                 assistant_agent_service=self.assistant_agent_service,
                 assistant_skill_service=self.assistant_skill_service,
                 assistant_preferences_service=self.assistant_preferences_service,

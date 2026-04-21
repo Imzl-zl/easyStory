@@ -6,7 +6,7 @@ from typing import Any
 from app.shared.runtime.errors import ConfigurationError
 
 
-class LangGraphAssistantTurnRecoveryRuntime:
+class AssistantTurnRecoveryRuntime:
     def __init__(
         self,
         *,
@@ -39,3 +39,6 @@ class LangGraphAssistantTurnRecoveryRuntime:
             )
         await self.recover_existing_running_turn(conflict_run)
         return self.recover_existing_turn(conflict_run)
+
+
+LangGraphAssistantTurnRecoveryRuntime = AssistantTurnRecoveryRuntime

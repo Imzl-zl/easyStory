@@ -9,38 +9,13 @@ from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
 
 
 def test_execute_stream_rejects_gemini_stream_without_finish_reason(monkeypatch) -> None:
-    class FakeResponse:
-        status_code = 200
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        async def aread(self):
-            return b""
-
-        async def aiter_lines(self):
-            yield 'data: {"candidates":[{"content":{"parts":[{"text":"只收到半句"}]}}]}'
-            yield ""
-
-    class FakeClient:
-        def __init__(self, *, timeout):
-            self.timeout = timeout
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def stream(self, *args, **kwargs):
-            return FakeResponse()
-
-    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
-
-    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    _patch_native_gemini_stream(
+        monkeypatch,
+        [
+            'data: {"candidates":[{"content":{"parts":[{"text":"只收到半句"}]}}]}',
+            "",
+        ],
+    )
     provider = LLMToolProvider()
 
     async def collect_parts() -> list[str]:
@@ -50,11 +25,12 @@ def test_execute_stream_rejects_gemini_stream_without_finish_reason(monkeypatch)
                 "llm.generate",
                 {
                     "prompt": "继续写",
-                    "model": {"provider": "薄荷", "name": "gemini-2.5-flash"},
-                    "credential": {
-                        "api_key": "test-key",
-                        "api_dialect": "gemini_generate_content",
+                    "model": {
+                        "provider": "薄荷",
+                        "name": "gemini-2.5-flash",
+                        "thinking_budget": 64,
                     },
+                    "credential": {"api_key": "test-key", "api_dialect": "gemini_generate_content"},
                 },
             ):
                 if event.delta:
@@ -65,38 +41,13 @@ def test_execute_stream_rejects_gemini_stream_without_finish_reason(monkeypatch)
 
 
 def test_execute_stream_accepts_gemini_stream_with_finish_reason(monkeypatch) -> None:
-    class FakeResponse:
-        status_code = 200
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        async def aread(self):
-            return b""
-
-        async def aiter_lines(self):
-            yield 'data: {"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"完整回复"}]}}]}'
-            yield ""
-
-    class FakeClient:
-        def __init__(self, *, timeout):
-            self.timeout = timeout
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def stream(self, *args, **kwargs):
-            return FakeResponse()
-
-    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
-
-    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+    _patch_native_gemini_stream(
+        monkeypatch,
+        [
+            'data: {"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"完整回复"}]}}]}',
+            "",
+        ],
+    )
     provider = LLMToolProvider()
 
     async def collect_events():
@@ -106,7 +57,11 @@ def test_execute_stream_accepts_gemini_stream_with_finish_reason(monkeypatch) ->
                 "llm.generate",
                 {
                     "prompt": "继续写",
-                    "model": {"provider": "薄荷", "name": "gemini-2.5-flash"},
+                    "model": {
+                        "provider": "薄荷",
+                        "name": "gemini-2.5-flash",
+                        "thinking_budget": 64,
+                    },
                     "credential": {
                         "api_key": "test-key",
                         "api_dialect": "gemini_generate_content",
@@ -133,47 +88,22 @@ def test_execute_stream_accepts_gemini_stream_with_finish_reason(monkeypatch) ->
 
 
 def test_execute_stream_preserves_gemini_tool_call_from_stream_terminal_synthesis(monkeypatch) -> None:
-    class FakeResponse:
-        status_code = 200
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        async def aread(self):
-            return b""
-
-        async def aiter_lines(self):
-            yield (
+    _patch_native_gemini_stream(
+        monkeypatch,
+        [
+            (
                 'data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"project_read_documents",'
                 '"args":{"paths":["设定/人物.md"]},"id":"gemini_call_1"}}],"role":"model"},"index":0}],'
                 '"responseId":"resp_gemini_1"}'
-            )
-            yield ""
-            yield (
+            ),
+            "",
+            (
                 'data: {"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":""}],"role":"model"},'
                 '"index":0}],"responseId":"resp_gemini_1"}'
-            )
-            yield ""
-
-    class FakeClient:
-        def __init__(self, *, timeout):
-            self.timeout = timeout
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def stream(self, *args, **kwargs):
-            return FakeResponse()
-
-    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
-
-    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)
+            ),
+            "",
+        ],
+    )
     provider = LLMToolProvider()
 
     async def collect_events():
@@ -183,7 +113,11 @@ def test_execute_stream_preserves_gemini_tool_call_from_stream_terminal_synthesi
                 "llm.generate",
                 {
                     "prompt": "继续写",
-                    "model": {"provider": "薄荷", "name": "gemini-2.5-flash"},
+                    "model": {
+                        "provider": "薄荷",
+                        "name": "gemini-2.5-flash",
+                        "thinking_budget": 64,
+                    },
                     "credential": {
                         "api_key": "test-key",
                         "api_dialect": "gemini_generate_content",
@@ -210,3 +144,38 @@ def test_execute_stream_preserves_gemini_tool_call_from_stream_terminal_synthesi
     assert events[-1].response["finish_reason"] == "STOP"
     assert len(events[-1].response["tool_calls"]) == 1
     assert events[-1].response["tool_calls"][0]["tool_name"] == "project.read_documents"
+
+
+def _patch_native_gemini_stream(monkeypatch: pytest.MonkeyPatch, lines: list[str]) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aread(self):
+            return b""
+
+        async def aiter_lines(self):
+            for line in lines:
+                yield line
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
+
+    monkeypatch.setattr(stream_support.httpx, "AsyncClient", FakeClient)

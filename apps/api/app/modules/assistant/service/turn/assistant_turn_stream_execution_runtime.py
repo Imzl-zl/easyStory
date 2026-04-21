@@ -51,6 +51,8 @@ class LangGraphAssistantTurnStreamExecutionRuntime:
         self._graph = self._build_graph()
 
     async def iterate(self) -> AsyncIterator[tuple[str, dict[str, Any]]]:
+        # This runtime must be consumed via LangGraph astream(stream_mode="custom"),
+        # otherwise get_stream_writer() is unavailable for event emission.
         try:
             async for payload in self._graph.astream({}, stream_mode="custom"):
                 event = _deserialize_stream_event(payload)
@@ -170,6 +172,10 @@ class LangGraphAssistantTurnStreamExecutionRuntime:
     def _emit_event(self, event_name: str, extra: dict[str, Any] | None) -> None:
         self.event_seq += 1
         writer = get_stream_writer()
+        if writer is None:
+            raise ConfigurationError(
+                "Assistant turn stream runtime requires astream(stream_mode='custom') to emit events"
+            )
         writer(
             {
                 "kind": "assistant_turn_stream_execution_event",
@@ -183,6 +189,10 @@ class LangGraphAssistantTurnStreamExecutionRuntime:
         payload = response.model_dump(mode="json")
         payload.update(self.build_stream_event_data(self.event_seq, None))
         writer = get_stream_writer()
+        if writer is None:
+            raise ConfigurationError(
+                "Assistant turn stream runtime requires astream(stream_mode='custom') to emit events"
+            )
         writer(
             {
                 "kind": "assistant_turn_stream_execution_event",

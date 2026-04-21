@@ -153,7 +153,8 @@ def is_canonical_project_document_path(document_path: str) -> bool:
 
 
 def is_supported_file_project_document_path(document_path: str) -> bool:
-    return _parse_relative_project_document_path(document_path) is not None
+    pure_path = _parse_relative_project_document_path(document_path)
+    return pure_path is not None and pure_path.suffix.lower() in SUPPORTED_FILE_SUFFIXES
 
 
 def is_visible_project_document_tree_file_path(document_path: str) -> bool:

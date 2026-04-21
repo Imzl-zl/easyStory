@@ -78,13 +78,13 @@ class WorkflowGraphRuntime:
         )
         return {"node_outcome": outcome}
 
-    def _apply_outcome(self, state: WorkflowGraphState) -> WorkflowGraphState:
+    async def _apply_outcome(self, state: WorkflowGraphState) -> WorkflowGraphState:
         current_node_id = state.get("current_node_id")
         outcome = state.get("node_outcome")
         if not current_node_id or outcome is None:
             raise ConfigurationError("Workflow graph state is missing current node execution result")
         node = resolve_node_config(self.workflow_config, current_node_id)
-        terminated = self.runtime_service.apply_outcome(
+        terminated = await self.runtime_service.apply_outcome_async(
             self.db,
             self.workflow,
             node,

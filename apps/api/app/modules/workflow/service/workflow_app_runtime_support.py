@@ -5,7 +5,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .workflow_app_persisted_runtime import LangGraphWorkflowAppPersistedRuntime
+from .workflow_app_persisted_runtime import WorkflowAppPersistedRuntime
 from .snapshot_support import build_runtime_snapshot
 
 RuntimeDispatchFn = Callable[[uuid.UUID, uuid.UUID], None]
@@ -32,7 +32,7 @@ class WorkflowAppRuntimeSupportMixin:
         *,
         owner_id: uuid.UUID,
     ) -> None:
-        runtime = LangGraphWorkflowAppPersistedRuntime(
+        runtime = WorkflowAppPersistedRuntime(
             load_workflow=lambda: self._require_workflow_for_update(
                 db,
                 workflow_id,

@@ -8,7 +8,7 @@ from app.shared.runtime.errors import ConfigurationError
 from .workflow_runtime_shared import NodeOutcome
 
 
-class LangGraphWorkflowChapterSplitRuntime:
+class WorkflowChapterSplitRuntime:
     def __init__(
         self,
         *,
@@ -55,3 +55,6 @@ class LangGraphWorkflowChapterSplitRuntime:
         if outcome is None:
             raise ConfigurationError("Workflow chapter split runtime completed without outcome")
         return outcome
+
+
+LangGraphWorkflowChapterSplitRuntime = WorkflowChapterSplitRuntime

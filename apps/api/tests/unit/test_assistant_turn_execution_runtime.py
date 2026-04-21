@@ -1,7 +1,7 @@
 import pytest
 
 from app.modules.assistant.service.turn.assistant_turn_execution_runtime import (
-    LangGraphAssistantTurnExecutionRuntime,
+    AssistantTurnExecutionRuntime,
 )
 
 
@@ -30,7 +30,7 @@ async def test_assistant_turn_execution_runtime_runs_success_path_and_stores_res
     async def store_terminal_turn(*, response=None, error=None):
         call_log.append(("store", response, error))
 
-    runtime = LangGraphAssistantTurnExecutionRuntime(
+    runtime = AssistantTurnExecutionRuntime(
         run_before_hooks=run_before_hooks,
         call_turn_llm=call_turn_llm,
         finalize_response=finalize_response,
@@ -74,7 +74,7 @@ async def test_assistant_turn_execution_runtime_store_failure_does_not_trigger_e
         call_log.append(("store", response, error))
         raise store_error
 
-    runtime = LangGraphAssistantTurnExecutionRuntime(
+    runtime = AssistantTurnExecutionRuntime(
         run_before_hooks=run_before_hooks,
         call_turn_llm=call_turn_llm,
         finalize_response=finalize_response,
@@ -112,7 +112,7 @@ async def test_assistant_turn_execution_runtime_uses_hook_error_for_terminal_sto
     async def store_terminal_turn(*, response=None, error=None):
         call_log.append(("store", response, error))
 
-    runtime = LangGraphAssistantTurnExecutionRuntime(
+    runtime = AssistantTurnExecutionRuntime(
         run_before_hooks=run_before_hooks,
         call_turn_llm=call_turn_llm,
         finalize_response=finalize_response,

@@ -13,7 +13,10 @@ from app.shared.settings import (
 )
 
 
-def test_settings_loads_env_file_values(tmp_path) -> None:
+def test_settings_loads_env_file_values(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
+    monkeypatch.delenv("EASYSTORY_JWT_EXPIRE_HOURS", raising=False)
+    monkeypatch.delenv("EASYSTORY_CORS_ALLOWED_ORIGINS", raising=False)
     env_file = tmp_path / ".env"
     env_file.write_text(
         "\n".join(
@@ -26,7 +29,7 @@ def test_settings_loads_env_file_values(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    settings = EasyStorySettings(_env_file=env_file)
+    settings = EasyStorySettings(_env_file=env_file, _env_file_encoding="utf-8")
 
     assert settings.require_jwt_secret() == "test-secret"
     assert settings.jwt_expire_hours == 12
@@ -45,6 +48,7 @@ def test_settings_require_jwt_secret_raises_when_missing(monkeypatch) -> None:
 
 
 def test_settings_reads_custom_origin_regex(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
     regex = r"^https://example\.com$"
     monkeypatch.setenv(JWT_EXPIRE_HOURS_ENV, "12")
     monkeypatch.setenv(CORS_ALLOWED_ORIGIN_REGEX_ENV, regex)
@@ -55,6 +59,7 @@ def test_settings_reads_custom_origin_regex(monkeypatch) -> None:
 
 
 def test_settings_rejects_non_positive_expire_hours(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
     monkeypatch.setenv(JWT_EXPIRE_HOURS_ENV, "0")
 
     with pytest.raises(ConfigurationError, match=JWT_EXPIRE_HOURS_ENV):
@@ -62,6 +67,7 @@ def test_settings_rejects_non_positive_expire_hours(monkeypatch) -> None:
 
 
 def test_settings_rejects_non_integer_expire_hours(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
     monkeypatch.setenv(JWT_EXPIRE_HOURS_ENV, "bad")
 
     with pytest.raises(ConfigurationError, match=JWT_EXPIRE_HOURS_ENV):
@@ -69,6 +75,7 @@ def test_settings_rejects_non_integer_expire_hours(monkeypatch) -> None:
 
 
 def test_settings_parses_private_endpoint_toggle(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
     monkeypatch.setenv(ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV, "true")
 
     settings = EasyStorySettings(_env_file=None)
@@ -77,6 +84,7 @@ def test_settings_parses_private_endpoint_toggle(monkeypatch) -> None:
 
 
 def test_settings_parses_insecure_public_endpoint_toggle(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
     monkeypatch.setenv(ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV, "true")
 
     settings = EasyStorySettings(_env_file=None)
@@ -85,6 +93,7 @@ def test_settings_parses_insecure_public_endpoint_toggle(monkeypatch) -> None:
 
 
 def test_settings_parses_config_admin_usernames(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
     monkeypatch.setenv(CONFIG_ADMIN_USERNAMES_ENV, "alice, bob, alice")
 
     settings = EasyStorySettings(_env_file=None)
@@ -95,6 +104,7 @@ def test_settings_parses_config_admin_usernames(monkeypatch) -> None:
 
 
 def test_settings_rejects_invalid_private_endpoint_toggle(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
     monkeypatch.setenv(ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV, "maybe")
 
     with pytest.raises(ConfigurationError, match=ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV):
@@ -102,6 +112,7 @@ def test_settings_rejects_invalid_private_endpoint_toggle(monkeypatch) -> None:
 
 
 def test_settings_rejects_invalid_insecure_public_endpoint_toggle(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
     monkeypatch.setenv(ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV, "maybe")
 
     with pytest.raises(ConfigurationError, match=ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV):

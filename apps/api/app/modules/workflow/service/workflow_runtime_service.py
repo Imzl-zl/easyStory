@@ -18,9 +18,9 @@ from app.shared.runtime.tool_provider import ToolProvider
 from app.shared.runtime.errors import ConfigurationError
 
 from .workflow_hook_providers import build_workflow_plugin_registry
-from .workflow_hook_agent_runtime import LangGraphWorkflowHookAgentRuntime
-from .workflow_node_execution_runtime import LangGraphWorkflowNodeExecutionRuntime
-from .workflow_outcome_runtime import LangGraphWorkflowOutcomeRuntime
+from .workflow_hook_agent_runtime import WorkflowHookAgentRuntime
+from .workflow_node_execution_runtime import WorkflowNodeExecutionRuntime
+from .workflow_outcome_runtime import WorkflowOutcomeRuntime
 from .snapshot_support import load_workflow_snapshot
 from .workflow_graph_runtime import WorkflowGraphRuntime
 from .workflow_runtime_chapter_candidate_mixin import WorkflowRuntimeChapterCandidateMixin
@@ -70,7 +70,7 @@ class WorkflowRuntimeService(
         self.template_renderer = template_renderer
         self.tool_provider = tool_provider
         self.plugin_registry = plugin_registry or build_workflow_plugin_registry(self)
-        self.workflow_hook_agent_runtime = LangGraphWorkflowHookAgentRuntime(
+        self.workflow_hook_agent_runtime = WorkflowHookAgentRuntime(
             template_renderer=self.template_renderer,
             llm_caller=self._call_llm,
             parse_json=self._parse_json,
@@ -120,7 +120,7 @@ class WorkflowRuntimeService(
         *,
         owner_id: uuid.UUID,
     ) -> NodeOutcome:
-        runtime = LangGraphWorkflowNodeExecutionRuntime(
+        runtime = WorkflowNodeExecutionRuntime(
             run_before_hook=lambda: self._run_hook_event(
                 self._build_node_event_context(
                     db,
@@ -195,7 +195,16 @@ class WorkflowRuntimeService(
         node: NodeConfig,
         outcome: NodeOutcome,
     ) -> bool:
-        return self._apply_outcome(
+        raise ConfigurationError("WorkflowRuntimeService.apply_outcome must be awaited")
+
+    async def apply_outcome_async(
+        self,
+        db: AsyncSession,
+        workflow: WorkflowExecution,
+        node: NodeConfig,
+        outcome: NodeOutcome,
+    ) -> bool:
+        return await self._apply_outcome(
             db,
             workflow,
             node,
@@ -271,14 +280,14 @@ class WorkflowRuntimeService(
             node_execution_id=node_execution_id,
         )
 
-    def _apply_outcome(
+    async def _apply_outcome(
         self,
         db: AsyncSession,
         workflow: WorkflowExecution,
         node: NodeConfig,
         outcome: NodeOutcome,
     ) -> bool:
-        runtime = LangGraphWorkflowOutcomeRuntime(
+        runtime = WorkflowOutcomeRuntime(
             workflow_service=self.workflow_service,
             record_execution_log=self._record_execution_log,
             db=db,
@@ -286,7 +295,7 @@ class WorkflowRuntimeService(
             node=node,
             outcome=outcome,
         )
-        return runtime.run()
+        return await runtime.run()
 
     def _resolve_credential_service(self) -> CredentialService:
         if self._credential_service is None:

@@ -21,7 +21,7 @@ from app.shared.runtime.llm.llm_tool_provider import LLM_GENERATE_TOOL
 
 from .chapter_store import require_approved_asset
 from .dto import AssetType, StoryAssetGenerateDTO, StoryAssetMutationDTO, StoryAssetSaveDTO
-from .story_asset_generation_runtime import LangGraphStoryAssetGenerationRuntime
+from .story_asset_generation_runtime import StoryAssetGenerationRuntime
 from .story_asset_service import PREPARATION_ASSET_TITLES, StoryAssetService
 
 GENERATED_VERSION_CREATED_BY = "ai_assist"
@@ -67,7 +67,7 @@ class StoryAssetGenerationService:
             load_contents=True,
             load_template=True,
         )
-        runtime = LangGraphStoryAssetGenerationRuntime(
+        runtime = StoryAssetGenerationRuntime(
             ensure_dependencies=lambda: self._ensure_asset_dependencies_ready(
                 db,
                 project.id,

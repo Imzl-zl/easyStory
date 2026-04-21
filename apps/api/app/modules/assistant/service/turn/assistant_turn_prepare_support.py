@@ -39,7 +39,7 @@ from ..skills.assistant_skill_service import AssistantSkillService
 from ..tooling.assistant_tool_loop import AssistantToolLoop
 from ..tooling.assistant_tool_catalog_support import build_tool_catalog_version
 from .assistant_turn_error_support import AssistantConversationStateMismatchError
-from .assistant_turn_preparation_runtime import LangGraphAssistantTurnPreparationRuntime
+from .assistant_turn_preparation_runtime import AssistantTurnPreparationRuntime
 from .assistant_turn_run_store import AssistantTurnRunStore
 from .assistant_turn_runtime_support import (
     PreparedAssistantTurn,
@@ -71,7 +71,7 @@ async def prepare_assistant_turn(
     project_document_capability_service: ProjectDocumentCapabilityService | None,
     resolve_llm_runtime,
 ) -> PreparedAssistantTurn:
-    runtime = LangGraphAssistantTurnPreparationRuntime(
+    runtime = AssistantTurnPreparationRuntime(
         resolve_scope_and_normalize=lambda: _resolve_scope_and_normalize_request(
             db,
             payload,

@@ -1,7 +1,7 @@
 import pytest
 
 from app.modules.assistant.service.turn.assistant_turn_prepare_runtime import (
-    LangGraphAssistantTurnPrepareRuntime,
+    AssistantTurnPrepareRuntime,
 )
 
 
@@ -24,7 +24,7 @@ async def test_assistant_turn_prepare_runtime_runs_prepare_and_recover_successfu
         call_log.append(("recover", value))
         return replayed_response
 
-    runtime = LangGraphAssistantTurnPrepareRuntime(
+    runtime = AssistantTurnPrepareRuntime(
         resolve_hooks=lambda: call_log.append("resolve_hooks") or list(resolved_hooks),
         prepare_turn=prepare_turn,
         run_prepare_on_error_hooks=run_prepare_on_error_hooks,
@@ -56,7 +56,7 @@ async def test_assistant_turn_prepare_runtime_runs_prepare_on_error_hooks_for_pr
         call_log.append(("prepare_on_error", list(hooks), error))
         return None
 
-    runtime = LangGraphAssistantTurnPrepareRuntime(
+    runtime = AssistantTurnPrepareRuntime(
         resolve_hooks=lambda: ["hook.one"],
         prepare_turn=prepare_turn,
         run_prepare_on_error_hooks=run_prepare_on_error_hooks,
@@ -85,7 +85,7 @@ async def test_assistant_turn_prepare_runtime_uses_hook_error_when_prepare_on_er
         assert error is original_error
         return hook_error
 
-    runtime = LangGraphAssistantTurnPrepareRuntime(
+    runtime = AssistantTurnPrepareRuntime(
         resolve_hooks=lambda: (_ for _ in ()).throw(original_error),
         prepare_turn=prepare_turn,
         run_prepare_on_error_hooks=run_prepare_on_error_hooks,
@@ -113,7 +113,7 @@ async def test_assistant_turn_prepare_runtime_does_not_run_prepare_on_error_hook
         call_log.append(("recover", prepared))
         raise recover_error
 
-    runtime = LangGraphAssistantTurnPrepareRuntime(
+    runtime = AssistantTurnPrepareRuntime(
         resolve_hooks=lambda: ["hook.one"],
         prepare_turn=prepare_turn,
         run_prepare_on_error_hooks=run_prepare_on_error_hooks,

@@ -17,8 +17,8 @@ from app.shared.runtime.errors import (
 )
 
 from .snapshot_support import resolve_next_node_id
-from .workflow_chapter_generation_runtime import LangGraphWorkflowChapterGenerationRuntime
-from .workflow_chapter_split_runtime import LangGraphWorkflowChapterSplitRuntime
+from .workflow_chapter_generation_runtime import WorkflowChapterGenerationRuntime
+from .workflow_chapter_split_runtime import WorkflowChapterSplitRuntime
 from .workflow_runtime_budget_support import (
     build_chapter_split_budget_outcome,
     build_completed_snapshot,
@@ -45,7 +45,7 @@ class WorkflowRuntimeExecuteMixin:
         execution = await self._create_node_execution(db, workflow, node)
         started_at = datetime.now(timezone.utc)
         try:
-            runtime = LangGraphWorkflowChapterSplitRuntime(
+            runtime = WorkflowChapterSplitRuntime(
                 prepare_request=lambda: self._prepare_chapter_split_request(
                     db,
                     workflow,
@@ -145,7 +145,7 @@ class WorkflowRuntimeExecuteMixin:
         execution = await self._create_node_execution(db, workflow, node)
         started_at = datetime.now(timezone.utc)
         try:
-            runtime = LangGraphWorkflowChapterGenerationRuntime(
+            runtime = WorkflowChapterGenerationRuntime(
                 generate_chapter=lambda: self._generate_chapter(
                     db,
                     workflow,

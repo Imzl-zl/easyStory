@@ -310,6 +310,7 @@ class PreparationChapterTaskStatusDTO(BaseModel):
 
 class ProjectPreparationStatusDTO(BaseModel):
     project_id: uuid.UUID
+    setting: SettingCompletenessResultDTO
     outline: PreparationAssetStatusDTO
     opening_plan: PreparationAssetStatusDTO
     chapter_tasks: PreparationChapterTaskStatusDTO

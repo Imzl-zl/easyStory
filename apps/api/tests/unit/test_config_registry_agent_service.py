@@ -34,14 +34,14 @@ async def test_config_registry_agent_write_service_reads_and_updates_agent(tmp_p
             **detail.model_dump(),
             "name": "文风检查员-已更新",
             "system_prompt": "你是一位严格的文风审核专家。\n\n请输出 ReviewResult JSON。",
-            "mcp_servers": ["ctx.story_bible"],
+            "mcp_servers": ["mcp.example.streamable_http"],
         }
     )
 
     updated = await write_service.update_agent(TARGET_AGENT_ID, payload)
 
     assert updated.name == "文风检查员-已更新"
-    assert updated.mcp_servers == ["ctx.story_bible"]
+    assert updated.mcp_servers == ["mcp.example.streamable_http"]
     assert updated.system_prompt.endswith("ReviewResult JSON。")
 
     reloaded = await query_service.get_agent(TARGET_AGENT_ID)

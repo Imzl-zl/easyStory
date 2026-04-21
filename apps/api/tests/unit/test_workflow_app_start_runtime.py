@@ -1,7 +1,7 @@
 import pytest
 
 from app.modules.workflow.service.workflow_app_start_runtime import (
-    LangGraphWorkflowAppStartRuntime,
+    WorkflowAppStartRuntime,
 )
 
 
@@ -14,7 +14,7 @@ async def test_workflow_app_start_runtime_runs_control_chain() -> None:
     call_log: list[object] = []
     workflow = type("Workflow", (), {"id": "workflow-1"})()
 
-    runtime = LangGraphWorkflowAppStartRuntime(
+    runtime = WorkflowAppStartRuntime(
         resolve_workflow_config=lambda: call_log.append("config") or "workflow-config",
         ensure_preconditions=lambda: _return_async(call_log.append("preconditions")),
         build_execution=lambda workflow_config: call_log.append(("build", workflow_config)) or workflow,

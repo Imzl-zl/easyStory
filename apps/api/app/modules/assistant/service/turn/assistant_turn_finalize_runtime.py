@@ -6,7 +6,7 @@ from typing import Any
 from app.shared.runtime.errors import ConfigurationError
 
 
-class LangGraphAssistantTurnFinalizeRuntime:
+class AssistantTurnFinalizeRuntime:
     def __init__(
         self,
         *,
@@ -28,3 +28,6 @@ class LangGraphAssistantTurnFinalizeRuntime:
         if response is None:
             raise ConfigurationError("Assistant turn finalize runtime completed without response")
         return response
+
+
+LangGraphAssistantTurnFinalizeRuntime = AssistantTurnFinalizeRuntime

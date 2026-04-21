@@ -1,7 +1,7 @@
 import pytest
 
 from app.modules.assistant.service.turn.assistant_turn_recovery_runtime import (
-    LangGraphAssistantTurnRecoveryRuntime,
+    AssistantTurnRecoveryRuntime,
 )
 from app.shared.runtime.errors import ConfigurationError
 
@@ -12,7 +12,7 @@ async def test_assistant_turn_recovery_runtime_recovers_existing_run() -> None:
     existing_run = object()
     replayed_response = object()
 
-    runtime = LangGraphAssistantTurnRecoveryRuntime(
+    runtime = AssistantTurnRecoveryRuntime(
         resolve_existing_run=lambda: _return_async(existing_run),
         recover_existing_running_turn=lambda value: _return_async(
             call_log.append(("recover_running", value))
@@ -39,7 +39,7 @@ async def test_assistant_turn_recovery_runtime_creates_new_run_without_replay() 
     call_log: list[object] = []
     running_record = object()
 
-    runtime = LangGraphAssistantTurnRecoveryRuntime(
+    runtime = AssistantTurnRecoveryRuntime(
         resolve_existing_run=lambda: _return_async(None),
         recover_existing_running_turn=lambda value: _return_async(
             call_log.append(("recover_running", value))
@@ -66,7 +66,7 @@ async def test_assistant_turn_recovery_runtime_recovers_after_create_conflict() 
     existing_run = object()
     replayed_response = object()
 
-    runtime = LangGraphAssistantTurnRecoveryRuntime(
+    runtime = AssistantTurnRecoveryRuntime(
         resolve_existing_run=lambda: _return_async(None),
         recover_existing_running_turn=lambda value: _return_async(
             call_log.append(("recover_running", value))
@@ -93,7 +93,7 @@ async def test_assistant_turn_recovery_runtime_recovers_after_create_conflict() 
 
 @pytest.mark.asyncio
 async def test_assistant_turn_recovery_runtime_fails_when_conflict_run_disappears() -> None:
-    runtime = LangGraphAssistantTurnRecoveryRuntime(
+    runtime = AssistantTurnRecoveryRuntime(
         resolve_existing_run=lambda: _return_async(None),
         recover_existing_running_turn=lambda value: _return_async(None),
         recover_existing_turn=lambda value: value,

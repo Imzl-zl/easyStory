@@ -8,7 +8,7 @@ from app.shared.runtime.errors import ConfigurationError
 from .workflow_runtime_shared import NodeOutcome, ReviewCycleOutcome
 
 
-class LangGraphWorkflowChapterGenerationRuntime:
+class WorkflowChapterGenerationRuntime:
     def __init__(
         self,
         *,
@@ -53,3 +53,6 @@ class LangGraphWorkflowChapterGenerationRuntime:
         if outcome is None:
             raise ConfigurationError("Workflow chapter generation runtime completed without outcome")
         return outcome
+
+
+LangGraphWorkflowChapterGenerationRuntime = WorkflowChapterGenerationRuntime

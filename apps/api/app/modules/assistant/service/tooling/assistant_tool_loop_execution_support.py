@@ -96,3 +96,62 @@ async def execute_planned_tool_calls(
             state_version=state_version,
         )
     return tool_results, write_effective
+
+
+def build_post_tool_cycle_state(
+    *,
+    state: dict[str, Any],
+    raw_output: dict[str, Any],
+    tool_calls: list[dict[str, Any]],
+    tool_results: list[AssistantToolResultEnvelope],
+    turn_context,
+    continuation_support,
+    output_items: list[dict[str, Any]],
+    write_effective: bool,
+    step_index: int,
+) -> dict[str, Any]:
+    from .assistant_tool_loop_output_support import (
+        _build_tool_cycle_continuation_items,
+        _build_tool_cycle_normalized_input_items,
+        _build_tool_cycle_output_items,
+        _resolve_provider_continuation_state,
+    )
+
+    cycle_output_items = _build_tool_cycle_output_items(
+        turn_context=turn_context,
+        start_index=len(output_items),
+        tool_calls=tool_calls,
+        tool_results=tool_results,
+    )
+    normalized_input_items = [
+        *state.get("normalized_input_items", []),
+        *_build_tool_cycle_normalized_input_items(
+            raw_output=raw_output,
+            tool_calls=tool_calls,
+            tool_results=tool_results,
+        ),
+    ]
+    cycle_continuation_items = _build_tool_cycle_continuation_items(
+        raw_output=raw_output,
+        tool_calls=tool_calls,
+        tool_results=tool_results,
+        tool_cycle_index=state.get("tool_cycle_index", 0),
+    )
+    continuation_items = [*state.get("continuation_items", []), *cycle_continuation_items]
+    provider_continuation_state = _resolve_provider_continuation_state(
+        raw_output=raw_output,
+        latest_items=cycle_continuation_items,
+        continuation_support=continuation_support,
+    )
+    return {
+        "output_items": [*output_items, *cycle_output_items],
+        "normalized_input_items": normalized_input_items,
+        "continuation_items": continuation_items,
+        "provider_continuation_state": provider_continuation_state,
+        "write_effective": write_effective,
+        "step_index": step_index,
+        "tool_cycle_index": state.get("tool_cycle_index", 0) + 1,
+        "current_tool_calls": [],
+        "current_raw_output": None,
+        "current_raw_output_already_streamed": False,
+    }

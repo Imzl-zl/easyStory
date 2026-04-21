@@ -24,7 +24,7 @@ class WorkflowHookAgentLlmCaller(Protocol):
     ) -> dict[str, Any]: ...
 
 
-class LangGraphWorkflowHookAgentRuntime:
+class WorkflowHookAgentRuntime:
     def __init__(
         self,
         *,
@@ -73,6 +73,9 @@ class LangGraphWorkflowHookAgentRuntime:
         if not isinstance(content, str):
             raise ConfigurationError("Hook agent output must be plain text")
         return content
+
+
+LangGraphWorkflowHookAgentRuntime = WorkflowHookAgentRuntime
 
 
 def _build_hook_agent_variables(

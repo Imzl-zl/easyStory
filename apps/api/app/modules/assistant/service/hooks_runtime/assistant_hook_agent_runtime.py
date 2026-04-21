@@ -45,7 +45,7 @@ class AssistantHookAgentRuntime(Protocol):
     ) -> Any: ...
 
 
-class LangGraphAssistantHookAgentRuntime:
+class AssistantHookAgentRuntimeImpl:
     def __init__(
         self,
         *,
@@ -120,3 +120,6 @@ class LangGraphAssistantHookAgentRuntime:
         if result is None:
             raise ConfigurationError("Assistant hook agent runtime completed without result")
         return result
+
+
+LangGraphAssistantHookAgentRuntime = AssistantHookAgentRuntimeImpl

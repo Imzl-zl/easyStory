@@ -7,7 +7,7 @@ from app.shared.runtime.errors import ConfigurationError
 from app.shared.runtime.llm.llm_tool_provider import LLMGenerateToolResponse
 
 
-class LangGraphAssistantTurnExecutionRuntime:
+class AssistantTurnExecutionRuntime:
     def __init__(
         self,
         *,
@@ -38,3 +38,6 @@ class LangGraphAssistantTurnExecutionRuntime:
             raise ConfigurationError("Assistant turn execution completed without response")
         await self.store_terminal_turn(response=response)
         return response
+
+
+LangGraphAssistantTurnExecutionRuntime = AssistantTurnExecutionRuntime

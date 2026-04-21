@@ -8,7 +8,7 @@ from app.shared.runtime.errors import ConfigurationError
 from .assistant_turn_runtime_support import PreparedAssistantTurn
 
 
-class LangGraphAssistantTurnPreparationRuntime:
+class AssistantTurnPreparationRuntime:
     def __init__(
         self,
         *,
@@ -89,3 +89,6 @@ class LangGraphAssistantTurnPreparationRuntime:
         if prepared_turn is None:
             raise ConfigurationError("Assistant turn preparation runtime completed without prepared turn")
         return prepared_turn
+
+
+LangGraphAssistantTurnPreparationRuntime = AssistantTurnPreparationRuntime
