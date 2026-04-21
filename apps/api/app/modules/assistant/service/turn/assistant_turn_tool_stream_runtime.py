@@ -108,6 +108,8 @@ class AssistantTurnToolStreamRuntime:
         self._graph = self._build_graph()
 
     async def iterate(self) -> AsyncIterator[tuple[str, dict[str, Any]]]:
+        # This runtime must be consumed via LangGraph astream(stream_mode="custom"),
+        # otherwise get_stream_writer() is unavailable for event emission.
         async for payload in self._graph.astream({}, stream_mode="custom"):
             event = _deserialize_stream_event(payload)
             if event is None:
@@ -267,7 +269,7 @@ def _build_buffered_final_chunk_payload(
 
 
 def _emit_stream_event(event_name: str, event_payload: dict[str, Any]) -> None:
-    writer = get_stream_writer()
+    writer = _require_stream_writer()
     writer(
         {
             "kind": "assistant_turn_tool_stream_event",
@@ -275,6 +277,15 @@ def _emit_stream_event(event_name: str, event_payload: dict[str, Any]) -> None:
             "event_payload": event_payload,
         }
     )
+
+
+def _require_stream_writer() -> Callable[[dict[str, Any]], None]:
+    writer = get_stream_writer()
+    if writer is None:
+        raise ConfigurationError(
+            "Assistant turn tool stream runtime requires astream(stream_mode='custom') to emit events"
+        )
+    return writer
 
 
 def _deserialize_stream_event(payload: Any) -> tuple[str, dict[str, Any]] | None:

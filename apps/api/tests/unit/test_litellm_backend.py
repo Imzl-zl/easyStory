@@ -5,14 +5,22 @@ import asyncio
 import litellm
 import pytest
 
-from app.shared.runtime.errors import ConfigurationError, UpstreamRateLimitError
+from app.shared.runtime.errors import (
+    ConfigurationError,
+    UpstreamRateLimitError,
+    UpstreamServiceError,
+)
 from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
 from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     build_text_probe_request,
 )
 from app.shared.runtime.llm.llm_backend import resolve_backend_selection
-from app.shared.runtime.llm.litellm_backend import LiteLLMBackend, build_litellm_call_spec
+from app.shared.runtime.llm.litellm_backend import (
+    LiteLLMBackend,
+    _execute_litellm_call,
+    build_litellm_call_spec,
+)
 from app.shared.runtime.llm.llm_protocol_types import LLMConnection, LLMGenerateRequest
 
 
@@ -566,6 +574,65 @@ def test_litellm_backend_maps_rate_limit_error_to_specific_exception(monkeypatch
 
     with pytest.raises(UpstreamRateLimitError, match="too many requests"):
         asyncio.run(LiteLLMBackend().generate(request))
+
+
+def test_litellm_backend_maps_generic_api_error_to_upstream_service_error(monkeypatch) -> None:
+    request = build_text_probe_request(
+        LLMConnection(
+            provider="openai",
+            api_dialect="openai_chat_completions",
+            api_key="test-key",
+            base_url="https://api.openai.com/v1",
+        ),
+        model_name="gpt-4.1-mini",
+    )
+
+    async def fake_acompletion(**kwargs):
+        raise litellm.APIError(
+            status_code=503,
+            message="gateway exploded",
+            llm_provider="openai",
+            model="gpt-4.1-mini",
+        )
+
+    monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
+
+    with pytest.raises(UpstreamServiceError, match="gateway exploded"):
+        asyncio.run(LiteLLMBackend().generate(request))
+
+
+def test_litellm_backend_keeps_bad_request_as_configuration_error(monkeypatch) -> None:
+    request = build_text_probe_request(
+        LLMConnection(
+            provider="openai",
+            api_dialect="openai_chat_completions",
+            api_key="test-key",
+            base_url="https://api.openai.com/v1",
+        ),
+        model_name="gpt-4.1-mini",
+    )
+
+    async def fake_acompletion(**kwargs):
+        raise litellm.BadRequestError(
+            message="bad payload",
+            llm_provider="openai",
+            model="gpt-4.1-mini",
+        )
+
+    monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
+
+    with pytest.raises(ConfigurationError, match="bad payload"):
+        asyncio.run(LiteLLMBackend().generate(request))
+
+
+def test_execute_litellm_call_rejects_unknown_call_kind() -> None:
+    with pytest.raises(ConfigurationError, match="Unsupported LiteLLM call kind"):
+        asyncio.run(
+            _execute_litellm_call(
+                call_kind="unknown",  # type: ignore[arg-type]
+                call_kwargs={},
+            )
+        )
 
 
 def test_build_litellm_call_spec_keeps_existing_openai_prefix_for_openai_compatible_gateway() -> (

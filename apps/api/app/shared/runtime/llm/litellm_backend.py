@@ -431,7 +431,9 @@ async def _execute_litellm_call(
 ) -> Any:
     if call_kind == "responses":
         return await litellm.aresponses(**call_kwargs)
-    return await litellm.acompletion(**call_kwargs)
+    if call_kind == "completion":
+        return await litellm.acompletion(**call_kwargs)
+    raise ConfigurationError(f"Unsupported LiteLLM call kind: {call_kind}")
 
 
 def _raise_litellm_request_error(error: Exception, *, streaming: bool) -> NoReturn:
@@ -450,6 +452,17 @@ def _raise_litellm_request_error(error: Exception, *, streaming: bool) -> NoRetu
             litellm.InternalServerError,
         ),
     ):
+        raise UpstreamServiceError(message) from error
+    if isinstance(
+        error,
+        (
+            litellm.BadRequestError,
+            litellm.NotFoundError,
+            litellm.ContentPolicyViolationError,
+        ),
+    ):
+        raise ConfigurationError(message) from error
+    if isinstance(error, litellm.APIError):
         raise UpstreamServiceError(message) from error
     raise ConfigurationError(message) from error
 
