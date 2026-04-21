@@ -35,6 +35,7 @@ from .llm_protocol_types import (
     JSON_OBJECT_RESPONSE_FORMAT,
     LLMGenerateRequest,
     NormalizedLLMResponse,
+    OPENAI_RESPONSES_TERMINAL_EVENT_NAMES,
 )
 from .llm_response_validation import raise_if_truncated_response
 from .llm_stream_events import (
@@ -44,8 +45,6 @@ from .llm_stream_events import (
     synthesize_stream_terminal_response,
 )
 from .llm_terminal_assembly import build_stream_completion
-
-RESPONSES_TERMINAL_EVENT_NAMES = {"response.completed", "response.incomplete", "response.failed"}
 
 
 @dataclass(frozen=True)
@@ -106,8 +105,7 @@ class LiteLLMBackend:
         try:
             async for chunk in stream:
                 if should_stop is not None and await should_stop():
-                    await _aclose_stream(stream)
-                    raise StreamInterruptedError("Client disconnected during streaming")
+                    await _raise_stream_interrupted(stream)
                 payload = _model_dump_payload(chunk)
                 event_name = _resolve_event_name(
                     call_kind=call_spec.call_kind,
@@ -191,7 +189,9 @@ def build_litellm_call_spec(request: LLMGenerateRequest) -> LiteLLMCallSpec:
         return LiteLLMCallSpec(
             call_kind="completion",
             output_api_dialect="openai_chat_completions",
-            call_kwargs=_build_openai_chat_call_kwargs(base_call_kwargs, prepared_request.json_body),
+            call_kwargs=_build_openai_chat_call_kwargs(
+                base_call_kwargs, prepared_request.json_body
+            ),
             tool_name_aliases=tool_name_aliases,
         )
     return LiteLLMCallSpec(
@@ -403,11 +403,13 @@ def _resolve_stream_api_dialect(
     return current_api_dialect
 
 
-def _is_terminal_stream_event(*, api_dialect: str, event_name: str | None, stop_reason: str | None) -> bool:
+def _is_terminal_stream_event(
+    *, api_dialect: str, event_name: str | None, stop_reason: str | None
+) -> bool:
     if api_dialect == "openai_chat_completions":
         return stop_reason is not None
     if api_dialect == "openai_responses":
-        return event_name in RESPONSES_TERMINAL_EVENT_NAMES
+        return event_name in OPENAI_RESPONSES_TERMINAL_EVENT_NAMES
     raise ConfigurationError(f"Unsupported LiteLLM stream dialect: {api_dialect}")
 
 
@@ -470,3 +472,12 @@ async def _aclose_stream(stream: Any) -> None:
     aclose = getattr(stream, "aclose", None)
     if callable(aclose):
         await aclose()
+
+
+async def _raise_stream_interrupted(stream: Any) -> NoReturn:
+    interruption = StreamInterruptedError("Client disconnected during streaming")
+    try:
+        await _aclose_stream(stream)
+    except Exception as exc:
+        raise interruption from exc
+    raise interruption

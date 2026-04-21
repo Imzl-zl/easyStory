@@ -6,14 +6,19 @@ import litellm
 import pytest
 
 from app.shared.runtime.errors import ConfigurationError, UpstreamRateLimitError
+from app.shared.runtime.llm.interop.provider_interop_stream_support import StreamInterruptedError
 from app.shared.runtime.llm.llm_tool_provider import LLMToolProvider
-from app.shared.runtime.llm.interop.provider_tool_conformance_support import build_text_probe_request
+from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
+    build_text_probe_request,
+)
 from app.shared.runtime.llm.llm_backend import resolve_backend_selection
 from app.shared.runtime.llm.litellm_backend import LiteLLMBackend, build_litellm_call_spec
 from app.shared.runtime.llm.llm_protocol_types import LLMConnection, LLMGenerateRequest
 
 
-def test_build_litellm_call_spec_uses_openai_prefix_and_api_base_for_openai_compatible_gateway() -> None:
+def test_build_litellm_call_spec_uses_openai_prefix_and_api_base_for_openai_compatible_gateway() -> (
+    None
+):
     request = LLMGenerateRequest(
         connection=LLMConnection(
             provider="deepseek",
@@ -68,6 +73,7 @@ def test_resolve_backend_selection_uses_native_for_full_endpoint_base_url() -> N
     selection = resolve_backend_selection(request)
 
     assert selection.backend_key == "native_http"
+
 
 def test_llm_tool_provider_defaults_to_litellm_backend_for_openai_chat(monkeypatch) -> None:
     captured = {}
@@ -260,22 +266,24 @@ def test_litellm_backend_generate_stream_accepts_responses_incomplete_terminal(m
             return self._events.pop(0)
 
     async def fake_aresponses(**kwargs):
-        return FakeStream([
-            {
-                "type": "response.incomplete",
-                "response": {
-                    "id": "resp_123",
-                    "output": [
-                        {
-                            "id": "msg_1",
-                            "type": "message",
-                            "content": [{"type": "output_text", "text": "半截内容"}],
-                        }
-                    ],
-                    "incomplete_details": {"reason": "content_filter"},
-                },
-            }
-        ])
+        return FakeStream(
+            [
+                {
+                    "type": "response.incomplete",
+                    "response": {
+                        "id": "resp_123",
+                        "output": [
+                            {
+                                "id": "msg_1",
+                                "type": "message",
+                                "content": [{"type": "output_text", "text": "半截内容"}],
+                            }
+                        ],
+                        "incomplete_details": {"reason": "content_filter"},
+                    },
+                }
+            ]
+        )
 
     monkeypatch.setattr(litellm, "aresponses", fake_aresponses)
     backend = LiteLLMBackend()
@@ -318,12 +326,14 @@ def test_litellm_backend_generate_stream_raises_responses_failed_message(monkeyp
             return self._events.pop(0)
 
     async def fake_aresponses(**kwargs):
-        return FakeStream([
-            {
-                "type": "response.failed",
-                "response": {"error": {"message": "上游失败"}},
-            }
-        ])
+        return FakeStream(
+            [
+                {
+                    "type": "response.failed",
+                    "response": {"error": {"message": "上游失败"}},
+                }
+            ]
+        )
 
     monkeypatch.setattr(litellm, "aresponses", fake_aresponses)
     backend = LiteLLMBackend()
@@ -338,7 +348,9 @@ def test_litellm_backend_generate_stream_raises_responses_failed_message(monkeyp
         asyncio.run(collect())
 
 
-def test_litellm_backend_generate_parses_responses_bridge_payload_as_openai_chat(monkeypatch) -> None:
+def test_litellm_backend_generate_parses_responses_bridge_payload_as_openai_chat(
+    monkeypatch,
+) -> None:
     request = build_text_probe_request(
         LLMConnection(
             provider="openai",
@@ -363,7 +375,9 @@ def test_litellm_backend_generate_parses_responses_bridge_payload_as_openai_chat
     assert normalized.finish_reason == "stop"
 
 
-def test_litellm_backend_generate_stream_parses_responses_bridge_chunks_as_openai_chat(monkeypatch) -> None:
+def test_litellm_backend_generate_stream_parses_responses_bridge_chunks_as_openai_chat(
+    monkeypatch,
+) -> None:
     request = build_text_probe_request(
         LLMConnection(
             provider="openai",
@@ -469,6 +483,67 @@ def test_litellm_backend_generate_stream_keeps_local_configuration_errors(monkey
         asyncio.run(collect())
 
 
+def test_litellm_backend_generate_stream_preserves_interrupt_semantics_when_close_fails(
+    monkeypatch,
+) -> None:
+    request = build_text_probe_request(
+        LLMConnection(
+            provider="openai",
+            api_dialect="openai_responses",
+            api_key="test-key",
+            base_url="https://api.openai.com/v1",
+        ),
+        model_name="gpt-4.1-mini",
+    )
+
+    class FakeStream:
+        def __init__(self) -> None:
+            self.closed = False
+            self._yielded = False
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            if self._yielded:
+                raise StopAsyncIteration
+            self._yielded = True
+            return {"type": "response.output_text.delta", "delta": "忽略"}
+
+        async def aclose(self) -> None:
+            self.closed = True
+            raise RuntimeError("close failed")
+
+    stream = FakeStream()
+
+    async def fake_aresponses(**kwargs):
+        return stream
+
+    monkeypatch.setattr(litellm, "aresponses", fake_aresponses)
+    backend = LiteLLMBackend()
+
+    async def should_stop() -> bool:
+        return True
+
+    async def collect():
+        events = []
+        async for event in backend.generate_stream(
+            request,
+            should_stop=should_stop,
+        ):
+            events.append(event)
+        return events
+
+    with pytest.raises(
+        StreamInterruptedError, match="Client disconnected during streaming"
+    ) as exc_info:
+        asyncio.run(collect())
+
+    assert stream.closed is True
+    assert isinstance(exc_info.value.__cause__, RuntimeError)
+    assert str(exc_info.value.__cause__) == "close failed"
+
+
 def test_litellm_backend_maps_rate_limit_error_to_specific_exception(monkeypatch) -> None:
     request = build_text_probe_request(
         LLMConnection(
@@ -493,7 +568,9 @@ def test_litellm_backend_maps_rate_limit_error_to_specific_exception(monkeypatch
         asyncio.run(LiteLLMBackend().generate(request))
 
 
-def test_build_litellm_call_spec_keeps_existing_openai_prefix_for_openai_compatible_gateway() -> None:
+def test_build_litellm_call_spec_keeps_existing_openai_prefix_for_openai_compatible_gateway() -> (
+    None
+):
     request = LLMGenerateRequest(
         connection=LLMConnection(
             provider="deepseek",

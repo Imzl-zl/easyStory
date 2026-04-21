@@ -51,12 +51,8 @@ DEFAULT_BASE_URLS: dict[LlmApiDialect, str] = {
 }
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 60
-VERIFY_USER_PROMPT = (
-    "今天天气怎么样？"
-)
-VERIFY_SYSTEM_PROMPT = (
-    "请像日常聊天一样，用一句简短中文直接回答用户问题，不要使用 Markdown。"
-)
+VERIFY_USER_PROMPT = "今天天气怎么样？"
+VERIFY_SYSTEM_PROMPT = "请像日常聊天一样，用一句简短中文直接回答用户问题，不要使用 Markdown。"
 # Verification requests should not use tiny output budgets. Reasoning-capable
 # models may spend part of the allowance before producing visible output, which
 # turns credential checks into false negatives.
@@ -64,6 +60,13 @@ VERIFY_MAX_TOKENS = 256
 JSON_OBJECT_RESPONSE_FORMAT = "json_object"
 HTTP_HEADER_TOKEN_PATTERN = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
 DEFAULT_ANTHROPIC_MAX_OUTPUT_TOKENS = 8192
+OPENAI_RESPONSES_TERMINAL_EVENT_NAMES = frozenset(
+    {
+        "response.completed",
+        "response.incomplete",
+        "response.failed",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -231,7 +234,9 @@ def resolve_api_key_header_name(
     normalized_name = _normalize_http_header_name(api_key_header_name)
     if strategy == "bearer":
         if normalized_name is not None:
-            raise ConfigurationError("api_key_header_name is only supported with non-bearer auth_strategy")
+            raise ConfigurationError(
+                "api_key_header_name is only supported with non-bearer auth_strategy"
+            )
         return None
     if strategy == "custom_header":
         if normalized_name is None:

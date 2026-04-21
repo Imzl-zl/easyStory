@@ -5,6 +5,7 @@ from typing import Any
 
 from app.shared.runtime.errors import BusinessRuleError
 
+
 class WorkflowAppPersistedRuntime:
     def __init__(
         self,
@@ -18,18 +19,18 @@ class WorkflowAppPersistedRuntime:
         self.run_runtime = run_runtime
         self.commit = commit
         self.recover_runtime_failure = recover_runtime_failure
-        self.current_node_id: str | None = None
 
     async def run(self) -> None:
+        current_node_id: str | None = None
         try:
             workflow = await self.load_workflow()
-            self.current_node_id = getattr(workflow, "current_node_id", None)
+            current_node_id = getattr(workflow, "current_node_id", None)
             await self.run_runtime(workflow)
             await self.commit()
         except Exception as exc:
             reason = None if isinstance(exc, BusinessRuleError) else "error"
             await self.recover_runtime_failure(
-                self.current_node_id,
+                current_node_id,
                 str(exc),
                 reason,
             )

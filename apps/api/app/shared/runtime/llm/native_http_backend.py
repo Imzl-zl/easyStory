@@ -13,6 +13,7 @@ from .llm_protocol_types import (
     HttpJsonResponse,
     LLMGenerateRequest,
     NormalizedLLMResponse,
+    OPENAI_RESPONSES_TERMINAL_EVENT_NAMES,
     send_json_http_request,
 )
 from .llm_response_validation import (
@@ -23,11 +24,6 @@ from .llm_response_validation import (
 from .llm_stream_events import build_truncated_stream_message, extract_stream_truncation_reason
 from .llm_terminal_assembly import build_stream_completion
 from .llm_protocol_responses import extract_response_truncation_reason
-RESPONSES_TERMINAL_EVENT_NAMES = frozenset({
-    "response.completed",
-    "response.incomplete",
-    "response.failed",
-})
 
 
 class AsyncLlmRequestSender(Protocol):
@@ -60,7 +56,9 @@ class NativeHttpLLMBackend:
                 payload,
             )
             if truncation_reason is not None:
-                raise ConfigurationError(build_truncated_response_message(truncation_reason)) from exc
+                raise ConfigurationError(
+                    build_truncated_response_message(truncation_reason)
+                ) from exc
             raise
         raise_if_truncated_response(
             api_dialect=request.connection.api_dialect,
@@ -167,12 +165,14 @@ def _is_terminal_stream_event(
     if api_dialect == "openai_chat_completions":
         return event.stop_reason is not None
     if api_dialect == "openai_responses":
-        return event.event_name in RESPONSES_TERMINAL_EVENT_NAMES
+        return event.event_name in OPENAI_RESPONSES_TERMINAL_EVENT_NAMES
     if api_dialect == "anthropic_messages":
         return event.event_name == "message_stop" or event.stop_reason is not None
     if api_dialect == "gemini_generate_content":
         return event.stop_reason is not None
-    raise ConfigurationError(f"Unsupported api_dialect for stream terminal detection: {api_dialect}")
+    raise ConfigurationError(
+        f"Unsupported api_dialect for stream terminal detection: {api_dialect}"
+    )
 
 
 async def _default_request_sender(request) -> HttpJsonResponse:
