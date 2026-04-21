@@ -89,6 +89,3 @@ class AssistantTurnPreparationRuntime:
         if prepared_turn is None:
             raise ConfigurationError("Assistant turn preparation runtime completed without prepared turn")
         return prepared_turn
-
-
-LangGraphAssistantTurnPreparationRuntime = AssistantTurnPreparationRuntime

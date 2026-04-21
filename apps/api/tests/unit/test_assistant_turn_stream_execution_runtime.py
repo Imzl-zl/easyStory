@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import pytest
 
 from app.modules.assistant.service.turn.assistant_turn_stream_execution_runtime import (
-    LangGraphAssistantTurnStreamExecutionRuntime,
+    AssistantTurnStreamExecutionRuntime,
 )
 from app.shared.runtime.llm.llm_tool_provider import LLMStreamEvent
 
@@ -21,7 +21,7 @@ class _FakeResponse:
 async def test_assistant_turn_stream_execution_runtime_replays_completed_response() -> None:
     replayed_response = _FakeResponse("done")
 
-    runtime = LangGraphAssistantTurnStreamExecutionRuntime(
+    runtime = AssistantTurnStreamExecutionRuntime(
         replayed_response=replayed_response,
         build_stream_event_data=lambda event_seq, extra=None: {
             "event_seq": event_seq,
@@ -83,7 +83,7 @@ async def test_assistant_turn_stream_execution_runtime_streams_chunks_and_comple
     async def store_terminal_turn(**kwargs):
         call_log.append(("store", kwargs))
 
-    runtime = LangGraphAssistantTurnStreamExecutionRuntime(
+    runtime = AssistantTurnStreamExecutionRuntime(
         replayed_response=None,
         build_stream_event_data=lambda event_seq, extra=None: {
             "event_seq": event_seq,
@@ -143,7 +143,7 @@ async def test_assistant_turn_stream_execution_runtime_attaches_error_meta_on_fi
     def attach_stream_error_meta(error: Exception, payload: dict[str, object]):
         call_log.append(("error_meta", error, payload))
 
-    runtime = LangGraphAssistantTurnStreamExecutionRuntime(
+    runtime = AssistantTurnStreamExecutionRuntime(
         replayed_response=None,
         build_stream_event_data=lambda event_seq, extra=None: {
             "event_seq": event_seq,

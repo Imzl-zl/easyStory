@@ -75,9 +75,6 @@ class WorkflowHookAgentRuntime:
         return content
 
 
-LangGraphWorkflowHookAgentRuntime = WorkflowHookAgentRuntime
-
-
 def _build_hook_agent_variables(
     context: HookExecutionContext,
     input_mapping: dict[str, str],

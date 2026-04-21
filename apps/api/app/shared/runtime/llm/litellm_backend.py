@@ -38,13 +38,14 @@ from .llm_protocol_types import (
     OPENAI_RESPONSES_TERMINAL_EVENT_NAMES,
 )
 from .llm_response_validation import raise_if_truncated_response
-from .llm_stream_events import (
-    build_truncated_stream_message,
-    extract_stream_truncation_reason,
-    parse_raw_stream_event,
-    synthesize_stream_terminal_response,
+from .llm_stream_completion_support import (
+    BackendStreamCompletionState,
+    finalize_backend_stream_completion,
+    record_backend_stream_event,
 )
-from .llm_terminal_assembly import build_stream_completion
+from .llm_stream_events import (
+    parse_raw_stream_event,
+)
 
 
 @dataclass(frozen=True)
@@ -96,11 +97,7 @@ class LiteLLMBackend:
             )
         except Exception as exc:  # pragma: no cover - exercised via integration tests
             _raise_litellm_request_error(exc, streaming=True)
-        text_parts: list[str] = []
-        raw_event_tuples: list[tuple[str | None, dict[str, Any]]] = []
-        truncation_reason: str | None = None
-        saw_terminal_event = False
-        terminal_response: NormalizedLLMResponse | None = None
+        completion_state = BackendStreamCompletionState()
         stream_api_dialect = call_spec.output_api_dialect
         try:
             async for chunk in stream:
@@ -125,22 +122,21 @@ class LiteLLMBackend:
                     payload=payload,
                     tool_name_aliases=call_spec.tool_name_aliases,
                 )
-                raw_event_tuples.append((parsed.event_name, payload))
-                if truncation_reason is None:
-                    truncation_reason = extract_stream_truncation_reason(parsed.stop_reason)
-                if not saw_terminal_event:
-                    saw_terminal_event = _is_terminal_stream_event(
+                delta = record_backend_stream_event(
+                    completion_state,
+                    recorded_event_name=parsed.event_name,
+                    raw_payload=payload,
+                    parsed_event=parsed,
+                    terminal_event_detected=_is_terminal_stream_event(
                         api_dialect=stream_api_dialect,
                         event_name=parsed.event_name,
                         stop_reason=parsed.stop_reason,
-                    )
-                if parsed.terminal_response is not None:
-                    terminal_response = parsed.terminal_response
-                if not parsed.delta:
+                    ),
+                )
+                if delta is None:
                     continue
-                text_parts.append(parsed.delta)
                 yield LLMBackendStreamEvent(
-                    delta=parsed.delta,
+                    delta=delta,
                     stop_reason=parsed.stop_reason,
                 )
         except StreamInterruptedError:
@@ -149,24 +145,13 @@ class LiteLLMBackend:
             raise
         except Exception as exc:  # pragma: no cover - exercised via integration tests
             _raise_litellm_request_error(exc, streaming=True)
-        synthesized_terminal = synthesize_stream_terminal_response(
-            stream_api_dialect,
-            raw_events=raw_event_tuples,
-            tool_name_aliases=call_spec.tool_name_aliases,
-        )
-        if synthesized_terminal is not None:
-            terminal_response = synthesized_terminal
-        normalized = build_stream_completion(
+        normalized = finalize_backend_stream_completion(
+            completion_state,
             api_dialect=stream_api_dialect,
-            text_parts=text_parts,
-            terminal_response=terminal_response,
+            tool_name_aliases=call_spec.tool_name_aliases,
+            has_tools=bool(request.tools),
+            incomplete_stream_message=INCOMPLETE_STREAM_MESSAGE,
         )
-        if normalized is None:
-            raise ConfigurationError("模型没有返回可展示的内容，请稍后重试。")
-        if truncation_reason is not None:
-            raise ConfigurationError(build_truncated_stream_message(truncation_reason))
-        if not saw_terminal_event:
-            raise ConfigurationError(INCOMPLETE_STREAM_MESSAGE)
         yield LLMBackendStreamEvent(terminal_response=normalized)
 
 

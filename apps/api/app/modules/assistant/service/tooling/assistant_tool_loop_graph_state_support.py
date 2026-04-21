@@ -42,8 +42,8 @@ class AssistantToolLoopGraphState(TypedDict, total=False):
     request_provider_state: dict[str, Any] | None
 
 
-TOOL_LOOP_RECURSION_STEP_WIDTH = 5
-TOOL_LOOP_RECURSION_BUFFER = 10
+TOOL_LOOP_GRAPH_MAX_STEPS_PER_ITERATION = 5
+TOOL_LOOP_GRAPH_RECURSION_BUFFER = 10
 INITIAL_TOOL_LOOP_STATE_VERSION = 1
 
 
@@ -73,6 +73,15 @@ def build_initial_graph_state(
         "request_continuation_items": [],
         "request_provider_state": None,
     }
+
+
+def resolve_tool_loop_recursion_limit(max_iterations: int) -> int:
+    if max_iterations < 1:
+        raise ConfigurationError("Assistant tool loop max_iterations must be at least 1")
+    return (
+        max_iterations * TOOL_LOOP_GRAPH_MAX_STEPS_PER_ITERATION
+        + TOOL_LOOP_GRAPH_RECURSION_BUFFER
+    )
 
 
 def record_graph_state(

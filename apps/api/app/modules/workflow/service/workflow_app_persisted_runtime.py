@@ -35,6 +35,3 @@ class WorkflowAppPersistedRuntime:
                 reason,
             )
             raise
-
-
-LangGraphWorkflowAppPersistedRuntime = WorkflowAppPersistedRuntime

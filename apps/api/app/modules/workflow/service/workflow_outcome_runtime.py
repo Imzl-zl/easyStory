@@ -93,6 +93,3 @@ class WorkflowOutcomeRuntime:
         self.workflow.current_node_id = next_node_id
         self.workflow.snapshot = None
         return False
-
-
-LangGraphWorkflowOutcomeRuntime = WorkflowOutcomeRuntime

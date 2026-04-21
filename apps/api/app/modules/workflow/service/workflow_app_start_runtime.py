@@ -31,6 +31,3 @@ class WorkflowAppStartRuntime:
             raise ConfigurationError("Workflow app start runtime missing workflow id after persist")
         await self.dispatch_runtime(execution_id)
         return execution_id
-
-
-LangGraphWorkflowAppStartRuntime = WorkflowAppStartRuntime

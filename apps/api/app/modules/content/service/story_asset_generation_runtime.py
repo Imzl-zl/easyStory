@@ -29,6 +29,3 @@ class StoryAssetGenerationRuntime:
         prompt = await self.build_prompt(skill)
         generated_text = await self.generate_text(model, prompt)
         return await self.save_draft(generated_text)
-
-
-LangGraphStoryAssetGenerationRuntime = StoryAssetGenerationRuntime

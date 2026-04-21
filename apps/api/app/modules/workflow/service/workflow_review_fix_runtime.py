@@ -21,7 +21,7 @@ class WorkflowReviewFixGraphState(TypedDict, total=False):
     max_fix_attempts: int
 
 
-class LangGraphWorkflowReviewFixRuntime:
+class WorkflowReviewFixRuntime:
     def __init__(
         self,
         *,

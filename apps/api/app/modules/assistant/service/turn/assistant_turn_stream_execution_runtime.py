@@ -20,7 +20,7 @@ class AssistantTurnStreamExecutionGraphState(TypedDict, total=False):
     response: AssistantTurnResponsePayload
 
 
-class LangGraphAssistantTurnStreamExecutionRuntime:
+class AssistantTurnStreamExecutionRuntime:
     def __init__(
         self,
         *,

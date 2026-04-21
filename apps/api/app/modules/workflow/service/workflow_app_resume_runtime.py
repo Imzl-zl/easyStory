@@ -25,6 +25,3 @@ class WorkflowAppResumeRuntime:
             raise ConfigurationError("Workflow app resume runtime missing workflow id")
         await self.dispatch_runtime(execution_id)
         return execution_id
-
-
-LangGraphWorkflowAppResumeRuntime = WorkflowAppResumeRuntime

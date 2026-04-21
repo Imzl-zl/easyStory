@@ -11,6 +11,7 @@ from app.modules.workflow.models import WorkflowExecution
 from app.shared.runtime.errors import ConfigurationError
 
 from .snapshot_support import resolve_node_config
+from .workflow_graph_runtime_support import resolve_workflow_graph_recursion_limit
 from .workflow_runtime_shared import NodeOutcome
 
 if TYPE_CHECKING:
@@ -44,10 +45,13 @@ class WorkflowGraphRuntime:
         current_node_id = self.workflow.current_node_id
         if not current_node_id:
             raise ConfigurationError("Workflow current node is required before runtime execution")
-        recursion_limit = max(25, len(self.workflow_config.nodes) * 4 + 10)
         await self._graph.ainvoke(
             {"current_node_id": current_node_id, "terminated": False},
-            config={"recursion_limit": recursion_limit},
+            config={
+                "recursion_limit": resolve_workflow_graph_recursion_limit(
+                    len(self.workflow_config.nodes)
+                )
+            },
         )
         return self.workflow
 

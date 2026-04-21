@@ -38,6 +38,3 @@ class AssistantTurnExecutionRuntime:
             raise ConfigurationError("Assistant turn execution completed without response")
         await self.store_terminal_turn(response=response)
         return response
-
-
-LangGraphAssistantTurnExecutionRuntime = AssistantTurnExecutionRuntime

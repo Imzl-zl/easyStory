@@ -13,7 +13,7 @@ from app.modules.workflow.models import NodeExecution, WorkflowExecution
 from app.shared.runtime.errors import BudgetExceededError, ConfigurationError, ModelFallbackExhaustedError
 
 from .snapshot_support import load_agent_snapshot, load_skill_snapshot
-from .workflow_review_fix_runtime import LangGraphWorkflowReviewFixRuntime
+from .workflow_review_fix_runtime import WorkflowReviewFixRuntime
 from .workflow_runtime_budget_support import build_budget_review_outcome
 from .workflow_runtime_shared import ReviewCycleOutcome
 
@@ -32,7 +32,7 @@ class WorkflowRuntimeReviewMixin:
         owner_id: uuid.UUID,
         generation_budget_error: BudgetExceededError | None,
     ) -> ReviewCycleOutcome:
-        runtime = LangGraphWorkflowReviewFixRuntime(
+        runtime = WorkflowReviewFixRuntime(
             generated_content=generated_content,
             generation_budget_error=generation_budget_error,
             build_budget_review_outcome=lambda budget_error, content: build_budget_review_outcome(

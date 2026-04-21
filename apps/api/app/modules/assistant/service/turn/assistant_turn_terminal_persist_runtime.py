@@ -24,6 +24,3 @@ class AssistantTurnTerminalPersistRuntime:
         if record is None:
             raise ConfigurationError("Assistant terminal persist runtime missing terminal record")
         await self.save_run(record)
-
-
-LangGraphAssistantTurnTerminalPersistRuntime = AssistantTurnTerminalPersistRuntime

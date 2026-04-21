@@ -18,13 +18,12 @@ from .assistant_tool_loop_context_support import _build_continuation_request_sna
 from .assistant_tool_loop_execution_support import build_post_tool_cycle_state, execute_planned_tool_calls
 from .assistant_tool_loop_graph_state_support import (
     INITIAL_TOOL_LOOP_STATE_VERSION,
-    TOOL_LOOP_RECURSION_BUFFER,
-    TOOL_LOOP_RECURSION_STEP_WIDTH,
     AssistantToolLoopGraphState,
     build_initial_graph_state,
     deserialize_iteration_item,
     record_graph_state,
     require_current_raw_output,
+    resolve_tool_loop_recursion_limit,
     serialize_iteration_item,
 )
 from .assistant_tool_loop_budget_support import apply_tool_loop_request_budget
@@ -103,15 +102,17 @@ class AssistantToolLoopRuntime:
                 yield item
             return
         saw_final_output = False
-        recursion_limit = self.tool_loop.max_iterations * TOOL_LOOP_RECURSION_STEP_WIDTH
-        recursion_limit += TOOL_LOOP_RECURSION_BUFFER
         async for payload in self._graph.astream(
             build_initial_graph_state(
                 self.turn_context,
                 initial_raw_output=self.initial_raw_output,
             ),
             stream_mode="custom",
-            config={"recursion_limit": recursion_limit},
+            config={
+                "recursion_limit": resolve_tool_loop_recursion_limit(
+                    self.tool_loop.max_iterations
+                )
+            },
         ):
             item = deserialize_iteration_item(
                 payload,

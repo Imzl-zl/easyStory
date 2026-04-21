@@ -120,6 +120,3 @@ class AssistantHookAgentRuntimeImpl:
         if result is None:
             raise ConfigurationError("Assistant hook agent runtime completed without result")
         return result
-
-
-LangGraphAssistantHookAgentRuntime = AssistantHookAgentRuntimeImpl

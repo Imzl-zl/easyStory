@@ -31,6 +31,3 @@ class WorkflowHookEventRuntime:
             self.record_success(hook, result)
             results.append(result)
         return results
-
-
-LangGraphWorkflowHookEventRuntime = WorkflowHookEventRuntime

@@ -53,6 +53,3 @@ class WorkflowChapterGenerationRuntime:
         if outcome is None:
             raise ConfigurationError("Workflow chapter generation runtime completed without outcome")
         return outcome
-
-
-LangGraphWorkflowChapterGenerationRuntime = WorkflowChapterGenerationRuntime

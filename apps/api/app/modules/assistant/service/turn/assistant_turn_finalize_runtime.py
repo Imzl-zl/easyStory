@@ -28,6 +28,3 @@ class AssistantTurnFinalizeRuntime:
         if response is None:
             raise ConfigurationError("Assistant turn finalize runtime completed without response")
         return response
-
-
-LangGraphAssistantTurnFinalizeRuntime = AssistantTurnFinalizeRuntime

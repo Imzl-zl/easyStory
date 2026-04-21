@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.modules.workflow.service.workflow_review_fix_runtime import (
-    LangGraphWorkflowReviewFixRuntime,
+    WorkflowReviewFixRuntime,
 )
 from app.modules.workflow.service.workflow_runtime_shared import ReviewCycleOutcome
 from app.shared.runtime.errors import BudgetExceededError
@@ -22,7 +22,7 @@ def _aggregated(*, overall_status: str, execution_failures: list[object] | None 
 
 @pytest.mark.asyncio
 async def test_workflow_review_fix_runtime_skips_review_when_auto_review_disabled() -> None:
-    runtime = LangGraphWorkflowReviewFixRuntime(
+    runtime = WorkflowReviewFixRuntime(
         generated_content="生成正文",
         generation_budget_error=None,
         build_budget_review_outcome=lambda budget_error, generated_content: ReviewCycleOutcome(
@@ -57,7 +57,7 @@ async def test_workflow_review_fix_runtime_pauses_when_auto_fix_disabled() -> No
     call_log: list[object] = []
     reviewers = ("reviewer-1",)
 
-    runtime = LangGraphWorkflowReviewFixRuntime(
+    runtime = WorkflowReviewFixRuntime(
         generated_content="生成正文",
         generation_budget_error=None,
         build_budget_review_outcome=lambda budget_error, generated_content: ReviewCycleOutcome(
@@ -106,7 +106,7 @@ async def test_workflow_review_fix_runtime_runs_fix_and_re_review_until_passed()
     failed_review = _aggregated(overall_status="failed")
     passed_review = _aggregated(overall_status="passed")
 
-    runtime = LangGraphWorkflowReviewFixRuntime(
+    runtime = WorkflowReviewFixRuntime(
         generated_content="生成正文",
         generation_budget_error=None,
         build_budget_review_outcome=lambda budget_error, generated_content: ReviewCycleOutcome(
@@ -161,7 +161,7 @@ async def test_workflow_review_fix_runtime_uses_fix_failure_after_last_attempt()
         failure_message="自动精修达到最大次数，仍未通过审核",
     )
 
-    runtime = LangGraphWorkflowReviewFixRuntime(
+    runtime = WorkflowReviewFixRuntime(
         generated_content="生成正文",
         generation_budget_error=None,
         build_budget_review_outcome=lambda budget_error, generated_content: ReviewCycleOutcome(
@@ -220,7 +220,7 @@ async def test_workflow_review_fix_runtime_returns_budget_outcome_from_fix_stage
         pause_reason="budget_exceeded",
     )
 
-    runtime = LangGraphWorkflowReviewFixRuntime(
+    runtime = WorkflowReviewFixRuntime(
         generated_content="生成正文",
         generation_budget_error=None,
         build_budget_review_outcome=lambda raised_budget_error, generated_content: (

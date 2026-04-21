@@ -41,7 +41,7 @@ from .turn.assistant_turn_runtime_support import (
 )
 from .turn.assistant_turn_terminal_persist_runtime import AssistantTurnTerminalPersistRuntime
 from .turn.assistant_turn_stream_execution_runtime import (
-    LangGraphAssistantTurnStreamExecutionRuntime,
+    AssistantTurnStreamExecutionRuntime,
 )
 from .turn.assistant_turn_llm_bridge_support import should_stream_with_tool_loop
 
@@ -163,7 +163,7 @@ async def iterate_stream_turn(
     )
     prepared = turn_start.prepared
     replayed_response = turn_start.replayed_response
-    runtime = LangGraphAssistantTurnStreamExecutionRuntime(
+    runtime = AssistantTurnStreamExecutionRuntime(
         replayed_response=replayed_response,
         build_stream_event_data=lambda event_seq, extra=None: build_stream_event_data(
             service,

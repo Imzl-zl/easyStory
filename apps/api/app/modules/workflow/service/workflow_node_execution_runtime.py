@@ -39,6 +39,3 @@ class WorkflowNodeExecutionRuntime:
             await self.run_after_on_error(outcome, exc)
             raise
         return outcome
-
-
-LangGraphWorkflowNodeExecutionRuntime = WorkflowNodeExecutionRuntime

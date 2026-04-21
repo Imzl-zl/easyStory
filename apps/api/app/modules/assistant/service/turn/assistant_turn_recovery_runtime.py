@@ -39,6 +39,3 @@ class AssistantTurnRecoveryRuntime:
             )
         await self.recover_existing_running_turn(conflict_run)
         return self.recover_existing_turn(conflict_run)
-
-
-LangGraphAssistantTurnRecoveryRuntime = AssistantTurnRecoveryRuntime

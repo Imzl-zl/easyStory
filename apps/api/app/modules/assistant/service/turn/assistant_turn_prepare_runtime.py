@@ -49,6 +49,3 @@ class AssistantTurnPrepareRuntime:
             prepared=prepared,
             replayed_response=replayed_response,
         )
-
-
-LangGraphAssistantTurnPrepareRuntime = AssistantTurnPrepareRuntime
