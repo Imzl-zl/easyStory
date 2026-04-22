@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useId, useRef, type RefObject } from "react"
 
 type DialogShellProps = {
   children: React.ReactNode;
+  closeDisabled?: boolean;
   description?: string;
   onClose: () => void;
   restoreFocusRef?: RefObject<HTMLElement | null>;
@@ -12,6 +13,7 @@ type DialogShellProps = {
 
 export function DialogShell({
   title,
+  closeDisabled = false,
   description,
   onClose,
   restoreFocusRef,
@@ -21,8 +23,14 @@ export function DialogShell({
   const descriptionId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const handleDismiss = useEffectEvent(() => {
+  const dismiss = () => {
+    if (closeDisabled) {
+      return;
+    }
     onClose();
+  };
+  const handleDismiss = useEffectEvent(() => {
+    dismiss();
   });
   const resolveRestoreFocusTarget = useEffectEvent((fallbackTarget: HTMLElement | null) => {
     return restoreFocusRef?.current ?? fallbackTarget;
@@ -79,7 +87,7 @@ export function DialogShell({
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--overlay-bg)] backdrop-blur-[2px] p-4 md:items-center animate-overlay-in"
       role="presentation"
-      onClick={onClose}
+      onClick={dismiss}
     >
       <div
         aria-describedby={description ? descriptionId : undefined}
@@ -104,8 +112,9 @@ export function DialogShell({
           </div>
           <button
             aria-label="关闭对话框"
-            className="ink-button-secondary min-w-0 px-4"
-            onClick={onClose}
+            className="ink-button-secondary min-w-0 px-4 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={closeDisabled}
+            onClick={dismiss}
             ref={closeButtonRef}
             type="button"
           >

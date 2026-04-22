@@ -92,7 +92,45 @@ function LobbyProjectCard({
   const isDeleted = Boolean(project.deleted_at);
   const isPhysicalDeleting = isPendingProjectAction(actionMutation, project.id, "physicalDelete");
   const isSoftDeleting = isPendingProjectAction(actionMutation, project.id, "delete");
+  const physicalDeleteErrorMessage = resolveProjectActionErrorMessage(
+    actionMutation,
+    project.id,
+    "physicalDelete",
+  );
+  const softDeleteErrorMessage = resolveProjectActionErrorMessage(
+    actionMutation,
+    project.id,
+    "delete",
+  );
   const tone = resolveProjectCardTone(project.id);
+
+  const handleOpenPhysicalDeleteDialog = () => {
+    resetProjectActionError(actionMutation, project.id, "physicalDelete");
+    setDeleteDialogOpen(true);
+  };
+
+  const handleOpenSoftDeleteDialog = () => {
+    resetProjectActionError(actionMutation, project.id, "delete");
+    setSoftDeleteDialogOpen(true);
+  };
+
+  const handleConfirmPhysicalDelete = async () => {
+    try {
+      await actionMutation.mutateAsync({ projectId: project.id, type: "physicalDelete" });
+      setDeleteDialogOpen(false);
+    } catch {
+      // Keep the dialog open so the user can see the inline error and retry.
+    }
+  };
+
+  const handleConfirmSoftDelete = async () => {
+    try {
+      await actionMutation.mutateAsync({ projectId: project.id, type: "delete" });
+      setSoftDeleteDialogOpen(false);
+    } catch {
+      // Keep the dialog open so the user can see the inline error and retry.
+    }
+  };
 
   return (
     <article
@@ -179,7 +217,7 @@ function LobbyProjectCard({
               <button
                 className="ink-button-danger"
                 disabled={actionMutation.isPending}
-                onClick={() => setDeleteDialogOpen(true)}
+                onClick={handleOpenPhysicalDeleteDialog}
                 type="button"
               >
                 彻底删除
@@ -193,7 +231,7 @@ function LobbyProjectCard({
               <button
                 className="ink-button-danger"
                 disabled={actionMutation.isPending}
-                onClick={() => setSoftDeleteDialogOpen(true)}
+                onClick={handleOpenSoftDeleteDialog}
                 type="button"
               >
                 删除
@@ -205,20 +243,19 @@ function LobbyProjectCard({
 
       {isDeleteDialogOpen ? (
         <RecycleBinDeleteDialog
+          errorMessage={physicalDeleteErrorMessage}
           isPending={isPhysicalDeleting}
           onClose={() => setDeleteDialogOpen(false)}
-          onConfirm={() => actionMutation.mutate({ projectId: project.id, type: "physicalDelete" })}
+          onConfirm={handleConfirmPhysicalDelete}
           project={project}
         />
       ) : null}
       {isSoftDeleteDialogOpen ? (
         <ProjectDeleteConfirmDialog
+          errorMessage={softDeleteErrorMessage}
           isPending={isSoftDeleting}
           onClose={() => setSoftDeleteDialogOpen(false)}
-          onConfirm={() => {
-            actionMutation.mutate({ projectId: project.id, type: "delete" });
-            setSoftDeleteDialogOpen(false);
-          }}
+          onConfirm={handleConfirmSoftDelete}
           project={project}
         />
       ) : null}
@@ -231,8 +268,37 @@ function isPendingProjectAction(
   projectId: string,
   type: ProjectActionVariables["type"],
 ) {
+  return actionMutation.isPending && matchesProjectAction(actionMutation, projectId, type);
+}
+
+function resolveProjectActionErrorMessage(
+  actionMutation: ProjectActionMutation,
+  projectId: string,
+  type: ProjectActionVariables["type"],
+) {
+  if (!actionMutation.isError || !matchesProjectAction(actionMutation, projectId, type)) {
+    return null;
+  }
+  return getErrorMessage(actionMutation.error);
+}
+
+function resetProjectActionError(
+  actionMutation: ProjectActionMutation,
+  projectId: string,
+  type: ProjectActionVariables["type"],
+) {
+  if (!actionMutation.isError || !matchesProjectAction(actionMutation, projectId, type)) {
+    return;
+  }
+  actionMutation.reset();
+}
+
+function matchesProjectAction(
+  actionMutation: ProjectActionMutation,
+  projectId: string,
+  type: ProjectActionVariables["type"],
+) {
   return (
-    actionMutation.isPending &&
     actionMutation.variables?.projectId === projectId &&
     actionMutation.variables?.type === type
   );

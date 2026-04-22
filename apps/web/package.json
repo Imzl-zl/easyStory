@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node ./scripts/clean-next-dev-types.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "pretypecheck": "node ./scripts/clean-next-dev-types.mjs",
+    "typecheck": "next typegen && tsc --noEmit -p tsconfig.typecheck.json",
     "check": "npm run lint && npm run typecheck",
     "test:unit": "node ./scripts/run-unit-tests.mjs",
     "postinstall": "node ./scripts/patch-arco-react19.cjs"

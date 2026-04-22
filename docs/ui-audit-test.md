@@ -2004,7 +2004,7 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 
 - [x] `npm run build` — 通过
 - [x] `npm run lint` — 通过
-- [x] TypeScript 类型检查 — 通过（build 内含）
+- [x] `npm run typecheck` — 通过（会先清理陈旧 `.next/dev/types`，再执行 `next typegen + tsc --noEmit -p tsconfig.typecheck.json`）
 
 ### 16.5 待办（后续阶段）
 

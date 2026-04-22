@@ -10,36 +10,75 @@ import type {
 
 const CATEGORY_META = {
   character: {
-    accent: "var(--accent-success)",
     badge: "人物",
-    fill: "var(--accent-success-soft)",
-    stroke: "var(--accent-success)",
   },
   faction: {
-    accent: "var(--accent-warning)",
     badge: "势力",
-    fill: "var(--accent-warning-soft)",
-    stroke: "var(--accent-warning)",
   },
 } as const;
 
 const EDGE_META = {
   character_relation: {
     badge: "人物关系",
-    color: "var(--accent-warning)",
     dash: "dashed" as const,
   },
   faction_relation: {
     badge: "势力关系",
-    color: "var(--accent-purple)",
     dash: "dashed" as const,
   },
   membership: {
     badge: "隶属",
-    color: "var(--accent-success)",
     dash: "solid" as const,
   },
 } as const;
+
+type CssVariableReader = {
+  getPropertyValue: (propertyName: string) => string;
+};
+
+export type JsonRelationGraphTheme = {
+  categories: {
+    character: {
+      accent: string;
+      fill: string;
+      stroke: string;
+    };
+    faction: {
+      accent: string;
+      fill: string;
+      stroke: string;
+    };
+  };
+  edges: {
+    character_relation: string;
+    faction_relation: string;
+    membership: string;
+  };
+  textPrimary: string;
+  textSecondary: string;
+};
+
+export const DEFAULT_JSON_RELATION_GRAPH_THEME: JsonRelationGraphTheme = {
+  categories: {
+    character: {
+      accent: "#6b8f71",
+      fill: "rgba(107, 143, 113, 0.10)",
+      stroke: "#6b8f71",
+    },
+    faction: {
+      accent: "#b8944a",
+      fill: "rgba(184, 148, 74, 0.10)",
+      stroke: "#b8944a",
+    },
+  },
+  edges: {
+    character_relation: "#b8944a",
+    faction_relation: "#9a7eb8",
+    membership: "#6b8f71",
+  },
+  textPrimary: "#3d3832",
+  textSecondary: "#7e776d",
+};
 
 export type JsonRelationGraphSelection =
   | { id: string; kind: "edge" }
@@ -60,6 +99,7 @@ export type JsonRelationGraphInspector = {
 export function buildJsonRelationGraphOption(
   graph: JsonRelationGraphModel,
   selection: JsonRelationGraphSelection,
+  theme: JsonRelationGraphTheme = DEFAULT_JSON_RELATION_GRAPH_THEME,
 ): EChartsOption {
   return {
     animationDuration: 260,
@@ -74,15 +114,15 @@ export function buildJsonRelationGraphOption(
         if (!isTooltipParams(params)) {
           return "";
         }
-        return formatTooltip(params.dataType, params.data);
+        return formatTooltip(params.dataType, params.data, theme.textSecondary);
       },
       textStyle: {
-        color: "var(--text-primary)",
+        color: theme.textPrimary,
         fontFamily: "inherit",
       },
     },
     series: [{
-      data: graph.nodes.map((node) => buildNodeOption(node, graph.edges, selection)),
+      data: graph.nodes.map((node) => buildNodeOption(node, graph.edges, selection, theme)),
       draggable: false,
       edgeLabel: {
         formatter: "{c}",
@@ -97,7 +137,7 @@ export function buildJsonRelationGraphOption(
         repulsion: 420,
       },
       label: {
-        color: "var(--text-primary)",
+        color: theme.textPrimary,
         fontSize: 12,
         overflow: "truncate",
         position: "right",
@@ -105,13 +145,39 @@ export function buildJsonRelationGraphOption(
         width: 110,
       },
       layout: "force",
-      links: graph.edges.map((edge) => buildEdgeOption(edge, selection)),
+      links: graph.edges.map((edge) => buildEdgeOption(edge, selection, theme)),
       roam: true,
       selectedMode: false,
       symbolKeepAspect: true,
       type: "graph",
     }],
   } as EChartsOption;
+}
+
+export function resolveJsonRelationGraphTheme(
+  styleSource: CssVariableReader | null | undefined,
+): JsonRelationGraphTheme {
+  return {
+    categories: {
+      character: {
+        accent: readCssVariable(styleSource, "--accent-success", DEFAULT_JSON_RELATION_GRAPH_THEME.categories.character.accent),
+        fill: readCssVariable(styleSource, "--accent-success-soft", DEFAULT_JSON_RELATION_GRAPH_THEME.categories.character.fill),
+        stroke: readCssVariable(styleSource, "--accent-success", DEFAULT_JSON_RELATION_GRAPH_THEME.categories.character.stroke),
+      },
+      faction: {
+        accent: readCssVariable(styleSource, "--accent-warning", DEFAULT_JSON_RELATION_GRAPH_THEME.categories.faction.accent),
+        fill: readCssVariable(styleSource, "--accent-warning-soft", DEFAULT_JSON_RELATION_GRAPH_THEME.categories.faction.fill),
+        stroke: readCssVariable(styleSource, "--accent-warning", DEFAULT_JSON_RELATION_GRAPH_THEME.categories.faction.stroke),
+      },
+    },
+    edges: {
+      character_relation: readCssVariable(styleSource, "--accent-warning", DEFAULT_JSON_RELATION_GRAPH_THEME.edges.character_relation),
+      faction_relation: readCssVariable(styleSource, "--accent-purple", DEFAULT_JSON_RELATION_GRAPH_THEME.edges.faction_relation),
+      membership: readCssVariable(styleSource, "--accent-success", DEFAULT_JSON_RELATION_GRAPH_THEME.edges.membership),
+    },
+    textPrimary: readCssVariable(styleSource, "--text-primary", DEFAULT_JSON_RELATION_GRAPH_THEME.textPrimary),
+    textSecondary: readCssVariable(styleSource, "--text-secondary", DEFAULT_JSON_RELATION_GRAPH_THEME.textSecondary),
+  };
 }
 
 export function isValidJsonRelationGraphSelection(
@@ -129,22 +195,24 @@ export function isValidJsonRelationGraphSelection(
 export function resolveJsonRelationGraphInspector(
   graph: JsonRelationGraphModel,
   selection: JsonRelationGraphSelection,
+  theme: JsonRelationGraphTheme = DEFAULT_JSON_RELATION_GRAPH_THEME,
 ): JsonRelationGraphInspector | null {
   if (!selection) {
     return null;
   }
   if (selection.kind === "node") {
-    return buildNodeInspector(graph, selection.id);
+    return buildNodeInspector(graph, selection.id, theme);
   }
-  return buildEdgeInspector(graph, selection.id);
+  return buildEdgeInspector(graph, selection.id, theme);
 }
 
 function buildNodeOption(
   node: JsonRelationGraphNode,
   edges: JsonRelationGraphEdge[],
   selection: JsonRelationGraphSelection,
+  theme: JsonRelationGraphTheme,
 ) {
-  const meta = CATEGORY_META[node.category];
+  const meta = theme.categories[node.category];
   const selected = selection?.kind === "node" && selection.id === node.id;
   const dimmed = selection ? !isNodeConnectedToSelection(node.id, edges, selection) : false;
   return {
@@ -165,13 +233,14 @@ function buildNodeOption(
     raw: node.raw,
     symbol: node.category === "character" ? "circle" : "roundRect",
     symbolSize: selected ? 76 : node.category === "character" ? 58 : 66,
-    value: meta.badge,
+    value: CATEGORY_META[node.category].badge,
   };
 }
 
 function buildEdgeOption(
   edge: JsonRelationGraphEdge,
   selection: JsonRelationGraphSelection,
+  theme: JsonRelationGraphTheme,
 ) {
   const meta = EDGE_META[edge.category];
   const selected = selection?.kind === "edge" && selection.id === edge.id;
@@ -180,7 +249,7 @@ function buildEdgeOption(
     id: edge.id,
     label: edge.label,
     lineStyle: {
-      color: meta.color,
+      color: theme.edges[edge.category],
       opacity: dimmed ? 0.18 : 0.72,
       type: meta.dash,
       width: selected ? 3.4 : edge.category === "membership" ? 2.4 : 2,
@@ -192,14 +261,18 @@ function buildEdgeOption(
   };
 }
 
-function buildNodeInspector(graph: JsonRelationGraphModel, nodeId: string) {
+function buildNodeInspector(
+  graph: JsonRelationGraphModel,
+  nodeId: string,
+  theme: JsonRelationGraphTheme,
+) {
   const node = graph.nodes.find((item) => item.id === nodeId);
   if (!node) {
     return null;
   }
   const connectedEdges = graph.edges.filter((edge) => edge.source === nodeId || edge.target === nodeId);
   return {
-    accentColor: CATEGORY_META[node.category].accent,
+    accentColor: theme.categories[node.category].accent,
     badges: [
       CATEGORY_META[node.category].badge,
       `${connectedEdges.length} 条关联`,
@@ -217,7 +290,11 @@ function buildNodeInspector(graph: JsonRelationGraphModel, nodeId: string) {
   };
 }
 
-function buildEdgeInspector(graph: JsonRelationGraphModel, edgeId: string) {
+function buildEdgeInspector(
+  graph: JsonRelationGraphModel,
+  edgeId: string,
+  theme: JsonRelationGraphTheme,
+) {
   const edge = graph.edges.find((item) => item.id === edgeId);
   if (!edge) {
     return null;
@@ -225,7 +302,7 @@ function buildEdgeInspector(graph: JsonRelationGraphModel, edgeId: string) {
   const source = graph.nodes.find((node) => node.id === edge.source);
   const target = graph.nodes.find((node) => node.id === edge.target);
   return {
-    accentColor: EDGE_META[edge.category].color,
+    accentColor: theme.edges[edge.category],
     badges: [
       EDGE_META[edge.category].badge,
       `${source?.label ?? edge.source} → ${target?.label ?? edge.target}`,
@@ -267,20 +344,33 @@ function isEdgeConnectedToSelection(
   return edge.source === selection.id || edge.target === selection.id;
 }
 
-function formatTooltip(dataType: string, data: unknown) {
+function formatTooltip(
+  dataType: string,
+  data: unknown,
+  textSecondary: string,
+) {
   if (!isTooltipRecord(data)) {
     return "";
   }
   if (dataType === "node") {
     return [
       `<div style="font-weight:600;margin-bottom:4px;">${escapeHtml(String(data.name ?? ""))}</div>`,
-      `<div style="font-size:12px;color:var(--text-secondary);">${escapeHtml(String(data.value ?? ""))}</div>`,
+      `<div style="font-size:12px;color:${textSecondary};">${escapeHtml(String(data.value ?? ""))}</div>`,
     ].join("");
   }
   return [
     `<div style="font-weight:600;margin-bottom:4px;">${escapeHtml(String(data.value ?? ""))}</div>`,
-    `<div style="font-size:12px;color:var(--text-secondary);">${escapeHtml(String(data.source ?? ""))} → ${escapeHtml(String(data.target ?? ""))}</div>`,
+    `<div style="font-size:12px;color:${textSecondary};">${escapeHtml(String(data.source ?? ""))} → ${escapeHtml(String(data.target ?? ""))}</div>`,
   ].join("");
+}
+
+function readCssVariable(
+  styleSource: CssVariableReader | null | undefined,
+  propertyName: string,
+  fallback: string,
+) {
+  const value = styleSource?.getPropertyValue(propertyName).trim();
+  return value || fallback;
 }
 
 function isTooltipRecord(value: unknown): value is Record<string, unknown> {

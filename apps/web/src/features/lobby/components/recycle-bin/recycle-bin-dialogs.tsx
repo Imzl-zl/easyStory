@@ -9,6 +9,7 @@ import {
 import type { ProjectSummary } from "@/lib/api/types";
 
 type RecycleBinDeleteDialogProps = {
+  errorMessage?: string | null;
   isPending: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -23,6 +24,7 @@ type RecycleBinClearDialogProps = {
 };
 
 type ProjectDeleteConfirmDialogProps = {
+  errorMessage?: string | null;
   isPending: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -30,6 +32,7 @@ type ProjectDeleteConfirmDialogProps = {
 };
 
 export function RecycleBinDeleteDialog({
+  errorMessage,
   isPending,
   onClose,
   onConfirm,
@@ -39,6 +42,7 @@ export function RecycleBinDeleteDialog({
     <DialogShell
       title="确认彻底删除项目"
       description="删除后无法恢复，项目关联数据会一并清理。"
+      closeDisabled={isPending}
       onClose={onClose}
     >
       <div className="space-y-4">
@@ -56,6 +60,9 @@ export function RecycleBinDeleteDialog({
             会同时清理正文、工作流、导出、事实、账单、审计和项目级凭证。
           </p>
         </div>
+        {errorMessage ? (
+          <div className="callout-danger text-sm leading-6 text-accent-danger">{errorMessage}</div>
+        ) : null}
         <div className="flex flex-wrap gap-3">
           <button className="ink-button-danger" disabled={isPending} onClick={onConfirm} type="button">
             {isPending ? "删除中..." : "确认彻底删除"}
@@ -70,6 +77,7 @@ export function RecycleBinDeleteDialog({
 }
 
 export function ProjectDeleteConfirmDialog({
+  errorMessage,
   isPending,
   onClose,
   onConfirm,
@@ -79,6 +87,7 @@ export function ProjectDeleteConfirmDialog({
     <DialogShell
       title="确认删除项目"
       description="删除后项目会移入回收站，可以在回收站中恢复。"
+      closeDisabled={isPending}
       onClose={onClose}
     >
       <div className="space-y-4">
@@ -91,6 +100,9 @@ export function ProjectDeleteConfirmDialog({
             删除后项目会保留在回收站中，关联数据不会清理，随时可以恢复。
           </p>
         </div>
+        {errorMessage ? (
+          <div className="callout-danger text-sm leading-6 text-accent-danger">{errorMessage}</div>
+        ) : null}
         <div className="flex flex-wrap gap-3">
           <button className="ink-button-danger" disabled={isPending} onClick={onConfirm} type="button">
             {isPending ? "删除中..." : "确认删除"}
@@ -114,6 +126,7 @@ export function RecycleBinClearDialog({
     <DialogShell
       title="确认清空回收站"
       description="会彻底删除当前账号回收站中的所有项目。"
+      closeDisabled={isPending}
       onClose={onClose}
     >
       <div className="space-y-4">

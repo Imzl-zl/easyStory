@@ -12,9 +12,12 @@ import type {
   JsonRelationGraphModel,
 } from "@/features/studio/components/document/json-document-support";
 import {
+  DEFAULT_JSON_RELATION_GRAPH_THEME,
   buildJsonRelationGraphOption,
   isValidJsonRelationGraphSelection,
   resolveJsonRelationGraphInspector,
+  resolveJsonRelationGraphTheme,
+  type JsonRelationGraphTheme,
   type JsonRelationGraphSelection,
 } from "@/features/studio/components/document/json-relation-graph-support";
 
@@ -33,13 +36,19 @@ export function JsonRelationGraph({
 }: Readonly<JsonRelationGraphProps>) {
   const [selection, setSelection] = useState<JsonRelationGraphSelection>(null);
   const [rawSelectionKey, setRawSelectionKey] = useState<string | null>(null);
+  const theme = useMemo<JsonRelationGraphTheme>(() => {
+    if (typeof document === "undefined") {
+      return DEFAULT_JSON_RELATION_GRAPH_THEME;
+    }
+    return resolveJsonRelationGraphTheme(getComputedStyle(document.documentElement));
+  }, []);
   const activeSelection = useMemo(
     () => (isValidJsonRelationGraphSelection(graph, selection) ? selection : null),
     [graph, selection],
   );
   const inspector = useMemo(
-    () => resolveJsonRelationGraphInspector(graph, activeSelection),
-    [activeSelection, graph],
+    () => resolveJsonRelationGraphInspector(graph, activeSelection, theme),
+    [activeSelection, graph, theme],
   );
   const selectionKey = activeSelection ? `${activeSelection.kind}:${activeSelection.id}` : null;
   const showRawContent = selectionKey !== null && rawSelectionKey === selectionKey;
@@ -63,6 +72,7 @@ export function JsonRelationGraph({
         <JsonRelationGraphCanvas
           graph={graph}
           selection={activeSelection}
+          theme={theme}
           onSelect={(nextSelection) => {
             setSelection((currentSelection) =>
               currentSelection?.kind === nextSelection.kind && currentSelection.id === nextSelection.id
@@ -95,12 +105,14 @@ type JsonRelationGraphCanvasProps = {
   graph: JsonRelationGraphModel;
   onSelect: (selection: NonNullable<JsonRelationGraphSelection>) => void;
   selection: JsonRelationGraphSelection;
+  theme: JsonRelationGraphTheme;
 };
 
 function JsonRelationGraphCanvas({
   graph,
   onSelect,
   selection,
+  theme,
 }: Readonly<JsonRelationGraphCanvasProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<EChartsType | null>(null);
@@ -112,7 +124,7 @@ function JsonRelationGraphCanvas({
     }
     const chart = chartRef.current ?? echarts.init(container, undefined, { renderer: "canvas" });
     chartRef.current = chart;
-    chart.setOption(buildJsonRelationGraphOption(graph, selection), true);
+    chart.setOption(buildJsonRelationGraphOption(graph, selection, theme), true);
 
     const handleClick = (params: unknown) => {
       const payload = isGraphClickPayload(params) ? params : null;
@@ -140,7 +152,7 @@ function JsonRelationGraphCanvas({
       chart.off("click", handleClick);
       resizeObserver.disconnect();
     };
-  }, [graph, onSelect, selection]);
+  }, [graph, onSelect, selection, theme]);
 
   useEffect(() => {
     return () => {
