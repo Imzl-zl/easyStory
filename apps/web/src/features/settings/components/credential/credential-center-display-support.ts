@@ -8,7 +8,7 @@ import type {
 
 export type CredentialTransportCapabilityItem = {
   detail: string;
-  lastVerifiedAt: string | null;
+  lastVerifiedAt: string | null | undefined;
   summary: string;
   title: string;
   tone: "completed" | "draft" | "ready" | "warning";

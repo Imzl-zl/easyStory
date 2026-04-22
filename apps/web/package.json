@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck",
     "test:unit": "node ./scripts/run-unit-tests.mjs",
     "postinstall": "node ./scripts/patch-arco-react19.cjs"
   },

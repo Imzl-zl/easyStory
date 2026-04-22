@@ -10,33 +10,33 @@ import type {
 
 const CATEGORY_META = {
   character: {
-    accent: "#2f7d6d",
+    accent: "var(--accent-success)",
     badge: "人物",
-    fill: "rgba(47,125,109,0.14)",
-    stroke: "#256458",
+    fill: "var(--accent-success-soft)",
+    stroke: "var(--accent-success)",
   },
   faction: {
-    accent: "#b67d2d",
+    accent: "var(--accent-warning)",
     badge: "势力",
-    fill: "rgba(182,125,45,0.14)",
-    stroke: "#966620",
+    fill: "var(--accent-warning-soft)",
+    stroke: "var(--accent-warning)",
   },
 } as const;
 
 const EDGE_META = {
   character_relation: {
     badge: "人物关系",
-    color: "#c49b57",
+    color: "var(--accent-warning)",
     dash: "dashed" as const,
   },
   faction_relation: {
     badge: "势力关系",
-    color: "#8f6fbc",
+    color: "var(--accent-purple)",
     dash: "dashed" as const,
   },
   membership: {
     badge: "隶属",
-    color: "#6b8f71",
+    color: "var(--accent-success)",
     dash: "solid" as const,
   },
 } as const;
@@ -77,7 +77,7 @@ export function buildJsonRelationGraphOption(
         return formatTooltip(params.dataType, params.data);
       },
       textStyle: {
-        color: "#2c2416",
+        color: "var(--text-primary)",
         fontFamily: "inherit",
       },
     },
@@ -97,7 +97,7 @@ export function buildJsonRelationGraphOption(
         repulsion: 420,
       },
       label: {
-        color: "#2c2416",
+        color: "var(--text-primary)",
         fontSize: 12,
         overflow: "truncate",
         position: "right",
@@ -274,12 +274,12 @@ function formatTooltip(dataType: string, data: unknown) {
   if (dataType === "node") {
     return [
       `<div style="font-weight:600;margin-bottom:4px;">${escapeHtml(String(data.name ?? ""))}</div>`,
-      `<div style="font-size:12px;color:#6d6458;">${escapeHtml(String(data.value ?? ""))}</div>`,
+      `<div style="font-size:12px;color:var(--text-secondary);">${escapeHtml(String(data.value ?? ""))}</div>`,
     ].join("");
   }
   return [
     `<div style="font-weight:600;margin-bottom:4px;">${escapeHtml(String(data.value ?? ""))}</div>`,
-    `<div style="font-size:12px;color:#6d6458;">${escapeHtml(String(data.source ?? ""))} → ${escapeHtml(String(data.target ?? ""))}</div>`,
+    `<div style="font-size:12px;color:var(--text-secondary);">${escapeHtml(String(data.source ?? ""))} → ${escapeHtml(String(data.target ?? ""))}</div>`,
   ].join("");
 }
 

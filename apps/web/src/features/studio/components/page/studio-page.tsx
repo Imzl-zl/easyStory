@@ -59,9 +59,9 @@ const STUDIO_TOOLBAR_BUTTON_CLASS = "ink-button-secondary whitespace-nowrap";
 const STUDIO_SAVE_BUTTON_CLASS =
   "ink-button whitespace-nowrap h-9 px-4 text-[13px] shadow-md";
 const STUDIO_STALE_BADGE_CLASS =
-  "inline-flex items-center gap-2 h-8 px-3.5 rounded-pill border border-accent-primary-muted bg-accent-soft text-[0.72rem] font-semibold tracking-[0.16em] uppercase text-accent-primary";
+  "inline-flex items-center gap-2 h-7 px-3 rounded-pill border border-accent-primary-muted bg-accent-soft text-[0.72rem] font-medium tracking-[0.08em] text-accent-primary";
 const STUDIO_STALE_BADGE_DOT_CLASS =
-  "inline-flex h-1.5 w-1.5 rounded-full bg-accent-tertiary ring-4 ring-accent-primary-muted";
+  "inline-flex h-1.5 w-1.5 rounded-full bg-accent-tertiary ring-2 ring-accent-primary-muted";
 const STUDIO_GRID_WITH_CHAT_CLASS =
   "grid [grid-template-columns:1fr] lg:[grid-template-columns:236px_minmax(0,1fr)_minmax(392px,0.72fr)] xl:[grid-template-columns:244px_minmax(0,1fr)_minmax(408px,0.76fr)] [grid-template-rows:auto_minmax(0,1fr)] h-full min-h-0 bg-canvas relative overflow-hidden";
 const STUDIO_GRID_WITHOUT_CHAT_CLASS =
@@ -566,7 +566,6 @@ export function StudioPage({ projectId }: StudioPageProps) {
         <div className="fixed -top-1/2 -right-[20%] w-full h-[150%] pointer-events-none [background:radial-gradient(ellipse_at_60%_40%,rgba(124,110,93,0.05)_0%,transparent_50%),radial-gradient(ellipse_at_30%_70%,rgba(196,167,125,0.04)_0%,transparent_40%)]" />
 
         <div className="col-span-full flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-glass-heavy backdrop-blur-xl border-b border-line-soft relative z-10 animate-[inkFadeIn_0.4s_cubic-bezier(0.16,1,0.3,1)] lg:px-5">
-          <div className="absolute bottom-[-1px] left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent-primary to-transparent opacity-20" />
           <h1 className="sr-only">{selectedNode?.label ?? "创作工作台"}</h1>
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="inline-flex shrink-0 items-center rounded-pill border border-accent-primary-muted bg-accent-soft px-3 py-1 text-[0.7rem] font-semibold tracking-[0.12em] uppercase text-accent-primary">

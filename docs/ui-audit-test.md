@@ -6,6 +6,7 @@
 > 账号密码：zhanglu 12345678
 > 审计日期：2026-04-12
 > 更新日期：2026-04-22（基于源码全面审计，对齐重构后的代码）
+> 优化日期：2026-04-22（Phase 1-3 优化完成，见十六节）
 ---
 
 ## 一、设计体系概览
@@ -205,9 +206,9 @@ Button、Link、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、
 
 #### UX 审计项
 
-- [ ] 注册成功后是否自动登录并跳转
-- [ ] 邮箱字段可选，不填是否可正常提交
-- [ ] 注册页是否需要添加 Suspense 包裹（与登录页保持一致）
+- [x] 注册成功后是否自动登录并跳转
+- [x] 邮箱字段可选，不填是否可正常提交
+- [x] 注册页是否需要添加 Suspense 包裹（与登录页保持一致）— **已修复**：注册页已添加 Suspense 包裹
 
 ---
 
@@ -276,7 +277,7 @@ Button、Link、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、
 - [ ] 侧边栏在窄屏下是否正常显示或折叠
 - [ ] 搜索输入是否实时过滤，是否有防抖（已使用 useDeferredValue）
 - [ ] 项目卡片 hover 动画是否流畅
-- [ ] "删除"操作是否需要确认（当前无确认弹窗）
+- [x] "删除"操作是否需要确认（当前无确认弹窗）— **已修复**：书架页删除项目已添加 `ProjectDeleteConfirmDialog` 确认弹窗
 - [ ] StatusBadge 各状态颜色是否语义清晰
 - [ ] 项目卡片网格在窄屏下是否单列排列
 - [ ] 当前节奏提示内容是否与用户行为相关
@@ -1956,3 +1957,62 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 | EmptyState | items-center（居中） | **items-start**（左对齐） | 布局修正 |
 | DialogShell | 无 restoreFocusRef | **新增** restoreFocusRef | 焦点恢复控制 |
 | Lobby 内容区宽度 | max-w-[1560px] | **w-[min(100%-2.5rem,1560px)]** | 响应式优化 |
+
+---
+
+## 十六、2026-04-22 UI/UX 优化记录
+
+### 16.1 色彩柔和度优化（Phase 1）
+
+**目标**：降低长时间写作的视觉疲劳
+
+| Token | 旧值 | 新值 | 说明 |
+|-------|------|------|------|
+| `--bg-canvas` | `#f7f5f0` | `#f5f3ed` | 更暖的米白底色 |
+| `--bg-surface` | `#fdfcf9` | `#faf9f5` | 降低纯白感 |
+| `--bg-muted` | `#efece5` | `#eeede6` | 更柔和的中性灰 |
+| `--bg-glass` | `rgba(253,252,249,0.65)` | `rgba(250,249,245,0.72)` | 提高透明度，更柔和 |
+| `--bg-glass-heavy` | `rgba(253,252,249,0.82)` | `rgba(250,249,245,0.88)` | 提高透明度 |
+| `--text-primary` | `#3b3630` | `#3d3832` | 避免纯黑，暖灰调 |
+| `--text-secondary` | `#7d7468` | `#7e776d` | 更柔和 |
+| `--text-tertiary` | `#a99e90` | `#a8a090` | 降低饱和度 |
+| `--accent-primary` | `#7c6e5d` | `#8a7e6e` | 降低饱和度，莫兰迪方向 |
+| `--accent-primary-hover` | `#6d604f` | `#7a6f60` | 对应调整 |
+| `--accent-primary-soft` | `rgba(124,110,93,0.12)` | `rgba(138,126,110,0.10)` | 更淡更柔和 |
+| `--accent-primary-muted` | `rgba(124,110,93,0.14)` | `rgba(138,126,110,0.16)` | 对应调整 |
+| `--line-soft` | `rgba(90,75,50,0.07)` | `rgba(100,90,75,0.08)` | 更柔和的分隔线 |
+| `--line-strong` | `rgba(124,110,93,0.20)` | `rgba(130,120,105,0.18)` | 降低对比度 |
+| `--line-focus` | `rgba(124,110,93,0.28)` | `rgba(130,120,105,0.26)` | 降低对比度 |
+
+**文件**：`apps/web/src/app/globals.css`
+
+### 16.2 视觉干扰优化（Phase 2）
+
+| 问题 | 处理 | 文件 |
+|------|------|------|
+| Studio 顶栏渐变装饰线分散注意力 | **已移除** `bg-gradient-to-r from-transparent via-accent-primary to-transparent opacity-20` | `studio-page.tsx` |
+| Stale 徽章过于醒目 | **已优化**：高度 8→7px，padding 缩减，tracking 0.16em→0.08em，去掉 uppercase，font-semibold→font-medium，ring 4→2 | `studio-page.tsx` |
+
+### 16.3 交互一致性修复（Phase 3）
+
+| 问题 | 处理 | 文件 |
+|------|------|------|
+| 注册页缺少 Suspense（与登录页不一致） | **已修复**：注册页添加 Suspense + AuthLoading fallback | `auth/register/page.tsx` |
+| 书架页删除项目无确认弹窗 | **已修复**：新增 `ProjectDeleteConfirmDialog` 组件，书架页删除操作弹出确认对话框 | `lobby-project-shelf.tsx`, `recycle-bin-dialogs.tsx` |
+
+### 16.4 验证结果
+
+- [x] `npm run build` — 通过
+- [x] `npm run lint` — 通过
+- [x] TypeScript 类型检查 — 通过（build 内含）
+
+### 16.5 待办（后续阶段）
+
+| 优先级 | 事项 | 说明 |
+|--------|------|------|
+| P1 | StudioChatComposer 拆分 | 34 个 Props 超标，需拆分为 Toolbar/Input/ModelSelector |
+| P1 | 阴影体系优化 | 增加环境光感，参考 Notion/Figma |
+| P2 | 圆角体系收敛 | `rounded-5xl`→`rounded-2xl`，更克制 |
+| P2 | 页面切换动画 | 增加 `prefers-reduced-motion` 兼容的过渡 |
+| P2 | 默认收起聊天面板 | 13-14 寸屏幕中间编辑器区域不足 600px |
+| P3 | 主题切换（浅色/深色/护眼） | 长期规划 |

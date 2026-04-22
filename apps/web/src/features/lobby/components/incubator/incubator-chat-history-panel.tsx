@@ -105,7 +105,7 @@ export function ChatHistoryPanel({ model }: { model: IncubatorChatModel }) {
                         {conversation.title}
                       </span>
                       {isActive ? (
-                        <span className="inline-flex shrink-0 items-center rounded-full bg-elevated px-1.5 py-0.5 text-[9.5px] leading-4 text-accent-ink">
+                        <span className="inline-flex shrink-0 items-center rounded-full bg-elevated px-1.5 py-0.5 text-[9.5px] leading-4 text-accent-primary">
                           当前
                         </span>
                       ) : null}

@@ -13,7 +13,7 @@ import {
   formatProjectUpdatedTime,
   resolveProjectCardTone,
 } from "@/features/lobby/components/projects/lobby-project-support";
-import { RecycleBinDeleteDialog } from "@/features/lobby/components/recycle-bin/recycle-bin-dialogs";
+import { ProjectDeleteConfirmDialog, RecycleBinDeleteDialog } from "@/features/lobby/components/recycle-bin/recycle-bin-dialogs";
 import { getErrorMessage } from "@/lib/api/client";
 import type { ProjectDetail, ProjectSummary } from "@/lib/api/types";
 
@@ -88,8 +88,10 @@ function LobbyProjectCard({
   templateName: string;
 }>) {
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isSoftDeleteDialogOpen, setSoftDeleteDialogOpen] = useState(false);
   const isDeleted = Boolean(project.deleted_at);
   const isPhysicalDeleting = isPendingProjectAction(actionMutation, project.id, "physicalDelete");
+  const isSoftDeleting = isPendingProjectAction(actionMutation, project.id, "delete");
   const tone = resolveProjectCardTone(project.id);
 
   return (
@@ -191,7 +193,7 @@ function LobbyProjectCard({
               <button
                 className="ink-button-danger"
                 disabled={actionMutation.isPending}
-                onClick={() => actionMutation.mutate({ projectId: project.id, type: "delete" })}
+                onClick={() => setSoftDeleteDialogOpen(true)}
                 type="button"
               >
                 删除
@@ -206,6 +208,17 @@ function LobbyProjectCard({
           isPending={isPhysicalDeleting}
           onClose={() => setDeleteDialogOpen(false)}
           onConfirm={() => actionMutation.mutate({ projectId: project.id, type: "physicalDelete" })}
+          project={project}
+        />
+      ) : null}
+      {isSoftDeleteDialogOpen ? (
+        <ProjectDeleteConfirmDialog
+          isPending={isSoftDeleting}
+          onClose={() => setSoftDeleteDialogOpen(false)}
+          onConfirm={() => {
+            actionMutation.mutate({ projectId: project.id, type: "delete" });
+            setSoftDeleteDialogOpen(false);
+          }}
           project={project}
         />
       ) : null}

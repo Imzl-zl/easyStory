@@ -180,7 +180,7 @@ function WorkspaceNavLink({
   const isActive = isWorkspaceItemActive(item, pathname);
   if (!item.href) {
     return (
-      <span aria-disabled="true" className="relative inline-flex items-center h-8 px-2.5 text-text-tertiary text-sm font-medium whitespace-nowrap opacity-40 cursor-not-allowed" title="请先打开一个项目">
+      <span aria-disabled="true" className="relative inline-flex items-center h-8 px-2.5 text-text-tertiary text-sm font-medium whitespace-nowrap opacity-40 cursor-not-allowed" title={item.meta || "请先打开一个项目"}>
         {item.label}
       </span>
     );

@@ -22,6 +22,13 @@ type RecycleBinClearDialogProps = {
   projectCount: number;
 };
 
+type ProjectDeleteConfirmDialogProps = {
+  isPending: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  project: ProjectSummary;
+};
+
 export function RecycleBinDeleteDialog({
   isPending,
   onClose,
@@ -52,6 +59,41 @@ export function RecycleBinDeleteDialog({
         <div className="flex flex-wrap gap-3">
           <button className="ink-button-danger" disabled={isPending} onClick={onConfirm} type="button">
             {isPending ? "删除中..." : "确认彻底删除"}
+          </button>
+          <button className="ink-button-secondary" disabled={isPending} onClick={onClose} type="button">
+            先保留
+          </button>
+        </div>
+      </div>
+    </DialogShell>
+  );
+}
+
+export function ProjectDeleteConfirmDialog({
+  isPending,
+  onClose,
+  onConfirm,
+  project,
+}: Readonly<ProjectDeleteConfirmDialogProps>) {
+  return (
+    <DialogShell
+      title="确认删除项目"
+      description="删除后项目会移入回收站，可以在回收站中恢复。"
+      onClose={onClose}
+    >
+      <div className="space-y-4">
+        <div className="space-y-3 rounded-2xl border border-accent-warning/20 bg-accent-warning/8 p-4">
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge status="archived" label="移入回收站" />
+          </div>
+          <p className="text-base font-medium text-text-primary">{project.name}</p>
+          <p className="text-sm leading-6 text-text-secondary">
+            删除后项目会保留在回收站中，关联数据不会清理，随时可以恢复。
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button className="ink-button-danger" disabled={isPending} onClick={onConfirm} type="button">
+            {isPending ? "删除中..." : "确认删除"}
           </button>
           <button className="ink-button-secondary" disabled={isPending} onClick={onClose} type="button">
             先保留
