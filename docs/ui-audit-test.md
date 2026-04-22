@@ -1,11 +1,11 @@
 # easyStory 前端 UI 审计测试文档
 
-> 审计范围：`apps/web` 全部 14 个页面路由、151 个组件、4 个 Zustand Store
+> 审计范围：`apps/web` 全部 14 个页面路由、143 个组件、4 个 Zustand Store
 > 技术栈：Next.js 16 (App Router) + React 19 + Arco Design + Tailwind CSS 4
 > 设计语言：Ink（自建，基于 CSS 变量体系）
 > 账号密码：zhanglu 12345678
 > 审计日期：2026-04-12
-> 更新日期：2026-04-12（补充遗漏组件、状态管理层、测试覆盖）
+> 更新日期：2026-04-22（基于源码全面审计，对齐重构后的代码）
 ---
 
 ## 一、设计体系概览
@@ -14,16 +14,22 @@
 
 | 分组 | 变量前缀 | 层级数 | 示例 |
 |------|----------|--------|------|
-| 背景 | `--bg-*` | 5 级 | canvas / surface / muted / elevated / glass |
+| 背景 | `--bg-*` | 9 级 | canvas / surface / surface-hover / surface-active / muted / elevated / glass / glass-heavy / code |
 | 边框 | `--line-*` | 4 级 | soft / strong / focus / glass |
-| 文字 | `--text-*` | 5 级 | primary / secondary / tertiary / placeholder / on-accent |
-| 强调 | `--accent-*` | 12 个 | primary / secondary / tertiary / success / warning / danger / purple / pink / ink |
-| 阴影 | `--shadow-*` | 7 级 | xs / sm / md / lg / xl / glass / float |
+| 文字 | `--text-*` | 6 级 | primary / secondary / tertiary / placeholder / on-accent / code |
+| 强调 | `--accent-*` | 20 个 | primary / primary-hover / primary-soft / primary-muted / primary-dark / secondary / tertiary / success / success-soft / warning / warning-soft / danger / danger-soft / danger-active / purple / pink / ink / info / info-soft / info-muted |
+| 阴影 | `--shadow-*` | 9 级 | xs / sm / md / lg / hero / glass / glass-heavy / float / panel-side |
 | 圆角 | `--radius-*` | 10 级 | xs ~ 5xl + pill |
 | 模糊 | `--blur-*` | 4 级 | sm / md / lg / xl |
 | 字体 | `--font-*` | 3 族 | serif / sans / mono |
 | 过渡 | `--transition-*` | 5 种 | fast / normal / slow / spring / smooth |
-| 层级 | `--z-*` | 7 级 | base / dropdown / sticky / overlay / modal / popover / toast |
+| 层级 | `--z-*` | 7 级 | base / surface / elevated / sticky / overlay / modal / toast |
+| 下拉 | `--dropdown-*` | 3 个 | bg / border / shadow |
+| 遮罩 | `--overlay-bg` | 1 个 | overlay-bg |
+| Callout | `--callout-*` | 8 个 | info-bg / info-border / warning-bg / warning-border / success-bg / success-border / danger-bg / danger-border |
+| Toolbar | `--toolbar-*` | 6 个 | bg / bg-hover / bg-active / border / text / text-active |
+| Chat | `--chat-*` | 4 个 | user-bubble-bg / assistant-bubble-bg / skill-panel-bg / skill-option-active-bg |
+| 渐变 | `--*gradient*` | 7 个 | auth-bg-gradient / workspace-shell-accent-gradient / bg-surface-warm-gradient / bg-panel-warm-gradient / bg-engine-page-gradient / bg-getting-started-gradient / bg-config-file-gradient |
 
 ### 1.2 CSS 组件类
 
@@ -33,30 +39,39 @@
 | `panel-muted` | 容器 | 灰底面板 |
 | `panel-glass` | 容器 | 毛玻璃面板，backdrop-blur |
 | `hero-card` | 容器 | 英雄卡片，大圆角 + 毛玻璃 + hero 阴影 |
-| `ink-button` | 按钮 | 主按钮，绿底白字，pill 圆角，光泽渐变 |
-| `ink-button-secondary` | 按钮 | 次按钮，透明底 + 边框 + 毛玻璃 |
-| `ink-button-danger` | 按钮 | 危险按钮，红边框透明底，hover 变红底白字 |
+| `section-card` / `__header` / `__copy` / `__body` | 容器 | 分节卡片（含 3 个 BEM 子元素类） |
+| `ink-button` | 按钮 | 主按钮，暖棕底白字，pill 圆角，光泽渐变 |
+| `ink-button-secondary` | 按钮 | 次按钮，白底 + 边框 + 毛玻璃 |
+| `ink-button-danger` | 按钮 | 危险按钮，红边框透明底，hover 红底白字 |
 | `ink-button-hero` | 按钮 | 英雄按钮，渐变底 + 更大尺寸 + hover 上浮 |
 | `ink-tab` | 按钮/标签 | 标签按钮，`data-active="true"` 激活态 |
 | `ink-icon-button` | 按钮 | 图标按钮，32×32 方形 |
 | `ink-pill` | 按钮/标签 | 药丸标签，`data-active="true"` 激活态 |
 | `ink-link-button` | 按钮 | 链接风格按钮 |
+| `ink-toolbar-icon` | 按钮 | 工具栏图标按钮，30×30 |
+| `ink-toolbar-chip` | 按钮/标签 | 工具栏 Chip，`data-active="true"` 激活态，`data-compact="true"` 紧凑变体 |
+| `ink-toolbar-toggle` | 按钮/标签 | 工具栏 Toggle，`aria-pressed="true"` 激活态，`data-compact="true"` 紧凑变体 |
 | `ink-input` | 输入框 | 标准输入框 |
 | `ink-input-roomy` | 输入框 | 宽松输入框，更大高度 + 毛玻璃背景 |
 | `ink-textarea` | 输入框 | 文本域 |
 | `badge` | 徽章 | 通用徽章，`badge--warning/success/danger` 变体 |
+| `callout-info` | 横幅 | 信息横幅 |
+| `callout-warning` | 横幅 | 警告横幅 |
+| `callout-success` | 横幅 | 成功横幅 |
+| `callout-danger` | 横幅 | 危险横幅 |
 | `divider` | 分隔 | 水平分割线，`divider--vertical` 竖直变体 |
 | `mono-block` | 展示 | 等宽代码块，深色背景 |
 | `label-text` | 文字 | 表单标签文字 |
 | `label-overline` | 文字 | 大写小号标签 |
 | `fade-in` | 动画 | 淡入动画 |
 | `slide-up` | 动画 | 上滑动画 |
+| `scrollbar-hide` | 工具 | 隐藏滚动条 |
 
 ### 1.3 Arco Design 覆写范围
 
 通过 `globals.css` 覆写了以下 Arco 组件样式，统一到 Ink 设计语言：
 
-Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notification、Modal、Tabs、Switch、Slider、Tooltip、Popover、Drawer、Table、Card、Message、Picker、Spin、Pagination、Breadcrumb、Divider、Collapse、Steps、Badge、Avatar、Progress
+Button、Link、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notification、Modal、Tabs、Switch、Slider、Tooltip、Popover、Drawer、Table、Card、Message、Picker、Spin、Pagination、Breadcrumb、Divider、Collapse、Steps、Badge、Avatar、Progress
 
 ---
 
@@ -105,7 +120,7 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 | 模式 | Header 样式 | 内容区布局 | 适用页面 |
 |------|-------------|-----------|----------|
 | auth | 无导航栏 | 全屏居中 | 登录、注册 |
-| lobby | 品牌标识 + 4 项导航 + 用户操作 | 居中滚动，`max-w-[1560px]` | 书架、孵化器、模板库等 |
+| lobby | 品牌标识 + 4 项导航 + 用户操作 | 居中滚动，`w-[min(100%-2.5rem,1560px)] mx-auto` | 书架、孵化器、模板库等 |
 | studio | 返回书架 + 项目标题 + 3 项导航 + 设置 | 全高固定 `h-[100dvh]`，无滚动 | 创作工作台 |
 | project | 返回书架 + 项目标题 + 3 项导航 + 设置 | 居中滚动 | 推进、洞察、项目设置 |
 
@@ -119,7 +134,7 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 | 外壳 | `<WorkspaceShell>` 包裹 `children` |
 | 渲染模式 | Server Component（无 `"use client"`） |
 
-`WorkspaceShell` 提供统一的 Header（品牌标识/返回书架 + 导航 + 用户操作）和页面结构框架。
+`WorkspaceShell` 提供统一的 Header（品牌标识/返回书架 + 导航 + 用户操作）和页面结构框架。包含跳到主内容链接（`href="#workspace-main"`）无障碍特性。壳层 div 有 `data-page-mode` 属性标记当前模式。
 
 ---
 
@@ -131,27 +146,39 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 
 | 区域 | 样式 |
 |------|------|
-| 整体 | `min-h-screen flex items-center justify-center`，多层径向渐变背景（米白→暖灰） |
-| 双栏 Grid | `grid [grid-template-columns:1fr] lg:[grid-template-columns:minmax(0,1.15fr)_minmax(360px,460px)]` |
-| 左栏 Hero | `hero-card`，仅大屏可见 `max-lg:hidden`，`p-9 flex flex-col gap-7` |
+| 整体 | `min-h-screen flex items-center justify-center p-6 lg:p-8`，`[background:var(--auth-bg-gradient)]` |
+| 双栏 Grid | `grid gap-6 w-full max-w-[1240px] mx-auto [grid-template-columns:1fr] lg:[grid-template-columns:minmax(0,1.15fr)_minmax(360px,460px)] lg:items-center` |
+| 左栏 Hero | `hero-card`，仅大屏可见 `max-lg:hidden`，含品牌区（ES logo + 标语）、创作步骤列表（`CREATION_STEPS`）、产品要点列表（`PRODUCT_PILLARS`）、装饰性圆形 `bg-accent-soft` |
 | 右栏表单 | `hero-card`，`max-w-[460px] p-8` |
 
 #### 交互元素
 
 | 元素 | 样式 | 验证点 |
 |------|------|--------|
-| 用户名输入 | `ink-input`，必填，minLength=3，maxLength=100 | 空值/过短/过长提示 |
-| 邮箱输入 | `ink-input`，仅注册模式，可选 | — |
-| 密码输入 | `ink-input`，type=password，必填，minLength=8，maxLength=200 | 空值/过短提示 |
+| 用户名输入 | `ink-input ink-input-roomy`，必填，minLength=3，maxLength=100 | 空值/过短/过长提示 |
+| 邮箱输入 | `ink-input ink-input-roomy`，仅注册模式，可选 | — |
+| 密码输入 | `ink-input ink-input-roomy`，type=password，必填，minLength=8，maxLength=200 | 空值/过短提示 |
 | 提交按钮 | `ink-button-hero w-full`，文案"进入书架" | pending 态"处理中..."，disabled |
 | 模式切换 | 底部 Link，"还没有账号？创建账号" | 点击跳转 `/auth/register` |
+
+#### 内部组件
+
+| 组件 | 功能 |
+|------|------|
+| `AuthHero` | 左栏品牌展示区，含 CREATION_STEPS 和 PRODUCT_PILLARS 列表 |
+| `AuthPanel` | 右栏表单区 |
+| `Field` | 统一输入框组件，`ink-input ink-input-roomy` 样式 |
+| `ErrorNotice` | 错误提示组件，`bg-accent-danger/10 text-accent-danger` |
+| `AuthLoading` | Suspense fallback，`panel-shell` 样式 |
+| `buildAuthCopy` | 根据 mode 返回文案对象，统一管理登录/注册文案 |
 
 #### 状态
 
 | 状态 | 表现 |
 |------|------|
-| 错误 | ErrorNotice，红色背景条 `bg-[rgba(196,90,90,0.1)]`，红色文字 + 圆形感叹号图标 |
+| 错误 | ErrorNotice，`bg-accent-danger/10 text-accent-danger` |
 | 加载 | 按钮 disabled + 文案"处理中..." |
+| Suspense | `<Suspense fallback={<AuthLoading />}>` 包裹 AuthForm |
 
 #### UX 审计项
 
@@ -171,15 +198,16 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 | 差异 | 登录模式 | 注册模式 |
 |------|----------|----------|
 | 邮箱字段 | 隐藏 | 显示，可选 |
-| 提交按钮文案 | "进入书架" | "创建并进入书架" |
+| 提交按钮文案 | "进入书架" | "创建并进入" |
 | 底部链接 | "还没有账号？创建账号" | "已经有账号？返回登录" |
 | autoComplete | username / current-password | username / new-password |
+| Suspense 包裹 | 有 `<Suspense>` | **无** `<Suspense>`（与登录页不一致） |
 
 #### UX 审计项
 
 - [ ] 注册成功后是否自动登录并跳转
 - [ ] 邮箱字段可选，不填是否可正常提交
-- [ ] 密码长度不足时是否有即时反馈
+- [ ] 注册页是否需要添加 Suspense 包裹（与登录页保持一致）
 
 ---
 
@@ -189,44 +217,37 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 
 | 区域 | 样式 |
 |------|------|
-| 整体 | 双栏 Grid `grid [grid-template-columns:272px_minmax(0,1fr)] gap-7` |
-| 侧边栏 | `panel-glass sticky top-[5.5rem]`，`p-5` |
-| 主内容 | `grid gap-6` |
+| 整体 | 双栏 Grid `-mt-4 grid min-h-[calc(100vh-72px)] [grid-template-columns:1fr] lg:[grid-template-columns:240px_minmax(0,1fr)] gap-5 lg:gap-7 items-start` |
+| 侧边栏 | `lg:sticky top-[5.5rem] flex flex-col gap-1 p-3 lg:p-4 max-lg:order-2 rounded-2xl border border-line-soft/60 bg-[var(--bg-glass-heavy)] backdrop-blur-sm` |
+| 主内容 | `grid gap-5 min-w-0 max-lg:order-1` |
 
 #### 侧边栏
 
 | 元素 | 样式 | 验证点 |
 |------|------|--------|
-| 导航链接 ×4 | `rounded-2xl p-3.5 pl-4`，active 有左侧竖条 + 背景色 | "我的作品"/"我的助手"/"模板库"/"回收站" |
-| "打开我的助手" | `ink-button-secondary` | 链接到 settings |
-| "新建作品" | `ink-button` | 链接到 `/workspace/lobby/new` |
-| 节奏提示卡 | `rounded-2xl border bg-muted backdrop-blur-sm p-4 pb-5` | 显示最近常用模板 |
+| 导航链接 ×4 | `p-2.5 pl-3`，active 有左侧 `before:` 伪元素竖条 + `bg-accent-soft` | "我的作品"/"我的助手"/"模板库"/"回收站" |
+| 导航区 | `flex flex-row lg:flex-col gap-1 overflow-x-auto scrollbar-hide` | 移动端水平滚动 |
+| "打开我的助手" | `rounded-2xl border border-dashed border-border`，位于侧栏底部 `max-lg:hidden` | 链接到 settings |
+| "新建作品" | `ink-button whitespace-nowrap max-lg:w-full max-lg:text-center` | 链接到 `/workspace/lobby/new` |
+| 当前节奏 | 侧栏底部一行小字，有模板时显示 `当前节奏：模板名` | — |
 
 #### 主内容区
 
 | 元素 | 样式 | 验证点 |
 |------|------|--------|
-| 页面标题 + 操作按钮 | Grid `minmax(0,1fr) auto` | — |
-| 搜索框 | `ink-input-roomy`，placeholder "搜索作品名、题材或模板…" | 实时过滤 |
-| MetricCard ×3 | 数值指标卡片 | "当前作品"/"筛选结果"/"模板库" |
-| 项目卡片网格 | `grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(320px,1fr))]` | 响应式列数 |
+| 搜索行 | `flex flex-wrap gap-3 items-center max-lg:flex-col max-lg:stretch` | 搜索框前置为第一个元素 |
+| 搜索框 | `ink-input-roomy min-h-12 flex-1 max-lg:w-full text-[0.95rem]` | 实时过滤，使用 `useDeferredValue` |
+| 统计文字 | `text-text-tertiary text-[0.84rem]` | 替代了原 MetricCard |
+| "新建作品"按钮 | `ink-button whitespace-nowrap max-lg:w-full max-lg:text-center` | 与搜索框同行 |
+| 项目卡片网格 | `LobbyProjectShelf` 组件 | 响应式列数 |
 
-#### LobbyEntryCard — 新建项目入口卡片
-
-| 属性 | 值 |
-|------|-----|
-| 容器 | `panel-muted space-y-4 p-5` |
-| 标题 | serif "新建项目" + 说明"通过 AI 聊天或模板创建项目。" |
-| 信息列表 | `dl > dt/dd` grid："可用模板"（数量）+"开始方式"（AI 聊天/模板创建） |
-| 模板预览 | `rounded-2xl bg-muted`，"最近常用模板：XXX / YYY" |
-| 操作按钮 | "AI 聊天"(`ink-button flex-1`) + "模板库"(`ink-button-secondary flex-1`)，等宽并排 |
-
-#### 项目卡片 LobbyProjectCard
+#### LobbyProjectCard
 
 | 区域 | 样式 |
 |------|------|
-| 整体 | `rounded-5xl` 大圆角卡片 |
-| 顶部色带 | 项目首字大号 + 题材标签 + 设置齿轮图标 |
+| 整体 | `rounded-5xl` 大圆角卡片，含首字母头像 + accent 渐变条 |
+| 色调 | `PROJECT_CARD_TONES` 5 色调数组，按 projectId 哈希分配 |
+| 顶部 | 项目首字大号 + 题材标签 + 设置齿轮图标 |
 | 中部内容 | StatusBadge + 字数标签 + 项目名 + 描述 + 元信息 |
 | 底部操作栏 | 更新时间 + "继续创作"(`ink-button`) + "删除"(`ink-button-danger`) |
 
@@ -236,17 +257,29 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 |------|------|
 | 空状态 | `rounded-5xl bg-muted`，文件夹图标 + "还没有作品" |
 | 加载 | `py-10 px-4 text-center`，"正在加载项目列表…" |
-| 错误 | `px-4.5 py-4 rounded-2xl bg-[rgba(196,90,90,0.08)]` |
+| 错误 | `callout-danger` |
+
+#### 与旧文档差异
+
+| 项目 | 旧文档 | 当前代码 |
+|------|--------|---------|
+| `LobbyEntryCard` | 存在 | **已删除**，替换为更丰富的 `LobbyProjectCard` |
+| MetricCard 统计区 | 3 个 MetricCard | **已替换**为一行统计文字 |
+| 品牌标题区 | "继续创作" + 大标题 | **已删除**，搜索框前置 |
+| 侧栏宽度 | 272px | **缩减**为 240px |
+| "打开我的助手"位置 | 侧栏中部 | **移入**侧栏底部 |
+| 搜索框位置 | 主内容区中部 | **前置**为第一个元素 |
+| `RecycleBinDeleteDialog` | 未提及在书架页使用 | 已在 `LobbyProjectCard` 中集成 |
 
 #### UX 审计项
 
 - [ ] 侧边栏在窄屏下是否正常显示或折叠
-- [ ] 搜索输入是否实时过滤，是否有防抖
-- [ ] 项目卡片 hover 动画（上移 + 阴影增强）是否流畅
+- [ ] 搜索输入是否实时过滤，是否有防抖（已使用 useDeferredValue）
+- [ ] 项目卡片 hover 动画是否流畅
 - [ ] "删除"操作是否需要确认（当前无确认弹窗）
 - [ ] StatusBadge 各状态颜色是否语义清晰
 - [ ] 项目卡片网格在窄屏下是否单列排列
-- [ ] 节奏提示卡内容是否与用户行为相关
+- [ ] 当前节奏提示内容是否与用户行为相关
 
 ---
 
@@ -256,26 +289,27 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 
 | 区域 | 样式 |
 |------|------|
-| 整体 | `flex h-full min-h-0 flex-col gap-2.5 overflow-y-auto` |
+| 整体 | `flex h-full min-h-0 flex-col gap-2.5 overflow-y-auto lg:overflow-hidden` |
 | Hero | `hero-card`，`px-4 py-3 md:px-5 md:py-3.5 gap-3` |
-| StageShell | `hero-card`，包裹 chat/template 两个 tabpanel |
+| StageShell | `hero-card flex min-h-0 flex-1 overflow-hidden`，内层 `bg-glass backdrop-blur-sm p-2.5 md:p-3.5` |
 
 #### 模式切换 ModeSwitch
 
 | 元素 | 样式 |
 |------|------|
-| 容器 | `role="tablist"`，`rounded-2xl border bg-muted p-1` |
+| 容器 | `role="tablist"`，`rounded-2xl px-3 py-2 text-[12px]` |
 | Tab 按钮 | "AI 聊天" / "模板创建"，active 态 `bg-surface shadow-sm` |
 | 面板 | `role="tabpanel"` |
+| 当前模式标签 | `rounded-pill px-2.5 py-1`，动态切换 accent-soft / muted 样式 |
 
 #### Chat 模式
 
 | 元素 | 样式 |
 |------|------|
 | 双栏 Grid | `grid lg:grid-cols-[minmax(312px,352px)_minmax(0,1fr)]` |
-| 聊天输入 | ArcoDesign `Input.TextArea`，`autoSize minRows=2 maxRows=6` |
-| 发送按钮 | ArcoDesign `Button` round primary |
-| Prompt 建议 | 示例提示词按钮组 |
+| 聊天输入 | ArcoDesign `Input.TextArea`，`autoSize minRows=2 maxRows=5` |
+| 发送按钮 | `ink-button` |
+| 草稿面板 | `IncubatorChatDraftPanel`，右侧 |
 | 高级设置面板 | 浮动面板，`preferredWidth: 576`，`maxHeight: 640` |
 | 历史面板 | 浮动面板，`preferredWidth: 384`，`maxHeight: 320` |
 
@@ -285,7 +319,7 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 |------|------|
 | 双栏 Grid | `grid xl:grid-cols-[0.84fr_1.16fr]` |
 | 控制卡 + 问题卡 | 左栏 |
-| 预览面板 | 右栏 |
+| 预览面板 | 右栏 `IncubatorPreview` |
 
 #### 状态
 
@@ -294,6 +328,18 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 | 空状态 | EmptyState，"当前没有模板"，带"使用 AI 聊天"按钮 |
 | 加载 | "正在准备" pill / "正在加载模板列表…" |
 | 错误 | RequestStateCard，带重试按钮；FeedbackBanner danger/info |
+| 反馈横幅 | `FeedbackBanner`，`rounded-2xl px-4 py-2.5`，支持 info/danger 两种 tone |
+
+#### 与旧文档差异
+
+| 项目 | 旧文档 | 当前代码 |
+|------|--------|---------|
+| 子组件名 | `IncubatorChatPanel` | **已重命名**为 `ChatModePanel` |
+| `ModeSwitch` | 未提及 | **新增**模式切换组件 |
+| `FeedbackBanner` | 未提及 | **新增**全局反馈横幅 |
+| `StageShell` | 未提及 | **新增**内容区壳层 |
+| 模板模式懒加载 | 未提及 | `hasVisitedTemplateMode` 控制首次切换才渲染 |
+| `IncubatorChatDraftPanel` | 未提及 | **新增**聊天模式右侧草稿面板 |
 
 #### UX 审计项
 
@@ -381,16 +427,15 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 | AppSelect | 排序下拉 |
 | 标签过滤 Tab | `ink-tab`，动态标签列表，toggle 行为 |
 | 状态过滤 Tab | `ink-tab`，"全部"/"已启用"/"已停用" |
-| 配置项卡片 | `rounded-3xl border bg-muted p-4`，active 态 `border-accent-primary/25 bg-accent-soft` |
+| 配置项卡片 | `rounded-3xl bg-muted shadow-sm p-4`，active 态 `border-accent-primary-muted bg-accent-soft ring-1` |
 
 #### 横幅
 
 | 类型 | 样式 |
 |------|------|
-| info | 蓝色背景 `bg-[rgba(58,124,165,0.1)]` |
-| danger | 红色背景 `bg-accent-danger/10` |
-| muted | 灰色背景 `panel-muted` |
-| loading | muted tone，"正在加载内容…" |
+| info | `callout-info` |
+| danger | `bg-accent-danger/10` |
+| muted | `panel-muted` |
 
 #### UX 审计项
 
@@ -412,8 +457,8 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 
 | 区域 | 样式 |
 |------|------|
-| 整体 | SectionCard 包裹，`space-y-6` |
-| 摘要卡 | `rounded-3xl border bg-glass-heavy p-5 lg:grid-cols-[1fr_auto]` |
+| 整体 | SectionCard 包裹，`space-y-5` |
+| 摘要卡 | `RecycleBinSummaryCard`，显示已删除项目数和保留说明 |
 | 项目列表 | 复用 LobbyProjectShelf（deletedOnly 模式） |
 
 #### 交互元素
@@ -451,7 +496,7 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 | 区域 | 样式 |
 |------|------|
 | 整体 | 双栏 Grid `grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]` |
-| 侧边栏 | SectionCard 包裹，sticky `top-6` |
+| 侧边栏 | SectionCard 包裹，`xl:sticky xl:top-6 xl:self-start`，`bg-glass shadow-glass backdrop-blur-lg` |
 | 内容区 | 根据 tab 条件渲染 |
 
 #### 侧边栏导航
@@ -461,17 +506,21 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 | 主路径 | AI 助手 / Skills / 模型连接 | 核心配置 |
 | 高级能力 | Agents / Hooks / MCP | 高级配置 |
 
-导航按钮样式：`rounded-2xl border px-4 py-4`，active 态 `border-accent-primary-muted bg-accent-soft shadow-sm`
+导航按钮样式：`rounded-2xl px-4 py-3.5 text-left transition-all duration-fast`，active 态 `bg-accent-soft shadow-sm`，inactive 态 `bg-surface shadow-xs hover:bg-surface-hover`
+
+状态标签：`rounded-pill`，active 显示"当前"，inactive 显示"进入"
+
+底部：`GuardedLink` "返回项目大厅" + 作用域提示面板 `panel-muted`（"这里只管理你自己的默认设置"）
 
 #### 子面板
 
 | 面板 | 功能 |
 |------|------|
-| LobbyAssistantSettingsPanel | AI 助手偏好和规则 |
+| LobbyAssistantSettingsPanel | AI 助手偏好和规则，含 Hero 区 + 双栏布局（主编辑区 + 辅助说明） |
 | AssistantSkillsPanel | Skills 管理 |
 | CredentialCenter | 模型凭证管理（含 ScopeTabs: 全局/当前项目；ModeTabs: 列表/审计日志） |
 | AssistantAgentsPanel | Agents 管理 |
-| AssistantHooksPanel | Hooks 管理（含 RawEditor YAML 编辑器） |
+| AssistantHooksPanel | Hooks 管理（含 GuidedEditor/RawEditor/ModeEditors 三种模式） |
 | AssistantMcpPanel | MCP 管理 |
 
 #### Assistant 子面板详细组件
@@ -552,21 +601,23 @@ Button、Input、Textarea、Select、Dropdown、Tag、Checkbox、Radio、Notific
 
 | 区域 | 样式 |
 |------|------|
-| 整体 | CSS Grid，全高 `h-[100dvh]`，无页面滚动 |
-| 无聊天 | `grid-template-columns: 236px(lg)/244px(xl) minmax(0,1fr)` |
-| 有聊天 | `grid-template-columns: 236px(lg)/244px(xl) minmax(0,1fr) minmax(392px,0.72fr)(lg)/minmax(408px,0.76fr)(xl)` |
-| 顶栏 | `bg-glass-heavy backdrop-blur-xl`，底部渐变分隔线 |
-| 左侧边栏 | 文稿目录树，`bg-glass-heavy backdrop-blur-md`，右侧渐变装饰线 |
-| 中间主内容 | 文稿编辑器，`bg-surface` |
-| 右侧边栏 | AI 聊天面板（条件渲染），`bg-glass-heavy backdrop-blur-md`，左侧渐变装饰线 |
+| 整体 | CSS Grid，全高 `h-full min-h-0`，无页面滚动 |
+| 无聊天 | `grid [grid-template-columns:1fr] lg:[grid-template-columns:236px_minmax(0,1fr)] [grid-template-rows:auto_minmax(0,1fr)]` |
+| 有聊天 | `grid [grid-template-columns:1fr] lg:[grid-template-columns:236px_minmax(0,1fr)_minmax(392px,0.72fr)] xl:[grid-template-columns:244px_minmax(0,1fr)_minmax(408px,0.76fr)] [grid-template-rows:auto_minmax(0,1fr)]` |
+| 顶栏 | `bg-glass-heavy backdrop-blur-xl border-b border-line-soft`，底部渐变分隔线 `bg-gradient-to-r from-transparent via-accent-primary to-transparent opacity-20` |
+| 左侧边栏 | 文稿目录树，`bg-glass-heavy backdrop-blur-md shadow-panel-side`，入场动画 `slideFromLeft` |
+| 中间主内容 | 文稿编辑器，`bg-surface shadow-lg`，入场动画 `inkFadeIn` |
+| 右侧边栏 | AI 聊天面板（条件渲染），`bg-glass-heavy backdrop-blur-md border-l border-line-soft shadow-panel-side`，入场动画 `slideFromRight` |
+| 背景装饰 | `fixed -top-1/2 -right-[20%]` 径向渐变 |
 
 #### 交互元素
 
 | 元素 | 样式 | 说明 |
 |------|------|------|
-| 保存按钮 | `ink-button` / `ink-button-secondary` | 动态文案（保存XX/XX已保存/保存中/载入中） |
-| 收起/展开助手 | 切换按钮 | 控制聊天面板显隐 |
-| "作品推进" | `ink-button-secondary` | 导航到 Engine，带未保存变更守卫 |
+| 保存按钮 | `ink-button h-9 px-4 text-[13px] shadow-md`（有未保存）/ `ink-button-secondary`（已保存） | 动态文案（保存XX/XX已保存/保存中/载入中） |
+| 收起/展开助手 | `ink-button-secondary h-9 px-4 text-[13px]` | 控制聊天面板显隐 |
+| "作品推进" | `ink-button-secondary h-9 px-4 text-[13px]` | 导航到 Engine，带未保存变更守卫 |
+| Stale 徽章 | `rounded-pill border border-accent-primary-muted bg-accent-soft text-[0.72rem] font-semibold tracking-[0.16em] uppercase text-accent-primary` | 显示待更新章节数 |
 | 聊天面板宽度调整 | `role="separator"` | Pointer 拖拽 + 键盘方向键 |
 | 目录树节点 | 点击选中/展开 | — |
 | 右键菜单 | Arco Dropdown | 新建/重命名/删除 |
@@ -593,11 +644,9 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 
 | 编辑器 | 文稿类型 | 说明 |
 |--------|----------|------|
-| ChapterEditor | 章节 | 章节正文编辑 |
-| MarkdownDocumentEditor | Markdown 文档 | Markdown 编辑 |
-| JsonDocumentEditor | JSON 文档 | JSON 结构化编辑 |
-| StoryAssetEditor | 故事资产 | 角色/势力/地点等资产编辑 |
-| StudioDocumentEditor | 总入口 | 根据文稿类型分发到上述编辑器 |
+| MarkdownDocumentEditor | Markdown 文档 | 支持编辑/分栏/预览三种视图，噪点纹理背景，渐变 header/footer，Ctrl/Cmd+S 保存 |
+| JsonDocumentEditor | JSON 文档 | 支持编辑/分栏/预览，图预览模式读取同目录下人物/势力/关系 JSON 组合关系图 |
+| StudioDocumentEditor | 总入口 | 根据 `isJsonStudioDocument` 分发到上述编辑器 |
 
 #### ChapterImpactPanel — 章节影响面板
 
@@ -622,14 +671,14 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 
 | 属性 | 值 |
 |------|-----|
-| Props | 28 个属性，涵盖文本、附件、凭证、模型选择、上下文等 |
-| 布局模式 | `"default"` / `"icon"` / 其他，compact 布局在非 default 模式下激活 |
-| 模型选择器 | 浮动面板，`useFloatingPanelStyle`，align right，maxHeight 480，width 352，side top |
-| 上下文选择器 | 浮动面板，align left，maxHeight 320，width 352，side top |
+| Props | 26 个属性，涵盖文本、附件、凭证、模型选择、上下文等 |
+| 布局模式 | `"default"` / `"compact"` / `"icon"`，compact 布局在非 default 模式下激活 |
+| 模型选择器 | 浮动面板，含渠道下拉 + 模型名输入 + 推理控制区 + 回复显示方式 Radio.Group |
+| 上下文选择器 | 浮动面板，align left，maxHeight 320，width 352 |
 | 文件上传 | 隐藏 `<input type="file">`，通过 ref 触发，附件显示为可移除 chip |
 | 发送触发 | Enter（非 Shift、非 IME composing）发送 |
 | 点击外部关闭 | 监听外部点击关闭浮动面板（忽略 `.arco-trigger-popup`） |
-| Reasoning 控制 | 三种模式：`gemini_budget` / `openai`（reasoningEffort）/ `none` |
+| Reasoning 控制 | 三种模式：`gemini_budget` / `openai`（reasoningEffort）/ `anthropic` / `none` |
 | 发送按钮 | `!canChat \|\| isResponding` 时 disabled |
 | ARIA | `aria-expanded`（Provider 按钮）、`aria-label`（工具栏按钮）、`aria-pressed`（toggle）、`aria-label="回复显示方式"`（Radio.Group） |
 
@@ -638,9 +687,9 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 | 子组件 | 功能 |
 |--------|------|
 | ReasoningChipButton | Thinking budget 选项 toggle chip |
-| ToolbarIconButton | 30×30px 图标按钮 |
-| ToolbarChipButton | Chip 样式 toggle，可选 badge 计数 |
-| ToolbarToggleButton | Toggle 按钮，`aria-pressed` 状态 |
+| ToolbarIconButton | `ink-toolbar-icon`，30×30px 图标按钮 |
+| ToolbarChipButton | `ink-toolbar-chip`，Chip 样式 toggle，可选 badge 计数 |
+| ToolbarToggleButton | `ink-toolbar-toggle`，Toggle 按钮，`aria-pressed` 状态 |
 | ComposerIcon / SVG 图标组 | JumpLinkIcon、PaperclipIcon、ContextIcon、SparkIcon、WriteIcon，均 `aria-hidden` |
 
 #### JsonRelationGraph — 关系图谱可视化
@@ -719,10 +768,10 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 
 | 区域 | 样式 |
 |------|------|
-| 整体 | 单页滚动，多层径向渐变 + 线性渐变背景 |
-| Hero 区域 | `hero-card`，`p-9`，`gap-6` |
-| Banner | 条件渲染，`px-4 py-3 rounded-2xl` |
-| 双栏 Grid | `grid-template-columns: minmax(0,1.15fr) minmax(360px,460px)`，`gap-6 max-w-[1240px]` |
+| 整体 | 单页滚动，`[background:var(--bg-engine-page-gradient)]` |
+| Hero 区域 | `hero-card p-9`，装饰性绝对定位圆形 `bg-accent-soft` |
+| Banner | 条件渲染，`flex flex-col gap-2 mt-4` |
+| 双栏 Grid | `grid gap-6 max-w-[1240px] min-h-[calc(100vh-64px)] mx-auto mt-6 [grid-template-columns:minmax(0,1.15fr)_minmax(360px,460px)]` |
 
 #### Hero 区域交互
 
@@ -738,11 +787,11 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 
 | 属性 | 值 |
 |------|-----|
-| 背景 | 三层径向渐变叠加线性渐变（琥珀色左上角 + 青色右侧 + 灰白渐变） |
+| 背景 | CSS 变量 `--bg-engine-page-gradient` |
 | Hero 区域 | `hero-card p-9`，标题区含装饰性圆形 `bg-accent-soft` |
 | 左列 | 有 workflow：StatusCallout + SummaryCard + DebugPanel；无 workflow：PreparationStatusPanel + EmptyState |
 | 右列 | `hero-card` 容器，标题"按视角查看这一轮推进" + 详情面板 |
-| 危险操作按钮 | 红色边框 + 浅红背景 |
+| 危险操作按钮 | `border border-accent-danger/25 rounded-4 bg-accent-danger/5 text-accent-danger` |
 | 禁用原因提示 | `text-text-tertiary text-xs` 文案 |
 
 #### EngineTaskFormPanels — 任务表单面板
@@ -916,13 +965,23 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 
 | 属性 | 值 |
 |------|-----|
-| 定位 | `fixed inset-0 z-50` |
-| 面板 | `max-w-6xl`，`max-h-[88vh]` |
+| 定位 | `fixed inset-0 z-50 flex items-end justify-center bg-[var(--overlay-bg)] backdrop-blur-[2px] p-4 md:items-center animate-overlay-in` |
+| 面板 | `bg-glass-heavy rounded-2xl shadow-float backdrop-blur-xl max-h-[88vh] w-full max-w-6xl overflow-hidden animate-modal-in` |
 | 移动端 | 面板底部对齐 |
 | 桌面端 | 面板居中 |
 | 关闭方式 | 遮罩点击 / 关闭按钮 / Escape |
-| 焦点管理 | 焦点陷阱 + 关闭后恢复焦点 |
-| 滚动锁定 | 打开时锁定 body 滚动 |
+| 焦点管理 | 自实现焦点陷阱（Tab 循环）+ 关闭后恢复焦点到 `restoreFocusRef` 或之前聚焦元素 |
+| 滚动锁定 | 打开时锁定 body 滚动（`overflow: hidden`） |
+
+**Props：**
+
+| 属性 | 类型 | 必需 |
+|------|------|------|
+| children | `React.ReactNode` | 是 |
+| description | `string` | 否 |
+| onClose | `() => void` | 是 |
+| restoreFocusRef | `RefObject<HTMLElement \| null>` | 否 |
+| title | `string` | 是 |
 
 #### 审计项
 
@@ -939,8 +998,20 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 | 属性 | 值 |
 |------|-----|
 | 标题 | "未保存更改" |
+| 描述 | "离开当前编辑上下文后，未保存内容会丢失。" |
 | 按钮 | "继续编辑"(`ink-button-secondary`) + "确认离开"(`ink-button-danger`) |
 | pending 态 | 按钮禁用 |
+| message | 可自定义，默认"有未保存的更改，确定要离开吗？" |
+
+**Props：**
+
+| 属性 | 类型 | 必需 | 默认值 |
+|------|------|------|--------|
+| isOpen | `boolean` | 是 | — |
+| isPending | `boolean` | 是 | — |
+| message | `string` | 否 | "有未保存的更改，确定要离开吗？" |
+| onClose | `() => void` | 是 | — |
+| onConfirm | `() => void` | 是 | — |
 
 #### 审计项
 
@@ -957,7 +1028,8 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 | 基于 | Arco Design Select |
 | 密度变体 | default / roomy |
 | 空状态文案 | "暂无可选项" |
-| 无效值 | 自动生成带警告样式的选项 |
+| 无效值 | 自动生成带 `callout-warning border-dashed` 样式的选项 |
+| 弹出层 | `p-[0.28rem] border border-[var(--dropdown-border)] rounded-4 bg-[var(--dropdown-bg)] shadow-[var(--dropdown-shadow)] backdrop-blur-xl` |
 
 #### 审计项
 
@@ -987,16 +1059,19 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 |------|-----|
 | 必需 | title + description |
 | 可选 | action（操作按钮区域） |
+| 容器 | `panel-glass flex min-h-48 flex-col items-start justify-center gap-3 p-6`（**左对齐**，非居中） |
+| 标题 | `font-serif text-lg font-semibold text-text-primary` |
+| 描述 | `max-w-2xl text-sm leading-6 text-text-secondary` |
 
 #### 审计项
 
-- [ ] 居中布局是否正确
+- [ ] 左对齐布局是否正确（非居中）
 - [ ] 有 action 时按钮是否可点击
 - [ ] 文案是否清晰
 
 ### 4.6 StatusBadge
 
-支持 20+ 种状态映射，每种状态有对应颜色和中文标签。
+支持 25 种状态映射，每种状态有对应颜色和中文标签。
 
 #### 审计项
 
@@ -1009,7 +1084,9 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 | 属性 | 值 |
 |------|-----|
 | 必需 | title + children |
-| 可选 | action / description / className |
+| 可选 | action / description / className / bodyClassName / headerClassName |
+
+**CSS 类：** `section-card panel-shell`，含 BEM 子元素 `section-card__header` / `section-card__copy` / `section-card__body`
 
 #### 审计项
 
@@ -1116,9 +1193,9 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 
 | 常量 | 值 |
 |------|-----|
-| VIEWPORT_MARGIN | 16px |
-| GAP | 8px |
-| MIN_HEIGHT | 160px |
+| FLOATING_PANEL_VIEWPORT_MARGIN | 16px |
+| FLOATING_PANEL_GAP | 8px |
+| FLOATING_PANEL_MIN_HEIGHT | 160px |
 
 #### useFloatingPanelStyle Hook
 
@@ -1567,7 +1644,7 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 | Action | 行为 |
 |--------|------|
 | setSession | 设置 token + user |
-| clearSession | 清空 workspace 项目上下文 → 清空 token + user |
+| clearSession | 跨 store 调用 `useWorkspaceStore.getState().clearProjectContext()` → 清空 token + user |
 | markHydrated | 标记 hydration 完成 |
 
 **工具函数：** `getAuthToken()` — 直接从 store 读取 token（不触发重渲染）
@@ -1798,9 +1875,9 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 
 | 目录 | 路径 | 状态 |
 |------|------|------|
-| demo | `src/app/demo/` | 空目录，可能为开发遗留 |
-| test-v2 | `src/app/test-v2/` | 空目录，可能为开发遗留 |
-| v2-demo | `src/app/v2-demo/` | 空目录，可能为开发遗留 |
+| demo | `src/app/demo/` | **已清理** |
+| test-v2 | `src/app/test-v2/` | **已清理** |
+| v2-demo | `src/app/v2-demo/` | **已清理** |
 
 ### 审计项
 
@@ -1811,32 +1888,26 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 
 ## 附录 G3：测试覆盖概览
 
-测试文件（`.test.ts`）与组件同目录放置，共计约 50 个：
+测试文件（`.test.ts`）与组件同目录放置，共计 72 个：
 
 | 模块 | 测试文件数 | 覆盖重点 |
 |------|-----------|----------|
-| config-registry | 5 | 状态管理、表单逻辑、通知逻辑 |
-| engine | 10 | 格式化、流处理、任务支持、工作流状态 |
-| lab | 1 | 基础支持逻辑 |
-| lobby/incubator | 7 | 聊天状态、模型支持、模板模型 |
+| studio | 15 | 聊天状态/发送守卫/模型/Composer/技能/上下文/写入效果、文档支持/反馈/同步、目录树、页面支持 |
+| engine | 11 | 格式化、流处理、任务支持、工作流状态/摘要、导出/回放/日志/详情面板 |
+| settings/credential | 8 | 凭证表单/兼容性/反馈/覆盖/用户代理/删除确认 |
+| settings/assistant | 7 | Skills/Rules/Preferences/MCP/Hooks/Agents/Markdown 文档支持 |
+| lobby/incubator | 7 | 聊天状态/模型/设置/草稿/提交/流客户端/请求支持 |
+| shared/assistant | 6 | 流默认值/推理/凭证/输出 token/技能选项/Markdown 文档支持 |
+| config-registry | 5 | 状态管理/表单逻辑/通知/Skill Reader/引用支持 |
+| project-settings | 3 | 审计面板/设置支持/摘要编辑 |
+| workspace | 2 | Shell 支持/Store 支持 |
+| project | 2 | 准备状态/摘要支持 |
 | lobby/projects | 1 | 项目模型支持 |
 | lobby/settings | 1 | 设置路由支持 |
 | lobby/templates | 1 | 模板库支持 |
-| settings/credential | 3+ | 凭证表单、兼容性、反馈 |
-| settings/agents | 1 | Agent 编辑器支持 |
-| settings/hooks | 1 | Hook 编辑器支持 |
-| settings/mcp | 1 | MCP 编辑器支持 |
-| settings/skills | 1 | Skill 编辑器支持 |
-| settings/preferences | 1 | 偏好设置支持 |
-| shared/assistant | 6 | 流默认值、推理支持、凭证支持 |
-| studio/chat | 多个 | 聊天状态、发送守卫、技能模型 |
-| studio/document | 多个 | 文档缓冲、目录支持 |
-| studio/page | 1 | 页面支持 |
-| studio/tree | 1 | 目录树支持 |
-| workspace | 2 | Shell 支持、Store 支持 |
-| project | 2 | 准备状态、摘要支持 |
-| project-settings | 3 | 审计面板、设置支持、摘要编辑 |
+| lab | 1 | 基础支持逻辑 |
 | observability | 1 | 时间格式化 |
+| components/ui | 1 | 浮动面板支持 |
 
 ### 审计项
 
@@ -1851,15 +1922,37 @@ Studio 中间主内容区根据文稿类型渲染不同编辑器：
 
 | 模块 | .tsx 组件数 | 关键子组件 |
 |------|------------|-----------|
-| studio/components | 22 | 文档编辑器×5、关系图谱、影响面板×2、聊天面板×6（含 Composer）、目录树×2、页面×2 |
-| engine/components | 19 | 页面壳、详情面板×7、导出面板、任务表单×2、状态卡片×3、风格参考辅助 |
+| studio/components | 19 | 文档编辑器×3（Markdown/JSON/总入口）、关系图谱、影响面板×2、聊天面板×6（含 Composer）、目录树×2、页面×2 |
+| engine/components | 18 | 页面壳、详情面板×7、导出面板、任务表单×2、状态卡片×3、风格参考辅助 |
 | lab/components | 5 | 页面、侧边栏、详情面板、创建面板、删除确认 |
-| settings/components | 38 | 凭证中心×12（含删除确认+标签）、助手面板×26（含 AgentModeEditors、HookGuidedFields） |
-| config-registry/components | 12 | 页面、侧边栏、详情/编辑面板、表单×5、原语 |
+| settings/components | 36 | 凭证中心×12（含删除确认+标签+审计面板）、助手面板×24（含 AgentModeEditors、HookGuidedFields、EditorPrimitives） |
+| config-registry/components | 12 | 页面、侧边栏、详情/编辑面板、表单×5、原语、SkillReader |
 | lobby/components | 26 | 项目列表×3、孵化器×13、模板库×4、设置×3、回收站×2、通用×1 |
-| project-settings/components | 9 | 页面、侧边栏、内容区、摘要×3、审计、图标、Tab按钮 |
+| project-settings/components | 9 | 页面、侧边栏、内容区、摘要×3、审计、图标、Tab按钮（未使用） |
 | project/components | 1 | 准备状态面板 |
 | workspace/components | 2 | 工作区壳、图标 |
 | auth/components | 2 | 认证表单、认证守卫 |
-| components/ui | 15 | 共享 UI 基础组件 |
-| **合计** | **~151** | — |
+| components/ui | 13 | 共享 UI 基础组件 |
+| **合计** | **~143** | — |
+
+### 与上次审计（2026-04-12）的差异汇总
+
+| 维度 | 旧值 | 新值 | 说明 |
+|------|------|------|------|
+| .tsx 组件总数 | ~151 | **143** | 减少 8 个，组件合并/重构 |
+| 测试文件总数 | ~50 | **72** | 增长 44% |
+| Design Token 分组 | 10 | **16** | 新增下拉/遮罩/Callout/Toolbar/Chat/渐变 |
+| accent 变量数 | 12 | **20** | 新增 primary-hover/primary-soft/primary-muted/primary-dark/danger-active/info/info-soft/info-muted/warning-soft/success-soft/danger-soft |
+| shadow 层级 | 7 | **9** | 新增 glass-heavy/panel-side，xl→hero |
+| z-index 命名 | base/dropdown/sticky/overlay/modal/popover/toast | **base/surface/elevated/sticky/overlay/modal/toast** | dropdown→surface，popover 移除，新增 elevated |
+| CSS 组件类 | 22 | **39** | 新增 ink-toolbar-*、callout-*、badge 变体、scrollbar-hide、section-card BEM 子元素 |
+| Arco 覆写组件 | 29 | **30** | 新增 Link |
+| StatusBadge 状态 | 20+ | **25** | 新增 setting/outline/opening_plan/chapter_tasks/workflow/chapter |
+| 残留目录 | 3 个未清理 | **已清理** | demo/test-v2/v2-demo |
+| 书架页 | LobbyEntryCard + MetricCard | **LobbyProjectCard + 统计文字** | 完成布局重设计 |
+| 孵化器 | IncubatorChatPanel | **ChatModePanel + ModeSwitch** | 双模式架构 |
+| Studio 编辑器 | ChapterEditor + StoryAssetEditor | **MarkdownDocumentEditor + JsonDocumentEditor** | 双编辑器+关系图预览 |
+| Engine 背景 | 硬编码渐变 | **CSS 变量** `--bg-engine-page-gradient` | 样式统一 |
+| EmptyState | items-center（居中） | **items-start**（左对齐） | 布局修正 |
+| DialogShell | 无 restoreFocusRef | **新增** restoreFocusRef | 焦点恢复控制 |
+| Lobby 内容区宽度 | max-w-[1560px] | **w-[min(100%-2.5rem,1560px)]** | 响应式优化 |
