@@ -70,6 +70,8 @@ ordinary chat 的正式未来口径统一以下列文档为准：
 | McpPluginProvider | 已实现 | 通过官方 MCP Python SDK 调用外部 `streamable_http` 工具 |
 | MCPToolProvider | 后续 | 面向 agent 通用 tool-calling 的统一 ToolProvider |
 
+MCP Client 出站地址执行统一 endpoint 策略：默认只允许公网 `https`，本地 / 私网地址和公网 `http` 必须通过 MCP 专属运行时环境变量显式放开；该策略同时作用于用户 / 项目 MCP 写入入口和运行时调用出口。
+
 ToolProvider 接口提供两个方法：
 - `execute(tool_name, params)` — 执行工具调用
 - `list_tools()` — 列出可用工具

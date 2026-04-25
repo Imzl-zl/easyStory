@@ -3,9 +3,9 @@
 
 ## 当前基线
 
-- 后端检查：`2026-04-19` 已确认 `cd apps/api && ./.venv/bin/ruff check app tests` 通过；与 framework-first runtime 拆分直接相关的定向后端回归已通过（`108 passed`）。全量 `pytest -q` 仍受 60 秒硬超时限制，当前未在本轮内跑完整轮
+- 后端检查：`2026-04-25` 已确认 `cd apps/api && ./.venv/bin/ruff check app tests` 通过；runtime flow hardening 相关定向后端回归已通过。全量 `pytest -q` 仍受 60 秒硬超时限制，当前未在本轮内跑完整轮
 - 前端检查：`2026-04-19` 已确认 `pnpm --dir apps/web lint` 与 `pnpm --dir apps/web test:unit` 通过（`342 passed`）
-- 最后更新：2026-04-19
+- 最后更新：2026-04-25
 ## 已完成能力
 
 - 凭证与模型连接闭环：安全存储、endpoint policy、`api_dialect` 路由、`interop_profile` / auth strategy override、公网 http 显式测试开关、本地 provider interop probe、旧库 schema reconcile，以及连接级 `context_window_tokens / default_max_output_tokens`
@@ -17,6 +17,7 @@
 - Credential Center 显式验证语义与 assistant 门控已收口：产品面现已区分 `验证连接(text_probe)`、`验证流式工具(tool_continuation_probe + stream)`、`验证非流工具(tool_continuation_probe + buffered)`；共享 verifier 已复用 conformance probe 主链，assistant 在 visible `project.*` 工具存在时会按本轮 `stream` 模式显式要求对应的工具能力真值，避免再出现“流式验证通过但非流 tool loop 实际不可用”的单一 verify 假象
 - 2026-04-08 review remediation 已完成：`tool_definition_probe` 现仅接受精确 success token；`tool_continuation_probe` follow-up 改为校验只存在于 tool result 中的动态 echoed 值，不再把期望答案写进 prompt；同模式下的工具能力写回已改为数据库当前值参与的原子 promote，避免并发低等级验证覆盖高等级 capability 真值
 - 2026-04-09 继续收口了工具能力真值与传输模式语义：若显式工具验证失败，只会清掉对应模式里同级或更高的工具能力真值；shared runtime 与 verifier 现已明确区分流式 / 非流工具链，并把“工具验证通过”改成带模式的能力结论。任何成功/失败验证现在都会清空 legacy `verified_probe_kind`，避免启动 reconcile 再从旧字段回灌流式能力；`openai_responses` 非流解析也只在 `output_text` 非空时才允许 `output=[]`，空字符串不再被静默放过。最新本地实测：`Gemini` 的流式和非流工具链都可用，而两条 OpenAI-compatible 连接在非流工具路径上仍会显式暴露上游空响应 / `output=[]`。
+- 2026-04-25 runtime flow hardening 已完成：MCP `streamable_http` 调用改为通过 MCP SDK 支持的 `http_client` 注入 headers/timeout，SDK `TextContent` 等 Pydantic content 会保留为 dict；MCP URL 新增专属 endpoint policy，写入和真实调用默认拒绝本地/私网与公网 http，需 `EASYSTORY_ALLOW_PRIVATE_MCP_ENDPOINTS` / `EASYSTORY_ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS` 显式放开；workflow graph recursion budget 现会计入运行时章节任务数量，避免章节循环被配置节点数预算误伤
 - 项目与前置资产闭环：project CRUD、结构化摘要提示（原 setting completeness）、story asset generation / confirm
 - 内容主链路闭环：outline / opening_plan / chapter / content version、章节确认与 stale 传播
 - 工作流闭环：control plane、runtime、auto-review / fix、workflow logs / prompt replay / audit
@@ -103,23 +104,8 @@
 - async 语义审查不要误把基础设施命名（AsyncSessionFactory 等）当待清理对象
 - shared/runtime 改为惰性导出，避免 settings -> runtime -> llm tool provider 循环导入
 
-## 最近活跃窗口（2026-03-26 ~ 03-30）
+## 最近活跃窗口（2026-04-06 ~ 2026-04-25）
 
-- 2026-03-27：完成 Workspace / Studio / Engine 的一轮布局收口，工作台侧栏、页头骨架、状态区和移动端细节已统一。
-- 2026-03-28：assistant 配置主真值切到 `apps/api/.runtime/assistant-config/`，多用户体验改为“AI 助手 / 模型连接”双入口，并补齐未保存离开保护。
-- 2026-03-29：修复本地 SQLite 开发库迁移卡死导致的“页面一直加载中”；登录、项目大厅、AI 聊天、模型连接页恢复。
-- 2026-03-29：完成用户自定义 Skills 闭环，真值文件落到 `users/<user_id>/skills/<skill_id>/SKILL.md`；聊天页可直接切换 Skill。
-- 2026-03-29：完成用户自定义 MCP + Hook(mcp) 闭环，真值文件落到 `users/<user_id>/mcp_servers/<server_id>/MCP.yaml`；Hook 可直接绑定用户 MCP。
-- 2026-03-30：继续按 Claude 风格收口前端主路径，保留“长期规则 + Skills + 模型连接”为默认心智，`Agents / Hooks / MCP` 进入更明确的次级区域。
-- 2026-03-30：补齐项目级 Skills / MCP，文件真值落到 `projects/<project_id>/skills/<skill_id>/SKILL.md` 与 `projects/<project_id>/mcp_servers/<server_id>/MCP.yaml`，运行时按 `项目 -> 用户 -> 系统` 解析；浏览器已实测 `Skills -> MCP` 无输入切换不再弹未保存提示。
-- 2026-04-04：修复模型连接编辑页保存后 dirty 误报；根因是编辑表单未在保存成功后立即重建基线，尤其 `apiKey` 不回显时会长期判脏。前端 `lint` 与 `test:unit` 已通过，并已在浏览器真实验证“编辑 -> 保存 -> 返回项目大厅”不再弹未保存提示。
-- 2026-04-06：assistant 原生 tool-calling runtime `v1A` 继续收口：非 `openai_responses` provider 改为结构化 replay，recoverable tool error 可回填模型继续推理，SSE `state_version` 回到 run 真值；`assistant_service + continuation + assistant_api` 共 `54 passed`，前端共享 stream client 终止优先级测试补齐并通过。
-- 2026-04-06：继续补齐 assistant stale-run 恢复语义：`AssistantTurnRun` 新增本地 runtime claim（`host / pid / instance_id`），旧进程中断留下的 `running` run 现在会被显式收口为 failed，而不是永久 `run_in_progress`；相关 assistant 后端回归已通过。
-- 2026-04-06：继续完善 SSE 错误语义：router/stream runtime 现已为 `error` 事件补齐 run 关联元数据，API 与前端 stream fixture 同步到真实 error 形状；`assistant_api`、相关 `assistant_service` 异常路径和前端 stream 测试已通过。
-- 2026-04-06：继续收口前端 stream 终止真值：`AssistantTurnStreamTerminalError` 现在会保留 `error` 与 `cancelled` 两类终止路径的 run 元数据；过程中修正了一次 camelCase/snake_case 二次转换导致的 `runId` 丢失问题，定向前端测试与 `eslint` 已通过。
-- 2026-04-06：补齐 `Incubator` 聊天 continuity：session/store/request builder/成功提交链已接入 `latestCompletedRunId -> continuation_anchor.previous_run_id`，避免与 `Studio` 在 run continuity 语义上继续漂移；相关前端定向测试 `5 passed`，`eslint` 通过。
-- 2026-04-06：继续完善共享 stream client：异常 EOF 不再抛裸 `Error`，而是统一转成带最后事件元数据的 `stream_interrupted` 结构化终止错误；assistant stream 定向测试与 `eslint` 已通过。
-- 2026-04-06：修正 `Incubator` store 边角语义：空会话判定已把 `latestCompletedRunId` 纳入非空条件，与 `Studio` 保持一致；相关 `Incubator` store/request/submit` 定向测试与 `eslint` 已通过。
-- 2026-04-06：继续强化共享 stream client 的协议异常暴露：malformed SSE payload 不再向上冒原始 `SyntaxError`，而是统一转成 `stream_payload_invalid` 结构化终止错误；中途修正了“误把正常 `error` 事件也包成 payload invalid”的实现错误，相关定向测试与 `eslint` 已通过。
-- 2026-04-06：assistant 文稿工具继续稳步推进到 `v1B`：补齐 `project.search_documents` 契约、continuity-first 搜索排序、长历史 compaction/budget、tool-loop continuation 预算，以及 `project.write_document` 的显式 `approval_grant` 骨架；当前 grant 已进入 policy decision、execution context、tool step snapshot 与 turn run snapshot，定向后端回归已通过。
-- 2026-04-07 ~ 2026-04-09：assistant runtime context governance、模型工具兼容层与凭证能力真值主线已收口：tool name alias codec、`tool_schema_compiler / tool_call_codec / tool_continuation_codec / stream_event_normalizer`、conformance probes、`interop_profile` 与分模式 `stream_tool_* / buffered_tool_*` 已打通 verifier -> assistant runtime -> Credential Center；assistant 在 visible `project.*` 工具存在时会按本轮 `stream` 模式要求对应能力，连接关键字段变更会清空验证状态，Credential Center 已区分 `验证连接 / 验证流式工具 / 验证非流工具` 并展示双模式工具能力摘要；同一窗口内 reasoning/compat 继续收口为“协议级边界 + 上游显式报错”：`llm_reasoning_validation` 不再按具体 GPT/Gemini 子型号做本地硬控，OpenAI Chat 官方端点优先使用 `max_completion_tokens`、第三方兼容网关继续保留 `max_tokens`，前端/偏好文案也会明确区分 `reasoning_effort` 与 `reasoning.effort` 的 dialect 差异。相关定向后端与前端测试已补齐并验证。
+- 2026-04-06：assistant 原生 tool-calling runtime `v1A`、stale-running-turn 恢复、SSE 错误元数据、Incubator continuity 与共享 stream client 终止语义集中收口。
+- 2026-04-07 ~ 2026-04-09：assistant runtime context governance、模型工具兼容层与凭证能力真值主线收口，`tool_*_codec`、stream normalizer、conformance probes、分模式 `stream_tool_* / buffered_tool_*` 已打通。
+- 2026-04-25：完成 runtime flow hardening；MCP SDK 适配、MCP endpoint policy、workflow graph loop recursion budget 均已补定向测试并通过，full pytest 仍因 60 秒硬超时未完成。

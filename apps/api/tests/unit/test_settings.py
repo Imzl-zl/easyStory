@@ -4,7 +4,9 @@ import pytest
 
 from app.shared.runtime.errors import ConfigurationError
 from app.shared.settings import (
+    ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS_ENV,
     ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV,
+    ALLOW_PRIVATE_MCP_ENDPOINTS_ENV,
     ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV,
     CONFIG_ADMIN_USERNAMES_ENV,
     CORS_ALLOWED_ORIGIN_REGEX_ENV,
@@ -92,6 +94,24 @@ def test_settings_parses_insecure_public_endpoint_toggle(monkeypatch) -> None:
     assert settings.allow_insecure_public_model_endpoints is True
 
 
+def test_settings_parses_private_mcp_endpoint_toggle(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
+    monkeypatch.setenv(ALLOW_PRIVATE_MCP_ENDPOINTS_ENV, "true")
+
+    settings = EasyStorySettings(_env_file=None)
+
+    assert settings.allow_private_mcp_endpoints is True
+
+
+def test_settings_parses_insecure_public_mcp_endpoint_toggle(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
+    monkeypatch.setenv(ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS_ENV, "true")
+
+    settings = EasyStorySettings(_env_file=None)
+
+    assert settings.allow_insecure_public_mcp_endpoints is True
+
+
 def test_settings_parses_config_admin_usernames(monkeypatch) -> None:
     monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
     monkeypatch.setenv(CONFIG_ADMIN_USERNAMES_ENV, "alice, bob, alice")
@@ -116,4 +136,20 @@ def test_settings_rejects_invalid_insecure_public_endpoint_toggle(monkeypatch) -
     monkeypatch.setenv(ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV, "maybe")
 
     with pytest.raises(ConfigurationError, match=ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV):
+        EasyStorySettings(_env_file=None)
+
+
+def test_settings_rejects_invalid_private_mcp_endpoint_toggle(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
+    monkeypatch.setenv(ALLOW_PRIVATE_MCP_ENDPOINTS_ENV, "maybe")
+
+    with pytest.raises(ConfigurationError, match=ALLOW_PRIVATE_MCP_ENDPOINTS_ENV):
+        EasyStorySettings(_env_file=None)
+
+
+def test_settings_rejects_invalid_insecure_public_mcp_endpoint_toggle(monkeypatch) -> None:
+    monkeypatch.delenv("EASYSTORY_JWT_SECRET", raising=False)
+    monkeypatch.setenv(ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS_ENV, "maybe")
+
+    with pytest.raises(ConfigurationError, match=ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS_ENV):
         EasyStorySettings(_env_file=None)

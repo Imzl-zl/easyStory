@@ -62,11 +62,12 @@
 - provider interop 探测脚本：`apps/api/scripts/provider_interop_check.py`
 - 模型协议兼容层主入口（真实实现）：`apps/api/app/shared/runtime/llm/llm_protocol_requests.py`、`apps/api/app/shared/runtime/llm/llm_protocol_responses.py`、`apps/api/app/shared/runtime/llm/llm_stream_transport.py`、`apps/api/app/shared/runtime/llm/llm_stream_events.py`、`apps/api/app/shared/runtime/llm/llm_terminal_assembly.py`、`apps/api/app/shared/runtime/llm/llm_interop_profiles.py`；tool name 外发 alias codec 入口是 `apps/api/app/shared/runtime/llm/interop/tool_name_codec.py`，tool schema 编译入口是 `apps/api/app/shared/runtime/llm/interop/tool_schema_compiler.py`，tool call 解析入口是 `apps/api/app/shared/runtime/llm/interop/tool_call_codec.py`，continuation 投影与编码入口是 `apps/api/app/shared/runtime/llm/interop/tool_continuation_codec.py`，stream 协议归一化入口是 `apps/api/app/shared/runtime/llm/interop/stream_event_normalizer.py`，内部 dotted name 继续作为 canonical 真值
 - `apps/api/app/shared/runtime/llm/interop/provider_interop_stream_support.py` 当前是共享 facade：transport / event normalizer / terminal assembly 已拆到独立模块，不要再把新逻辑堆回 facade
-- MCP client 真实实现：`apps/api/app/shared/runtime/mcp/mcp_client.py`
+- MCP client 真实实现：`apps/api/app/shared/runtime/mcp/mcp_client.py`；MCP endpoint policy 入口：`apps/api/app/shared/runtime/mcp/mcp_endpoint_policy.py`
 - 插件 runtime 真实实现：`apps/api/app/shared/runtime/plugins/plugin_registry.py`、`apps/api/app/shared/runtime/plugins/plugin_providers.py`
 - 当前 `apps/api/app/shared/runtime/` 根目录只保留 `__init__.py`、`errors.py`、`tool_provider.py`、`token_counter.py`、`storage_paths.py`、`template_renderer.py`
 - 当前仓库内部（`apps/api/app`、`tests/unit`、`scripts`）已全部直接指向真实子域路径；新增/修改代码不得再回到旧根路径
 - provider interop 显式公网 `http` 放行开关：`EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS`
+- MCP endpoint policy 显式放行开关：`EASYSTORY_ALLOW_PRIVATE_MCP_ENDPOINTS` 允许本地 / 私网 MCP，`EASYSTORY_ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS` 允许公网 `http` MCP；默认只允许公网 `https`
 - `config_registry` 管理 API 除 JWT 外，还要求 `EASYSTORY_CONFIG_ADMIN_USERNAMES` 命中当前用户名；默认空列表即全部拒绝
 - 控制面轻权限当前统一口径：`EASYSTORY_CONFIG_ADMIN_USERNAMES` 命中才允许写控制面资源；现阶段包括 `config_registry` 全部接口和模板创建/更新/删除，模板读取仍只要求登录
 - `create_app()` 当前对外部注入的 `async_session_factory` 只挂载到 `app.state` 并继续执行 settings/template startup；只有内部自行创建 session factory 时才负责启动期建库，并通过 `initialize_async_database()` 走 Alembic。测试若需要同步 seed，会在 app 外部单独创建 sync `session_factory`

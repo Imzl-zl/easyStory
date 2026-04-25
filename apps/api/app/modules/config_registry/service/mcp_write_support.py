@@ -3,12 +3,17 @@ from __future__ import annotations
 from app.modules.config_registry import ConfigLoader
 from app.modules.config_registry.schemas import McpServerConfig
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError, NotFoundError
+from app.shared.runtime.mcp.mcp_endpoint_policy import validate_mcp_endpoint_url
 
 from .mcp_query_dto import McpServerConfigUpdateDTO
 from .write_validation_support import validate_config_model
 
 
 def build_mcp_server_config(payload: McpServerConfigUpdateDTO) -> McpServerConfig:
+    try:
+        validate_mcp_endpoint_url(payload.url)
+    except ConfigurationError as exc:
+        raise BusinessRuleError(str(exc)) from exc
     return validate_config_model(McpServerConfig, payload.model_dump())
 
 

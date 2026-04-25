@@ -9,6 +9,7 @@ import secrets
 import yaml
 
 from app.modules.config_registry.schemas import McpServerConfig
+from app.shared.runtime.mcp.mcp_endpoint_policy import normalize_mcp_endpoint_url
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 
 from .assistant_mcp_dto import (
@@ -164,7 +165,7 @@ def _create_mcp_detail(
         enabled=payload.enabled,
         version=normalize_mcp_version(payload.version),
         transport=normalize_mcp_transport(payload.transport),
-        url=normalize_mcp_url(payload.url),
+        url=normalize_writable_mcp_url(payload.url),
         headers=dict(payload.headers),
         timeout=payload.timeout,
         header_count=len(payload.headers),
@@ -201,7 +202,7 @@ def update_mcp_detail(
         enabled=payload.enabled,
         version=normalize_mcp_version(payload.version),
         transport=normalize_mcp_transport(payload.transport),
-        url=normalize_mcp_url(payload.url),
+        url=normalize_writable_mcp_url(payload.url),
         headers=dict(payload.headers),
         timeout=payload.timeout,
         header_count=len(payload.headers),
@@ -276,6 +277,13 @@ def normalize_mcp_url(value: str) -> str:
     if not normalized:
         raise BusinessRuleError("MCP 地址不能为空。")
     return normalized
+
+
+def normalize_writable_mcp_url(value: str) -> str:
+    try:
+        return normalize_mcp_endpoint_url(value)
+    except ConfigurationError as exc:
+        raise BusinessRuleError(str(exc)) from exc
 
 
 def normalize_mcp_version(value: str) -> str:

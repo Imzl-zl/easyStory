@@ -327,7 +327,7 @@ mcp_server:
 - `enabled`：可选，默认 `true`；停用后不会被 Hook 或运行时调用
 - `version`：可选，默认 `1.0.0`
 - `transport`：必填；当前正式只支持 `streamable_http`
-- `url`：必填；MCP 服务地址
+- `url`：必填；MCP 服务地址，默认只允许公网 `https`；本地 / 私网地址和公网 `http` 需要通过后端运行时环境变量显式放开
 - `headers`：可选；请求头字典
 - `timeout`：可选；超时时间，单位秒
 
@@ -335,6 +335,7 @@ mcp_server:
 
 - 运行时按 `项目 MCP -> 用户 MCP -> 系统 MCP` 解析；项目层命中后整份 MCP 会覆盖同 ID 的用户层或系统层定义
 - `transport` 当前仅正式支持 `streamable_http`
+- `url` 会在写入入口和运行时出口执行同一套出站 endpoint 策略；默认拒绝嵌入凭证、query/fragment、本地 / 私网地址和公网 `http`
 - `headers` 必须是 `string -> string` 映射；非法结构直接报错
 - 文档根节点缺失、URL 非法或内容非法时，运行时直接报错，不做静默降级
 
@@ -961,6 +962,8 @@ model:
 | `EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX` | 可选 | `^https?://(localhost|127\.0\.0\.1)(:\d+)?$` | CORS 正则白名单 |
 | `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS` | 可选 | `false` | 是否允许 `localhost` / 私网 IP 等本地模型 endpoint；默认只允许公网 `https` endpoint |
 | `EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS` | 可选 | `false` | 是否显式允许公网 `http` 模型 endpoint；仅用于兼容测试或受控代理环境 |
+| `EASYSTORY_ALLOW_PRIVATE_MCP_ENDPOINTS` | 可选 | `false` | 是否允许 `localhost` / 私网 IP 等本地 MCP endpoint；默认只允许公网 `https` endpoint |
+| `EASYSTORY_ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS` | 可选 | `false` | 是否显式允许公网 `http` MCP endpoint；仅用于兼容测试或受控代理环境 |
 | `EASYSTORY_CONFIG_ADMIN_USERNAMES` | 可选 | 空列表 | 逗号分隔的控制面管理员用户名白名单；仅命中用户可访问 `/api/v1/config/*` 与模板写接口 |
 
 **校验与暴露规则**：
@@ -970,6 +973,8 @@ model:
 - `EASYSTORY_CORS_ALLOWED_ORIGINS` 接受逗号分隔字符串；解析失败视为配置错误。
 - 自定义模型 `base_url` 默认只允许公网 `https` endpoint；若确需访问本地 / 私网模型网关，必须显式设置 `EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS=true`。
 - 若确需访问公网 `http` 模型网关，必须显式设置 `EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS=true`；该能力默认关闭，且只应用于兼容测试或明确受控的代理环境。
+- 自定义 MCP `url` 默认只允许公网 `https` endpoint；若确需访问本地 / 私网 MCP，必须显式设置 `EASYSTORY_ALLOW_PRIVATE_MCP_ENDPOINTS=true`。
+- 若确需访问公网 `http` MCP，必须显式设置 `EASYSTORY_ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS=true`；该能力默认关闭，且只应用于兼容测试或明确受控的代理环境。
 - `EASYSTORY_CONFIG_ADMIN_USERNAMES` 为空时，控制面写入口默认全部拒绝；当前包括 `/api/v1/config/*` 与模板创建/修改/删除接口。只有命中白名单的已认证用户才能执行这些写操作。
 - 新增运行时环境变量时，必须同时更新 `app/shared/settings.py`、`apps/api/.env.example`、本规范与 `docs/README.md`。
 

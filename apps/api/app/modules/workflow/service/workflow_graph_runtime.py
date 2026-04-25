@@ -4,10 +4,11 @@ import uuid
 from typing import TYPE_CHECKING, TypedDict
 
 from langgraph.graph import END, START, StateGraph
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.config_registry.schemas.config_schemas import WorkflowConfig
-from app.modules.workflow.models import WorkflowExecution
+from app.modules.workflow.models import ChapterTask, WorkflowExecution
 from app.shared.runtime.errors import ConfigurationError
 
 from .snapshot_support import resolve_node_config
@@ -45,15 +46,27 @@ class WorkflowGraphRuntime:
         current_node_id = self.workflow.current_node_id
         if not current_node_id:
             raise ConfigurationError("Workflow current node is required before runtime execution")
+        recursion_limit = await self._resolve_recursion_limit()
         await self._graph.ainvoke(
             {"current_node_id": current_node_id, "terminated": False},
-            config={
-                "recursion_limit": resolve_workflow_graph_recursion_limit(
-                    len(self.workflow_config.nodes)
-                )
-            },
+            config={"recursion_limit": recursion_limit},
         )
         return self.workflow
+
+    async def _resolve_recursion_limit(self) -> int:
+        loop_item_count = await self._count_runtime_loop_items()
+        return resolve_workflow_graph_recursion_limit(
+            len(self.workflow_config.nodes),
+            runtime_loop_item_count=loop_item_count,
+        )
+
+    async def _count_runtime_loop_items(self) -> int:
+        statement = (
+            select(func.count())
+            .select_from(ChapterTask)
+            .where(ChapterTask.workflow_execution_id == self.workflow.id)
+        )
+        return int(await self.db.scalar(statement) or 0)
 
     def _build_graph(self):
         graph = StateGraph(WorkflowGraphState)

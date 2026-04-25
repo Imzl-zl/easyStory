@@ -20,6 +20,8 @@ CORS_ALLOWED_ORIGINS_ENV = "EASYSTORY_CORS_ALLOWED_ORIGINS"
 CORS_ALLOWED_ORIGIN_REGEX_ENV = "EASYSTORY_CORS_ALLOWED_ORIGIN_REGEX"
 ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV = "EASYSTORY_ALLOW_PRIVATE_MODEL_ENDPOINTS"
 ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV = "EASYSTORY_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS"
+ALLOW_PRIVATE_MCP_ENDPOINTS_ENV = "EASYSTORY_ALLOW_PRIVATE_MCP_ENDPOINTS"
+ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS_ENV = "EASYSTORY_ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS"
 CONFIG_ADMIN_USERNAMES_ENV = "EASYSTORY_CONFIG_ADMIN_USERNAMES"
 ASSISTANT_CONFIG_ROOT_ENV = "EASYSTORY_ASSISTANT_CONFIG_ROOT"
 
@@ -27,6 +29,8 @@ DEFAULT_JWT_EXPIRE_HOURS = 24
 DEFAULT_LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 DEFAULT_ALLOW_PRIVATE_MODEL_ENDPOINTS = False
 DEFAULT_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS = False
+DEFAULT_ALLOW_PRIVATE_MCP_ENDPOINTS = False
+DEFAULT_ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS = False
 DEFAULT_ASSISTANT_CONFIG_ROOT = API_ROOT / ".runtime" / "assistant-config"
 ENV_SETUP_HINT = "请参考 apps/api/.env.example 创建 apps/api/.env 并填写必需项。"
 TRUTHY_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
@@ -112,6 +116,14 @@ class EasyStorySettings(BaseSettings):
         default=DEFAULT_ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS,
         validation_alias=ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV,
     )
+    allow_private_mcp_endpoints: bool = Field(
+        default=DEFAULT_ALLOW_PRIVATE_MCP_ENDPOINTS,
+        validation_alias=ALLOW_PRIVATE_MCP_ENDPOINTS_ENV,
+    )
+    allow_insecure_public_mcp_endpoints: bool = Field(
+        default=DEFAULT_ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS,
+        validation_alias=ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS_ENV,
+    )
     config_admin_usernames: list[str] = Field(
         default_factory=list,
         validation_alias=CONFIG_ADMIN_USERNAMES_ENV,
@@ -149,6 +161,19 @@ class EasyStorySettings(BaseSettings):
         return _parse_boolean_env_value(
             value,
             env_name=ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV,
+        )
+
+    @field_validator("allow_private_mcp_endpoints", mode="before")
+    @classmethod
+    def parse_allow_private_mcp_endpoints(cls, value: Any) -> bool:
+        return _parse_boolean_env_value(value, env_name=ALLOW_PRIVATE_MCP_ENDPOINTS_ENV)
+
+    @field_validator("allow_insecure_public_mcp_endpoints", mode="before")
+    @classmethod
+    def parse_allow_insecure_public_mcp_endpoints(cls, value: Any) -> bool:
+        return _parse_boolean_env_value(
+            value,
+            env_name=ALLOW_INSECURE_PUBLIC_MCP_ENDPOINTS_ENV,
         )
 
     @field_validator("config_admin_usernames", mode="before")
