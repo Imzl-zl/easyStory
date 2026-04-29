@@ -5,7 +5,7 @@
 | 文档类型 | 设计索引 |
 | 文档状态 | 生效 |
 | 创建时间 | 2026-03-16 |
-| 更新时间 | 2026-04-10 |
+| 更新时间 | 2026-04-29 |
 
 ---
 
@@ -65,6 +65,7 @@
 | 21 | Assistant 项目文稿工具 | [21-assistant-project-document-tools](./21-assistant-project-document-tools.md) | 🟡 | 项目内文稿读写工具、统一路径路由、目录/版本/revision 约束 |
 | 22 | Assistant 原生 Tool-Calling Runtime | [22-assistant-tool-calling-runtime](./22-assistant-tool-calling-runtime.md) | 🔴 | ordinary chat tool loop、provider 适配、run/step 真值与 SSE 语义 |
 | 23 | 模型工具调用兼容层 | [23-provider-tool-interop-compatibility-layer](./23-provider-tool-interop-compatibility-layer.md) | 🔴 | canonical tool contract、协议族适配、gateway profile 与 conformance 验证 |
+| 26 | 产品页面架构规划 | [26-product-page-architecture](./26-product-page-architecture.md) | 🟡 | 新项目视角的页面数量、承载功能与布局边界 |
 
 ---
 
@@ -76,6 +77,7 @@
 - 创作准备链路：`06 -> 19 -> 04 -> 05`
 - Workflow / 审核 / 上下文：`01 -> 02 -> 03 -> 08 -> 09`
 - 凭证 / 用户 / 配置：`10 -> specs/config-format -> specs/database-design`
+- 产品页面规划：`26 -> specs/architecture -> 06 -> 19 -> 05 -> 20 -> 21`
 - UI 页面实现：`docs/ui/README.md`
 
 ---
