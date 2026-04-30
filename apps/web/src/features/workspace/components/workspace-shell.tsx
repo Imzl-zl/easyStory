@@ -53,8 +53,8 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
   const workspaceItems = buildWorkspaceItems(currentProjectId, lastProjectId);
   const pageMode = resolvePageMode(pathname);
   const shellClassName = pageMode === "studio"
-    ? "flex h-[100dvh] flex-col overflow-hidden [background:var(--workspace-shell-accent-gradient),var(--bg-canvas)]"
-    : "min-h-screen pb-[max(env(safe-area-inset-bottom),0px)] [background:var(--workspace-shell-accent-gradient),var(--bg-canvas)]";
+    ? "workspace-shell--studio"
+    : "workspace-shell--default";
 
   useEffect(() => {
     if (currentProjectId) {
@@ -99,7 +99,7 @@ function WorkspaceHeader({
 }>) {
   if (pageMode === "lobby") {
     return (
-      <header className="sticky top-0 z-20 border-b border-line-soft bg-glass-heavy backdrop-blur-xl">
+      <header className="sticky top-0 z-20 bg-glass-heavy backdrop-blur-xl lg:ml-16">
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 md:gap-6 w-[min(100%-2.5rem,1560px)] mx-auto py-3 md:py-3.5">
           <WorkspaceBrand />
           <WorkspaceNav items={workspaceItems} pathname={pathname} />
@@ -115,10 +115,10 @@ function WorkspaceHeader({
   }
 
   return (
-    <header className={`sticky top-0 z-20 border-b backdrop-blur-xl ${pageMode === "studio" ? "border-line-soft/50 bg-glass-heavy" : "border-line-soft bg-glass-heavy/90"}`}>
+    <header className={`sticky top-0 z-20 border-b backdrop-blur-xl lg:ml-16 ${pageMode === "studio" ? "border-line-soft/50 bg-glass-heavy" : "border-line-soft bg-glass-heavy/90"}`}>
       <div className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 md:gap-5 w-[min(100%-2.5rem,1560px)] mx-auto ${pageMode === "studio" ? "py-2.5" : "py-3"}`}>
         <div className="flex items-center gap-4 min-w-0">
-          <Link className="inline-flex items-center gap-1.5 text-text-secondary text-sm font-medium whitespace-nowrap hover:text-text-primary transition-colors duration-fast" href="/workspace/lobby">
+          <Link className="inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap transition-colors text-text-secondary hover:text-text-primary" href="/workspace/lobby">
             <span aria-hidden="true">←</span>
             返回书架
           </Link>
@@ -188,7 +188,7 @@ function WorkspaceNavLink({
 
   return (
     <Link
-      className="relative inline-flex items-center h-8 px-2.5 text-text-secondary text-sm font-medium whitespace-nowrap rounded-2xl transition-colors duration-fast hover:text-text-primary hover:bg-surface-hover [&[data-active='true']]:text-accent-primary [&[data-active='true']]:bg-accent-soft"
+      className="ink-tab text-sm h-8 rounded-2xl"
       data-active={isActive ? "true" : "false"}
       href={item.href}
       title={item.meta}
@@ -211,14 +211,14 @@ function WorkspaceActions({
 }>) {
   return (
     <div className="inline-flex min-w-0 items-center justify-end gap-1.5 md:gap-2.5">
-      <Link className="hidden md:inline-flex items-center justify-center h-8 px-3.5 rounded-pill bg-surface shadow-xs text-text-primary text-sm font-medium transition-all duration-fast hover:bg-surface-hover hover:shadow-sm" href={settingsHref}>
+      <Link className="wsh-action-link hidden md:inline-flex text-sm" href={settingsHref}>
         {settingsLabel}
       </Link>
-      <div className="inline-flex min-w-0 items-center gap-2 py-1 px-2.5 rounded-pill bg-accent-soft">
+      <div className="wsh-user-badge">
         <Avatar size={28}>{resolveWorkspaceUserBadge(userName)}</Avatar>
         <span className="max-w-[8rem] overflow-hidden text-text-primary text-sm font-semibold text-ellipsis whitespace-nowrap max-md:hidden">{userName}</span>
       </div>
-      <button className="inline-flex items-center justify-center h-8 px-3.5 rounded-pill bg-surface shadow-xs text-text-secondary text-sm font-medium cursor-pointer transition-all duration-fast hover:bg-surface-hover hover:shadow-sm hover:text-text-primary" onClick={onLogout} type="button">
+      <button className="wsh-action-btn text-sm" onClick={onLogout} type="button">
         退出
       </button>
     </div>

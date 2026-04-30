@@ -1,0 +1,357 @@
+/* ============================================================
+   Arco Design Overrides
+   适配版本: @arco-design/web-react v2.66.12
+   说明: 将 Arco 组件拉入 Midnight Study 设计体系。
+   升级 Arco 版本前请检查此文件中覆盖的属性是否仍生效。
+   ============================================================ */
+
+body {
+  --arco-color-primary-6: var(--accent-primary);
+  --arco-color-primary-5: #b89a62;
+  --arco-color-primary-4: #a68a58;
+  --arco-color-primary-3: #947a4e;
+  --arco-color-primary-2: #826a44;
+  --arco-color-primary-1: #705a3a;
+  --arco-color-primary-7: #d4b87a;
+  --arco-color-primary-8: var(--accent-primary-hover);
+  --arco-color-primary-9: #e0c88a;
+  --arco-color-primary-10: #ecd89a;
+  --arco-color-success-6: var(--accent-success);
+  --arco-color-warning-6: var(--accent-warning);
+  --arco-color-danger-6: var(--accent-danger);
+  --arco-border-radius-small: var(--radius-sm);
+  --arco-border-radius-medium: var(--radius-md);
+  --arco-border-radius-large: var(--radius-lg);
+}
+
+.arco-btn-primary {
+  background-color: var(--accent-primary) !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+.arco-btn-primary:hover {
+  background-color: var(--accent-primary-hover) !important;
+}
+
+.arco-btn-secondary {
+  border-color: var(--line-strong) !important;
+  background-color: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: var(--shadow-xs) !important;
+}
+
+.arco-btn-secondary:hover {
+  border-color: var(--accent-primary-muted) !important;
+  background-color: var(--bg-elevated) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.arco-link-hover {
+  color: var(--accent-primary) !important;
+}
+
+.arco-input:focus,
+.arco-input:hover {
+  border-color: var(--accent-primary) !important;
+}
+
+.arco-input:focus {
+  box-shadow: 0 0 0 3px var(--line-focus) !important;
+}
+
+.arco-select-view {
+  border-color: var(--line-soft) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.arco-select-view:hover {
+  border-color: var(--line-medium) !important;
+}
+
+.arco-select-view-focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px var(--line-focus) !important;
+}
+
+.arco-dropdown-menu-item:hover {
+  background-color: var(--bg-surface-hover) !important;
+}
+
+.arco-tag {
+  border-radius: var(--radius-pill) !important;
+}
+
+.arco-checkbox-checked .arco-checkbox-icon {
+  background-color: var(--accent-primary) !important;
+  border-color: var(--accent-primary) !important;
+  border-radius: var(--radius-xs) !important;
+}
+
+.arco-radio-checked .arco-radio-icon {
+  border-color: var(--accent-primary) !important;
+}
+
+.arco-radio-checked .arco-radio-icon::after {
+  background-color: var(--accent-primary) !important;
+}
+
+.arco-notification {
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--shadow-float) !important;
+  -webkit-backdrop-filter: blur(var(--blur-md)) !important;
+  backdrop-filter: blur(var(--blur-md)) !important;
+}
+
+.arco-modal {
+  border-radius: var(--radius-2xl) !important;
+  box-shadow: var(--shadow-float) !important;
+  overflow: hidden !important;
+}
+
+.arco-modal-header {
+  border-bottom: 1px solid var(--line-soft) !important;
+  padding: 20px 24px !important;
+}
+
+.arco-modal-body {
+  padding: 20px 24px !important;
+}
+
+.arco-modal-footer {
+  border-top: 1px solid var(--line-soft) !important;
+  padding: 16px 24px !important;
+}
+
+.arco-modal-mask {
+  background-color: var(--overlay-bg) !important;
+  -webkit-backdrop-filter: blur(2px) !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+.arco-tabs-content {
+  padding-top: 16px !important;
+}
+
+.arco-tabs-tab {
+  border-radius: var(--radius-md) !important;
+  transition: background-color var(--transition-fast), color var(--transition-fast) !important;
+}
+
+.arco-tabs-tab-active {
+  color: var(--accent-primary) !important;
+  font-weight: 600 !important;
+}
+
+.arco-tabs-ink {
+  background-color: var(--accent-primary) !important;
+  border-radius: 1px !important;
+}
+
+.arco-tabs-nav::before {
+  border-bottom-color: var(--line-soft) !important;
+}
+
+.arco-switch {
+  border-radius: var(--radius-pill) !important;
+  background-color: var(--bg-muted) !important;
+  transition: background-color var(--transition-fast) !important;
+}
+
+.arco-switch-checked {
+  background-color: var(--accent-primary) !important;
+}
+
+.arco-slider-road {
+  background-color: var(--bg-muted) !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+.arco-slider-bar {
+  background-color: var(--accent-primary) !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+.arco-slider-btn {
+  border: 2px solid var(--accent-primary) !important;
+  background-color: var(--bg-surface) !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast) !important;
+}
+
+.arco-slider-btn:hover {
+  transform: scale(1.15) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.arco-tooltip-content {
+  border-radius: var(--radius-md) !important;
+  background-color: var(--text-primary) !important;
+  box-shadow: var(--shadow-md) !important;
+  font-size: 12px !important;
+  padding: 6px 10px !important;
+}
+
+.arco-popover {
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--shadow-float) !important;
+  border: 1px solid var(--line-glass) !important;
+  -webkit-backdrop-filter: blur(var(--blur-md)) !important;
+  backdrop-filter: blur(var(--blur-md)) !important;
+}
+
+.arco-drawer {
+  box-shadow: var(--shadow-float) !important;
+}
+
+.arco-drawer-header {
+  border-bottom: 1px solid var(--line-soft) !important;
+}
+
+.arco-drawer-footer {
+  border-top: 1px solid var(--line-soft) !important;
+}
+
+.arco-table {
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+}
+
+.arco-table-th {
+  background-color: var(--bg-muted) !important;
+  border-bottom: 1px solid var(--line-soft) !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.02em !important;
+  color: var(--text-secondary) !important;
+}
+
+.arco-table-td {
+  border-bottom: 1px solid var(--line-soft) !important;
+}
+
+.arco-table-tr:hover .arco-table-td {
+  background-color: var(--bg-surface-hover) !important;
+}
+
+.arco-card {
+  border-radius: var(--radius-xl) !important;
+  border: 1px solid var(--line-soft) !important;
+  box-shadow: var(--shadow-xs) !important;
+  transition: box-shadow var(--transition-smooth), border-color var(--transition-fast) !important;
+}
+
+.arco-card:hover {
+  box-shadow: var(--shadow-sm) !important;
+  border-color: var(--line-medium) !important;
+}
+
+.arco-message {
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--shadow-float) !important;
+  -webkit-backdrop-filter: blur(var(--blur-md)) !important;
+  backdrop-filter: blur(var(--blur-md)) !important;
+}
+
+.arco-input {
+  border-color: var(--line-soft) !important;
+  border-radius: var(--radius-md) !important;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast) !important;
+}
+
+.arco-input:hover {
+  border-color: var(--line-medium) !important;
+}
+
+.arco-textarea {
+  border-color: var(--line-soft) !important;
+  border-radius: var(--radius-md) !important;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast) !important;
+}
+
+.arco-textarea:hover {
+  border-color: var(--line-medium) !important;
+}
+
+.arco-textarea:focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px var(--line-focus) !important;
+}
+
+.arco-picker {
+  border-color: var(--line-soft) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.arco-picker:hover {
+  border-color: var(--line-medium) !important;
+}
+
+.arco-picker-focused {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px var(--line-focus) !important;
+}
+
+.arco-spin {
+  color: var(--accent-primary) !important;
+}
+
+.arco-pagination-item {
+  border-radius: var(--radius-md) !important;
+  border-color: var(--line-soft) !important;
+}
+
+.arco-pagination-item:hover {
+  border-color: var(--accent-primary) !important;
+  color: var(--accent-primary) !important;
+}
+
+.arco-pagination-item-active {
+  background-color: var(--accent-primary) !important;
+  border-color: var(--accent-primary) !important;
+  color: var(--text-on-accent) !important;
+}
+
+.arco-breadcrumb-item {
+  color: var(--text-tertiary) !important;
+}
+
+.arco-breadcrumb-item:last-child {
+  color: var(--text-primary) !important;
+}
+
+.arco-divider {
+  border-color: var(--line-soft) !important;
+}
+
+.arco-collapse-item {
+  border-color: var(--line-soft) !important;
+}
+
+.arco-collapse-item-header {
+  border-radius: var(--radius-md) !important;
+}
+
+.arco-steps-item-active .arco-steps-item-title {
+  color: var(--accent-primary) !important;
+  font-weight: 600 !important;
+}
+
+.arco-badge-count {
+  background-color: var(--accent-primary) !important;
+  border-radius: var(--radius-pill) !important;
+  font-size: 11px !important;
+}
+
+.arco-avatar {
+  border-radius: var(--radius-lg) !important;
+}
+
+.arco-progress-line-bar {
+  border-radius: var(--radius-pill) !important;
+}
+
+.arco-progress-line-wrapper {
+  background-color: var(--bg-muted) !important;
+  border-radius: var(--radius-pill) !important;
+}

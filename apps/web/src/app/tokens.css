@@ -1,0 +1,196 @@
+/* ============================================================
+   easyStory Design System — 深夜书房 Midnight Study
+   Design Tokens (CSS Custom Properties)
+   ============================================================ */
+
+:root {
+  /* ----------------------------------------------------------
+     1. Background — 背景层
+     深夜书房：暗蓝灰墙面 -> 胡桃木桌面 -> 抽屉层叠
+     ---------------------------------------------------------- */
+  --bg-canvas: #1a1d23;
+  --bg-surface: #242830;
+  --bg-surface-hover: rgba(201, 169, 110, 0.06);
+  --bg-surface-active: rgba(201, 169, 110, 0.10);
+  --bg-muted: #2d323d;
+  --bg-elevated: #353b47;
+  --bg-glass: rgba(36, 40, 48, 0.68);
+  --bg-glass-heavy: rgba(36, 40, 48, 0.85);
+
+  /* 背景渐变 */
+  --bg-surface-warm-gradient: linear-gradient(180deg, rgba(45,50,61,0.98) 0%, rgba(36,40,48,0.96) 100%);
+  --bg-panel-warm-gradient: linear-gradient(180deg, rgba(53,59,71,0.94) 0%, rgba(45,50,61,0.92) 100%);
+  --bg-getting-started-gradient: linear-gradient(180deg, rgba(45,50,61,0.98), rgba(36,40,48,0.94));
+  --bg-config-file-gradient: linear-gradient(180deg, rgba(45,50,61,0.98), rgba(40,45,55,0.94));
+
+  /* ----------------------------------------------------------
+     2. Text — 文字色
+     暖白稿纸 -> 旧书页边缘 -> 褪色墨迹
+     ---------------------------------------------------------- */
+  --text-primary: #e8e0d0;
+  --text-secondary: #9a9488;
+  --text-tertiary: #6b6560;
+  --text-placeholder: #4a4642;
+  --text-on-accent: #1a1d23;
+  --text-on-dark: #e8e0d0;
+
+  /* ----------------------------------------------------------
+     3. Accent — 强调色（主品牌色）
+     黄铜台灯光：温暖、聚焦、有仪式感
+     ---------------------------------------------------------- */
+  --accent-primary: #c9a96e;
+  --accent-primary-hover: #d4b87a;
+  --accent-primary-active: #e0c88a;
+  --accent-primary-soft: rgba(201, 169, 110, 0.12);
+  --accent-primary-muted: rgba(201, 169, 110, 0.22);
+  --accent-primary-dark: #a88a52;
+
+  /* 辅助强调色 */
+  --accent-secondary: #9a9488;
+  --accent-tertiary: #6b6560;
+
+  /* ----------------------------------------------------------
+     4. Functional Accents — 功能色
+     ---------------------------------------------------------- */
+  --accent-success: #7aaa8a;
+  --accent-success-soft: rgba(122, 170, 138, 0.12);
+  --accent-success-muted: rgba(122, 170, 138, 0.20);
+
+  --accent-warning: #d4a85a;
+  --accent-warning-soft: rgba(212, 168, 90, 0.12);
+  --accent-warning-muted: rgba(212, 168, 90, 0.20);
+
+  --accent-danger: #c47070;
+  --accent-danger-soft: rgba(196, 112, 112, 0.12);
+  --accent-danger-muted: rgba(196, 112, 112, 0.20);
+  --accent-danger-active: rgba(180, 90, 90, 0.95);
+
+  --accent-info: #7a9ab0;
+  --accent-info-soft: rgba(122, 154, 176, 0.12);
+  --accent-info-muted: rgba(122, 154, 176, 0.20);
+
+  --accent-purple: #a090c0;
+  --accent-pink: #c090a0;
+
+  /* ----------------------------------------------------------
+     5. Line — 线条与边框
+     ---------------------------------------------------------- */
+  --line-soft: rgba(201, 169, 110, 0.08);
+  --line-medium: rgba(201, 169, 110, 0.14);
+  --line-strong: rgba(201, 169, 110, 0.22);
+  --line-focus: rgba(201, 169, 110, 0.35);
+  --line-glass: rgba(36, 40, 48, 0.5);
+
+  /* ----------------------------------------------------------
+     6. Shadow — 阴影系统
+     统一使用 rgba(15, 17, 21, ?) 作为阴影底色
+     ---------------------------------------------------------- */
+  --shadow-xs: 0 1px 2px rgba(15, 17, 21, 0.20);
+  --shadow-sm: 0 1px 3px rgba(15, 17, 21, 0.25), 0 1px 2px rgba(15, 17, 21, 0.15);
+  --shadow-md: 0 4px 8px rgba(15, 17, 21, 0.25), 0 2px 4px rgba(15, 17, 21, 0.15);
+  --shadow-lg: 0 12px 24px rgba(15, 17, 21, 0.30), 0 4px 8px rgba(15, 17, 21, 0.15);
+  --shadow-hero: 0 24px 48px rgba(15, 17, 21, 0.35), 0 8px 16px rgba(15, 17, 21, 0.20);
+  --shadow-glass: 0 8px 32px rgba(15, 17, 21, 0.25), 0 2px 8px rgba(15, 17, 21, 0.15);
+  --shadow-glass-heavy: 0 12px 32px rgba(15, 17, 21, 0.30), 0 4px 12px rgba(15, 17, 21, 0.20);
+  --shadow-float: 0 16px 40px rgba(15, 17, 21, 0.35), 0 4px 12px rgba(15, 17, 21, 0.20);
+  --shadow-panel-side: 2px 0 24px rgba(15, 17, 21, 0.20);
+
+  /* ----------------------------------------------------------
+     7. Effect — 特效与装饰
+     ---------------------------------------------------------- */
+  --glow-warm: rgba(201, 169, 110, 0.15);
+  --glow-cool: rgba(90, 130, 160, 0.12);
+  --overlay-bg: rgba(15, 17, 21, 0.55);
+  --noise-texture-opacity: 0.03;
+
+  /* ----------------------------------------------------------
+     8. Radius — 圆角系统
+     ---------------------------------------------------------- */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-4xl: 28px;
+  --radius-5xl: 32px;
+  --radius-pill: 9999px;
+
+  /* ----------------------------------------------------------
+     9. Blur — 模糊半径
+     ---------------------------------------------------------- */
+  --blur-sm: 8px;
+  --blur-md: 16px;
+  --blur-lg: 24px;
+  --blur-xl: 40px;
+
+  /* ----------------------------------------------------------
+     10. Typography — 字体栈
+     ---------------------------------------------------------- */
+  --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: "SF Mono", "Cascadia Code", "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+
+  /* ----------------------------------------------------------
+     11. Transition — 过渡曲线
+     ---------------------------------------------------------- */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ----------------------------------------------------------
+     12. Z-Index — 层级系统
+     ---------------------------------------------------------- */
+  --z-base: 0;
+  --z-surface: 10;
+  --z-elevated: 20;
+  --z-sticky: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+
+  /* ----------------------------------------------------------
+     13. Component Tokens — 组件级语义变量
+     ---------------------------------------------------------- */
+
+  /* Dropdown */
+  --dropdown-bg: rgba(36, 40, 48, 0.96);
+  --dropdown-border: rgba(201, 169, 110, 0.08);
+  --dropdown-shadow: 0 16px 40px rgba(15, 17, 21, 0.40);
+
+  /* Toolbar */
+  --toolbar-bg: var(--bg-surface);
+  --toolbar-bg-hover: rgba(201, 169, 110, 0.08);
+  --toolbar-bg-active: rgba(201, 169, 110, 0.12);
+  --toolbar-border: var(--line-strong);
+  --toolbar-text: var(--text-secondary);
+  --toolbar-text-active: var(--accent-primary);
+
+  /* Chat */
+  --chat-user-bubble-bg: var(--bg-muted);
+  --chat-assistant-bubble-bg: var(--accent-primary-soft);
+  --chat-skill-panel-bg: var(--bg-surface);
+  --chat-skill-option-active-bg: var(--accent-primary-soft);
+
+  /* Callout */
+  --callout-info-bg: rgba(122, 154, 176, 0.08);
+  --callout-info-border: rgba(122, 154, 176, 0.16);
+  --callout-warning-bg: rgba(212, 168, 90, 0.08);
+  --callout-warning-border: rgba(212, 168, 90, 0.18);
+  --callout-success-bg: rgba(122, 170, 138, 0.08);
+  --callout-success-border: rgba(122, 170, 138, 0.16);
+  --callout-danger-bg: rgba(196, 112, 112, 0.08);
+  --callout-danger-border: rgba(196, 112, 112, 0.14);
+
+  /* Code Block */
+  --bg-code: #0f1115;
+  --text-code: #c8d0e0;
+
+  /* Scene Gradients */
+  --auth-bg-gradient: radial-gradient(circle at top left, rgba(201,169,110,0.10), transparent 32%), radial-gradient(circle at right 20%, rgba(90,130,160,0.08), transparent 26%), linear-gradient(180deg, #1e2128 0%, #1a1d23 48%, #181a20 100%);
+  --workspace-shell-accent-gradient: radial-gradient(circle at top left, rgba(201,169,110,0.05), transparent 26%);
+  --bg-engine-page-gradient: var(--auth-bg-gradient);
+}

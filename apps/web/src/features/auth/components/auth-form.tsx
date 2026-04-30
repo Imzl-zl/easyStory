@@ -8,37 +8,21 @@ import type { ComponentProps } from "react";
 
 import { login, register } from "@/lib/api/auth";
 import { getErrorMessage } from "@/lib/api/client";
+import { useMounted } from "@/lib/hooks/use-mounted";
 import { useAuthStore } from "@/lib/stores/auth-store";
-
-const CREATION_STEPS = [
-  ["起稿", "从灵感到完整故事"],
-  ["推进", "写作与推进一体完成"],
-  ["定稿", "围绕作品的创作工具"],
-] as const;
-
-const PRODUCT_PILLARS = [
-  "工具自动跟随作品，不需要来回切换。",
-  "专注作品和创作进度。",
-  "直接写，工具在背后配合你。",
-] as const;
 
 type AuthMode = "login" | "register";
 
-type AuthFormProps = {
-  mode: AuthMode;
-};
-
 type AuthCopy = {
-  description: string;
   formTitle: string;
-  heroTitle: string;
+  formSubtitle: string;
   submitLabel: string;
   switchHref: string;
   switchLabel: string;
   switchPrompt: string;
 };
 
-export function AuthForm({ mode }: AuthFormProps) {
+export function AuthForm({ mode }: { mode: AuthMode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setSession = useAuthStore((state) => state.setSession);
@@ -46,6 +30,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const mounted = useMounted();
   const copy = buildAuthCopy(mode);
 
   const mutation = useMutation({
@@ -63,152 +48,196 @@ export function AuthForm({ mode }: AuthFormProps) {
   });
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-6 lg:p-8 [background:var(--auth-bg-gradient)]">
-      <div className="grid gap-6 w-full max-w-[1240px] mx-auto [grid-template-columns:1fr] lg:[grid-template-columns:minmax(0,1.15fr)_minmax(360px,460px)] lg:items-center">
-        <AuthHero copy={copy} />
-        <AuthPanel
-          email={email}
-          errorMessage={errorMessage}
-          isPending={mutation.isPending}
-          mode={mode}
-          password={password}
-          username={username}
-          onEmailChange={setEmail}
-          onPasswordChange={setPassword}
-          onSubmit={() => mutation.mutate()}
-          onUsernameChange={setUsername}
+    <main
+      className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden bg-canvas"
+    >
+      {/* 背景光晕 — 左上角暖金 */}
+      <div
+        className="absolute top-0 left-0 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none"
+        style={{
+          background: "radial-gradient(circle, var(--glow-warm) 0%, transparent 70%)",
+          opacity: mounted ? 0.8 : 0,
+          transition: "opacity 2.5s ease 0.3s",
+        }}
+      />
+      {/* 背景光晕 — 右下角冷蓝 */}
+      <div
+        className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full blur-[100px] pointer-events-none"
+        style={{
+          background: "radial-gradient(circle, var(--glow-cool) 0%, transparent 70%)",
+          opacity: mounted ? 0.5 : 0,
+          transition: "opacity 2.5s ease 0.6s",
+        }}
+      />
+
+      {/* 返回首页链接 */}
+      <nav
+        className="absolute top-6 left-6 z-20"
+        style={{
+          opacity: mounted ? 1 : 0,
+          transition: "opacity 1s ease 0.8s",
+        }}
+      >
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-[13px] font-medium text-text-tertiary"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          返回首页
+        </Link>
+      </nav>
+
+      {/* 主卡片 */}
+      <div
+        className="relative z-10 w-full max-w-[420px]"
+        style={{
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? "translateY(0)" : "translateY(20px)",
+          transition: "all 1s cubic-bezier(0.4, 0, 0.2, 1) 0.4s",
+        }}
+      >
+        {/* 卡片外发光 */}
+        <div
+          className="absolute -inset-[1px] rounded-[28px] pointer-events-none"
+          style={{
+            background: "linear-gradient(135deg, rgba(201,169,110,0.15), rgba(90,130,160,0.08), transparent)",
+            opacity: mounted ? 1 : 0,
+            transition: "opacity 2s ease 0.6s",
+          }}
         />
-      </div>
-    </main>
-  );
-}
 
-function AuthHero({ copy }: Readonly<{ copy: AuthCopy }>) {
-  return (
-    <section className="hero-card p-9 flex flex-col gap-7 max-lg:hidden">
-      <div className="absolute -right-10 -bottom-14 w-[180px] h-[180px] rounded-full bg-accent-soft" />
-      <div className="flex items-center gap-3.5">
-        <span className="inline-flex items-center justify-center w-12 h-12 rounded-4 bg-gradient-to-br from-accent-primary to-accent-primary-dark text-white text-[15px] font-semibold tracking-[0.12em]">ES</span>
-        <div>
-          <p className="text-[15px] font-semibold">easyStory</p>
-          <p className="mt-1 text-text-secondary text-[13px] leading-relaxed">持续进入作品的写作工具。</p>
-        </div>
-      </div>
-      <div className="max-w-[620px]">
-        <p className="label-overline">写作者入口</p>
-        <h1 className="mt-4.5 font-serif text-[clamp(2.6rem,5vw,4.4rem)] font-semibold leading-tight">{copy.heroTitle}</h1>
-        <p className="max-w-[580px] mt-4.5 text-text-secondary text-base leading-relaxed">{copy.description}</p>
-      </div>
-      <div className="grid gap-4.5 p-6 rounded-2xl bg-gradient-to-b from-glass-heavy to-glass">
-        <p className="font-serif text-xl leading-relaxed text-text-primary">
-          作品在哪，工具就在哪。
-        </p>
-        <ol className="grid gap-4 list-none">
-          {CREATION_STEPS.map(([title, detail]) => (
-            <li className="pt-4 border-t border-line-soft" key={title}>
-              <span className="inline-block mb-1.5 text-accent-primary text-[13px] font-semibold tracking-[0.14em] uppercase">{title}</span>
-              <p className="text-text-secondary text-sm leading-relaxed">{detail}</p>
-            </li>
-          ))}
-        </ol>
-      </div>
-      <div className="grid gap-2.5">
-        {PRODUCT_PILLARS.map((item) => (
-          <p className="pl-4.5 relative text-text-secondary text-sm leading-relaxed" key={item}>
-            <span className="absolute left-0 top-2.5 w-[7px] h-[7px] rounded-full bg-accent-primary/45" />
-            {item}
-          </p>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function AuthPanel({
-  email,
-  errorMessage,
-  isPending,
-  mode,
-  password,
-  username,
-  onEmailChange,
-  onPasswordChange,
-  onSubmit,
-  onUsernameChange,
-}: Readonly<{
-  email: string;
-  errorMessage: string | null;
-  isPending: boolean;
-  mode: AuthMode;
-  password: string;
-  username: string;
-  onEmailChange: (value: string) => void;
-  onPasswordChange: (value: string) => void;
-  onSubmit: () => void;
-  onUsernameChange: (value: string) => void;
-}>) {
-  const copy = buildAuthCopy(mode);
-
-  return (
-    <section className="flex items-center justify-center">
-      <div className="hero-card w-full max-w-[460px] p-8">
-        <div className="mb-7">
-          <p className="label-overline">easyStory</p>
-          <h2 className="mt-3.5 font-serif text-[34px] font-semibold">{copy.formTitle}</h2>
-          <p className="mt-3 text-text-secondary text-sm leading-relaxed">登录后直接进入书架，继续上次创作。</p>
-        </div>
-        <form
-          className="grid gap-4.5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSubmit();
+        <div
+          className="relative p-10"
+          style={{
+            background: "var(--bg-glass-heavy)",
+            borderRadius: "var(--radius-4xl)",
+            boxShadow: "var(--shadow-hero), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+            backdropFilter: "blur(32px)",
+            WebkitBackdropFilter: "blur(32px)",
           }}
         >
-          <Field
-            autoComplete="username"
-            label="用户名"
-            maxLength={100}
-            minLength={3}
-            placeholder="输入你的创作身份"
-            required
-            value={username}
-            onChange={onUsernameChange}
-          />
-          {mode === "register" ? (
+          {/* Logo */}
+          <div className="flex justify-center mb-8">
+            <div className="flex items-center gap-3">
+              <span
+                className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-[14px] font-semibold tracking-[0.12em]"
+                style={{
+                  background: "linear-gradient(135deg, var(--accent-primary), var(--accent-primary-dark))",
+                  color: "var(--text-on-accent)",
+                }}
+              >
+                ES
+              </span>
+            </div>
+          </div>
+
+          {/* 标题 */}
+          <div className="text-center mb-8">
+            <h1
+              className="font-serif text-[28px] font-semibold tracking-[-0.02em] text-text-primary"
+            >
+              {copy.formTitle}
+            </h1>
+            <p
+              className="mt-2 text-[14px] leading-relaxed text-text-secondary"
+            >
+              {copy.formSubtitle}
+            </p>
+          </div>
+
+          {/* 表单 */}
+          <form
+            className="grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              mutation.mutate();
+            }}
+          >
             <Field
-              autoComplete="email"
-              label="邮箱"
-              maxLength={200}
-              placeholder="用于接收重要通知，可留空"
-              type="email"
-              value={email}
-              onChange={onEmailChange}
+              autoComplete="username"
+              label="用户名"
+              maxLength={100}
+              minLength={3}
+              placeholder="你的创作身份"
+              required
+              value={username}
+              onChange={setUsername}
             />
-          ) : null}
-          <Field
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            label="密码"
-            maxLength={200}
-            minLength={8}
-            placeholder="至少 8 位"
-            required
-            type="password"
-            value={password}
-            onChange={onPasswordChange}
-          />
-          {errorMessage ? <ErrorNotice message={errorMessage} /> : null}
-          <button className="ink-button-hero w-full" disabled={isPending} type="submit">
-            {isPending ? "处理中..." : copy.submitLabel}
-          </button>
-        </form>
-        <div className="flex gap-2 justify-center mt-6.5 pt-5.5 border-t border-line-soft">
-          <span className="text-text-secondary text-sm">{copy.switchPrompt}</span>
-          <Link className="text-accent-primary text-sm font-semibold" href={copy.switchHref}>
-            {copy.switchLabel}
-          </Link>
+            {mode === "register" ? (
+              <Field
+                autoComplete="email"
+                label="邮箱"
+                maxLength={200}
+                placeholder="可选，用于找回账号"
+                type="email"
+                value={email}
+                onChange={setEmail}
+              />
+            ) : null}
+            <Field
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              label="密码"
+              maxLength={200}
+              minLength={8}
+              placeholder="至少 8 位"
+              required
+              type="password"
+              value={password}
+              onChange={setPassword}
+            />
+            {errorMessage ? <ErrorNotice message={errorMessage} /> : null}
+            <button
+              className="ink-button-hero w-full mt-2"
+              disabled={mutation.isPending}
+              type="submit"
+            >
+              {mutation.isPending ? "处理中..." : copy.submitLabel}
+            </button>
+          </form>
+
+          {/* 切换模式 */}
+          <div
+            className="flex gap-2 justify-center mt-7 pt-6 border-t border-line-soft"
+          >
+            <span className="text-[13px] text-text-tertiary">
+              {copy.switchPrompt}
+            </span>
+            <Link
+              className="text-[13px] font-semibold text-accent-primary"
+              href={copy.switchHref}
+            >
+              {copy.switchLabel}
+            </Link>
+          </div>
         </div>
       </div>
-    </section>
+
+      {/* 底部文案 */}
+      <div
+        className="absolute bottom-6 left-0 right-0 flex justify-center"
+        style={{
+          opacity: mounted ? 0.4 : 0,
+          transition: "opacity 2s ease 1.2s",
+        }}
+      >
+        <p
+          className="text-[11px] tracking-[0.15em] uppercase text-text-tertiary"
+        >
+          本地部署 · 数据由你掌控
+        </p>
+      </div>
+    </main>
   );
 }
 
@@ -226,7 +255,11 @@ function Field({
 >) {
   return (
     <label className="grid gap-2">
-      <span className="text-text-secondary text-[13px] font-medium">{label}</span>
+      <span
+        className="text-[13px] font-medium text-text-secondary"
+      >
+        {label}
+      </span>
       <input
         className="ink-input ink-input-roomy"
         value={value}
@@ -239,8 +272,14 @@ function Field({
 
 function ErrorNotice({ message }: Readonly<{ message: string }>) {
   return (
-    <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-4 bg-accent-danger/10 text-accent-danger text-[13px] leading-relaxed">
-      <span className="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-accent-danger/14 font-bold">!</span>
+    <div
+      className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-[13px] leading-relaxed bg-accent-danger-soft text-accent-danger"
+    >
+      <span
+        className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full font-bold text-[10px] bg-accent-danger-muted"
+      >
+        !
+      </span>
       <span>{message}</span>
     </div>
   );
@@ -249,9 +288,8 @@ function ErrorNotice({ message }: Readonly<{ message: string }>) {
 function buildAuthCopy(mode: AuthMode): AuthCopy {
   if (mode === "login") {
     return {
-      description: "回到书架，继续写作。",
-      formTitle: "继续创作",
-      heroTitle: "把故事继续写下去",
+      formTitle: "欢迎回来",
+      formSubtitle: "继续你的故事",
       submitLabel: "进入书架",
       switchHref: "/auth/register",
       switchLabel: "创建账号",
@@ -260,9 +298,8 @@ function buildAuthCopy(mode: AuthMode): AuthCopy {
   }
 
   return {
-    description: "注册后立即开始创作。",
-    formTitle: "创建你的写作空间",
-    heroTitle: "给故事一个真正的开始",
+    formTitle: "开始创作",
+    formSubtitle: "给故事一个起点",
     submitLabel: "创建并进入",
     switchHref: "/auth/login",
     switchLabel: "返回登录",

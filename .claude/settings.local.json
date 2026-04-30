@@ -59,7 +59,8 @@
       "mcp__Playwright__browser_navigate",
       "mcp__Playwright__browser_snapshot",
       "mcp__Playwright__browser_evaluate",
-      "mcp__Playwright__browser_take_screenshot"
+      "mcp__Playwright__browser_take_screenshot",
+      "mcp__serena__find_symbol"
     ]
   }
 }

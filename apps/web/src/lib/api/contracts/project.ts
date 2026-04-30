@@ -52,6 +52,7 @@ export type ProjectSummary = {
   status: ProjectStatus;
   genre: string | null;
   target_words: number | null;
+  current_words: number | null;
   template_id: string | null;
   allow_system_credential_pool: boolean;
   deleted_at: string | null;
