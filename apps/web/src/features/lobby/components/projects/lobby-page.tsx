@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
 import { LobbyProjectShelf } from "@/features/lobby/components/projects/lobby-project-shelf";
 import { useLobbyProjectModel } from "@/features/lobby/components/projects/lobby-project-model";
@@ -10,9 +11,25 @@ import { BinIcon, GearIcon } from "@/components/icons/shared-icons";
 
 export function LobbyPage() {
   const model = useLobbyProjectModel({ deletedOnly: false });
+  const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const clearSession = useAuthStore((state) => state.clearSession);
   const [mounted, setMounted] = useState(false);
+
+  const handleCreateProject = useCallback(async () => {
+    try {
+      const detail = await model.createProjectMutation.mutateAsync({
+        name: "新作品",
+      });
+      if (detail?.id) {
+        router.push(
+          `/workspace/project/${detail.id}/studio?panel=overview&doc=${encodeURIComponent("项目说明.md")}`,
+        );
+      }
+    } catch {
+      // error notice handled by mutation
+    }
+  }, [model.createProjectMutation, router]);
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
@@ -205,6 +222,10 @@ export function LobbyPage() {
             label="回收"
             href="/workspace/lobby/recycle-bin"
           />
+          <NewProjectButton
+            isPending={model.createProjectMutation.isPending}
+            onClick={handleCreateProject}
+          />
           <ToolButton
             icon={<GearIcon />}
             label="设置"
@@ -219,6 +240,52 @@ export function LobbyPage() {
 /* ============================================================
    底部工具按钮
    ============================================================ */
+
+function NewProjectButton({
+  isPending,
+  onClick,
+}: {
+  isPending: boolean;
+  onClick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <button
+      className="relative flex flex-col items-center gap-1 px-5 py-2 rounded-xl transition-all duration-300"
+      disabled={isPending}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered
+          ? "var(--accent-primary-hover)"
+          : "var(--accent-primary)",
+        transform: hovered ? "translateY(-2px) scale(1.05)" : "translateY(0)",
+        boxShadow: hovered
+          ? "0 4px 20px var(--accent-primary-soft)"
+          : "0 2px 8px var(--accent-primary-soft)",
+      }}
+    >
+      <svg
+        className="w-4 h-4"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--text-on-accent)"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      >
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      <span
+        className="text-[11px] tracking-[0.08em] font-medium"
+        style={{ color: "var(--text-on-accent)" }}
+      >
+        {isPending ? "创建中..." : "新建"}
+      </span>
+    </button>
+  );
+}
 
 function ToolButton({
   icon,

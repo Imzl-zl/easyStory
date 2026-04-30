@@ -12,12 +12,14 @@ import {
 } from "@/features/lobby/components/projects/lobby-project-support";
 import { getErrorMessage } from "@/lib/api/client";
 import {
+  createProject,
   deleteProject,
   emptyTrash,
   listProjects,
   physicalDeleteProject,
   restoreProject,
 } from "@/lib/api/projects";
+import type { ProjectCreatePayload } from "@/lib/api/contracts/project";
 import type { ProjectDetail } from "@/lib/api/types";
 
 export type ProjectActionVariables = {
@@ -34,6 +36,7 @@ export function useLobbyProjectModel({ deletedOnly }: { deletedOnly: boolean }) 
     queryFn: () => listProjects(deletedOnly),
   });
   const actionMutation = useProjectActionMutation(queryClient);
+  const createProjectMutation = useCreateProjectMutation(queryClient);
   const emptyTrashMutation = useEmptyTrashMutation(queryClient);
   const filteredProjects = useMemo(
     () => buildFilteredProjects(projectsQuery.data, deferredSearchText),
@@ -42,6 +45,7 @@ export function useLobbyProjectModel({ deletedOnly }: { deletedOnly: boolean }) 
 
   return {
     actionMutation,
+    createProjectMutation,
     deletedOnly,
     deletedProjectCount: projectsQuery.data?.length ?? 0,
     emptyTrashMutation,
@@ -50,6 +54,28 @@ export function useLobbyProjectModel({ deletedOnly }: { deletedOnly: boolean }) 
     searchText,
     setSearchText,
   };
+}
+
+function useCreateProjectMutation(
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
+  return useMutation<ProjectDetail, unknown, ProjectCreatePayload>({
+    mutationFn: (payload: ProjectCreatePayload) => createProject(payload),
+    onSuccess: (_result, variables) => {
+      showAppNotice({
+        content: `《${variables.name}》创建完成。`,
+        title: "项目",
+        tone: "success",
+      });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+    onError: (error) =>
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "项目",
+        tone: "danger",
+      }),
+  });
 }
 
 function useProjectActionMutation(

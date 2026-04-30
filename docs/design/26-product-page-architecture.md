@@ -16,7 +16,7 @@ easyStory 包含以下页面：
 | 序号 | 页面 | 路由族 | 功能定位 |
 |---:|---|---|---|
 | 1 | 认证 | `/auth/login`、`/auth/register` | 登录 / 注册 |
-| 2 | 书架 | `/workspace/lobby` | 项目管理 + 公共配置 |
+| 2 | 书架 | `/workspace/lobby` | 项目管理 |
 | 3 | 创作工作室 | `/workspace/project/[id]/studio` | 写作主场 + AI 对话 |
 | 4 | 工作流引擎 | `/workspace/project/[id]/engine` | 自动化批量执行 + 工作流配置 |
 | 5 | 分析实验室 | `/workspace/project/[id]/lab` | 研究外部文本 + 风格分析 |
@@ -40,13 +40,6 @@ easyStory 包含以下页面：
 - 卡片主操作：打开作品 / 继续创作
 - 新建项目：可输入项目名或使用默认名称（如"新作品"），创建后直接进入工作室
 - 回收站
-
-**公共配置**（侧边面板）
-- Skills
-- Agents
-- MCP
-- 模型连接与凭证
-- 账户信息
 
 ---
 
