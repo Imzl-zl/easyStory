@@ -158,8 +158,8 @@ function WelcomeSection({
     <section
       className="relative overflow-hidden rounded-[28px]"
       style={{
-        background: "linear-gradient(145deg, rgba(45,50,61,0.95) 0%, rgba(36,40,48,0.92) 50%, rgba(30,33,40,0.95) 100%)",
-        border: "1px solid rgba(201, 169, 110, 0.1)",
+        background: "linear-gradient(145deg, rgba(38,43,52,0.95) 0%, rgba(30,33,41,0.92) 50%, rgba(24,27,33,0.95) 100%)",
+        border: "1px solid rgba(160, 150, 130, 0.08)",
         boxShadow: "0 24px 64px rgba(15, 17, 21, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06)",
         opacity: mounted ? 1 : 0,
         transform: mounted ? "translateY(0)" : "translateY(24px)",
@@ -170,7 +170,7 @@ function WelcomeSection({
       <div
         className="absolute top-0 left-1/4 w-96 h-48 rounded-full blur-3xl pointer-events-none"
         style={{
-          background: "radial-gradient(circle, rgba(201,169,110,0.08) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(160,150,130,0.06) 0%, transparent 70%)",
           opacity: mounted ? 1 : 0,
           transition: "opacity 2s ease 0.5s",
         }}
@@ -227,10 +227,10 @@ function WelcomeSection({
                 style={{
                   background: isHovered
                     ? action.tone === "primary"
-                      ? "linear-gradient(135deg, rgba(201,169,110,0.15), rgba(201,169,110,0.05))"
+                      ? "linear-gradient(135deg, rgba(160,150,130,0.12), rgba(160,150,130,0.04))"
                       : "var(--bg-muted)"
-                    : "rgba(36, 40, 48, 0.6)",
-                  border: `1px solid ${isHovered ? (action.tone === "primary" ? "rgba(201,169,110,0.25)" : "var(--line-medium)") : "rgba(201,169,110,0.06)"}`,
+                    : "rgba(30, 33, 41, 0.6)",
+                  border: `1px solid ${isHovered ? (action.tone === "primary" ? "rgba(160,150,130,0.22)" : "var(--line-medium)") : "rgba(160,150,130,0.05)"}`,
                   opacity: mounted ? 1 : 0,
                   transform: mounted ? "translateY(0)" : "translateY(16px)",
                   transition: `all 0.8s cubic-bezier(0.4, 0, 0.2, 1) ${0.35 + index * 0.1}s`,
@@ -241,7 +241,7 @@ function WelcomeSection({
                   className="absolute inset-0 rounded-2xl transition-opacity duration-500"
                   style={{
                     background: action.tone === "primary"
-                      ? "radial-gradient(circle at 80% 20%, rgba(201,169,110,0.1) 0%, transparent 60%)"
+                      ? "radial-gradient(circle at 80% 20%, rgba(160,150,130,0.08) 0%, transparent 60%)"
                       : "radial-gradient(circle at 80% 20%, rgba(255,255,255,0.02) 0%, transparent 60%)",
                     opacity: isHovered ? 1 : 0,
                   }}
@@ -485,7 +485,7 @@ function DashboardAtmosphere({ mounted }: Readonly<{ mounted: boolean }>) {
       <div
         className="absolute top-0 right-0 w-[500px] h-[400px] rounded-full blur-3xl pointer-events-none"
         style={{
-          background: "radial-gradient(circle, rgba(201,169,110,0.06) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(160,150,130,0.05) 0%, transparent 70%)",
           opacity: mounted ? 1 : 0,
           transition: "opacity 2s ease 0.5s",
         }}
@@ -493,7 +493,7 @@ function DashboardAtmosphere({ mounted }: Readonly<{ mounted: boolean }>) {
       <div
         className="absolute bottom-[10%] left-0 w-[400px] h-[300px] rounded-full blur-3xl pointer-events-none"
         style={{
-          background: "radial-gradient(circle, rgba(90,130,160,0.05) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(110,140,170,0.04) 0%, transparent 70%)",
           opacity: mounted ? 1 : 0,
           transition: "opacity 2s ease 0.8s",
         }}

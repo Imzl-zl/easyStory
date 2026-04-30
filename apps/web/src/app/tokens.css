@@ -1,53 +1,53 @@
 /* ============================================================
-   easyStory Design System — 深夜书房 Midnight Study
+   easyStory Design System — 寒窗 Cold Study
    Design Tokens (CSS Custom Properties)
    ============================================================ */
 
 :root {
   /* ----------------------------------------------------------
      1. Background — 背景层
-     深夜书房：暗蓝灰墙面 -> 胡桃木桌面 -> 抽屉层叠
+     冷灰基底，减轻长时间阅读的色温疲劳
      ---------------------------------------------------------- */
-  --bg-canvas: #1a1d23;
-  --bg-surface: #242830;
-  --bg-surface-hover: rgba(201, 169, 110, 0.06);
-  --bg-surface-active: rgba(201, 169, 110, 0.10);
-  --bg-muted: #2d323d;
-  --bg-elevated: #353b47;
-  --bg-glass: rgba(36, 40, 48, 0.68);
-  --bg-glass-heavy: rgba(36, 40, 48, 0.85);
+  --bg-canvas: #15181e;
+  --bg-surface: #1e2129;
+  --bg-surface-hover: rgba(150, 158, 170, 0.06);
+  --bg-surface-active: rgba(150, 158, 170, 0.10);
+  --bg-muted: #262b34;
+  --bg-elevated: #2f343e;
+  --bg-glass: rgba(30, 33, 41, 0.68);
+  --bg-glass-heavy: rgba(30, 33, 41, 0.85);
 
   /* 背景渐变 */
-  --bg-surface-warm-gradient: linear-gradient(180deg, rgba(45,50,61,0.98) 0%, rgba(36,40,48,0.96) 100%);
-  --bg-panel-warm-gradient: linear-gradient(180deg, rgba(53,59,71,0.94) 0%, rgba(45,50,61,0.92) 100%);
-  --bg-getting-started-gradient: linear-gradient(180deg, rgba(45,50,61,0.98), rgba(36,40,48,0.94));
-  --bg-config-file-gradient: linear-gradient(180deg, rgba(45,50,61,0.98), rgba(40,45,55,0.94));
+  --bg-surface-warm-gradient: linear-gradient(180deg, rgba(38,43,52,0.98) 0%, rgba(30,33,41,0.96) 100%);
+  --bg-panel-warm-gradient: linear-gradient(180deg, rgba(47,52,62,0.94) 0%, rgba(38,43,52,0.92) 100%);
+  --bg-getting-started-gradient: linear-gradient(180deg, rgba(38,43,52,0.98), rgba(30,33,41,0.94));
+  --bg-config-file-gradient: linear-gradient(180deg, rgba(38,43,52,0.98), rgba(34,38,47,0.94));
 
   /* ----------------------------------------------------------
      2. Text — 文字色
-     暖白稿纸 -> 旧书页边缘 -> 褪色墨迹
+     偏冷纸白 → 青灰次级 → 淡墨三级
      ---------------------------------------------------------- */
-  --text-primary: #e8e0d0;
-  --text-secondary: #9a9488;
-  --text-tertiary: #6b6560;
-  --text-placeholder: #4a4642;
-  --text-on-accent: #1a1d23;
-  --text-on-dark: #e8e0d0;
+  --text-primary: #dde1e6;
+  --text-secondary: #9299a3;
+  --text-tertiary: #686e77;
+  --text-placeholder: #474d54;
+  --text-on-accent: #15181e;
+  --text-on-dark: #dde1e6;
 
   /* ----------------------------------------------------------
      3. Accent — 强调色（主品牌色）
-     黄铜台灯光：温暖、聚焦、有仪式感
+     石灰岩色：暖中带冷，像古旧石碑或旧纸，克制不刺眼
      ---------------------------------------------------------- */
-  --accent-primary: #c9a96e;
-  --accent-primary-hover: #d4b87a;
-  --accent-primary-active: #e0c88a;
-  --accent-primary-soft: rgba(201, 169, 110, 0.12);
-  --accent-primary-muted: rgba(201, 169, 110, 0.22);
-  --accent-primary-dark: #a88a52;
+  --accent-primary: #a09682;
+  --accent-primary-hover: #b0a794;
+  --accent-primary-active: #c0b8a6;
+  --accent-primary-soft: rgba(160, 150, 130, 0.12);
+  --accent-primary-muted: rgba(160, 150, 130, 0.22);
+  --accent-primary-dark: #867c6a;
 
   /* 辅助强调色 */
-  --accent-secondary: #9a9488;
-  --accent-tertiary: #6b6560;
+  --accent-secondary: #9299a3;
+  --accent-tertiary: #686e77;
 
   /* ----------------------------------------------------------
      4. Functional Accents — 功能色
@@ -74,16 +74,16 @@
 
   /* ----------------------------------------------------------
      5. Line — 线条与边框
+     中性灰调，不再带黄铜暖色
      ---------------------------------------------------------- */
-  --line-soft: rgba(201, 169, 110, 0.08);
-  --line-medium: rgba(201, 169, 110, 0.14);
-  --line-strong: rgba(201, 169, 110, 0.22);
-  --line-focus: rgba(201, 169, 110, 0.35);
-  --line-glass: rgba(36, 40, 48, 0.5);
+  --line-soft: rgba(150, 158, 170, 0.08);
+  --line-medium: rgba(150, 158, 170, 0.14);
+  --line-strong: rgba(150, 158, 170, 0.22);
+  --line-focus: rgba(150, 158, 170, 0.35);
+  --line-glass: rgba(30, 33, 41, 0.5);
 
   /* ----------------------------------------------------------
      6. Shadow — 阴影系统
-     统一使用 rgba(15, 17, 21, ?) 作为阴影底色
      ---------------------------------------------------------- */
   --shadow-xs: 0 1px 2px rgba(15, 17, 21, 0.20);
   --shadow-sm: 0 1px 3px rgba(15, 17, 21, 0.25), 0 1px 2px rgba(15, 17, 21, 0.15);
@@ -98,9 +98,9 @@
   /* ----------------------------------------------------------
      7. Effect — 特效与装饰
      ---------------------------------------------------------- */
-  --glow-warm: rgba(201, 169, 110, 0.15);
-  --glow-cool: rgba(90, 130, 160, 0.12);
-  --overlay-bg: rgba(15, 17, 21, 0.55);
+  --glow-warm: rgba(160, 150, 130, 0.10);
+  --glow-cool: rgba(110, 140, 170, 0.08);
+  --overlay-bg: rgba(15, 17, 20, 0.55);
   --noise-texture-opacity: 0.03;
 
   /* ----------------------------------------------------------
@@ -157,14 +157,14 @@
      ---------------------------------------------------------- */
 
   /* Dropdown */
-  --dropdown-bg: rgba(36, 40, 48, 0.96);
-  --dropdown-border: rgba(201, 169, 110, 0.08);
+  --dropdown-bg: rgba(30, 33, 41, 0.96);
+  --dropdown-border: rgba(150, 158, 170, 0.08);
   --dropdown-shadow: 0 16px 40px rgba(15, 17, 21, 0.40);
 
   /* Toolbar */
   --toolbar-bg: var(--bg-surface);
-  --toolbar-bg-hover: rgba(201, 169, 110, 0.08);
-  --toolbar-bg-active: rgba(201, 169, 110, 0.12);
+  --toolbar-bg-hover: rgba(160, 150, 130, 0.08);
+  --toolbar-bg-active: rgba(160, 150, 130, 0.12);
   --toolbar-border: var(--line-strong);
   --toolbar-text: var(--text-secondary);
   --toolbar-text-active: var(--accent-primary);
@@ -190,7 +190,7 @@
   --text-code: #c8d0e0;
 
   /* Scene Gradients */
-  --auth-bg-gradient: radial-gradient(circle at top left, rgba(201,169,110,0.10), transparent 32%), radial-gradient(circle at right 20%, rgba(90,130,160,0.08), transparent 26%), linear-gradient(180deg, #1e2128 0%, #1a1d23 48%, #181a20 100%);
-  --workspace-shell-accent-gradient: radial-gradient(circle at top left, rgba(201,169,110,0.05), transparent 26%);
+  --auth-bg-gradient: radial-gradient(circle at top left, rgba(160,150,130,0.08), transparent 32%), radial-gradient(circle at right 20%, rgba(110,140,170,0.06), transparent 26%), linear-gradient(180deg, #181b23 0%, #15181e 48%, #13151b 100%);
+  --workspace-shell-accent-gradient: radial-gradient(circle at top left, rgba(160,150,130,0.04), transparent 26%);
   --bg-engine-page-gradient: var(--auth-bg-gradient);
 }

@@ -101,7 +101,7 @@ export function useParticleCanvas(config?: ParticleConfig) {
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(201, 169, 110, ${alpha * cfg.alpha})`;
+        ctx.fillStyle = `rgba(160, 150, 130, ${alpha * cfg.alpha})`;
         ctx.fill();
 
         return true;

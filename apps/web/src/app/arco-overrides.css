@@ -7,15 +7,15 @@
 
 body {
   --arco-color-primary-6: var(--accent-primary);
-  --arco-color-primary-5: #b89a62;
-  --arco-color-primary-4: #a68a58;
-  --arco-color-primary-3: #947a4e;
-  --arco-color-primary-2: #826a44;
-  --arco-color-primary-1: #705a3a;
-  --arco-color-primary-7: #d4b87a;
+  --arco-color-primary-5: #908674;
+  --arco-color-primary-4: #807764;
+  --arco-color-primary-3: #706754;
+  --arco-color-primary-2: #605844;
+  --arco-color-primary-1: #504834;
+  --arco-color-primary-7: #b0a794;
   --arco-color-primary-8: var(--accent-primary-hover);
-  --arco-color-primary-9: #e0c88a;
-  --arco-color-primary-10: #ecd89a;
+  --arco-color-primary-9: #c0b8a6;
+  --arco-color-primary-10: #d0c9b8;
   --arco-color-success-6: var(--accent-success);
   --arco-color-warning-6: var(--accent-warning);
   --arco-color-danger-6: var(--accent-danger);
@@ -355,3 +355,13 @@ body {
   background-color: var(--bg-muted) !important;
   border-radius: var(--radius-pill) !important;
 }
+
+/* Arco 的 main { display: block; } 是无层叠样式，覆盖 Tailwind v4 @layer utilities。
+   统一用更高特异性的无层叠规则抵消。之后所有 <main> 上的 display 工具类都不会被覆盖。 */
+main.flex { display: flex; }
+main.inline-flex { display: inline-flex; }
+main.grid { display: grid; }
+main.inline-grid { display: inline-grid; }
+main.table { display: table; }
+main.contents { display: contents; }
+main.hidden { display: none; }

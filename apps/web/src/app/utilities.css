@@ -196,12 +196,12 @@
 
 .ink-button:hover {
   background: var(--accent-primary-hover);
-  box-shadow: 0 2px 12px rgba(201, 169, 110, 0.25), 0 0 0 1px rgba(201, 169, 110, 0.10);
+  box-shadow: 0 2px 12px rgba(160, 150, 130, 0.25), 0 0 0 1px rgba(160, 150, 130, 0.10);
 }
 
 .ink-button:active {
   transform: scale(0.97);
-  box-shadow: 0 1px 4px rgba(201, 169, 110, 0.18);
+  box-shadow: 0 1px 4px rgba(160, 150, 130, 0.18);
   background: var(--accent-primary-active);
 }
 
@@ -326,7 +326,7 @@
 
 .ink-button-hero:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(201, 169, 110, 0.25);
+  box-shadow: 0 12px 28px rgba(160, 150, 130, 0.25);
 }
 
 .ink-button-hero:disabled {

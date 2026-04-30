@@ -27,7 +27,7 @@ export function LobbyPage() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(circle at top left, rgba(201,169,110,0.05), transparent 32%), radial-gradient(circle at right 20%, rgba(90,130,160,0.04), transparent 26%)",
+            "radial-gradient(circle at top left, rgba(160,150,130,0.04), transparent 32%), radial-gradient(circle at right 20%, rgba(110,140,170,0.035), transparent 26%)",
           opacity: mounted ? 1 : 0,
           transition: "opacity 2s ease",
         }}

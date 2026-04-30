@@ -100,7 +100,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         <div
           className="absolute -inset-[1px] rounded-[28px] pointer-events-none"
           style={{
-            background: "linear-gradient(135deg, rgba(201,169,110,0.15), rgba(90,130,160,0.08), transparent)",
+            background: "linear-gradient(135deg, var(--accent-primary-soft), var(--glow-cool), transparent)",
             animation: "authFadeIn 2s ease 0.6s both",
           }}
         />
