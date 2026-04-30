@@ -62,6 +62,18 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
     }
   }, [currentProjectId, setLastProjectId]);
 
+  // Lobby page renders its own full-viewport layout; skip shell chrome
+  if (pageMode === "lobby") {
+    return (
+      <AuthGuard>
+        <a className="absolute top-3 left-3 z-50 -translate-y-[140%] focus-visible:translate-y-0" href="#workspace-main">跳到主内容</a>
+        <div className={shellClassName} data-page-mode={pageMode}>
+          <main className="w-full" id="workspace-main">{children}</main>
+        </div>
+      </AuthGuard>
+    );
+  }
+
   return (
     <AuthGuard>
       <a className="absolute top-3 left-3 z-30 -translate-y-[140%] focus-visible:translate-y-0" href="#workspace-main">跳到主内容</a>

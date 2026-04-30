@@ -1,202 +1,299 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { LobbyProjectShelf } from "@/features/lobby/components/projects/lobby-project-shelf";
 import { useLobbyProjectModel } from "@/features/lobby/components/projects/lobby-project-model";
-import { BinIcon, GearIcon, GridIcon, ScrollIcon } from "@/components/icons/shared-icons";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { BinIcon, BrushIcon, GearIcon, GridIcon } from "@/components/icons/shared-icons";
 
 export function LobbyPage() {
   const model = useLobbyProjectModel({ deletedOnly: false });
-  const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const clearSession = useAuthStore((state) => state.clearSession);
   const [mounted, setMounted] = useState(false);
-  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
   }, []);
 
-  const navItems = [
-    { id: "works", icon: ScrollIcon, label: "作品", href: "/workspace/lobby", active: true },
-    { id: "templates", icon: GridIcon, label: "模板", href: "/workspace/lobby/templates" },
-    { id: "bin", icon: BinIcon, label: "回收", href: "/workspace/lobby/recycle-bin" },
-    { id: "settings", icon: GearIcon, label: "设置", href: "/workspace/lobby/settings" },
-  ];
-
   return (
     <div
-      className="relative min-h-screen flex bg-canvas"
+      className="relative h-screen flex flex-col workspace-shell--studio"
     >
-      {/* 左侧图标边栏 — 无边框，用阴影区分层级 */}
-      <aside
-        className="fixed left-0 top-0 h-screen w-16 flex flex-col items-center py-6 z-30 hidden lg:flex"
+      {/* === 背景层：微光渐变 === */}
+      <div
+        className="absolute inset-0 pointer-events-none"
         style={{
-          background: "var(--bg-surface)",
-          boxShadow: "var(--shadow-panel-side)",
+          background:
+            "radial-gradient(circle at top left, rgba(201,169,110,0.05), transparent 32%), radial-gradient(circle at right 20%, rgba(90,130,160,0.04), transparent 26%)",
+          opacity: mounted ? 1 : 0,
+          transition: "opacity 2s ease",
+        }}
+      />
+
+      {/* === 顶部导航 === */}
+      <nav
+        className="relative z-30 flex-none flex items-center justify-between px-6 py-4 lg:px-10"
+        style={{
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? "translateY(0)" : "translateY(-16px)",
+          transition: "all 1.2s cubic-bezier(0.4, 0, 0.2, 1) 0.4s",
         }}
       >
-        {/* Logo */}
-        <Link href="/" className="mb-10">
+        <Link href="/" className="flex items-center gap-3 group">
           <span
-            className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-[11px] font-semibold tracking-[0.12em]"
+            className="inline-flex items-center justify-center w-9 h-9 rounded-xl text-[12px] font-bold tracking-[0.15em]"
             style={{
-              background: "linear-gradient(135deg, var(--accent-primary), var(--accent-primary-dark))",
+              background:
+                "linear-gradient(135deg, var(--accent-primary), var(--accent-primary-dark))",
               color: "var(--text-on-accent)",
             }}
           >
             ES
           </span>
-        </Link>
-
-        {/* 导航图标 */}
-        <nav className="flex flex-col gap-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isHovered = hoveredNav === item.id;
-            return (
-              <div
-                key={item.id}
-                className="relative"
-                onMouseEnter={() => setHoveredNav(item.id)}
-                onMouseLeave={() => setHoveredNav(null)}
-              >
-                <Link
-                  href={item.href}
-                  className="flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200"
-                  style={{
-                    background: item.active ? "var(--accent-primary-soft)" : isHovered ? "var(--bg-muted)" : "transparent",
-                    color: item.active ? "var(--accent-primary)" : "var(--text-tertiary)",
-                  }}
-                >
-                  <Icon className="w-[18px] h-[18px]" />
-                </Link>
-                {/* 悬停提示 */}
-                {isHovered && (
-                  <div
-                    className="absolute left-12 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg text-[12px] font-medium whitespace-nowrap z-50"
-                    style={{
-                      background: "var(--bg-glass-heavy)",
-                      backdropFilter: "blur(12px)",
-                      color: "var(--text-primary)",
-                      border: "1px solid var(--line-soft)",
-                      boxShadow: "var(--shadow-md)",
-                    }}
-                  >
-                    {item.label}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-
-        {/* 底部用户 */}
-        <div className="mt-auto">
-          <button
-            className="flex items-center justify-center w-10 h-10 rounded-xl text-text-tertiary"
-            onClick={() => {
-              router.push("/auth/login");
+          <span
+            className="text-[15px] font-medium tracking-[-0.01em]"
+            style={{
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-serif)",
             }}
           >
-            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+            easyStory
+          </span>
+        </Link>
+
+        <div className="flex items-center gap-4">
+          {/* 搜索 */}
+          <div
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full"
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--line-soft)",
+              boxShadow: "var(--shadow-xs)",
+            }}
+          >
+            <svg
+              className="w-3.5 h-3.5"
+              style={{ color: "var(--text-tertiary)" }}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
             </svg>
+            <input
+              className="bg-transparent text-[13px] outline-none w-[120px]"
+              style={{
+                color: "var(--text-secondary)",
+                caretColor: "var(--accent-primary)",
+              }}
+              placeholder="寻书..."
+              value={model.searchText}
+              onChange={(e) => model.setSearchText(e.target.value)}
+            />
+          </div>
+
+          {/* 用户名 */}
+          <span
+            className="hidden md:block text-[13px]"
+            style={{ color: "var(--text-tertiary)" }}
+          >
+            {user?.username ?? "未登录"}
+          </span>
+
+          {/* 退出 */}
+          <button
+            onClick={clearSession}
+            className="ink-link-button text-[12px] tracking-[0.05em]"
+          >
+            退出
           </button>
         </div>
-      </aside>
+      </nav>
 
-      {/* 主内容 */}
-      <main className="flex-1 lg:ml-16 min-w-0">
-        {/* 页面标题区 — 非 sticky，因为上面已有全局导航 */}
-        <header
-          className="flex items-center justify-between px-6 py-5"
-          style={{
-            opacity: mounted ? 1 : 0,
-            transform: mounted ? "translateY(0)" : "translateY(-8px)",
-            transition: "all 0.8s ease 0.2s",
-          }}
-        >
-          <div>
-            <h1
-              className="font-serif text-[22px] font-semibold tracking-[-0.02em] text-text-primary"
-            >
-              书架
-            </h1>
-            <p
-              className="mt-0.5 text-[13px] text-text-tertiary"
-            >
-              {model.projectsQuery.data?.length ?? 0} 部作品
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* 搜索 */}
-            <div
-              className="relative hidden sm:block"
-              style={{
-                opacity: mounted ? 1 : 0,
-                transition: "opacity 0.8s ease 0.4s",
-              }}
-            >
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-                style={{ color: "var(--text-tertiary)" }}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-              <input
-                className="ink-input-roomy min-h-9 w-[200px] pl-9 text-[13px]"
-                placeholder="搜索作品…"
-                value={model.searchText}
-                onChange={(e) => model.setSearchText(e.target.value)}
+      {/* === 可滚动内容区 === */}
+      <div
+        className="relative z-20 flex-1 overflow-y-auto overflow-x-hidden"
+        style={{
+          scrollbarWidth: "thin",
+          scrollbarColor: "var(--line-medium) transparent",
+        }}
+      >
+        <main className="px-6 lg:px-10 pb-32">
+          {/* 书阁标题 */}
+          <header
+            className="mb-10 mt-2"
+            style={{
+              opacity: mounted ? 1 : 0,
+              transform: mounted ? "translateY(0)" : "translateY(20px)",
+              transition: "all 1.4s cubic-bezier(0.4, 0, 0.2, 1) 0.6s",
+            }}
+          >
+            <div className="flex items-end gap-6">
+              <div>
+                <h1
+                  className="text-[clamp(2rem,5vw,3.5rem)] font-semibold leading-none tracking-[-0.04em]"
+                  style={{
+                    color: "var(--text-primary)",
+                    fontFamily: "var(--font-serif)",
+                  }}
+                >
+                  墨海书阁
+                </h1>
+                <p
+                  className="mt-3 text-[14px] tracking-[0.1em]"
+                  style={{ color: "var(--text-tertiary)" }}
+                >
+                  {model.projectsQuery.data?.length ?? 0} 卷藏书
+                </p>
+              </div>
+              <div
+                className="hidden md:block flex-1 h-px mb-3"
+                style={{
+                  background:
+                    "linear-gradient(90deg, var(--line-medium), transparent)",
+                }}
               />
             </div>
+          </header>
 
-            {/* 新建 */}
-            <Link
-              href="/workspace/lobby/new"
-              className="ink-button-hero text-[13px] min-h-9 px-4"
-              style={{
-                opacity: mounted ? 1 : 0,
-                transform: mounted ? "scale(1)" : "scale(0.9)",
-                transition: "all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s",
-              }}
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              新建
-            </Link>
+          {/* 项目展示 */}
+          <div
+            style={{
+              opacity: mounted ? 1 : 0,
+              transform: mounted ? "translateY(0)" : "translateY(24px)",
+              transition: "all 1.2s cubic-bezier(0.4, 0, 0.2, 1) 0.9s",
+            }}
+          >
+            <LobbyProjectShelf
+              actionMutation={model.actionMutation}
+              deletedOnly={false}
+              error={model.projectsQuery.error}
+              isLoading={model.projectsQuery.isLoading}
+              projects={model.filteredProjects}
+              templateNameById={model.templateNameById}
+              viewMode="grid"
+            />
           </div>
-        </header>
+        </main>
+      </div>
 
-        {/* 项目区域 */}
+      {/* === 底部工具栏 === */}
+      <footer
+        className="fixed bottom-6 left-0 right-0 z-30 flex justify-center pointer-events-none"
+        style={{
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? "translateY(0)" : "translateY(20px)",
+          transition: "all 1s cubic-bezier(0.4, 0, 0.2, 1) 1.2s",
+        }}
+      >
         <div
-          className="px-6 pb-12"
+          className="pointer-events-auto flex items-center gap-1 px-2 py-2 rounded-2xl"
           style={{
-            opacity: mounted ? 1 : 0,
-            transform: mounted ? "translateY(0)" : "translateY(12px)",
-            transition: "all 1s ease 0.4s",
+            background: "var(--bg-glass-heavy)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid var(--line-soft)",
+            boxShadow: "var(--shadow-glass-heavy)",
           }}
         >
-          <LobbyProjectShelf
-            actionMutation={model.actionMutation}
-            deletedOnly={false}
-            error={model.projectsQuery.error}
-            isLoading={model.projectsQuery.isLoading}
-            projects={model.filteredProjects}
-            templateNameById={model.templateNameById}
-            viewMode="grid"
+          <ToolButton
+            icon={<BrushIcon />}
+            label="新卷"
+            href="/workspace/lobby/new"
+            tone="primary"
+          />
+          <div
+            className="w-px h-5 mx-1"
+            style={{ background: "var(--line-soft)" }}
+          />
+          <ToolButton
+            icon={<GridIcon />}
+            label="模板"
+            href="/workspace/lobby/templates"
+          />
+          <ToolButton
+            icon={<BinIcon />}
+            label="回收"
+            href="/workspace/lobby/recycle-bin"
+          />
+          <ToolButton
+            icon={<GearIcon />}
+            label="设置"
+            href="/workspace/lobby/settings"
           />
         </div>
-      </main>
+      </footer>
     </div>
+  );
+}
+
+/* ============================================================
+   底部工具按钮
+   ============================================================ */
+
+function ToolButton({
+  icon,
+  label,
+  href,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  href: string;
+  tone?: "primary" | "default";
+}) {
+  const [hovered, setHovered] = useState(false);
+  const isPrimary = tone === "primary";
+
+  return (
+    <Link
+      href={href}
+      className="relative flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered
+          ? isPrimary
+            ? "var(--accent-primary-soft)"
+            : "var(--bg-surface-hover)"
+          : "transparent",
+        transform: hovered ? "translateY(-2px)" : "translateY(0)",
+      }}
+    >
+      <span
+        style={{
+          color: isPrimary
+            ? hovered
+              ? "var(--accent-primary-hover)"
+              : "var(--accent-primary)"
+            : hovered
+              ? "var(--text-secondary)"
+              : "var(--text-tertiary)",
+          transition: "color 0.3s ease",
+        }}
+      >
+        {icon}
+      </span>
+      <span
+        className="text-[10px] tracking-[0.1em]"
+        style={{
+          color: isPrimary
+            ? hovered
+              ? "var(--accent-primary)"
+              : "var(--accent-primary-dark)"
+            : hovered
+              ? "var(--text-secondary)"
+              : "var(--text-tertiary)",
+          transition: "color 0.3s ease",
+        }}
+      >
+        {label}
+      </span>
+    </Link>
   );
 }

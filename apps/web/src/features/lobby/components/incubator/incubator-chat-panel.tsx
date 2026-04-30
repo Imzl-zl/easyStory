@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { KeyboardEvent, RefObject } from "react";
 import { Input } from "@arco-design/web-react";
 import type { RefTextAreaType } from "@arco-design/web-react/es/Input";
@@ -29,30 +29,27 @@ type ChatModePanelProps = {
   model: IncubatorChatModel;
 };
 
-type ComposerSectionProps = {
-  canSubmit: boolean;
-  composerRef: RefObject<RefTextAreaType | null>;
-  isCredentialLoading: boolean;
-  isResponding: boolean;
-  model: IncubatorChatModel;
-};
+/* ------------------------------------------------------------------ */
+/*  Chat Mode Panel — 中央聚焦式布局                                  */
+/* ------------------------------------------------------------------ */
 
 export function ChatModePanel({ model }: Readonly<ChatModePanelProps>) {
   const visibleMessages = model.messages.filter(isVisibleConversationMessage);
   const canSubmit = buildCanSubmit(model);
   const composerRef = useRef<RefTextAreaType | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
-  const showPromptSuggestions = model.credentialState === "ready"
-    && model.canChat
-    && shouldShowPromptSuggestions(model.hasUserMessage)
-    && !model.isResponding;
+  const showPromptSuggestions =
+    model.credentialState === "ready" &&
+    model.canChat &&
+    shouldShowPromptSuggestions(model.hasUserMessage) &&
+    !model.isResponding;
   const disablePromptSuggestions = !model.canChat || model.isCredentialLoading;
   const lastMessage = visibleMessages.at(-1);
+  const [draftOpen, setDraftOpen] = useState(false);
+
   const syncTranscriptToBottom = useEffectEvent(() => {
     const node = transcriptRef.current;
-    if (!node) {
-      return;
-    }
+    if (!node) return;
     node.scrollTop = node.scrollHeight;
   });
 
@@ -68,9 +65,9 @@ export function ChatModePanel({ model }: Readonly<ChatModePanelProps>) {
   ]);
 
   return (
-    <div className="grid h-full min-h-0 gap-2 lg:gap-2.5 lg:grid-cols-[minmax(312px,352px)_minmax(0,1fr)] xl:grid-cols-[minmax(324px,368px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(336px,384px)_minmax(0,1fr)]">
-      <section className="panel-shell order-1 flex min-h-[440px] flex-col overflow-hidden md:min-h-[500px] lg:order-2 lg:h-full lg:min-h-0">
-        <ChatPanelHeader model={model} />
+    <div className="incubator-chat">
+      {/* 中央对话区 */}
+      <div className="incubator-chat-main">
         <ChatTranscript
           disablePromptSuggestions={disablePromptSuggestions}
           messages={visibleMessages}
@@ -81,63 +78,46 @@ export function ChatModePanel({ model }: Readonly<ChatModePanelProps>) {
             composerRef.current?.focus();
           }}
         />
-        <ChatComposerSection
+        <ChatComposer
           canSubmit={canSubmit}
           composerRef={composerRef}
           isCredentialLoading={model.isCredentialLoading}
           isResponding={model.isResponding}
           model={model}
         />
-      </section>
-      <IncubatorChatDraftPanel
-        canCompleteWithAi={model.canCompleteDraftWithAi}
-        createMutation={model.createMutation}
+      </div>
+
+      {/* 草稿面板触发器 */}
+      <DraftTrigger
         draft={model.draft}
-        draftMutation={model.draftMutation}
+        draftOpen={draftOpen}
         hasUserMessage={model.hasUserMessage}
-        isDraftStale={model.isDraftStale}
-        isCompletingWithAi={model.isCompletingDraftWithAi}
-        onCompleteWithAi={model.completeDraftWithAi}
-        onProjectNameChange={model.setProjectName}
-        onSyncDraft={model.syncDraft}
-        projectName={model.projectName}
+        onToggle={() => setDraftOpen(!draftOpen)}
       />
+
+      {/* 底部升起式草稿面板 */}
+      <div className={`incubator-draft-drawer ${draftOpen ? "open" : ""}`}>
+        <IncubatorChatDraftPanel
+          canCompleteWithAi={model.canCompleteDraftWithAi}
+          createMutation={model.createMutation}
+          draft={model.draft}
+          draftMutation={model.draftMutation}
+          hasUserMessage={model.hasUserMessage}
+          isDraftStale={model.isDraftStale}
+          isCompletingWithAi={model.isCompletingDraftWithAi}
+          onCompleteWithAi={model.completeDraftWithAi}
+          onProjectNameChange={model.setProjectName}
+          onSyncDraft={model.syncDraft}
+          projectName={model.projectName}
+        />
+      </div>
     </div>
   );
 }
 
-function ChatPanelHeader({
-  model,
-}: {
-  model: IncubatorChatModel;
-}) {
-  return (
-    <header className="relative z-10 border-b border-line-soft px-3 py-1.5 md:px-4 md:py-2 xl:px-5">
-      <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <h2 className="text-[13px] font-semibold text-text-primary">AI 聊天</h2>
-          {model.isCredentialLoading ? (
-            <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[10px] leading-4 text-text-secondary">
-              正在准备
-            </span>
-          ) : null}
-        </div>
-        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-          <ChatHistoryPanel model={model} />
-          <ChatAdvancedSettings model={model} />
-        </div>
-      </div>
-      {model.credentialNotice ? (
-        <div className="mt-2">
-          <CredentialNoticeCard
-            credentialSettingsHref={model.credentialSettingsHref}
-            message={model.credentialNotice}
-          />
-        </div>
-      ) : null}
-    </header>
-  );
-}
+/* ------------------------------------------------------------------ */
+/*  Chat Transcript — 中央滚动区                                      */
+/* ------------------------------------------------------------------ */
 
 function ChatTranscript({
   disablePromptSuggestions,
@@ -152,94 +132,197 @@ function ChatTranscript({
   transcriptRef: RefObject<HTMLDivElement | null>;
   onSelectPrompt: (prompt: string) => void;
 }) {
+  const hasMessages = messages.length > 0;
+
   return (
     <div
       aria-live="polite"
-      className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-[var(--bg-panel-warm-gradient)] px-3 py-1.5 md:px-4 md:py-2 xl:px-5"
+      className="incubator-transcript"
       ref={transcriptRef}
     >
-      <div className="mx-auto flex min-h-full w-full max-w-[980px] flex-col gap-1.5">
-        {messages.map((message) => (
-          <MessageBubble
-            content={message.content}
-            hookResults={message.hookResults}
-            key={message.id}
-            role={message.role}
-            status={message.status}
-          />
-        ))}
-        {showPromptSuggestions ? (
-          <section className="mt-0.5 rounded-2xl bg-glass shadow-glass p-2.5 shadow-sm">
-            <p className="text-[12.5px] font-medium text-text-primary">不知道怎么开始？</p>
-            <p className="mt-1 text-[11.5px] leading-5 text-text-secondary">
-              先选一句示例，再按你的想法继续改。
-            </p>
-            <PromptSuggestionBar disabled={disablePromptSuggestions} onSelect={onSelectPrompt} />
-          </section>
-        ) : null}
+      <div className="incubator-transcript-inner">
+        {/* 空状态 — 大标题引导 */}
+        {!hasMessages && !showPromptSuggestions && (
+          <EmptyState />
+        )}
+
+        {/* 消息流 */}
+        <div className="incubator-messages">
+          {messages.map((message) => (
+            <MessageBubble
+              content={message.content}
+              hookResults={message.hookResults}
+              key={message.id}
+              role={message.role}
+              status={message.status}
+            />
+          ))}
+        </div>
+
+        {/* 提示词建议 */}
+        {showPromptSuggestions && (
+          <div className="incubator-suggestions">
+            <PromptSuggestionSection
+              disabled={disablePromptSuggestions}
+              onSelect={onSelectPrompt}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function ChatComposerSection({
+/* ------------------------------------------------------------------ */
+/*  Empty State — 杂志风大标题                                        */
+/* ------------------------------------------------------------------ */
+
+function EmptyState() {
+  return (
+    <div className="incubator-empty">
+      <div className="incubator-empty-kicker">新项目</div>
+      <h1 className="incubator-empty-title">
+        从这里开始<br />你的故事
+      </h1>
+      <p className="incubator-empty-body">
+        描述你想写的故事——题材、主角、世界观，<br />
+        AI 会帮你整理成完整的项目草稿。
+      </p>
+      <div className="incubator-empty-line" />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Prompt Suggestion Section                                         */
+/* ------------------------------------------------------------------ */
+
+function PromptSuggestionSection({
+  disabled,
+  onSelect,
+}: {
+  disabled?: boolean;
+  onSelect: (prompt: string) => void;
+}) {
+  return (
+    <div className="incubator-suggestion-card">
+      <p className="incubator-suggestion-label">不知道怎么开始？</p>
+      <PromptSuggestionBar disabled={disabled} onSelect={onSelect} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Chat Composer — 底部中央输入                                      */
+/* ------------------------------------------------------------------ */
+
+function ChatComposer({
   canSubmit,
   composerRef,
   isCredentialLoading,
   isResponding,
   model,
-}: Readonly<ComposerSectionProps>) {
+}: {
+  canSubmit: boolean;
+  composerRef: RefObject<RefTextAreaType | null>;
+  isCredentialLoading: boolean;
+  isResponding: boolean;
+  model: IncubatorChatModel;
+}) {
   return (
-    <footer className="border-t border-line-soft bg-glass px-3 py-1.5 md:px-4 md:py-2 xl:px-5">
-      <div className="rounded-2xl bg-glass shadow-glass-heavy px-2.5 py-1.5 shadow-sm transition-[border-color,box-shadow,background-color] focus-within:border-accent-primary/25 focus-within:ring-3 focus-within:ring-accent-primary/10">
-        <label className="block">
-          <span className="sr-only">继续聊</span>
+    <div className="incubator-composer">
+      <div className="incubator-composer-inner">
+        <div className="incubator-composer-field">
           <Input.TextArea
-            autoSize={{ maxRows: 6, minRows: 2 }}
+            autoSize={{ maxRows: 6, minRows: 1 }}
             autoComplete="off"
-            className="w-full text-[13px] leading-6"
+            className="incubator-composer-input"
             maxLength={INCUBATOR_INPUT_MAX_LENGTH}
             name="incubatorMessage"
-            placeholder="例如：我想写一篇女主成长小说，开局就要有冲突…"
+            placeholder="描述你想写的故事..."
             ref={composerRef}
             value={model.composerText}
             onChange={(value) => model.setComposerText(value)}
             onKeyDown={(event) => handleComposerKeyDown(event, canSubmit, model)}
           />
-        </label>
-        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
-          <p className="flex-1 text-[11px] leading-5 text-text-secondary">
+          <button
+            className="incubator-composer-send"
+            disabled={!canSubmit}
+            type="button"
+            onClick={() => submitComposerText(canSubmit, model)}
+          >
+            <svg aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+        <div className="incubator-composer-meta">
+          <span className="incubator-composer-hint">
             {buildComposerHint(
               model.composerText.length,
               model.credentialState,
               model.canChat,
               isCredentialLoading,
             )}
-          </p>
-          <button
-            className="ink-button"
-            disabled={!canSubmit}
-            type="button"
-            onClick={() => submitComposerText(canSubmit, model)}
-          >
-            {resolveSubmitButtonLabel(isCredentialLoading, isResponding)}
-          </button>
+          </span>
+          <div className="incubator-composer-tools">
+            <ChatHistoryPanel model={model} />
+            <ChatAdvancedSettings model={model} />
+          </div>
         </div>
       </div>
-    </footer>
+    </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  Draft Trigger — 草稿面板开关                                      */
+/* ------------------------------------------------------------------ */
+
+function DraftTrigger({
+  draft,
+  draftOpen,
+  hasUserMessage,
+  onToggle,
+}: {
+  draft: { setting_completeness?: { status: string } } | null;
+  draftOpen: boolean;
+  hasUserMessage: boolean;
+  onToggle: () => void;
+}) {
+  if (!hasUserMessage && !draft) return null;
+
+  const status = draft?.setting_completeness?.status;
+  const statusDot = status === "complete" ? "complete" : status === "partial" ? "partial" : "draft";
+
+  return (
+    <button className={`incubator-draft-trigger ${draftOpen ? "open" : ""}`} onClick={onToggle} type="button">
+      <span className={`incubator-draft-dot ${statusDot}`} />
+      <span className="incubator-draft-label">{draftOpen ? "收起草稿" : "查看草稿"}</span>
+      <svg aria-hidden="true" className="incubator-draft-arrow" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                           */
+/* ------------------------------------------------------------------ */
 
 function handleComposerKeyDown(
   event: KeyboardEvent<HTMLTextAreaElement>,
   canSubmit: boolean,
   model: IncubatorChatModel,
 ) {
-  if (!canSubmit || !shouldSubmitIncubatorComposer({
-    isComposing: event.nativeEvent.isComposing,
-    key: event.key,
-    shiftKey: event.shiftKey,
-  })) {
+  if (
+    !canSubmit ||
+    !shouldSubmitIncubatorComposer({
+      isComposing: event.nativeEvent.isComposing,
+      key: event.key,
+      shiftKey: event.shiftKey,
+    })
+  ) {
     return;
   }
   event.preventDefault();
@@ -247,8 +330,6 @@ function handleComposerKeyDown(
 }
 
 function submitComposerText(canSubmit: boolean, model: IncubatorChatModel) {
-  if (!canSubmit) {
-    return;
-  }
+  if (!canSubmit) return;
   void model.submitPrompt(model.composerText);
 }

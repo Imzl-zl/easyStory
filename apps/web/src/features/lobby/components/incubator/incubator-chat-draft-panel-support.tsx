@@ -27,6 +27,10 @@ export type ActionCardProps = {
   projectName: string;
 };
 
+/* ------------------------------------------------------------------ */
+/*  Action Card — 顶部操作区                                          */
+/* ------------------------------------------------------------------ */
+
 export function ActionCard({
   canCreate,
   canCompleteWithAi,
@@ -42,17 +46,44 @@ export function ActionCard({
   projectName,
 }: Readonly<ActionCardProps>) {
   return (
-    <section className="panel-shell space-y-2.5 p-3">
-      <ActionCardHeader draft={draft} />
-      <ProjectNameField projectName={projectName} onProjectNameChange={onProjectNameChange} />
-      <ActionButtons
-        canCreate={canCreate}
-        canSyncDraft={canSyncDraft}
-        createMutation={createMutation}
-        draft={draft}
-        draftMutation={draftMutation}
-        onSyncDraft={onSyncDraft}
-      />
+    <section className="action-card">
+      <div className="action-card-header">
+        <span className="action-card-title">项目草稿</span>
+        {draft ? <DraftStatusBadge draft={draft} /> : null}
+      </div>
+
+      <div className="project-name-field">
+        <label htmlFor="incubator-project-name">项目名称</label>
+        <Input
+          allowClear
+          autoComplete="off"
+          id="incubator-project-name"
+          name="projectName"
+          placeholder="例如：林昭的玄幻故事…"
+          value={projectName}
+          onChange={(value) => onProjectNameChange(value)}
+        />
+      </div>
+
+      <div className="action-buttons">
+        <button
+          className="ink-button-secondary"
+          disabled={!canSyncDraft}
+          type="button"
+          onClick={() => void onSyncDraft()}
+        >
+          {draftMutation.isPending ? "整理中…" : draft ? "重新整理" : "整理草稿"}
+        </button>
+        <button
+          className="ink-button"
+          disabled={!canCreate}
+          type="button"
+          onClick={() => createMutation.mutate()}
+        >
+          {createMutation.isPending ? "创建中…" : "创建项目"}
+        </button>
+      </div>
+
       {draft ? (
         <DraftGuidanceCard
           canCompleteWithAi={canCompleteWithAi}
@@ -61,9 +92,11 @@ export function ActionCard({
           onCompleteWithAi={() => void onCompleteWithAi()}
         />
       ) : null}
-      <p className="text-[11px] leading-5 text-text-secondary">
+
+      <p className="action-notice">
         只缺建议项时也能继续创建项目，后面照样可以用 AI 生成大纲。
       </p>
+
       <NoticeList
         createMutation={createMutation}
         draftMutation={draftMutation}
@@ -72,6 +105,10 @@ export function ActionCard({
     </section>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  Draft Body — 草稿内容区                                           */
+/* ------------------------------------------------------------------ */
 
 export function DraftBody({
   draft,
@@ -83,10 +120,23 @@ export function DraftBody({
   sections: SettingPreviewSection[];
 }) {
   if (!draft) {
-    return <PlaceholderCard message={buildPlaceholderMessage(hasUserMessage)} />;
+    return (
+      <div className="draft-empty">
+        <div className="draft-empty-icon">
+          <svg aria-hidden="true" fill="none" height="24" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" width="24">
+            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <p className="draft-empty-title">暂无草稿</p>
+        <p className="draft-empty-body">
+          {buildPlaceholderMessage(hasUserMessage)}
+        </p>
+      </div>
+    );
   }
+
   return (
-    <div className="space-y-2.5">
+    <div className="draft-body">
       {sections.length > 0 ? <SectionIndexCard sections={sections} /> : null}
       {draft.follow_up_questions.length > 0 ? <QuestionListCard questions={draft.follow_up_questions} /> : null}
       {sections.map((section, index) => (
@@ -96,93 +146,24 @@ export function DraftBody({
   );
 }
 
-function ActionCardHeader({ draft }: { draft: ProjectIncubatorConversationDraft | null }) {
-  return (
-    <div className="space-y-1.5">
-      <div className="space-y-1">
-        <p className="text-[10px] tracking-[0.16em] text-accent-primary">项目草稿</p>
-        <h2 className="text-[14px] font-semibold text-text-primary">草稿预览</h2>
-        <p className="text-[12px] leading-5 text-text-secondary">
-          整理结果会显示在这里。
-        </p>
-      </div>
-      {draft ? <DraftStatusRow draft={draft} /> : null}
-    </div>
-  );
-}
+/* ------------------------------------------------------------------ */
+/*  Draft Status Badge                                                */
+/* ------------------------------------------------------------------ */
 
-function DraftStatusRow({ draft }: { draft: ProjectIncubatorConversationDraft }) {
+function DraftStatusBadge({ draft }: { draft: ProjectIncubatorConversationDraft }) {
   const guidance = buildDraftGuidance(draft);
+  const statusClass = draft.setting_completeness.issues.length === 0 ? "complete" :
+    draft.setting_completeness.status === "warning" ? "partial" : "draft";
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <StatusBadge label={guidance.statusLabel} status={draft.setting_completeness.status} />
-      <span className="text-xs leading-5 text-text-secondary">
-        {buildSettingIssueSummary(draft.setting_completeness)}
-      </span>
-    </div>
+    <span className={`action-card-status ${statusClass}`}>
+      {guidance.statusLabel}
+    </span>
   );
 }
 
-function ProjectNameField({
-  onProjectNameChange,
-  projectName,
-}: {
-  onProjectNameChange: (value: string) => void;
-  projectName: string;
-}) {
-  return (
-    <label className="block">
-      <span className="label-text">项目名称</span>
-      <Input
-        allowClear
-        autoComplete="off"
-        className="w-full"
-        name="projectName"
-        placeholder="例如：林昭的玄幻故事…"
-        size="default"
-        value={projectName}
-        onChange={(value) => onProjectNameChange(value)}
-      />
-    </label>
-  );
-}
-
-function ActionButtons({
-  canCreate,
-  canSyncDraft,
-  createMutation,
-  draft,
-  draftMutation,
-  onSyncDraft,
-}: {
-  canCreate: boolean;
-  canSyncDraft: boolean;
-  createMutation: UseMutationResult<ProjectDetail, unknown, void>;
-  draft: ProjectIncubatorConversationDraft | null;
-  draftMutation: IncubatorConversationDraftMutation;
-  onSyncDraft: () => Promise<void>;
-}) {
-  return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      <button
-        className="ink-button-secondary w-full"
-        disabled={!canSyncDraft}
-        type="button"
-        onClick={() => void onSyncDraft()}
-      >
-        {draftMutation.isPending ? "整理中…" : draft ? "重新整理草稿" : "整理草稿"}
-      </button>
-      <button
-        className="ink-button w-full"
-        disabled={!canCreate}
-        type="button"
-        onClick={() => createMutation.mutate()}
-      >
-        {createMutation.isPending ? "创建中…" : "创建项目"}
-      </button>
-    </div>
-  );
-}
+/* ------------------------------------------------------------------ */
+/*  Notice List                                                       */
+/* ------------------------------------------------------------------ */
 
 function NoticeList({
   createMutation,
@@ -202,34 +183,36 @@ function NoticeList({
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Question List Card                                                */
+/* ------------------------------------------------------------------ */
+
 function QuestionListCard({ questions }: { questions: string[] }) {
   return (
-    <section className="panel-muted space-y-2 p-3">
-      <h3 className="text-sm font-semibold text-text-primary">待补充信息</h3>
-      <ul className="space-y-2 text-[13px] leading-5 text-text-secondary">
-        {questions.map((question) => (
-          <li className="rounded-2xl bg-glass px-3 py-1.5" key={question}>
-            {question}
-          </li>
-        ))}
-      </ul>
+    <section className="question-list">
+      <h3 className="question-list-title">待补充信息</h3>
+      {questions.map((question) => (
+        <div className="question-item" key={question}>
+          {question}
+        </div>
+      ))}
     </section>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Section Index Card                                                */
+/* ------------------------------------------------------------------ */
+
 function SectionIndexCard({ sections }: { sections: SettingPreviewSection[] }) {
   return (
-    <section className="panel-muted space-y-2 p-3">
-      <h3 className="text-sm font-semibold text-text-primary">草稿目录</h3>
-      <nav aria-label="项目方案目录" className="grid gap-1.5">
-        {sections.map((section, index) => (
-          <a
-            className="flex items-center justify-between rounded-2xl bg-glass px-3 py-1.5 text-[12.5px] text-text-primary transition hover:bg-glass-heavy"
-            href={`#incubator-section-${index}`}
-            key={section.title}
-          >
-            <span className="min-w-0 truncate">{section.title}</span>
-            <span className="text-xs text-text-secondary">查看</span>
+    <section className="section-index">
+      <h3 className="section-index-title">草稿目录</h3>
+      <nav aria-label="项目方案目录" className="section-index-list">
+        {sections.map((section) => (
+          <a className="section-index-item" href={`#incubator-section-${section.title}`} key={section.title}>
+            <span>{section.title}</span>
+            <span>查看</span>
           </a>
         ))}
       </nav>
@@ -237,20 +220,22 @@ function SectionIndexCard({ sections }: { sections: SettingPreviewSection[] }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Setting Section Card                                              */
+/* ------------------------------------------------------------------ */
+
 function SettingSectionCard({ index, section }: { index: number; section: SettingPreviewSection }) {
   return (
-    <section className="panel-shell space-y-2 p-3 scroll-mt-4" id={`incubator-section-${index}`}>
-      <header className="space-y-1">
-        <h3 className="text-sm font-semibold text-text-primary">{section.title}</h3>
-        <p className="text-[12px] leading-5 text-text-secondary">
-          当前已整理内容
-        </p>
+    <section className="setting-section" id={`incubator-section-${index}`}>
+      <header>
+        <h3 className="setting-section-title">{section.title}</h3>
+        <p className="setting-section-subtitle">当前已整理内容</p>
       </header>
-      <dl className="grid gap-2">
+      <dl>
         {section.items.map((item) => (
-          <div className="panel-muted space-y-1 p-2.5" key={`${section.title}-${item.label}`}>
-            <dt className="text-[11px] tracking-[0.12em] text-text-secondary">{item.label}</dt>
-            <dd className="break-words text-[13px] leading-5 text-text-primary">{item.value}</dd>
+          <div className="setting-item" key={`${section.title}-${item.label}`}>
+            <dt className="setting-item-label">{item.label}</dt>
+            <dd className="setting-item-value">{item.value}</dd>
           </div>
         ))}
       </dl>
@@ -258,27 +243,27 @@ function SettingSectionCard({ index, section }: { index: number; section: Settin
   );
 }
 
-function PlaceholderCard({ message }: { message: string }) {
+/* ------------------------------------------------------------------ */
+/*  Notice Card                                                       */
+/* ------------------------------------------------------------------ */
+
+function NoticeCard({ message, tone }: { message: string; tone: "danger" | "warning" }) {
   return (
-    <section className="panel-muted space-y-2 p-3">
-      <h3 className="text-sm font-semibold text-text-primary">暂无草稿</h3>
-      <p className="text-[13px] leading-5 text-text-secondary">{message}</p>
-    </section>
+    <div className={`notice-card ${tone}`}>
+      {message}
+    </div>
   );
 }
 
-function NoticeCard({ message, tone }: { message: string; tone: "danger" | "warning" }) {
-  const className = tone === "danger"
-    ? "bg-accent-danger/10 text-accent-danger"
-    : "bg-accent-warning/14 text-accent-warning";
-  return <div className={`rounded-2xl px-3 py-2 text-[12.5px] leading-5 ${className}`}>{message}</div>;
-}
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                           */
+/* ------------------------------------------------------------------ */
 
 function buildPlaceholderMessage(hasUserMessage: boolean) {
   if (hasUserMessage) {
     return "发送消息后，可整理当前聊天并生成草稿。";
   }
-  return "先在右侧聊想法，再整理草稿。";
+  return "先在左侧聊想法，再整理草稿。";
 }
 
 function resolveDraftErrorMessage(error: unknown) {
