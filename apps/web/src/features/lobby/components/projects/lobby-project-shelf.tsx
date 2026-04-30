@@ -32,7 +32,6 @@ type LobbyProjectShelfProps = {
   error: unknown;
   isLoading: boolean;
   projects: ProjectSummary[];
-  templateNameById: Map<string, string>;
   viewMode?: "grid" | "list";
 };
 
@@ -42,7 +41,6 @@ export function LobbyProjectShelf({
   error,
   isLoading,
   projects,
-  templateNameById,
   viewMode = "grid",
 }: Readonly<LobbyProjectShelfProps>) {
   if (isLoading) {
@@ -65,11 +63,6 @@ export function LobbyProjectShelf({
             actionMutation={actionMutation}
             key={project.id}
             project={project}
-            templateName={
-              project.template_id
-                ? (templateNameById.get(project.template_id) ?? "已绑定模板")
-                : "无"
-            }
           />
         ))}
       </div>
@@ -83,11 +76,6 @@ export function LobbyProjectShelf({
           actionMutation={actionMutation}
           key={project.id}
           project={project}
-          templateName={
-            project.template_id
-              ? (templateNameById.get(project.template_id) ?? "已绑定模板")
-              : "无"
-          }
           index={index}
         />
       ))}
@@ -185,26 +173,8 @@ function ProjectShelfEmptyState({
       >
         {deletedOnly
           ? "当前没有已删除项目。删除后的项目会保留在回收站里，随时可以恢复。"
-          : "提笔写下第一卷，或从模板中择一而始。"}
+          : "书阁尚空，创建第一卷开始你的创作之旅。"}
       </p>
-      {!deletedOnly && (
-        <Link
-          href="/workspace/lobby/new"
-          className="ink-button mt-8"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          开卷提笔
-        </Link>
-      )}
     </div>
   );
 }
@@ -216,12 +186,10 @@ function ProjectShelfEmptyState({
 function LobbyProjectCard({
   actionMutation,
   project,
-  templateName,
   index,
 }: Readonly<{
   actionMutation: ProjectActionMutation;
   project: ProjectSummary;
-  templateName: string;
   index: number;
 }>) {
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -382,10 +350,6 @@ function LobbyProjectCard({
           style={{ color: "var(--text-tertiary)" }}
         >
           <span>{formatProjectTargetWords(project.target_words)}</span>
-          <span style={{ color: "var(--line-medium)" }}>·</span>
-          <span>
-            {templateName === "无" ? "自由创作" : templateName}
-          </span>
         </div>
 
         {/* 进度 */}
@@ -430,7 +394,7 @@ function LobbyProjectCard({
         >
           {isDeleted
             ? `已移入回收站，保留至 ${formatProjectTrashDeadline(project.deleted_at)}。`
-            : `以 ${templateName === "无" ? "自由创作" : templateName} 为起点，继续整理设定与章节。`}
+            : "继续整理设定与章节。"}
         </p>
 
         {/* 底部操作 */}
@@ -613,11 +577,9 @@ function InkStatusBadge({ status }: { status: string }) {
 function LobbyProjectListItem({
   actionMutation,
   project,
-  templateName,
 }: Readonly<{
   actionMutation: ProjectActionMutation;
   project: ProjectSummary;
-  templateName: string;
 }>) {
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isSoftDeleteDialogOpen, setSoftDeleteDialogOpen] = useState(false);
@@ -722,10 +684,6 @@ function LobbyProjectListItem({
           <span>{project.genre ?? "未定题材"}</span>
           <span style={{ color: "var(--line-medium)" }}>·</span>
           <span>{formatProjectTargetWords(project.target_words)}</span>
-          <span style={{ color: "var(--line-medium)" }}>·</span>
-          <span>
-            {templateName === "无" ? "自由创作" : templateName}
-          </span>
         </div>
       </div>
 

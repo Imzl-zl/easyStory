@@ -40,7 +40,6 @@ export function RecycleBinPage() {
             error={model.projectsQuery.error}
             isLoading={model.projectsQuery.isLoading}
             projects={model.filteredProjects}
-            templateNameById={model.templateNameById}
           />
         </div>
       </SectionCard>

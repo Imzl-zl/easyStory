@@ -9,7 +9,7 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { resolveProjectCardTone } from "@/features/lobby/components/projects/lobby-project-support";
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { useParticleCanvas } from "@/lib/hooks/use-particle-canvas";
-import { GridIcon, QuillIcon, ScrollIcon } from "@/components/icons/shared-icons";
+import { QuillIcon, ScrollIcon } from "@/components/icons/shared-icons";
 import type { ProjectSummary } from "@/lib/api/types";
 
 export function DashboardPage() {
@@ -84,7 +84,7 @@ export function DashboardPage() {
                 />
               </div>
               <Link
-                href="/workspace/lobby/new"
+                href="/workspace/lobby"
                 className="ink-button-hero text-[13px] min-h-9 px-4 sm:px-5 shrink-0"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -103,7 +103,6 @@ export function DashboardPage() {
                 error={model.projectsQuery.error}
                 isLoading={model.projectsQuery.isLoading}
                 projects={model.filteredProjects}
-                templateNameById={model.templateNameById}
                 viewMode="grid"
               />
             </div>
@@ -137,17 +136,9 @@ function WelcomeSection({
       id: "new",
       label: "开始新故事",
       description: "从空白页或 AI 对话开始",
-      href: "/workspace/lobby/new",
+      href: "/workspace/lobby",
       icon: QuillIcon,
       tone: "primary" as const,
-    },
-    {
-      id: "templates",
-      label: "浏览模板",
-      description: "从成熟框架开始创作",
-      href: "/workspace/lobby/templates",
-      icon: GridIcon,
-      tone: "secondary" as const,
     },
     {
       id: "continue",

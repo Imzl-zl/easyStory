@@ -10,13 +10,14 @@
   }
 
   html {
+    height: 100%;
     color-scheme: dark;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
 
   body {
-    min-height: 100vh;
+    min-height: 100%;
     overflow-x: hidden;
     color: var(--text-primary);
     background: var(--bg-canvas);

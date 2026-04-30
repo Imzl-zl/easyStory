@@ -27,7 +27,6 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [projectMcpDirty, setProjectMcpDirty] = useState(false);
-  const [projectPreferencesDirty, setProjectPreferencesDirty] = useState(false);
   const [projectRulesDirty, setProjectRulesDirty] = useState(false);
   const [projectBriefDirty, setProjectBriefDirty] = useState(false);
   const [projectSkillsDirty, setProjectSkillsDirty] = useState(false);
@@ -38,7 +37,6 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
   const tab = resolveProjectSettingsTab(routeTab);
   const eventType = normalizeProjectAuditEventType(routeEvent);
   const isDirty = resolveProjectSettingsDirtyState(tab, {
-    assistant: projectPreferencesDirty,
     brief: projectBriefDirty,
     mcp: projectMcpDirty,
     rules: projectRulesDirty,
@@ -88,7 +86,6 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
         <div className="h-fit animate-[slideInLeft_0.35s_cubic-bezier(0.16,1,0.3,1)]">
           <ProjectSettingsSidebar
             dirtyState={{
-              assistant: projectPreferencesDirty,
               brief: projectBriefDirty,
               mcp: projectMcpDirty,
               rules: projectRulesDirty,
@@ -112,7 +109,6 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
             eventType={eventType}
             onEventTypeChange={(nextEventType) => setParams({ event: nextEventType, tab: "audit" })}
             onProjectMcpDirtyChange={setProjectMcpDirty}
-            onProjectPreferencesDirtyChange={setProjectPreferencesDirty}
             onProjectRulesDirtyChange={setProjectRulesDirty}
             onProjectBriefDirtyChange={setProjectBriefDirty}
             onProjectSkillsDirtyChange={setProjectSkillsDirty}
@@ -137,7 +133,6 @@ export function ProjectSettingsPage({ projectId }: ProjectSettingsPageProps) {
 function resolveProjectSettingsDirtyState(
   tab: ProjectSettingsTab,
   dirtyState: {
-    assistant: boolean;
     brief: boolean;
     mcp: boolean;
     rules: boolean;
@@ -149,9 +144,6 @@ function resolveProjectSettingsDirtyState(
   }
   if (tab === "rules") {
     return dirtyState.rules;
-  }
-  if (tab === "assistant") {
-    return dirtyState.assistant;
   }
   if (tab === "skills") {
     return dirtyState.skills;
@@ -173,10 +165,6 @@ function handleSelectTab(
   }
   if (nextTab === "rules") {
     setParams({ event: null, tab: null });
-    return;
-  }
-  if (nextTab === "assistant") {
-    setParams({ event: null, tab: "assistant" });
     return;
   }
   if (nextTab === "skills") {

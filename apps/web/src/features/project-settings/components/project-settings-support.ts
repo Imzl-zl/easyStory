@@ -1,9 +1,8 @@
-export type ProjectSettingsTab = "brief" | "rules" | "assistant" | "skills" | "mcp" | "audit";
+export type ProjectSettingsTab = "brief" | "rules" | "skills" | "mcp" | "audit";
 
 const PROJECT_SETTINGS_TABS: ProjectSettingsTab[] = [
   "brief",
   "rules",
-  "assistant",
   "skills",
   "mcp",
   "audit",

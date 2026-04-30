@@ -18,7 +18,6 @@ import {
   physicalDeleteProject,
   restoreProject,
 } from "@/lib/api/projects";
-import { listTemplates } from "@/lib/api/templates";
 import type { ProjectDetail } from "@/lib/api/types";
 
 export type ProjectActionVariables = {
@@ -34,20 +33,11 @@ export function useLobbyProjectModel({ deletedOnly }: { deletedOnly: boolean }) 
     queryKey: ["projects", deletedOnly],
     queryFn: () => listProjects(deletedOnly),
   });
-  const templatesQuery = useQuery({ queryKey: ["templates"], queryFn: listTemplates });
   const actionMutation = useProjectActionMutation(queryClient);
   const emptyTrashMutation = useEmptyTrashMutation(queryClient);
   const filteredProjects = useMemo(
     () => buildFilteredProjects(projectsQuery.data, deferredSearchText),
     [deferredSearchText, projectsQuery.data],
-  );
-  const templateNameById = useMemo(
-    () => new Map((templatesQuery.data ?? []).map((template) => [template.id, template.name])),
-    [templatesQuery.data],
-  );
-  const templatePreviewNames = useMemo(
-    () => (templatesQuery.data ?? []).slice(0, 3).map((template) => template.name),
-    [templatesQuery.data],
   );
 
   return {
@@ -59,10 +49,6 @@ export function useLobbyProjectModel({ deletedOnly }: { deletedOnly: boolean }) 
     projectsQuery,
     searchText,
     setSearchText,
-    templateCount: templatesQuery.data?.length ?? 0,
-    templateNameById,
-    templatePreviewNames,
-    templatesQuery,
   };
 }
 

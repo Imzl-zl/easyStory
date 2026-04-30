@@ -4,9 +4,7 @@ import { GuardedLink } from "@/components/ui/guarded-link";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   AuditIcon,
-  AssistantIcon,
   EngineIcon,
-  KeyIcon,
   McpIcon,
   RulesIcon,
   SettingsIcon,
@@ -71,14 +69,6 @@ export function ProjectSettingsSidebar({
           onClick={() => onSelectTab("rules")}
         />
         <TabButton
-          active={tab === "assistant"}
-          disabled={isPending}
-          dirty={dirtyState.assistant}
-          icon={<AssistantIcon className="w-4 h-4" />}
-          label="AI 偏好"
-          onClick={() => onSelectTab("assistant")}
-        />
-        <TabButton
           active={tab === "skills"}
           disabled={isPending}
           dirty={dirtyState.skills}
@@ -122,15 +112,6 @@ export function ProjectSettingsSidebar({
         >
           <EngineIcon className="w-3.5 h-3.5" />
           打开执行器
-        </GuardedLink>
-        <GuardedLink
-          className="ink-link-button w-full justify-center"
-          href={`/workspace/lobby/settings?tab=credentials&scope=project&project=${projectId}&sub=list`}
-          isDirty={isDirty}
-          onNavigate={onNavigate}
-        >
-          <KeyIcon className="w-3.5 h-3.5" />
-          项目凭证
         </GuardedLink>
       </div>
     </div>

@@ -60,7 +60,9 @@
       "mcp__Playwright__browser_snapshot",
       "mcp__Playwright__browser_evaluate",
       "mcp__Playwright__browser_take_screenshot",
-      "mcp__serena__find_symbol"
+      "mcp__serena__find_symbol",
+      "Bash(sed -i 's/^\\\\\\(\\\\t\\\\\\)html {$/\\\\1html {\\\\n\\\\1    height: 100%;/' apps/web/src/app/base.css)",
+      "Bash(sed -i 's/min-height: 100vh;/min-height: 100%;/' apps/web/src/app/base.css)"
     ]
   }
 }

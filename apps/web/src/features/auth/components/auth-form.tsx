@@ -8,7 +8,6 @@ import type { ComponentProps } from "react";
 
 import { login, register } from "@/lib/api/auth";
 import { getErrorMessage } from "@/lib/api/client";
-import { useMounted } from "@/lib/hooks/use-mounted";
 import { useAuthStore } from "@/lib/stores/auth-store";
 
 type AuthMode = "login" | "register";
@@ -30,7 +29,6 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const mounted = useMounted();
   const copy = buildAuthCopy(mode);
 
   const mutation = useMutation({
@@ -56,8 +54,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         className="absolute top-0 left-0 w-[500px] h-[500px] rounded-full blur-[120px] pointer-events-none"
         style={{
           background: "radial-gradient(circle, var(--glow-warm) 0%, transparent 70%)",
-          opacity: mounted ? 0.8 : 0,
-          transition: "opacity 2.5s ease 0.3s",
+          animation: "authGlowIn 2.5s ease 0.3s both",
         }}
       />
       {/* 背景光晕 — 右下角冷蓝 */}
@@ -65,18 +62,14 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full blur-[100px] pointer-events-none"
         style={{
           background: "radial-gradient(circle, var(--glow-cool) 0%, transparent 70%)",
-          opacity: mounted ? 0.5 : 0,
-          transition: "opacity 2.5s ease 0.6s",
+          animation: "authGlowIn 2.5s ease 0.6s both",
         }}
       />
 
       {/* 返回首页链接 */}
       <nav
         className="absolute top-6 left-6 z-20"
-        style={{
-          opacity: mounted ? 1 : 0,
-          transition: "opacity 1s ease 0.8s",
-        }}
+        style={{ animation: "authFadeIn 1s ease 0.8s both" }}
       >
         <Link
           href="/"
@@ -101,19 +94,14 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       {/* 主卡片 */}
       <div
         className="relative z-10 w-full max-w-[420px]"
-        style={{
-          opacity: mounted ? 1 : 0,
-          transform: mounted ? "translateY(0)" : "translateY(20px)",
-          transition: "all 1s cubic-bezier(0.4, 0, 0.2, 1) 0.4s",
-        }}
+        style={{ animation: "authSlideUp 1s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both" }}
       >
         {/* 卡片外发光 */}
         <div
           className="absolute -inset-[1px] rounded-[28px] pointer-events-none"
           style={{
             background: "linear-gradient(135deg, rgba(201,169,110,0.15), rgba(90,130,160,0.08), transparent)",
-            opacity: mounted ? 1 : 0,
-            transition: "opacity 2s ease 0.6s",
+            animation: "authFadeIn 2s ease 0.6s both",
           }}
         />
 
@@ -226,10 +214,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       {/* 底部文案 */}
       <div
         className="absolute bottom-6 left-0 right-0 flex justify-center"
-        style={{
-          opacity: mounted ? 0.4 : 0,
-          transition: "opacity 2s ease 1.2s",
-        }}
+        style={{ animation: "authFadeIn 2s ease 1.2s both", opacity: 0.4 }}
       >
         <p
           className="text-[11px] tracking-[0.15em] uppercase text-text-tertiary"

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { LobbyProjectShelf } from "@/features/lobby/components/projects/lobby-project-shelf";
 import { useLobbyProjectModel } from "@/features/lobby/components/projects/lobby-project-model";
 import { useAuthStore } from "@/lib/stores/auth-store";
-import { BinIcon, BrushIcon, GearIcon, GridIcon } from "@/components/icons/shared-icons";
+import { BinIcon, GearIcon } from "@/components/icons/shared-icons";
 
 export function LobbyPage() {
   const model = useLobbyProjectModel({ deletedOnly: false });
@@ -175,7 +175,6 @@ export function LobbyPage() {
               error={model.projectsQuery.error}
               isLoading={model.projectsQuery.isLoading}
               projects={model.filteredProjects}
-              templateNameById={model.templateNameById}
               viewMode="grid"
             />
           </div>
@@ -201,21 +200,6 @@ export function LobbyPage() {
             boxShadow: "var(--shadow-glass-heavy)",
           }}
         >
-          <ToolButton
-            icon={<BrushIcon />}
-            label="新卷"
-            href="/workspace/lobby/new"
-            tone="primary"
-          />
-          <div
-            className="w-px h-5 mx-1"
-            style={{ background: "var(--line-soft)" }}
-          />
-          <ToolButton
-            icon={<GridIcon />}
-            label="模板"
-            href="/workspace/lobby/templates"
-          />
           <ToolButton
             icon={<BinIcon />}
             label="回收"

@@ -4,7 +4,6 @@ import { ProjectAuditPanel } from "@/features/project-settings/components/projec
 import { ProjectSettingSummaryPanel } from "@/features/project-settings/components/project-setting-summary-panel";
 import type { ProjectSettingsTab } from "@/features/project-settings/components/project-settings-support";
 import { AssistantMcpPanel } from "@/features/settings/components/assistant/mcp/assistant-mcp-panel";
-import { AssistantPreferencesPanel } from "@/features/settings/components/assistant/preferences/assistant-preferences-panel";
 import { AssistantRulesEditor } from "@/features/settings/components/assistant/rules/assistant-rules-editor";
 import { AssistantSkillsPanel } from "@/features/settings/components/assistant/skills/assistant-skills-panel";
 import { getErrorMessage } from "@/lib/api/client";
@@ -14,7 +13,6 @@ type ProjectSettingsContentProps = {
   eventType: string | null;
   onEventTypeChange: (eventType: string | null) => void;
   onProjectMcpDirtyChange: (isDirty: boolean) => void;
-  onProjectPreferencesDirtyChange: (isDirty: boolean) => void;
   onProjectBriefDirtyChange: (isDirty: boolean) => void;
   onProjectRulesDirtyChange: (isDirty: boolean) => void;
   onProjectSkillsDirtyChange: (isDirty: boolean) => void;
@@ -29,7 +27,6 @@ export function ProjectSettingsContent({
   eventType,
   onEventTypeChange,
   onProjectMcpDirtyChange,
-  onProjectPreferencesDirtyChange,
   onProjectBriefDirtyChange,
   onProjectRulesDirtyChange,
   onProjectSkillsDirtyChange,
@@ -73,15 +70,6 @@ export function ProjectSettingsContent({
             projectId={projectId}
             scope="project"
             title="项目长期规则"
-          />
-        </div>
-      ) : null}
-      {tab === "assistant" ? (
-        <div className="rounded-2xl bg-surface shadow-sm p-6">
-          <AssistantPreferencesPanel
-            onDirtyChange={onProjectPreferencesDirtyChange}
-            projectId={projectId}
-            scope="project"
           />
         </div>
       ) : null}
