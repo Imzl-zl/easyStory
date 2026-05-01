@@ -2787,12 +2787,21 @@
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 150ms ease;
+  white-space: nowrap;
 }
 
 .studio-new-chat-btn:hover {
   background: var(--chat-panel-bg);
   border-color: rgba(160, 150, 130, 0.25);
   color: var(--accent-primary);
+}
+
+/* 带文字标签的变体 */
+.studio-new-chat-btn--labeled {
+  width: auto;
+  height: 32px;
+  padding: 0 12px;
+  gap: 6px;
 }
 
 /* ===== 工具栏按钮：精密仪器感 ===== */

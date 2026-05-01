@@ -250,7 +250,7 @@ export function StudioChatComposer({
           onKeyDown={handleComposerKeyDown}
         />
 
-        <div className={`mt-1.5 flex gap-2 ${compactLayout ? "flex-col items-stretch" : "items-start justify-between"}`}>
+        <div className="mt-1.5 flex flex-wrap items-start justify-between gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
             <ToolbarIconButton label="上传文件" onClick={() => fileInputRef.current?.click()}>
               <PaperclipIcon />

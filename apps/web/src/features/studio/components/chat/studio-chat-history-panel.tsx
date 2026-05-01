@@ -165,7 +165,7 @@ export function StudioChatHistoryPanel({
     <div className={`relative flex min-w-0 items-center gap-2 ${compactLayout ? "w-full justify-stretch" : "ml-auto w-[min(240px,100%)] justify-end"}`} ref={containerRef}>
       <button
         aria-label="新对话"
-        className={`studio-new-chat-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-40 ${iconLayout ? "" : "gap-1.5 px-3 w-auto"}`}
+        className={`studio-new-chat-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-40 ${iconLayout ? "" : "studio-new-chat-btn--labeled"}`}
         disabled={disabled}
         title="新对话"
         type="button"
