@@ -340,16 +340,16 @@ export function StudioChatComposer({
                             <span className="min-w-0 flex-1 truncate font-semibold text-[14px]">
                               {currentProviderOption?.label ?? (isCredentialLoading ? "读取中..." : "选择渠道")}
                             </span>
-                            <span className={`shrink-0 text-[11px] text-[#686e77] transition-transform duration-200 ${showProviderList ? "rotate-180" : ""}`}>▾</span>
+                            <span className={`shrink-0 text-[11px] text-text-tertiary transition-transform duration-200 ${showProviderList ? "rotate-180" : ""}`}>▾</span>
                           </button>
                           {showProviderList ? (
-                            <div className="mt-2 grid gap-1 rounded-xl bg-[#1e2129] border border-[rgba(150,158,170,0.10)] p-2 max-h-64 overflow-y-auto shadow-lg">
+                            <div className="mt-2 grid gap-1 rounded-xl bg-surface border border-line-soft p-2 max-h-64 overflow-y-auto shadow-lg">
                               {providerOptions.length > 0 ? (
                                 providerOptions.map((option) => {
                                   const selected = option.value === settings.provider;
                                   return (
                                     <button
-                                      className={`flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${selected ? "bg-[rgba(160,150,130,0.10)] text-[#a09682]" : "text-[#dde1e6] hover:bg-[rgba(150,158,170,0.06)]"}`}
+                                      className={`flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${selected ? "bg-accent-soft text-accent-primary" : "text-text-primary hover:bg-surface-hover"}`}
                                       key={option.value}
                                       type="button"
                                       onMouseDown={(event) => {
@@ -359,13 +359,13 @@ export function StudioChatComposer({
                                     >
                                       <span className="text-[14px] font-semibold leading-relaxed">{option.label}</span>
                                       {option.description ? (
-                                        <span className="text-[12px] leading-relaxed text-[#686e77]">{option.description}</span>
+                                        <span className="text-[12px] leading-relaxed text-text-tertiary">{option.description}</span>
                                       ) : null}
                                     </button>
                                   );
                                 })
                               ) : (
-                                <p className="px-3 py-3 text-[14px] text-[#686e77]">
+                                <p className="px-3 py-3 text-[14px] text-text-tertiary">
                                   {isCredentialLoading ? "正在读取渠道..." : "当前没有可用渠道"}
                                 </p>
                               )}
@@ -389,9 +389,9 @@ export function StudioChatComposer({
 
                       {/* 推理控制 */}
                       <div className="chat-model-form__section">
-                        <p className="m-0 text-[14px] font-bold text-[#dde1e6]">{reasoningControl.title}</p>
+                        <p className="m-0 text-[14px] font-bold text-text-primary">{reasoningControl.title}</p>
                         {reasoningControl.description ? (
-                          <p className="mt-1 text-[13px] leading-5 text-[#9299a3]">{reasoningControl.description}</p>
+                          <p className="mt-1 text-[13px] leading-5 text-text-secondary">{reasoningControl.description}</p>
                         ) : null}
                         {reasoningControl.kind === "gemini_budget" ? (
                           <div className="mt-3 space-y-3">
@@ -445,7 +445,7 @@ export function StudioChatComposer({
                       {/* 回复显示方式 */}
                       <div className="chat-model-form__section mt-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                          <p className="m-0 text-[14px] font-bold text-[#dde1e6]">回复显示方式</p>
+                          <p className="m-0 text-[14px] font-bold text-text-primary">回复显示方式</p>
                           <Radio.Group
                             aria-label="回复显示方式"
                             mode="fill"

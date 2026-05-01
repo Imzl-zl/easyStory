@@ -63,7 +63,7 @@ export function StudioChatContextSelectorContent({
           <p className="chat-panel-header__subtitle">已选 {selectedContextPaths.length} / {totalFileCount} 个文件</p>
         </div>
       </div>
-      <div className="px-5 py-3 border-t border-[rgba(150,158,170,0.08)]">
+      <div className="px-5 py-3 border-t border-line-soft">
         <input
           type="text"
           className="chat-panel-search"
@@ -124,11 +124,11 @@ function StudioChatContextTreeNode({
     const checked = selectedContextPaths.includes(node.path);
     return (
       <label
-        className="flex cursor-pointer items-center gap-2.5 py-1.5 pr-4 hover:bg-[rgba(150,158,170,0.05)] transition-colors"
+        className="flex cursor-pointer items-center gap-2.5 py-1.5 pr-4 hover:bg-surface-hover transition-colors"
         style={rowPaddingStyle}
       >
         <CustomCheckbox checked={checked} onChange={() => onToggleContext(node.path)} />
-        <span className="min-w-0 flex-1 truncate text-[14px] text-[#dde1e6]">
+        <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">
           {node.label}
         </span>
       </label>
@@ -144,14 +144,14 @@ function StudioChatContextTreeNode({
   return (
     <div>
       <button
-        className={`flex w-full items-center gap-2.5 py-2 pr-4 text-left text-[13px] font-semibold text-[#9299a3] hover:bg-[rgba(150,158,170,0.05)] transition-colors ${isExpanded ? "text-[#dde1e6]" : ""}`}
+        className={`flex w-full items-center gap-2.5 py-2 pr-4 text-left text-[13px] font-semibold text-text-secondary hover:bg-surface-hover transition-colors ${isExpanded ? "text-text-primary" : ""}`}
         style={rowPaddingStyle}
         type="button"
         onClick={() => onToggleFolder(node.path, isExpanded)}
       >
         <span className={`text-[10px] transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}>▶</span>
         <span className="min-w-0 flex-1 truncate">{node.label}</span>
-        <span className="text-[11px] text-[#686e77] bg-[#2f343e] px-2 py-0.5 rounded-full">{visibleFileCount}</span>
+        <span className="text-[11px] text-text-tertiary bg-elevated px-2 py-0.5 rounded-full">{visibleFileCount}</span>
       </button>
       {isExpanded
         ? node.children?.map((child) => (
@@ -183,8 +183,8 @@ function CustomCheckbox({
     <span
       className={`inline-flex items-center justify-center size-[16px] rounded-[4px] border transition-all duration-150 cursor-pointer shrink-0 ${
         checked
-          ? "bg-[#a09682] border-[#a09682]"
-          : "bg-transparent border-[rgba(150,158,170,0.30)] hover:border-[rgba(160,150,130,0.50)]"
+          ? "bg-accent-primary border-accent-primary"
+          : "bg-transparent border-line-strong hover:border-accent-primary"
       }`}
       role="checkbox"
       aria-checked={checked}
@@ -192,7 +192,7 @@ function CustomCheckbox({
     >
       {checked ? (
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-          <path d="M5 12l5 5L20 7" stroke="#1a1d24" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M5 12l5 5L20 7" stroke="var(--chat-panel-input-bg)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       ) : null}
     </span>

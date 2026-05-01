@@ -111,8 +111,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
             background: "var(--bg-glass-heavy)",
             borderRadius: "var(--radius-4xl)",
             boxShadow: "var(--shadow-hero), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
-            backdropFilter: "blur(32px)",
-            WebkitBackdropFilter: "blur(32px)",
+            backdropFilter: "blur(var(--blur-lg))",
+            WebkitBackdropFilter: "blur(var(--blur-lg))",
           }}
         >
           {/* Logo */}

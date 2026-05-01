@@ -128,18 +128,18 @@ export function StudioChatHistoryPanel({
                           {conversation.title}
                         </span>
                         {isActive ? (
-                          <span className="inline-flex shrink-0 items-center rounded-full bg-[#2f343e] px-2 py-0.5 text-[11px] leading-4 text-[#a09682]">
+                          <span className="inline-flex shrink-0 items-center rounded-full bg-elevated px-2 py-0.5 text-[11px] leading-4 text-accent-primary">
                             当前
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-[12px] leading-4 text-[#686e77]">
+                      <p className="mt-1 text-[12px] leading-4 text-text-tertiary">
                         {formatConversationUpdatedAt(conversation.updatedAt)}
                       </p>
                     </button>
                     <button
                       aria-label={`删除对话：${conversation.title}`}
-                      className="ink-toolbar-icon text-[#c47070] shrink-0"
+                      className="ink-toolbar-icon text-accent-danger shrink-0"
                       disabled={disabled}
                       type="button"
                       onClick={(event) => {
@@ -181,24 +181,24 @@ export function StudioChatHistoryPanel({
       </button>
       <button
         aria-expanded={isOpen}
-        className="group flex h-[32px] min-w-0 flex-1 items-center gap-2 rounded-full bg-[#1e2129] px-3 text-left transition-all hover:bg-[#252a33] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-40"
+        className="group flex h-[32px] min-w-0 flex-1 items-center gap-2 rounded-full bg-surface px-3 text-left transition-all hover:bg-chat-panel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-40"
         disabled={disabled}
         title={activeConversation?.title ?? "新对话"}
         type="button"
         onClick={() => onOpenChange(!isOpen)}
       >
-        <span className="inline-flex shrink-0 items-center rounded-full bg-[#2f343e] px-2 py-0.5 text-[10px] font-semibold leading-4 text-[#9299a3]">
+        <span className="inline-flex shrink-0 items-center rounded-full bg-elevated px-2 py-0.5 text-[10px] font-semibold leading-4 text-text-secondary">
           历史
         </span>
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-5 text-[#dde1e6]">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-5 text-text-primary">
           {activeConversation?.title ?? "新对话"}
         </span>
-        <span className="inline-flex shrink-0 items-center rounded-full bg-[#2f343e] px-1.5 py-0.5 text-[10px] leading-4 text-[#686e77]">
+        <span className="inline-flex shrink-0 items-center rounded-full bg-elevated px-1.5 py-0.5 text-[10px] leading-4 text-text-tertiary">
           {conversations.length} 条
         </span>
         <span
           aria-hidden="true"
-          className={`shrink-0 text-[11px] text-[#686e77] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          className={`shrink-0 text-[11px] text-text-tertiary transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
         >
           ▾
         </span>
