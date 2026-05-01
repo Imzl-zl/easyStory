@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { AppSelect } from "@/components/ui/app-select";
 import { EmptyState } from "@/components/ui/empty-state";
-import { StatusBadge } from "@/components/ui/status-badge";
 import type { NodeExecutionView, PromptReplayView } from "@/lib/api/types";
 
 import { formatDateTime, formatDuration, formatExecutionStatusLabel, formatShortId, resolveExecutionTone } from "./engine-logs-format";
@@ -51,7 +50,7 @@ export function EngineReplayPanel({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {executionsErrorMessage ? <FeedbackMessage tone="danger" message={executionsErrorMessage} /> : null}
       <ReplaySelection
         executions={executions}
@@ -104,8 +103,8 @@ function ReplaySelection({
   onSelectExecutionId: (value: string) => void;
 }>) {
   return (
-    <label className="block space-y-2">
-      <span className="label-text">选择节点执行记录</span>
+    <label className="block space-y-1.5">
+      <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>选择节点执行记录</span>
       <AppSelect
         options={[
           { label: "先选择一个节点", value: "" },
@@ -117,9 +116,6 @@ function ReplaySelection({
         value={selectedExecutionId}
         onChange={onSelectExecutionId}
       />
-      <p className="text-sm leading-6 text-text-secondary">
-        选择一个节点查看提示词与回复。
-      </p>
     </label>
   );
 }
@@ -128,43 +124,33 @@ function ReplayExecutionSummary({
   execution,
 }: Readonly<{ execution: NodeExecutionView }>) {
   return (
-    <section className="panel-muted space-y-3 p-4">
-      <header className="space-y-1">
-        <h3 className="font-serif text-lg font-semibold">当前节点</h3>
-        <p className="text-sm leading-6 text-text-secondary">
-          当前节点的提示词回放。
-        </p>
-      </header>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge
-              status={resolveExecutionTone(execution.status)}
-              label={formatExecutionStatusLabel(execution.status)}
-            />
-            <StatusBadge status="active" label={execution.node_type} />
+    <div className="rounded p-3" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1.5 min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <StatusPill tone={resolveExecutionTone(execution.status)} label={formatExecutionStatusLabel(execution.status)} />
+            <StatusPill tone="active" label={execution.node_type} />
           </div>
           <div>
-            <p className="text-sm font-medium text-text-primary">
-              {execution.node_id} · 序列 {execution.sequence} · 排序 {execution.node_order}
+            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
+              {execution.node_id} · 序列 {execution.sequence}
             </p>
-            <p className="text-sm leading-6 text-text-secondary">
+            <p className="text-[11px]" style={{ color: "#6b7280" }}>
               开始 {formatDateTime(execution.started_at)} · 完成 {formatDateTime(execution.completed_at)}
             </p>
           </div>
         </div>
-        <div className="text-right text-sm leading-6 text-text-secondary">
-          <p>执行 ID：{formatShortId(execution.id)}</p>
-          <p>耗时：{formatDuration(execution.execution_time_ms)}</p>
-          <p>重试：{execution.retry_count}</p>
+        <div className="text-right flex-shrink-0">
+          <p className="text-[11px]" style={{ color: "#4b5563" }}>{formatShortId(execution.id)}</p>
+          <p className="text-[11px]" style={{ color: "#4b5563" }}>{formatDuration(execution.execution_time_ms)}</p>
         </div>
       </div>
       {execution.error_message ? (
-        <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm leading-6 text-accent-danger">
+        <div className="mt-2 rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
           {execution.error_message}
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -200,11 +186,11 @@ function ReplayDetailStateView({
     );
   }
   return (
-    <section className="space-y-3">
+    <div className="space-y-2">
       {replays.map((replay, index) => (
         <ReplayCard key={replay.id} replay={replay} index={index} />
       ))}
-    </section>
+    </div>
   );
 }
 
@@ -216,27 +202,27 @@ function ReplayCard({
   index: number;
 }>) {
   return (
-    <article className="rounded-2xl bg-muted shadow-sm p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status="active" label={`#${index + 1}`} />
-            <StatusBadge status="draft" label={formatReplayTypeLabel(replay.replay_type)} />
+    <div className="rounded" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+      <div className="p-3 flex items-start justify-between gap-3">
+        <div className="space-y-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#1f2328", color: "#9ca3af" }}>#{index + 1}</span>
+            <StatusPill tone="draft" label={formatReplayTypeLabel(replay.replay_type)} />
           </div>
           <div>
-            <p className="text-sm font-medium text-text-primary">{replay.model_name}</p>
-            <p className="text-sm leading-6 text-text-secondary">
+            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>{replay.model_name}</p>
+            <p className="text-[11px]" style={{ color: "#6b7280" }}>
               {formatReplayTokenUsage(replay)} · {formatDateTime(replay.created_at)}
             </p>
           </div>
         </div>
-        <p className="text-sm leading-6 text-text-secondary">
-          回放 ID：{formatShortId(replay.id)}
+        <p className="text-[11px] flex-shrink-0" style={{ color: "#4b5563" }}>
+          {formatShortId(replay.id)}
         </p>
       </div>
       <ReplayTextDisclosure title="提示词" value={replay.prompt_text} defaultOpen />
       <ReplayTextDisclosure title="响应" value={replay.response_text ?? "模型未返回文本响应。"} />
-    </article>
+    </div>
   );
 }
 
@@ -252,17 +238,41 @@ function ReplayTextDisclosure({
   const [open, setOpen] = useState(defaultOpen);
   return (
     <details
-      className="mt-4 rounded-2xl bg-muted shadow-sm"
+      className="border-t"
+      style={{ borderColor: "#1f2328" }}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-text-primary">
-        {title}
+      <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-medium flex items-center justify-between" style={{ color: "#9ca3af" }}>
+        <span>{title}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </summary>
-      <div className="border-t border-line-soft px-4 py-4">
-        <pre className="mono-block whitespace-pre-wrap break-words">{value}</pre>
+      <div className="px-3 pb-3">
+        <pre className="whitespace-pre-wrap break-words text-[11px] leading-relaxed" style={{ color: "#9ca3af" }}>{value}</pre>
       </div>
     </details>
+  );
+}
+
+function StatusPill({ tone, label }: { tone: string; label: string }) {
+  const colors: Record<string, { bg: string; text: string }> = {
+    completed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
+    failed: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
+    warning: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
+    active: { bg: "rgba(232, 184, 109, 0.12)", text: "#e8b86d" },
+    outline: { bg: "#1f2328", text: "#9ca3af" },
+    draft: { bg: "#1f2328", text: "#6b7280" },
+  };
+  const c = colors[tone] || colors.outline;
+  return (
+    <span
+      className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+      style={{ background: c.bg, color: c.text }}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -275,10 +285,10 @@ function FeedbackMessage({
 }>) {
   if (tone === "danger") {
     return (
-      <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
+      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
         {message}
       </div>
     );
   }
-  return <div className="panel-muted px-4 py-5 text-sm text-text-secondary">{message}</div>;
+  return <div className="rounded px-3 py-2 text-[11px]" style={{ background: "#1f2328", color: "#6b7280" }}>{message}</div>;
 }

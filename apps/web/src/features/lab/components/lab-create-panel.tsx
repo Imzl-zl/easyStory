@@ -1,77 +1,96 @@
 "use client";
 
+import { useState } from "react";
+
 import { AppSelect } from "@/components/ui/app-select";
 
 import type { LabAnalysisFormState } from "./lab-support";
-import { LAB_ANALYSIS_TYPES } from "./lab-support";
+import { LAB_ANALYSIS_TYPES, createInitialLabAnalysisFormState } from "./lab-support";
 
 type LabCreatePanelProps = {
-  formState: LabAnalysisFormState;
   isPending: boolean;
-  onFieldChange: (patch: Partial<LabAnalysisFormState>) => void;
-  onSubmit: () => void;
+  onCancel: () => void;
+  onSubmit: (formState: LabAnalysisFormState) => void;
 };
 
 export function LabCreatePanel({
-  formState,
   isPending,
-  onFieldChange,
+  onCancel,
   onSubmit,
 }: Readonly<LabCreatePanelProps>) {
-  return (
-    <form
-      className="panel-shell space-y-4 p-5"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSubmit();
-      }}
-    >
-      <div>
-        <h2 className="font-serif text-xl font-semibold">记录新的洞察</h2>
-      </div>
-      <LabCreateFields formState={formState} isPending={isPending} onFieldChange={onFieldChange} />
-      <button className="ink-button w-full" disabled={isPending} type="submit">
-        {isPending ? "保存中..." : "保存洞察"}
-      </button>
-    </form>
-  );
-}
+  const [formState, setFormState] = useState<LabAnalysisFormState>(createInitialLabAnalysisFormState);
 
-function LabCreateFields({
-  formState,
-  isPending,
-  onFieldChange,
-}: Readonly<{
-  formState: LabAnalysisFormState;
-  isPending: boolean;
-  onFieldChange: (patch: Partial<LabAnalysisFormState>) => void;
-}>) {
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onSubmit(formState);
+  };
+
+  const handleFieldChange = (patch: Partial<LabAnalysisFormState>) => {
+    setFormState((current) => ({ ...current, ...patch }));
+  };
+
   return (
-    <>
-      <label className="block space-y-2">
-        <span className="label-text">洞察类型</span>
-        <AppSelect
-          disabled={isPending}
-          options={LAB_ANALYSIS_TYPES.map((item) => ({ label: item, value: item }))}
-          value={formState.analysisType}
-          onChange={(value) => onFieldChange({ analysisType: value as LabAnalysisFormState["analysisType"] })}
-        />
-      </label>
-      <LabTextField label="来源标题" required value={formState.sourceTitle} onChange={(value) => onFieldChange({ sourceTitle: value })} />
-      <LabTextField
-        label="来源 Skill"
-        placeholder="可选，例如 skill.style.river"
-        value={formState.generatedSkillKey}
-        onChange={(value) => onFieldChange({ generatedSkillKey: value })}
-      />
-      <LabTextAreaField label="洞察正文（JSON）" value={formState.result} onChange={(value) => onFieldChange({ result: value })} />
-      <LabTextAreaField
-        label="后续建议（JSON）"
-        minHeightClassName="min-h-32"
-        value={formState.suggestions}
-        onChange={(value) => onFieldChange({ suggestions: value })}
-      />
-    </>
+    <div className="h-full flex flex-col rounded" style={{ background: "#1a1d23", border: "1px solid #2a2f35" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #2a2f35" }}>
+        <span className="text-[12px] font-medium" style={{ color: "#9ca3af" }}>记录新的洞察</span>
+        <button
+          className="px-3 py-1.5 rounded text-[11px] font-medium transition-colors"
+          style={{ background: "#1f2328", color: "#9ca3af" }}
+          onClick={onCancel}
+          type="button"
+        >
+          取消
+        </button>
+      </div>
+      <div className="flex-1 overflow-auto p-4">
+        <form className="space-y-3" onSubmit={handleSubmit}>
+          <label className="block space-y-1">
+            <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>洞察类型</span>
+            <AppSelect
+              disabled={isPending}
+              options={LAB_ANALYSIS_TYPES.map((item) => ({ label: item, value: item }))}
+              value={formState.analysisType}
+              onChange={(value) => handleFieldChange({ analysisType: value as LabAnalysisFormState["analysisType"] })}
+            />
+          </label>
+          <LabTextField
+            label="来源标题"
+            required
+            disabled={isPending}
+            value={formState.sourceTitle}
+            onChange={(value) => handleFieldChange({ sourceTitle: value })}
+          />
+          <LabTextField
+            label="来源 Skill"
+            disabled={isPending}
+            placeholder="可选，例如 skill.style.river"
+            value={formState.generatedSkillKey}
+            onChange={(value) => handleFieldChange({ generatedSkillKey: value })}
+          />
+          <LabTextAreaField
+            label="洞察正文（JSON）"
+            disabled={isPending}
+            value={formState.result}
+            onChange={(value) => handleFieldChange({ result: value })}
+          />
+          <LabTextAreaField
+            label="后续建议（JSON）"
+            disabled={isPending}
+            minHeightClassName="min-h-32"
+            value={formState.suggestions}
+            onChange={(value) => handleFieldChange({ suggestions: value })}
+          />
+          <button
+            className="w-full px-4 py-2 rounded text-[12px] font-medium transition-all disabled:opacity-40"
+            style={{ background: "#e8b86d", color: "#111418" }}
+            disabled={isPending}
+            type="submit"
+          >
+            {isPending ? "保存中..." : "保存洞察"}
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -88,9 +107,17 @@ function LabTextField({
   }
 >) {
   return (
-    <label className="block space-y-2">
-      <span className="label-text">{label}</span>
-      <input className="ink-input" value={value} onChange={(event) => onChange(event.target.value)} {...props} />
+    <label className="block space-y-1">
+      <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>{label}</span>
+      <input
+        className="w-full px-3 py-2 rounded text-[12px] outline-none"
+        style={{ background: "#111418", color: "#e8e6e3", border: "1px solid #2a2f35" }}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onFocus={(e) => { e.currentTarget.style.borderColor = "#e8b86d"; }}
+        onBlur={(e) => { e.currentTarget.style.borderColor = "#2a2f35"; }}
+        {...props}
+      />
     </label>
   );
 }
@@ -100,19 +127,26 @@ function LabTextAreaField({
   minHeightClassName = "min-h-40",
   onChange,
   value,
-}: Readonly<{
-  label: string;
-  minHeightClassName?: string;
-  onChange: (value: string) => void;
-  value: string;
-}>) {
+  ...props
+}: Readonly<
+  Omit<React.ComponentProps<"textarea">, "onChange" | "value"> & {
+    label: string;
+    minHeightClassName?: string;
+    onChange: (value: string) => void;
+    value: string;
+  }
+>) {
   return (
-    <label className="block space-y-2">
-      <span className="label-text">{label}</span>
+    <label className="block space-y-1">
+      <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>{label}</span>
       <textarea
-        className={`ink-textarea ${minHeightClassName}`}
+        className={`w-full px-3 py-2 rounded text-[12px] outline-none resize-y ${minHeightClassName}`}
+        style={{ background: "#111418", color: "#e8e6e3", border: "1px solid #2a2f35" }}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onFocus={(e) => { e.currentTarget.style.borderColor = "#e8b86d"; }}
+        onBlur={(e) => { e.currentTarget.style.borderColor = "#2a2f35"; }}
+        {...props}
       />
     </label>
   );

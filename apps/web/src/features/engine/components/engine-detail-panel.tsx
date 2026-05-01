@@ -86,7 +86,7 @@ export function EngineDetailPanel({
     <div className="space-y-4">
       <nav
         aria-label="引擎详情标签"
-        className="flex flex-wrap gap-2"
+        className="flex flex-wrap gap-1"
       >
         {tabs.map((tab) => (
           <DetailTabButton
@@ -187,7 +187,26 @@ function DetailTabButton({
   tab: EngineDetailTabOption;
 }>) {
   return (
-    <button className="ink-tab" data-active={isActive} onClick={onClick}>
+    <button
+      className="px-3 py-1.5 rounded text-[11px] font-medium transition-all"
+      style={{
+        background: isActive ? "#e8b86d" : "transparent",
+        color: isActive ? "#111418" : "#6b7280",
+      }}
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.color = "#9ca3af";
+          e.currentTarget.style.background = "#1f2328";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.color = "#6b7280";
+          e.currentTarget.style.background = "transparent";
+        }
+      }}
+    >
       {tab.label}
     </button>
   );

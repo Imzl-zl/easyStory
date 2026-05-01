@@ -1,287 +1,242 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 
-import Link from "next/link";
 import { showAppNotice } from "@/components/ui/app-notice";
-import { createAnalysis, deleteAnalysis, getAnalysis, listAnalyses } from "@/lib/api/analysis";
 import { getErrorMessage } from "@/lib/api/client";
-import type { AnalysisDetail, AnalysisSummary } from "@/lib/api/types";
+import { createAnalysis, deleteAnalysis, getAnalysis, listAnalyses } from "@/lib/api/analysis";
 
 import { LabCreatePanel } from "./lab-create-panel";
-import { LabDeleteConfirmDialog } from "./lab-delete-confirm-dialog";
 import { LabDetailPanel } from "./lab-detail-panel";
 import { LabSidebar } from "./lab-sidebar";
 import {
-  buildLabAnalysisSummary,
   buildLabAnalysisListOptions,
   buildLabAnalysisQueryKey,
   buildLabCreatePayload,
   createInitialLabAnalysisFilterState,
   createInitialLabAnalysisFormState,
-  formatLabAnalysisTitle,
-  hasActiveLabAnalysisListOptions,
-  matchesLabAnalysisListOptions,
+  hasActiveLabAnalysisFilters,
   prependLabAnalysisSummary,
   removeLabAnalysisSummary,
   resolveActiveLabAnalysisId,
   resolveNextLabSelectedIdAfterDelete,
+  type LabAnalysisFilterState,
 } from "./lab-support";
 
 type LabPageProps = {
   projectId: string;
 };
 
-type DeleteAnalysisMutationVariables = {
-  analysisId: string;
-  analysisTitle: string;
-};
-
-export function LabPage({ projectId }: LabPageProps) {
+export function LabPage({ projectId }: Readonly<LabPageProps>) {
   const queryClient = useQueryClient();
-  const [filterState, setFilterState] = useState(createInitialLabAnalysisFilterState);
-  const [formState, setFormState] = useState(createInitialLabAnalysisFormState);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  const [filters, setFilters] = useState<LabAnalysisFilterState>(createInitialLabAnalysisFilterState());
+  const [isCreating, setIsCreating] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [pendingDeleteAnalysis, setPendingDeleteAnalysis] = useState<AnalysisSummary | AnalysisDetail | null>(null);
-  const listOptions = useLabListOptions(filterState);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  const listOptions = useMemo(() => buildLabAnalysisListOptions(filters), [filters]);
   const listQueryKey = buildLabAnalysisQueryKey(projectId, listOptions);
-  const listQuery = useQuery({ queryKey: listQueryKey, queryFn: () => listAnalyses(projectId, listOptions) });
-  const analyses = listQuery.data ?? [];
-  const activeId = resolveActiveLabAnalysisId(analyses, selectedId);
+
+  const analysesQuery = useQuery({
+    queryKey: listQueryKey,
+    queryFn: () => listAnalyses(projectId, listOptions),
+  });
+
+  const activeId = resolveActiveLabAnalysisId(analysesQuery.data, selectedId);
+
   const detailQuery = useQuery({
     queryKey: ["analysis-detail", projectId, activeId],
-    queryFn: () => getAnalysis(projectId, activeId as string),
-    enabled: Boolean(activeId),
-  });
-  const hasActiveFilters = hasActiveLabAnalysisListOptions(listOptions);
-  const createMutation = useCreateAnalysisMutation({
-    activeId,
-    formState,
-    listOptions,
-    listQueryKey,
-    projectId,
-    queryClient,
-    setFormState,
-    setSelectedId,
-  });
-  const deleteMutation = useDeleteAnalysisMutation({
-    activeId,
-    analyses,
-    listQueryKey,
-    projectId,
-    queryClient,
-    setPendingDeleteAnalysis,
-    setSelectedId,
+    queryFn: () => (activeId ? getAnalysis(projectId, activeId) : null),
+    enabled: Boolean(activeId) && !isCreating,
   });
 
+  const createMutation = useMutation({
+    mutationFn: (formState: ReturnType<typeof createInitialLabAnalysisFormState>) =>
+      createAnalysis(projectId, buildLabCreatePayload(formState)),
+    onSuccess: (analysis) => {
+      showAppNotice({
+        content: "洞察已保存。",
+        title: "分析实验室",
+        tone: "success",
+      });
+      setIsCreating(false);
+      queryClient.setQueryData(listQueryKey, (current: typeof analysesQuery.data) =>
+        prependLabAnalysisSummary(current, analysis),
+      );
+      startTransition(() => {
+        setSelectedId(analysis.id);
+      });
+    },
+    onError: (error) =>
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "分析实验室",
+        tone: "danger",
+      }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (analysisId: string) => deleteAnalysis(projectId, analysisId),
+    onSuccess: (_, analysisId) => {
+      showAppNotice({
+        content: "洞察已删除。",
+        title: "分析实验室",
+        tone: "success",
+      });
+      setDeleteTarget(null);
+      queryClient.setQueryData(listQueryKey, (current: typeof analysesQuery.data) =>
+        removeLabAnalysisSummary(current, analysisId),
+      );
+      const nextId = resolveNextLabSelectedIdAfterDelete(
+        analysesQuery.data,
+        selectedId,
+        analysisId,
+      );
+      startTransition(() => {
+        setSelectedId(nextId);
+      });
+    },
+    onError: (error) =>
+      showAppNotice({
+        content: getErrorMessage(error),
+        title: "分析实验室",
+        tone: "danger",
+      }),
+  });
+
+  const handleFilterChange = (patch: Partial<LabAnalysisFilterState>) => {
+    startTransition(() => {
+      setFilters((current) => ({ ...current, ...patch }));
+      setSelectedId(null);
+    });
+  };
+
+  const handleSelect = (analysisId: string) => {
+    if (isPending) return;
+    startTransition(() => {
+      setSelectedId(analysisId);
+      setIsCreating(false);
+    });
+  };
+
+  const handleStartCreate = () => {
+    setIsCreating(true);
+    setSelectedId(null);
+  };
+
+  const handleCancelCreate = () => {
+    setIsCreating(false);
+  };
+
+  const handleRequestDelete = (analysisId: string) => {
+    setDeleteTarget(analysisId);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteTarget) {
+      deleteMutation.mutate(deleteTarget);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteTarget(null);
+  };
+
   return (
-    <div className="flex flex-col gap-5">
-      <LabHero
-        activeTitle={detailQuery.data ? formatLabAnalysisTitle(detailQuery.data) : null}
-        analysesCount={analyses.length}
-        hasActiveFilters={hasActiveFilters}
-        projectId={projectId}
-      />
-      <div className="hero-card grid gap-4.5 p-4.5 [grid-template-columns:1fr] xl:[grid-template-columns:minmax(260px,320px)_minmax(0,1fr)_minmax(300px,360px)]">
-        <aside className="min-w-0">
+    <div className="h-full flex flex-col" style={{ background: "#111418" }}>
+      {/* Header */}
+      <header className="px-6 pt-6 pb-4 flex-shrink-0" style={{ borderBottom: "1px solid #1f2328" }}>
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#e8b86d" }} />
+              <span className="text-[10px] font-semibold tracking-[0.15em] uppercase" style={{ color: "#e8b86d" }}>
+                分析实验室
+              </span>
+            </div>
+            <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: "#e8e6e3" }}>
+              项目洞察
+            </h1>
+          </div>
+          <button
+            className="px-4 py-2 rounded text-[12px] font-medium transition-all disabled:opacity-40"
+            style={{ background: "#e8b86d", color: "#111418" }}
+            disabled={isPending || createMutation.isPending}
+            onClick={handleStartCreate}
+            type="button"
+          >
+            新建洞察
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex-1 px-6 py-4 overflow-auto">
+        <div className="grid gap-4 h-full" style={{ gridTemplateColumns: "minmax(280px, 320px) minmax(0, 1fr)" }}>
           <LabSidebar
             activeId={activeId}
-            analyses={analyses}
-            errorMessage={listQuery.error ? getErrorMessage(listQuery.error) : null}
-            filters={filterState}
-            isLoading={listQuery.isLoading}
-            isPending={deleteMutation.isPending}
-            onFilterChange={(patch) => setFilterState((current) => ({ ...current, ...patch }))}
-            onSelect={setSelectedId}
+            analyses={analysesQuery.data ?? []}
+            errorMessage={analysesQuery.error ? getErrorMessage(analysesQuery.error) : null}
+            filters={filters}
+            isLoading={analysesQuery.isLoading}
+            isPending={isPending}
+            onFilterChange={handleFilterChange}
+            onSelect={handleSelect}
           />
-        </aside>
-        <section className="min-w-0">
-          <LabDetailPanel
-            activeId={activeId}
-            analysis={detailQuery.data}
-            errorMessage={detailQuery.error ? getErrorMessage(detailQuery.error) : null}
-            hasActiveFilters={hasActiveFilters}
-            isDeletePending={deleteMutation.isPending}
-            isLoading={detailQuery.isLoading}
-            onRequestDelete={setPendingDeleteAnalysis}
-          />
-        </section>
-        <aside className="min-w-0">
-          <LabCreatePanel
-            formState={formState}
-            isPending={createMutation.isPending}
-            onFieldChange={(patch) => setFormState((current) => ({ ...current, ...patch }))}
-            onSubmit={() => createMutation.mutate()}
-          />
-        </aside>
+
+          {isCreating ? (
+            <LabCreatePanel
+              isPending={createMutation.isPending}
+              onCancel={handleCancelCreate}
+              onSubmit={(formState) => createMutation.mutate(formState)}
+            />
+          ) : (
+            <LabDetailPanel
+              activeId={activeId}
+              analysis={detailQuery.data ?? undefined}
+              errorMessage={detailQuery.error ? getErrorMessage(detailQuery.error) : null}
+              hasActiveFilters={hasActiveLabAnalysisFilters(filters)}
+              isDeletePending={deleteMutation.isPending}
+              isLoading={detailQuery.isLoading}
+              onRequestDelete={handleRequestDelete}
+            />
+          )}
+        </div>
       </div>
-      {pendingDeleteAnalysis ? (
-        <LabDeleteConfirmDialog
-          analysisTitle={pendingDeleteAnalysis.source_title ?? pendingDeleteAnalysis.analysis_type}
-          analysisType={pendingDeleteAnalysis.analysis_type}
-          generatedSkillKey={pendingDeleteAnalysis.generated_skill_key}
-          isPending={deleteMutation.isPending}
-          onClose={() => setPendingDeleteAnalysis(null)}
-          onConfirm={() =>
-            deleteMutation.mutate({
-              analysisId: pendingDeleteAnalysis.id,
-              analysisTitle: pendingDeleteAnalysis.source_title ?? pendingDeleteAnalysis.analysis_type,
-            })
-          }
-        />
+
+      {/* Delete Dialog */}
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}>
+          <div className="rounded p-5 w-full max-w-sm" style={{ background: "#1a1d23", border: "1px solid #2a2f35" }}>
+            <h3 className="text-[14px] font-semibold mb-2" style={{ color: "#e8e6e3" }}>删除洞察</h3>
+            <p className="text-[12px] mb-4" style={{ color: "#9ca3af" }}>确定要删除这条洞察记录吗？此操作不可撤销。</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                className="px-3 py-1.5 rounded text-[12px] font-medium transition-colors"
+                style={{ background: "#1f2328", color: "#9ca3af" }}
+                onClick={handleCancelDelete}
+                type="button"
+              >
+                取消
+              </button>
+              <button
+                className="px-3 py-1.5 rounded text-[12px] font-medium transition-all disabled:opacity-40"
+                style={{ background: "rgba(220, 38, 38, 0.12)", color: "#f87171", border: "1px solid rgba(220, 38, 38, 0.2)" }}
+                disabled={deleteMutation.isPending}
+                onClick={handleConfirmDelete}
+                type="button"
+              >
+                {deleteMutation.isPending ? "删除中..." : "删除"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );
-}
-
-function LabHero({
-  activeTitle,
-  analysesCount,
-  hasActiveFilters,
-  projectId,
-}: Readonly<{
-  activeTitle: string | null;
-  analysesCount: number;
-  hasActiveFilters: boolean;
-  projectId: string;
-}>) {
-  return (
-    <section className="hero-card grid gap-4.5 p-6">
-      <div>
-        <p className="label-overline">分析实验室</p>
-        <h1 className="max-w-[900px] font-serif text-[clamp(2rem,4vw,3.6rem)] leading-tight">把灵感拆解、文风判断和结构分析留在项目语境里。</h1>
-      </div>
-      <div className="grid gap-3 [grid-template-columns:repeat(3,minmax(0,1fr))]">
-        <article className="grid gap-2.5 min-h-[110px] p-4.5 rounded-2xl bg-gradient-to-b from-glass-heavy to-glass shadow-glass">
-          <span className="label-overline">当前记录</span>
-          <strong className="font-serif text-2xl leading-tight">{analysesCount}</strong>
-        </article>
-        <article className="grid gap-2.5 min-h-[110px] p-4.5 rounded-2xl bg-gradient-to-b from-glass-heavy to-glass shadow-glass">
-          <span className="label-overline">筛选状态</span>
-          <strong className="font-serif text-2xl leading-tight">{hasActiveFilters ? "已聚焦" : "查看全部"}</strong>
-        </article>
-        <article className="grid gap-2.5 min-h-[110px] p-4.5 rounded-2xl bg-gradient-to-b from-glass-heavy to-glass shadow-glass">
-          <span className="label-overline">当前焦点</span>
-          <strong className="font-serif text-2xl leading-tight">{activeTitle ?? "选择一条洞察"}</strong>
-        </article>
-      </div>
-      <div className="flex gap-2.5">
-        <Link className="ink-link-button" href={`/workspace/project/${projectId}/studio`}>
-          创作
-        </Link>
-        <Link className="ink-link-button" href={`/workspace/project/${projectId}/engine`}>
-          工作流
-        </Link>
-      </div>
-    </section>
-  );
-}
-
-function useLabListOptions(filterState: ReturnType<typeof createInitialLabAnalysisFilterState>) {
-  const deferredContentId = useDeferredValue(filterState.contentId.trim());
-  const deferredGeneratedSkillKey = useDeferredValue(filterState.generatedSkillKey.trim());
-
-  return useMemo(
-    () =>
-      buildLabAnalysisListOptions({
-        ...filterState,
-        contentId: deferredContentId,
-        generatedSkillKey: deferredGeneratedSkillKey,
-      }),
-    [deferredContentId, deferredGeneratedSkillKey, filterState],
-  );
-}
-
-function useCreateAnalysisMutation({
-  activeId,
-  formState,
-  listOptions,
-  listQueryKey,
-  projectId,
-  queryClient,
-  setFormState,
-  setSelectedId,
-}: Readonly<{
-  activeId: string | null;
-  formState: ReturnType<typeof createInitialLabAnalysisFormState>;
-  listOptions: ReturnType<typeof buildLabAnalysisListOptions>;
-  listQueryKey: ReturnType<typeof buildLabAnalysisQueryKey>;
-  projectId: string;
-  queryClient: ReturnType<typeof useQueryClient>;
-  setFormState: Dispatch<SetStateAction<ReturnType<typeof createInitialLabAnalysisFormState>>>;
-  setSelectedId: Dispatch<SetStateAction<string | null>>;
-}>) {
-  return useMutation({
-    mutationFn: () => createAnalysis(projectId, buildLabCreatePayload(formState)),
-    onSuccess: async (result) => {
-      const matchesFilters = matchesLabAnalysisListOptions(result, listOptions);
-      if (matchesFilters) {
-        const createdSummary = buildLabAnalysisSummary(result);
-        queryClient.setQueryData<AnalysisSummary[]>(listQueryKey, (current) =>
-          prependLabAnalysisSummary(current, createdSummary),
-        );
-        queryClient.setQueryData(["analysis-detail", projectId, result.id], result);
-      }
-      showAppNotice({
-        content: matchesFilters ? "洞察已保存。" : "洞察已保存，清除筛选后可在列表中看到。",
-        title: "洞察",
-        tone: "success",
-      });
-      setSelectedId(matchesFilters ? result.id : activeId);
-      setFormState(createInitialLabAnalysisFormState());
-      await refreshAnalyses(projectId, queryClient);
-    },
-    onError: (error) =>
-      showAppNotice({ content: getErrorMessage(error), title: "洞察", tone: "danger" }),
-  });
-}
-
-function useDeleteAnalysisMutation({
-  activeId,
-  analyses,
-  listQueryKey,
-  projectId,
-  queryClient,
-  setPendingDeleteAnalysis,
-  setSelectedId,
-}: Readonly<{
-  activeId: string | null;
-  analyses: AnalysisSummary[];
-  listQueryKey: ReturnType<typeof buildLabAnalysisQueryKey>;
-  projectId: string;
-  queryClient: ReturnType<typeof useQueryClient>;
-  setPendingDeleteAnalysis: Dispatch<SetStateAction<AnalysisSummary | AnalysisDetail | null>>;
-  setSelectedId: Dispatch<SetStateAction<string | null>>;
-}>) {
-  return useMutation({
-    mutationFn: ({ analysisId }: DeleteAnalysisMutationVariables) => deleteAnalysis(projectId, analysisId),
-    onSuccess: async (_, variables) => {
-      queryClient.setQueryData<AnalysisSummary[]>(listQueryKey, (current) =>
-        removeLabAnalysisSummary(current, variables.analysisId),
-      );
-      queryClient.removeQueries({ exact: true, queryKey: ["analysis-detail", projectId, variables.analysisId] });
-      setSelectedId(resolveNextLabSelectedIdAfterDelete(analyses, activeId, variables.analysisId));
-      showAppNotice({
-        content: `洞察「${variables.analysisTitle}」已删除。`,
-        title: "洞察",
-        tone: "success",
-      });
-      setPendingDeleteAnalysis(null);
-      await refreshAnalyses(projectId, queryClient);
-    },
-    onError: (error) => {
-      showAppNotice({ content: getErrorMessage(error), title: "洞察", tone: "danger" });
-      setPendingDeleteAnalysis(null);
-    },
-  });
-}
-
-async function refreshAnalyses(projectId: string, queryClient: ReturnType<typeof useQueryClient>) {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["analyses", projectId] }),
-    queryClient.invalidateQueries({ queryKey: ["analysis-detail", projectId] }),
-    queryClient.invalidateQueries({ queryKey: ["engine-context-style-analyses", projectId] }),
-  ]);
 }

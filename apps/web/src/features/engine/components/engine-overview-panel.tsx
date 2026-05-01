@@ -1,8 +1,6 @@
 "use client";
 
 import { EmptyState } from "@/components/ui/empty-state";
-import { MetricCard } from "@/components/ui/metric-card";
-import { StatusBadge } from "@/components/ui/status-badge";
 import type { NodeExecutionView, WorkflowExecution } from "@/lib/api/types";
 
 import {
@@ -54,14 +52,24 @@ export function EngineOverviewPanel({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {errorMessage ? <FeedbackMessage tone="danger" message={errorMessage} /> : null}
-      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+      <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
         {overview.metrics.map((metric) => (
-          <MetricCard key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} />
+          <MetricItem key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} />
         ))}
       </div>
       <TimelineSection overview={overview} onOpenReplayExecution={onOpenReplayExecution} />
+    </div>
+  );
+}
+
+function MetricItem({ label, value, detail }: { label: string; value: string; detail?: string }) {
+  return (
+    <div className="rounded p-3" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+      <p className="text-[10px] mb-1" style={{ color: "#4b5563" }}>{label}</p>
+      <p className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>{value}</p>
+      {detail ? <p className="text-[10px] mt-0.5" style={{ color: "#4b5563" }}>{detail}</p> : null}
     </div>
   );
 }
@@ -74,14 +82,9 @@ function TimelineSection({
   overview: EngineOverviewData;
 }>) {
   return (
-    <section className="panel-muted space-y-3 p-4">
-      <header className="space-y-1">
-        <h3 className="font-serif text-lg font-semibold">节点时间线</h3>
-        <p className="text-sm leading-6 text-text-secondary">
-          节点执行状态总览。
-        </p>
-      </header>
-      <div className="space-y-3">
+    <section className="space-y-2">
+      <h3 className="text-[12px] font-medium" style={{ color: "#6b7280" }}>节点时间线</h3>
+      <div className="space-y-2">
         {overview.timeline.map((item, index) => (
           <TimelineItem
             key={item.key}
@@ -107,50 +110,83 @@ function TimelineItem({
   const latestExecutionId = item.latestExecutionId;
 
   return (
-    <div className="grid gap-3 md:grid-cols-[20px_1fr]">
-      <div className="flex flex-col items-center pt-2">
-        <span className={`h-3 w-3 rounded-full ${resolveTimelineDotClass(item.statusTone)}`} />
+    <div className="flex gap-3">
+      <div className="flex flex-col items-center pt-1.5">
+        <span
+          className="h-2 w-2 rounded-full flex-shrink-0"
+          style={{ background: resolveTimelineDotColor(item.statusTone) }}
+        />
         {!isLast ? (
-          <span className="mt-2 h-full w-px bg-line-strong" />
+          <span className="mt-1.5 w-px flex-1" style={{ background: "#2a2f35" }} />
         ) : null}
       </div>
-      <div className="rounded-2xl bg-muted shadow-sm p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={item.statusTone} label={item.statusLabel} />
+      <div className="flex-1 rounded p-3 mb-2" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1.5 min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <StatusPill tone={item.statusTone} label={item.statusLabel} />
               {item.badges.map((badge) => (
-                <StatusBadge key={`${item.key}-${badge.label}`} status={badge.status} label={badge.label} />
+                <StatusPill key={`${item.key}-${badge.label}`} tone={badge.status} label={badge.label} />
               ))}
             </div>
             <div>
-              <p className="text-sm font-medium text-text-primary">{item.title}</p>
-              <p className="text-sm leading-6 text-text-secondary">{item.subtitle}</p>
+              <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>{item.title}</p>
+              <p className="text-[11px]" style={{ color: "#6b7280" }}>{item.subtitle}</p>
             </div>
           </div>
-          <p className="text-right text-sm leading-6 text-text-secondary">
+          <p className="text-[11px] flex-shrink-0" style={{ color: "#4b5563" }}>
             {item.timeDetail}
           </p>
         </div>
-        <p className="mt-3 text-sm leading-6 text-text-secondary">{item.detail}</p>
+        <p className="mt-2 text-[11px] leading-relaxed" style={{ color: "#6b7280" }}>{item.detail}</p>
         {latestExecutionId && onOpenReplayExecution ? (
-          <div className="mt-4">
+          <div className="mt-2">
             <button
-              className="ink-button-secondary"
+              className="px-3 py-1.5 rounded text-[11px] font-medium transition-colors"
+              style={{ background: "#1f2328", color: "#9ca3af" }}
               onClick={() => onOpenReplayExecution(latestExecutionId)}
               type="button"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#2a2f35";
+                e.currentTarget.style.color = "#e8e6e3";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#1f2328";
+                e.currentTarget.style.color = "#9ca3af";
+              }}
             >
-              查看最新 Prompt 回放
+              查看 Prompt 回放
             </button>
           </div>
         ) : null}
         {item.errorMessage ? (
-          <div className="mt-4 rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm leading-6 text-accent-danger">
+          <div className="mt-2 rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
             {item.errorMessage}
           </div>
         ) : null}
       </div>
     </div>
+  );
+}
+
+function StatusPill({ tone, label }: { tone: string; label: string }) {
+  const colors: Record<string, { bg: string; text: string }> = {
+    completed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
+    failed: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
+    warning: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
+    stale: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
+    active: { bg: "rgba(232, 184, 109, 0.12)", text: "#e8b86d" },
+    outline: { bg: "#1f2328", text: "#9ca3af" },
+    draft: { bg: "#1f2328", text: "#6b7280" },
+  };
+  const c = colors[tone] || colors.outline;
+  return (
+    <span
+      className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+      style={{ background: c.bg, color: c.text }}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -163,27 +199,27 @@ function FeedbackMessage({
 }>) {
   if (tone === "danger") {
     return (
-      <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
+      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
         {message}
       </div>
     );
   }
 
-  return <div className="panel-muted px-4 py-5 text-sm text-text-secondary">{message}</div>;
+  return <div className="rounded px-3 py-2 text-[11px]" style={{ background: "#1f2328", color: "#6b7280" }}>{message}</div>;
 }
 
-function resolveTimelineDotClass(status: EngineOverviewTimelineItem["statusTone"]): string {
+function resolveTimelineDotColor(status: EngineOverviewTimelineItem["statusTone"]): string {
   switch (status) {
     case "completed":
-      return "bg-accent-success";
+      return "#22c55e";
     case "failed":
-      return "bg-accent-danger";
+      return "#dc2626";
     case "warning":
     case "stale":
-      return "bg-accent-warning";
+      return "#eab308";
     case "active":
-      return "bg-accent-primary";
+      return "#e8b86d";
     default:
-      return "bg-text-secondary";
+      return "#6b7280";
   }
 }

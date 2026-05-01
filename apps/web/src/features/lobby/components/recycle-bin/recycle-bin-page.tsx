@@ -3,46 +3,96 @@
 import { useState } from "react";
 import Link from "next/link";
 
-import { SectionCard } from "@/components/ui/section-card";
 import { useLobbyProjectModel } from "@/features/lobby/components/projects/lobby-project-model";
-import { resolveEmptyTrashButtonLabel } from "@/features/lobby/components/projects/lobby-project-support";
-import { LobbyProjectShelf } from "@/features/lobby/components/projects/lobby-project-shelf";
 import { RecycleBinClearDialog } from "@/features/lobby/components/recycle-bin/recycle-bin-dialogs";
+import { getErrorMessage } from "@/lib/api/client";
+import type { ProjectSummary } from "@/lib/api/types";
 
 export function RecycleBinPage() {
   const [isClearDialogOpen, setClearDialogOpen] = useState(false);
   const model = useLobbyProjectModel({ deletedOnly: true });
 
   return (
-    <div className="space-y-6">
-      <SectionCard
-        title="回收站"
-        action={<Link className="ink-button-secondary" href="/workspace/lobby">返回书架</Link>}
-      >
-        <div className="space-y-5">
-          <RecycleBinSummaryCard
-            deletedProjectCount={model.deletedProjectCount}
-            isPending={model.emptyTrashMutation.isPending}
-            onClear={() => setClearDialogOpen(true)}
-          />
-          <label className="block">
-            <span className="label-text">快速搜索</span>
+    <div className="h-full flex flex-col" style={{ background: "#111418" }}>
+      {/* Header */}
+      <header className="px-6 pt-6 pb-4 flex-shrink-0" style={{ borderBottom: "1px solid #1f2328" }}>
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#e8b86d" }} />
+              <span className="text-[10px] font-semibold tracking-[0.15em] uppercase" style={{ color: "#e8b86d" }}>
+                项目管理
+              </span>
+            </div>
+            <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: "#e8e6e3" }}>
+              回收站
+            </h1>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-[11px]" style={{ color: "#6b7280" }}>
+                {model.deletedProjectCount} 个项目
+              </span>
+              <span className="text-[11px]" style={{ color: "#4b5563" }}>
+                保留 30 天
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
             <input
-              className="ink-input"
-              placeholder="按项目名过滤"
+              className="h-8 px-3 rounded-md text-[12px] w-48"
+              placeholder="搜索项目"
+              style={{ background: "#16191e", color: "#e8e6e3", border: "1px solid #1f2328" }}
               value={model.searchText}
               onChange={(event) => model.setSearchText(event.target.value)}
             />
-          </label>
-          <LobbyProjectShelf
-            actionMutation={model.actionMutation}
-            deletedOnly
-            error={model.projectsQuery.error}
-            isLoading={model.projectsQuery.isLoading}
-            projects={model.filteredProjects}
-          />
+            <button
+              className="h-8 px-4 rounded-md text-[12px] font-medium"
+              disabled={model.deletedProjectCount === 0 || model.emptyTrashMutation.isPending}
+              style={{
+                background: model.deletedProjectCount > 0 ? "rgba(239,68,68,0.1)" : "#1f2328",
+                color: model.deletedProjectCount > 0 ? "#ef4444" : "#4b5563",
+                border: "1px solid #2d3139",
+              }}
+              type="button"
+              onClick={() => setClearDialogOpen(true)}
+            >
+              {model.emptyTrashMutation.isPending ? "清空中..." : "清空"}
+            </button>
+            <Link
+              className="h-8 px-4 rounded-md text-[12px] font-medium flex items-center"
+              href="/workspace/lobby"
+              style={{ background: "#1f2328", color: "#9ca3af", border: "1px solid #2d3139" }}
+            >
+              返回书架
+            </Link>
+          </div>
         </div>
-      </SectionCard>
+      </header>
+
+      {/* Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "#2d3139 transparent" }}>
+        <div className="px-6 py-5">
+          {model.projectsQuery.isLoading ? (
+            <LoadingState />
+          ) : model.projectsQuery.error ? (
+            <div className="rounded-md px-3.5 py-2.5 text-[13px]" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+              {getErrorMessage(model.projectsQuery.error)}
+            </div>
+          ) : model.filteredProjects.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {model.filteredProjects.map((project) => (
+                <RecycleBinCard
+                  key={project.id}
+                  actionMutation={model.actionMutation}
+                  project={project}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {isClearDialogOpen ? (
         <RecycleBinClearDialog
           isPending={model.emptyTrashMutation.isPending}
@@ -59,34 +109,175 @@ export function RecycleBinPage() {
   );
 }
 
-function RecycleBinSummaryCard({
-  deletedProjectCount,
-  isPending,
-  onClear,
-}: Readonly<{
-  deletedProjectCount: number;
-  isPending: boolean;
-  onClear: () => void;
-}>) {
+function RecycleBinCard({
+  actionMutation,
+  project,
+}: {
+  actionMutation: ReturnType<typeof useLobbyProjectModel>["actionMutation"];
+  project: ProjectSummary;
+}) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const isRestoring = actionMutation.isPending && actionMutation.variables?.projectId === project.id && actionMutation.variables?.type === "restore";
+  const isDeleting = actionMutation.isPending && actionMutation.variables?.projectId === project.id && actionMutation.variables?.type === "physicalDelete";
+
   return (
-    <section className="grid gap-4 rounded-3xl bg-glass shadow-glass-heavy p-5 lg:grid-cols-[1fr_auto] lg:items-center">
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.18em] text-accent-primary">回收站状态</p>
-        <h3 className="font-serif text-2xl font-semibold text-text-primary">
-          当前共有 {deletedProjectCount} 个已删除项目
-        </h3>
-        <p className="text-sm leading-6 text-text-secondary">
-          删除后默认保留 30 天。到期前你可以恢复，也可以立即彻底删除。
-        </p>
-      </div>
-      <button
-        className="ink-button-danger"
-        disabled={deletedProjectCount === 0 || isPending}
-        onClick={onClear}
-        type="button"
+    <>
+      <div
+        className="rounded-lg p-4 transition-colors hover:brightness-110"
+        style={{
+          background: "#16191e",
+          border: "1px solid #1f2328",
+        }}
       >
-        {resolveEmptyTrashButtonLabel(isPending)}
-      </button>
-    </section>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div
+              className="w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+              style={{ background: "#1f2328", color: "#9ca3af" }}
+            >
+              {project.name.charAt(0)}
+            </div>
+            <span className="text-[13px] font-medium truncate" style={{ color: "#e8e6e3" }}>
+              {project.name}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mt-2">
+          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#1f2328", color: "#6b7280" }}>
+            {project.genre ?? "未定题材"}
+          </span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b" }}>
+            {project.target_words ? `${(project.target_words / 10000).toFixed(1)}万字` : "未设定"}
+          </span>
+        </div>
+
+        <p className="mt-2 text-[11px]" style={{ color: "#6b7280" }}>
+          删除于 {formatTrashTime(project.deleted_at)}
+        </p>
+
+        <div className="flex gap-2 mt-3">
+          <button
+            className="h-7 px-3 rounded text-[11px] font-medium"
+            disabled={isRestoring || isDeleting}
+            style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}
+            onClick={() => actionMutation.mutate({ projectId: project.id, type: "restore" })}
+            type="button"
+          >
+            {isRestoring ? "恢复中..." : "恢复"}
+          </button>
+          <button
+            className="h-7 px-3 rounded text-[11px] font-medium"
+            disabled={isRestoring || isDeleting}
+            style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}
+            onClick={() => setShowDeleteDialog(true)}
+            type="button"
+          >
+            {isDeleting ? "删除中..." : "彻底删除"}
+          </button>
+        </div>
+      </div>
+
+      {showDeleteDialog ? (
+        <DeleteConfirmDialog
+          onClose={() => setShowDeleteDialog(false)}
+          onConfirm={() => {
+            actionMutation.mutate(
+              { projectId: project.id, type: "physicalDelete" },
+              { onSuccess: () => setShowDeleteDialog(false) },
+            );
+          }}
+          project={project}
+        />
+      ) : null}
+    </>
   );
+}
+
+function DeleteConfirmDialog({
+  onClose,
+  onConfirm,
+  project,
+}: {
+  onClose: () => void;
+  onConfirm: () => void;
+  project: ProjectSummary;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[380px] rounded-lg overflow-hidden"
+        style={{ background: "#111418", border: "1px solid #1f2328" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid #1f2328" }}>
+          <h2 className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>
+            彻底删除
+          </h2>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div
+            className="rounded-md px-3 py-2.5"
+            style={{ background: "#16191e", border: "1px solid #1f2328" }}
+          >
+            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>{project.name}</p>
+          </div>
+          <p className="text-[11px]" style={{ color: "#ef4444" }}>
+            删除后无法恢复，所有关联数据将一并清理。
+          </p>
+        </div>
+        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid #1f2328" }}>
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}
+            onClick={onConfirm}
+            type="button"
+          >
+            确认删除
+          </button>
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            style={{ background: "#1f2328", color: "#9ca3af", border: "1px solid #2d3139" }}
+            onClick={onClose}
+            type="button"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16">
+      <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ background: "#1a1d23" }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round">
+          <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        </svg>
+      </div>
+      <p className="text-[14px] font-medium" style={{ color: "#9ca3af" }}>回收站为空</p>
+      <p className="mt-1 text-[12px]" style={{ color: "#4b5563" }}>删除的项目会保留 30 天</p>
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16">
+      <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin mb-3" style={{ borderColor: "#2d3139", borderTopColor: "transparent" }} />
+      <p className="text-[13px]" style={{ color: "#6b7280" }}>加载中...</p>
+    </div>
+  );
+}
+
+function formatTrashTime(value: string | null): string {
+  if (!value) return "未知";
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }

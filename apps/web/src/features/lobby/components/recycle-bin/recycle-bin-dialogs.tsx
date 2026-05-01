@@ -1,30 +1,91 @@
 "use client";
 
-import { DialogShell } from "@/components/ui/dialog-shell";
-import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  formatProjectTrashDeadline,
-  formatProjectTrashTime,
-} from "@/features/lobby/components/projects/lobby-project-support";
 import type { ProjectSummary } from "@/lib/api/types";
 
-type RecycleBinDeleteDialogProps = {
-  errorMessage?: string | null;
+/* ============================================================
+   Soft Delete Confirm Dialog
+   ============================================================ */
+
+type ProjectDeleteConfirmDialogProps = {
+  errorMessage: string | null;
   isPending: boolean;
   onClose: () => void;
   onConfirm: () => void;
   project: ProjectSummary;
 };
 
-type RecycleBinClearDialogProps = {
-  isPending: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  projectCount: number;
-};
+export function ProjectDeleteConfirmDialog({
+  errorMessage,
+  isPending,
+  onClose,
+  onConfirm,
+  project,
+}: Readonly<ProjectDeleteConfirmDialogProps>) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[380px] rounded-lg overflow-hidden"
+        style={{ background: "#111418", border: "1px solid #1f2328" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid #1f2328" }}>
+          <h2 className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>
+            移入回收站
+          </h2>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div
+            className="rounded-md px-3 py-2.5"
+            style={{ background: "#16191e", border: "1px solid #1f2328" }}
+          >
+            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
+              {project.name}
+            </p>
+          </div>
+          <p className="text-[11px]" style={{ color: "#f59e0b" }}>
+            项目会移入回收站并保留 30 天，期间可随时恢复。
+          </p>
+          {errorMessage ? (
+            <p className="rounded-md px-3 py-2 text-[11px]" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+              {errorMessage}
+            </p>
+          ) : null}
+        </div>
+        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid #1f2328" }}>
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            disabled={isPending}
+            style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b" }}
+            onClick={onConfirm}
+            type="button"
+          >
+            {isPending ? "移动中..." : "确认移入"}
+          </button>
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            disabled={isPending}
+            style={{ background: "#1f2328", color: "#9ca3af", border: "1px solid #2d3139" }}
+            onClick={onClose}
+            type="button"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-type ProjectDeleteConfirmDialogProps = {
-  errorMessage?: string | null;
+/* ============================================================
+   Physical Delete Confirm Dialog
+   ============================================================ */
+
+type RecycleBinDeleteDialogProps = {
+  errorMessage: string | null;
   isPending: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -39,82 +100,74 @@ export function RecycleBinDeleteDialog({
   project,
 }: Readonly<RecycleBinDeleteDialogProps>) {
   return (
-    <DialogShell
-      title="确认彻底删除项目"
-      description="删除后无法恢复，项目关联数据会一并清理。"
-      closeDisabled={isPending}
-      onClose={onClose}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
     >
-      <div className="space-y-4">
-        <div className="space-y-3 rounded-2xl border border-accent-danger/15 bg-accent-danger/10 p-4">
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge status="failed" label="不可恢复" />
-            <StatusBadge status="archived" label="回收站" />
-          </div>
-          <p className="text-base font-medium text-text-primary">{project.name}</p>
-          <p className="text-sm leading-6 text-text-secondary">
-            删除时间：{formatProjectTrashTime(project.deleted_at)} · 保留截止：
-            {formatProjectTrashDeadline(project.deleted_at)}
-          </p>
-          <p className="text-sm leading-6 text-text-secondary">
-            会同时清理正文、工作流、导出、事实、账单、审计和项目级凭证。
-          </p>
+      <div
+        className="w-full max-w-[380px] rounded-lg overflow-hidden"
+        style={{ background: "#111418", border: "1px solid #1f2328" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid #1f2328" }}>
+          <h2 className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>
+            彻底删除
+          </h2>
         </div>
-        {errorMessage ? (
-          <div className="callout-danger text-sm leading-6 text-accent-danger">{errorMessage}</div>
-        ) : null}
-        <div className="flex flex-wrap gap-3">
-          <button className="ink-button-danger" disabled={isPending} onClick={onConfirm} type="button">
-            {isPending ? "删除中..." : "确认彻底删除"}
+        <div className="px-5 py-4 space-y-3">
+          <div
+            className="rounded-md px-3 py-2.5"
+            style={{ background: "#16191e", border: "1px solid #1f2328" }}
+          >
+            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
+              {project.name}
+            </p>
+          </div>
+          <p className="text-[11px]" style={{ color: "#ef4444" }}>
+            删除后无法恢复，所有关联数据将一并清理。
+          </p>
+          {errorMessage ? (
+            <p className="rounded-md px-3 py-2 text-[11px]" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+              {errorMessage}
+            </p>
+          ) : null}
+        </div>
+        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid #1f2328" }}>
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            disabled={isPending}
+            style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}
+            onClick={onConfirm}
+            type="button"
+          >
+            {isPending ? "删除中..." : "确认删除"}
           </button>
-          <button className="ink-button-secondary" disabled={isPending} onClick={onClose} type="button">
-            先保留
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            disabled={isPending}
+            style={{ background: "#1f2328", color: "#9ca3af", border: "1px solid #2d3139" }}
+            onClick={onClose}
+            type="button"
+          >
+            取消
           </button>
         </div>
       </div>
-    </DialogShell>
+    </div>
   );
 }
 
-export function ProjectDeleteConfirmDialog({
-  errorMessage,
-  isPending,
-  onClose,
-  onConfirm,
-  project,
-}: Readonly<ProjectDeleteConfirmDialogProps>) {
-  return (
-    <DialogShell
-      title="确认删除项目"
-      description="删除后项目会移入回收站，可以在回收站中恢复。"
-      closeDisabled={isPending}
-      onClose={onClose}
-    >
-      <div className="space-y-4">
-        <div className="space-y-3 rounded-2xl border border-accent-warning/20 bg-accent-warning/8 p-4">
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge status="archived" label="移入回收站" />
-          </div>
-          <p className="text-base font-medium text-text-primary">{project.name}</p>
-          <p className="text-sm leading-6 text-text-secondary">
-            删除后项目会保留在回收站中，关联数据不会清理，随时可以恢复。
-          </p>
-        </div>
-        {errorMessage ? (
-          <div className="callout-danger text-sm leading-6 text-accent-danger">{errorMessage}</div>
-        ) : null}
-        <div className="flex flex-wrap gap-3">
-          <button className="ink-button-danger" disabled={isPending} onClick={onConfirm} type="button">
-            {isPending ? "删除中..." : "确认删除"}
-          </button>
-          <button className="ink-button-secondary" disabled={isPending} onClick={onClose} type="button">
-            先保留
-          </button>
-        </div>
-      </div>
-    </DialogShell>
-  );
-}
+/* ============================================================
+   Clear Recycle Bin Dialog
+   ============================================================ */
+
+type RecycleBinClearDialogProps = {
+  isPending: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  projectCount: number;
+};
 
 export function RecycleBinClearDialog({
   isPending,
@@ -123,31 +176,55 @@ export function RecycleBinClearDialog({
   projectCount,
 }: Readonly<RecycleBinClearDialogProps>) {
   return (
-    <DialogShell
-      title="确认清空回收站"
-      description="会彻底删除当前账号回收站中的所有项目。"
-      closeDisabled={isPending}
-      onClose={onClose}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
     >
-      <div className="space-y-4">
-        <div className="space-y-3 rounded-2xl border border-accent-danger/15 bg-accent-danger/10 p-4">
-          <div className="flex flex-wrap gap-2">
-            <StatusBadge status="failed" label="批量清理" />
-            <StatusBadge status="archived" label={`${projectCount} 个项目`} />
+      <div
+        className="w-full max-w-[380px] rounded-lg overflow-hidden"
+        style={{ background: "#111418", border: "1px solid #1f2328" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid #1f2328" }}>
+          <h2 className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>
+            清空回收站
+          </h2>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div
+            className="rounded-md px-3 py-2.5"
+            style={{ background: "#16191e", border: "1px solid #1f2328" }}
+          >
+            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
+              {projectCount} 个项目
+            </p>
           </div>
-          <p className="text-sm leading-6 text-text-secondary">
-            此操作会一次性清空回收站中的全部项目及其关联数据，无法恢复。
+          <p className="text-[11px]" style={{ color: "#ef4444" }}>
+            此操作会一次性清空回收站中的全部项目，无法恢复。
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <button className="ink-button-danger" disabled={isPending} onClick={onConfirm} type="button">
+        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid #1f2328" }}>
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            disabled={isPending}
+            style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}
+            onClick={onConfirm}
+            type="button"
+          >
             {isPending ? "清空中..." : "确认清空"}
           </button>
-          <button className="ink-button-secondary" disabled={isPending} onClick={onClose} type="button">
-            先保留
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            disabled={isPending}
+            style={{ background: "#1f2328", color: "#9ca3af", border: "1px solid #2d3139" }}
+            onClick={onClose}
+            type="button"
+          >
+            取消
           </button>
         </div>
       </div>
-    </DialogShell>
+    </div>
   );
 }

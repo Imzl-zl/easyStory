@@ -8,8 +8,10 @@ export function EngineBlock({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="panel-muted space-y-4 p-5">
-      <h2 className="font-serif text-lg font-semibold">{title}</h2>
+    <div className="space-y-3">
+      <h2 className="text-[13px] font-semibold" style={{ color: "#9ca3af" }}>
+        {title}
+      </h2>
       {children}
     </div>
   );

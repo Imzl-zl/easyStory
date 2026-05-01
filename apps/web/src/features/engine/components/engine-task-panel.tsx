@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { showAppNotice } from "@/components/ui/app-notice";
 import { EmptyState } from "@/components/ui/empty-state";
-import { StatusBadge } from "@/components/ui/status-badge";
 import {
   EngineTaskEditorSection,
   EngineTaskRegenerateSection,
@@ -174,29 +173,26 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
 
   return (
     <>
-      <div className="grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
-        <section className="panel-muted space-y-4 p-5" ref={taskListSectionRef} tabIndex={-1}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <h3 className="font-serif text-lg font-semibold">当前章节任务</h3>
-              <p className="text-sm leading-6 text-text-secondary">
-                当前章节任务列表。
-              </p>
-            </div>
-            <StatusBadge status={workflow.status} label={workflow.status} />
+      <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
+        <section ref={taskListSectionRef} tabIndex={-1}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[12px] font-medium" style={{ color: "#6b7280" }}>
+              当前章节任务
+            </span>
+            <StatusPill tone={workflow.status} label={workflow.status} />
           </div>
 
           {tasksQuery.isLoading ? (
-            <p className="text-sm text-text-secondary">正在加载章节任务...</p>
+            <p className="text-[11px]" style={{ color: "#6b7280" }}>正在加载章节任务...</p>
           ) : null}
           {tasksQuery.error ? (
-            <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
+            <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
               {getErrorMessage(tasksQuery.error)}
             </div>
           ) : null}
 
           {hasStaleTasks(tasks) ? (
-            <div className="callout-warning px-4 py-3 text-sm text-accent-warning">
+            <div className="rounded px-3 py-2 text-[11px] mb-2" style={{ background: "rgba(234, 179, 8, 0.08)", color: "#fbbf24" }}>
               部分任务已过期，请重建章节计划后继续。
             </div>
           ) : null}
@@ -207,37 +203,45 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
               description="工作流尚未生成章节计划。"
             />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {tasks.map((task) => {
                 const status = resolveTaskStatusPresentation(task);
                 const editDisabledReason = getTaskEditDisabledReason(task.status);
                 return (
                   <article
                     key={task.task_id}
-                    className="rounded-2xl bg-muted shadow-sm p-4"
+                    className="rounded p-3 cursor-pointer transition-colors"
+                    style={{
+                      background: selectedTaskNumber === task.chapter_number ? "#1f2328" : "#111418",
+                      border: `1px solid ${selectedTaskNumber === task.chapter_number ? "#2a2f35" : "#1f2328"}`,
+                    }}
+                    onClick={() => startEditingTask(task.chapter_number)}
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <StatusBadge status="outline" label={`第 ${task.chapter_number} 章`} />
-                          <StatusBadge status={status.badgeStatus} label={status.badgeLabel} />
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#1f2328", color: "#9ca3af" }}>
+                            第 {task.chapter_number} 章
+                          </span>
+                          <StatusPill tone={status.badgeStatus} label={status.badgeLabel} />
                         </div>
-                        <p className="font-medium text-text-primary">{task.title}</p>
+                        <p className="text-[12px] font-medium truncate" style={{ color: "#e8e6e3" }}>{task.title}</p>
                       </div>
                       <button
-                        className="ink-button-secondary"
+                        className="flex-shrink-0 px-2 py-1 rounded text-[10px] font-medium transition-colors disabled:opacity-40"
+                        style={{ background: "#1f2328", color: "#9ca3af" }}
                         disabled={Boolean(editDisabledReason)}
-                        onClick={() => startEditingTask(task.chapter_number)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditingTask(task.chapter_number);
+                        }}
                         title={editDisabledReason ?? undefined}
                       >
-                        编辑此任务
+                        编辑
                       </button>
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-text-secondary">
+                    <p className="mt-1.5 text-[11px] leading-relaxed line-clamp-2" style={{ color: "#6b7280" }}>
                       {task.brief}
-                    </p>
-                    <p className="mt-3 text-xs uppercase tracking-[0.14em] text-text-secondary">
-                      {status.description}
                     </p>
                   </article>
                 );
@@ -246,7 +250,7 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
           )}
         </section>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <EngineTaskEditorSection
             editor={editor}
             isPending={updateMutation.isPending}
@@ -293,5 +297,25 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
         />
       ) : null}
     </>
+  );
+}
+
+function StatusPill({ tone, label }: { tone: string; label: string }) {
+  const colors: Record<string, { bg: string; text: string }> = {
+    completed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
+    failed: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
+    warning: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
+    active: { bg: "rgba(232, 184, 109, 0.12)", text: "#e8b86d" },
+    outline: { bg: "#1f2328", text: "#9ca3af" },
+    draft: { bg: "#1f2328", text: "#6b7280" },
+  };
+  const c = colors[tone] || colors.outline;
+  return (
+    <span
+      className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+      style={{ background: c.bg, color: c.text }}
+    >
+      {label}
+    </span>
   );
 }

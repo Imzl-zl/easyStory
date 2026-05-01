@@ -1,8 +1,6 @@
 "use client";
 
 import { EmptyState } from "@/components/ui/empty-state";
-import { MetricCard } from "@/components/ui/metric-card";
-import { StatusBadge } from "@/components/ui/status-badge";
 import type { TokenUsageView, WorkflowBillingSummary } from "@/lib/api/types";
 
 import {
@@ -33,7 +31,7 @@ export function EngineBillingPanel({
 }: EngineBillingPanelProps) {
   if (errorMessage) {
     return (
-      <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
+      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
         {errorMessage}
       </div>
     );
@@ -41,7 +39,7 @@ export function EngineBillingPanel({
 
   if (isLoading && summary === null) {
     return (
-      <div className="panel-muted px-4 py-5 text-sm text-text-secondary">
+      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "#1f2328", color: "#6b7280" }}>
         正在汇总预算窗口、类型拆分和调用明细…
       </div>
     );
@@ -57,60 +55,37 @@ export function EngineBillingPanel({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
-        <MetricCard
-          label="总 Token"
-          value={formatTokenCount(summary.total_tokens)}
-          detail={`${formatTokenCount(summary.total_input_tokens)} 输入 / ${formatTokenCount(summary.total_output_tokens)} 输出`}
-        />
-        <MetricCard
-          label="预估成本"
-          value={formatUsdCost(summary.total_estimated_cost)}
-          detail={`策略：${formatExceedStrategyLabel(summary.on_exceed)}`}
-        />
-        <MetricCard
-          label="预算参考点"
-          value={formatDateTime(summary.budget_recorded_at)}
-          detail="日级预算围绕这次最近 usage 归档"
-        />
-        <MetricCard
-          label="统计窗口"
-          value={formatBudgetWindow(summary.budget_window_start_at, summary.budget_window_end_at)}
-          detail="project_day / user_day 使用同一窗口"
-        />
+    <div className="space-y-3">
+      <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
+        <MetricItem label="总 Token" value={formatTokenCount(summary.total_tokens)} detail={`${formatTokenCount(summary.total_input_tokens)} 输入 / ${formatTokenCount(summary.total_output_tokens)} 输出`} />
+        <MetricItem label="预估成本" value={formatUsdCost(summary.total_estimated_cost)} detail={`策略：${formatExceedStrategyLabel(summary.on_exceed)}`} />
+        <MetricItem label="预算参考点" value={formatDateTime(summary.budget_recorded_at)} detail="日级预算围绕这次最近 usage 归档" />
+        <MetricItem label="统计窗口" value={formatBudgetWindow(summary.budget_window_start_at, summary.budget_window_end_at)} detail="project_day / user_day 使用同一窗口" />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-        <div className="space-y-4">
-          <section className="panel-muted space-y-3 p-4">
-            <header className="space-y-1">
-              <h3 className="font-serif text-lg font-semibold">预算状态</h3>
-              <p className="text-sm leading-6 text-text-secondary">
-                按层级查看用量。
-              </p>
-            </header>
-            <div className="space-y-3">
+      <div className="grid gap-3 xl:grid-cols-[0.92fr_1.08fr]">
+        <div className="space-y-3">
+          <section className="space-y-2">
+            <h3 className="text-[12px] font-medium" style={{ color: "#6b7280" }}>预算状态</h3>
+            <div className="space-y-2">
               {summary.budget_statuses.map((status) => (
                 <div
                   key={status.scope}
-                  className="rounded-2xl bg-muted shadow-sm p-4"
+                  className="rounded p-3"
+                  style={{ background: "#111418", border: "1px solid #1f2328" }}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-text-primary">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
                         {formatBudgetScopeLabel(status.scope)}
                       </p>
-                      <p className="text-sm text-text-secondary">
+                      <p className="text-[11px]" style={{ color: "#6b7280" }}>
                         已用 {formatTokenCount(status.used_tokens)} / 上限 {formatTokenCount(status.limit_tokens)}
                       </p>
                     </div>
-                    <StatusBadge
-                      status={resolveBudgetTone(status)}
-                      label={resolveBudgetLabel(status)}
-                    />
+                    <StatusPill tone={resolveBudgetTone(status)} label={resolveBudgetLabel(status)} />
                   </div>
-                  <p className="mt-3 text-xs uppercase tracking-[0.16em] text-text-secondary">
+                  <p className="mt-2 text-[10px]" style={{ color: "#4b5563" }}>
                     告警阈值 {formatWarningThreshold(status.warning_threshold)}
                   </p>
                 </div>
@@ -118,81 +93,73 @@ export function EngineBillingPanel({
             </div>
           </section>
 
-          <section className="panel-muted space-y-3 p-4">
-            <header className="space-y-1">
-              <h3 className="font-serif text-lg font-semibold">用途拆分</h3>
-              <p className="text-sm leading-6 text-text-secondary">
-                按环节查看成本分布。
-              </p>
-            </header>
+          <section className="space-y-2">
+            <h3 className="text-[12px] font-medium" style={{ color: "#6b7280" }}>用途拆分</h3>
             {summary.usage_by_type.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {summary.usage_by_type.map((usage) => (
                   <div
                     key={usage.usage_type}
-                    className="rounded-2xl bg-muted shadow-sm p-4"
+                    className="rounded p-3"
+                    style={{ background: "#111418", border: "1px solid #1f2328" }}
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">
+                        <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
                           {formatUsageTypeLabel(usage.usage_type)}
                         </p>
-                        <p className="text-sm text-text-secondary">
+                        <p className="text-[11px]" style={{ color: "#6b7280" }}>
                           {usage.call_count} 次调用，{formatTokenCount(usage.total_tokens)} tokens
                         </p>
                       </div>
-                      <p className="text-sm font-medium text-accent-primary">
+                      <p className="text-[12px] font-medium" style={{ color: "#e8b86d" }}>
                         {formatUsdCost(usage.estimated_cost)}
                       </p>
                     </div>
-                    <p className="mt-3 text-xs text-text-secondary">
+                    <p className="mt-2 text-[10px]" style={{ color: "#4b5563" }}>
                       输入 {formatTokenCount(usage.input_tokens)} / 输出 {formatTokenCount(usage.output_tokens)}
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-text-secondary">暂无用量记录。</p>
+              <p className="text-[11px]" style={{ color: "#6b7280" }}>暂无用量记录。</p>
             )}
           </section>
         </div>
 
-        <section className="panel-muted space-y-3 p-4">
-          <header className="space-y-1">
-            <h3 className="font-serif text-lg font-semibold">调用明细</h3>
-            <p className="text-sm leading-6 text-text-secondary">
-              按时间查看每次调用。
-            </p>
-          </header>
+        <section className="space-y-2">
+          <h3 className="text-[12px] font-medium" style={{ color: "#6b7280" }}>调用明细</h3>
           {usages.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {usages.map((usage) => (
                 <div
                   key={usage.id}
-                  className="rounded-2xl bg-muted shadow-sm p-4"
+                  className="rounded p-3"
+                  style={{ background: "#111418", border: "1px solid #1f2328" }}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusBadge status="active" label={formatUsageTypeLabel(usage.usage_type)} />
-                      <span className="text-sm font-medium text-text-primary">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <StatusPill tone="active" label={formatUsageTypeLabel(usage.usage_type)} />
+                      <span className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
                         {usage.model_name}
                       </span>
                     </div>
-                    <span className="text-sm text-text-secondary">
+                    <span className="text-[11px]" style={{ color: "#4b5563" }}>
                       {formatDateTime(usage.created_at)}
                     </span>
                   </div>
-                  <div className="mt-3 grid gap-3 md:grid-cols-4">
-                    <UsageMetric label="输入" value={formatTokenCount(usage.input_tokens)} />
-                    <UsageMetric label="输出" value={formatTokenCount(usage.output_tokens)} />
-                    <UsageMetric label="总量" value={formatTokenCount(usage.total_tokens)} />
-                    <UsageMetric label="成本" value={formatUsdCost(usage.estimated_cost)} />
+                  <div className="mt-2 grid gap-2 grid-cols-4">
+                    <MiniMetric label="输入" value={formatTokenCount(usage.input_tokens)} />
+                    <MiniMetric label="输出" value={formatTokenCount(usage.output_tokens)} />
+                    <MiniMetric label="总量" value={formatTokenCount(usage.total_tokens)} />
+                    <MiniMetric label="成本" value={formatUsdCost(usage.estimated_cost)} />
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-text-secondary">暂无调用记录。</p>
+            <p className="text-[11px]" style={{ color: "#6b7280" }}>暂无调用记录。</p>
           )}
         </section>
       </div>
@@ -200,17 +167,43 @@ export function EngineBillingPanel({
   );
 }
 
-function UsageMetric({
-  label,
-  value,
-}: Readonly<{
-  label: string;
-  value: string;
-}>) {
+function MetricItem({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="rounded-2xl bg-muted shadow-sm px-3 py-3">
-      <p className="text-xs uppercase tracking-[0.14em] text-text-secondary">{label}</p>
-      <p className="mt-2 text-sm font-medium text-text-primary">{value}</p>
+    <div className="rounded p-3" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+      <p className="text-[10px] mb-1" style={{ color: "#4b5563" }}>{label}</p>
+      <p className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>{value}</p>
+      {detail ? <p className="text-[10px] mt-0.5" style={{ color: "#4b5563" }}>{detail}</p> : null}
     </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded p-2" style={{ background: "#1a1d23" }}>
+      <p className="text-[9px] mb-0.5" style={{ color: "#4b5563" }}>{label}</p>
+      <p className="text-[11px] font-medium" style={{ color: "#9ca3af" }}>{value}</p>
+    </div>
+  );
+}
+
+function StatusPill({ tone, label }: { tone: string; label: string }) {
+  const colors: Record<string, { bg: string; text: string }> = {
+    completed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
+    failed: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
+    warning: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
+    active: { bg: "rgba(232, 184, 109, 0.12)", text: "#e8b86d" },
+    outline: { bg: "#1f2328", text: "#9ca3af" },
+    draft: { bg: "#1f2328", text: "#6b7280" },
+    success: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
+    danger: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
+  };
+  const c = colors[tone] || colors.outline;
+  return (
+    <span
+      className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+      style={{ background: c.bg, color: c.text }}
+    >
+      {label}
+    </span>
   );
 }

@@ -11,14 +11,17 @@ export function EngineWorkflowDebugPanel({
   workflow,
 }: Readonly<EngineWorkflowDebugPanelProps>) {
   return (
-    <details className="rounded-3xl bg-muted shadow-sm p-4">
-      <summary className="cursor-pointer list-none text-sm font-medium text-text-primary">
-        查看原始 workflow 调试数据
+    <details className="rounded" style={{ background: "#1a1d23", border: "1px solid #2a2f35" }}>
+      <summary
+        className="cursor-pointer list-none px-4 py-3 text-[11px] font-medium flex items-center justify-between"
+        style={{ color: "#4b5563" }}
+      >
+        <span>调试数据</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </summary>
-      <p className="mt-3 text-sm leading-6 text-text-secondary">
-        调试信息，包含完整的原始响应数据。
-      </p>
-      <div className="mt-4">
+      <div className="px-4 pb-4">
         <CodeBlock value={workflow} />
       </div>
     </details>
