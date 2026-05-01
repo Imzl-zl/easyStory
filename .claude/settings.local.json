@@ -70,7 +70,8 @@
       "mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_screenshot",
       "mcp__plugin_chrome-devtools-mcp_chrome-devtools__click",
       "mcp__plugin_chrome-devtools-mcp_chrome-devtools__wait_for",
-      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__evaluate_script"
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__evaluate_script",
+      "Bash(node --import tsx --test src/features/studio/components/document/studio-document-support.test.ts)"
     ]
   }
 }

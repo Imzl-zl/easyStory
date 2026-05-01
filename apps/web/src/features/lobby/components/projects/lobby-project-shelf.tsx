@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import type { ProjectActionVariables } from "@/features/lobby/components/projects/lobby-project-model";
 import {
@@ -192,9 +193,11 @@ function LobbyProjectCard({
   project: ProjectSummary;
   index: number;
 }>) {
+  const router = useRouter();
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isSoftDeleteDialogOpen, setSoftDeleteDialogOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isEntering, setIsEntering] = useState(false);
   const isDeleted = Boolean(project.deleted_at);
   const isPhysicalDeleting = isPendingProjectAction(
     actionMutation,
@@ -257,6 +260,16 @@ function LobbyProjectCard({
     ((project.current_words ?? 0) / (project.target_words ?? 1)) * 100,
   );
 
+  const studioHref = `/workspace/project/${project.id}/studio?panel=overview&doc=${encodeURIComponent("项目说明.md")}`;
+
+  const handleEnterStudio = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    setIsEntering(true);
+    setTimeout(() => {
+      router.push(studioHref);
+    }, 420);
+  };
+
   return (
     <article
       className={`group relative flex flex-col overflow-hidden transition-all duration-700 ${isDeleted ? "opacity-50" : ""}`}
@@ -271,10 +284,13 @@ function LobbyProjectCard({
         boxShadow: isHovered
           ? "var(--shadow-lg)"
           : "var(--shadow-sm)",
-        transform: isHovered
-          ? "translateY(-6px) scale(1.01)"
-          : "translateY(0) scale(1)",
+        transform: isEntering
+          ? "translateY(-8px) scale(1.02)"
+          : isHovered
+            ? "translateY(-6px) scale(1.01)"
+            : "translateY(0) scale(1)",
         transitionDelay: `${index * 60}ms`,
+        opacity: isEntering ? 0.6 : 1,
       }}
     >
       {/* 顶部装饰线 */}
@@ -449,7 +465,8 @@ function LobbyProjectCard({
             ) : (
               <>
                 <Link
-                  href={`/workspace/project/${project.id}/studio?panel=overview&doc=${encodeURIComponent("项目说明.md")}`}
+                  href={studioHref}
+                  onClick={handleEnterStudio}
                   className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[12px] font-medium tracking-[0.02em] transition-all duration-300 hover:scale-105"
                   style={{
                     background: isHovered
@@ -581,8 +598,10 @@ function LobbyProjectListItem({
   actionMutation: ProjectActionMutation;
   project: ProjectSummary;
 }>) {
+  const router = useRouter();
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isSoftDeleteDialogOpen, setSoftDeleteDialogOpen] = useState(false);
+  const [isEntering, setIsEntering] = useState(false);
   const isDeleted = Boolean(project.deleted_at);
   const isPhysicalDeleting = isPendingProjectAction(
     actionMutation,
@@ -640,6 +659,16 @@ function LobbyProjectListItem({
     }
   };
 
+  const studioHref = `/workspace/project/${project.id}/studio?panel=overview&doc=${encodeURIComponent("项目说明.md")}`;
+
+  const handleEnterStudio = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    setIsEntering(true);
+    setTimeout(() => {
+      router.push(studioHref);
+    }, 420);
+  };
+
   return (
     <article
       className={`group flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-300 ${isDeleted ? "opacity-50" : ""}`}
@@ -647,6 +676,8 @@ function LobbyProjectListItem({
         background: "var(--bg-glass)",
         border: "1px solid var(--line-soft)",
         boxShadow: "var(--shadow-xs)",
+        opacity: isEntering ? 0.5 : 1,
+        transform: isEntering ? "translateX(8px) scale(1.01)" : "translateX(0) scale(1)",
         ["--project-card-accent" as string]: tone.accent,
       } as CSSProperties}
     >
@@ -734,13 +765,14 @@ function LobbyProjectListItem({
         ) : (
           <>
             <Link
+              href={studioHref}
+              onClick={handleEnterStudio}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200"
               style={{
                 background: `${tone.accent}12`,
                 color: tone.accent,
                 border: `1px solid ${tone.accent}25`,
               }}
-              href={`/workspace/project/${project.id}/studio?panel=overview&doc=${encodeURIComponent("项目说明.md")}`}
             >
               展卷
             </Link>

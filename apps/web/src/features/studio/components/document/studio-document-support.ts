@@ -236,32 +236,31 @@ async function syncStudioDocumentCatalogEntry(
 ) {
   const queryKey = buildStudioDocumentCatalogQueryKey(projectId);
   const currentEntries = queryClient.getQueryData<ProjectDocumentCatalogEntry[] | undefined>(queryKey);
-  if (!currentEntries?.length) {
-    return;
-  }
-  let didChange = false;
-  const nextEntries = currentEntries.map((entry) => {
-    if (entry.path !== document.path || entry.version === document.version) {
-      return entry;
+  if (currentEntries?.length) {
+    let didChange = false;
+    const nextEntries = currentEntries.map((entry) => {
+      if (entry.path !== document.path || entry.version === document.version) {
+        return entry;
+      }
+      didChange = true;
+      return {
+        ...entry,
+        version: document.version,
+      };
+    });
+    if (didChange) {
+      const nextCatalogVersion = await buildStudioDocumentCatalogVersion(nextEntries);
+      queryClient.setQueryData<ProjectDocumentCatalogEntry[]>(
+        queryKey,
+        nextEntries.map((entry) => ({
+          ...entry,
+          catalog_version: nextCatalogVersion,
+        })),
+      );
+      return;
     }
-    didChange = true;
-    return {
-      ...entry,
-      version: document.version,
-    };
-  });
-  if (!didChange) {
-    return;
   }
-  const nextCatalogVersion = await buildStudioDocumentCatalogVersion(nextEntries);
-  queryClient.setQueryData<ProjectDocumentCatalogEntry[]>(
-    queryKey,
-    nextEntries.map((entry) => ({
-      ...entry,
-      catalog_version: nextCatalogVersion,
-    })),
-  );
-  void queryClient.invalidateQueries({ queryKey });
+  await queryClient.refetchQueries({ queryKey });
 }
 
 function isStudioFileSavedDocument(document: StudioSavedDocument): document is StudioFileSavedDocument {
