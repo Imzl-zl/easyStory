@@ -108,7 +108,7 @@ export function StudioChatComposer({
   const contextButtonRef = useRef<HTMLButtonElement>(null);
   const modelPickerStyle = useFloatingPanelStyle(showModelPicker, modelButtonRef, {
     align: "right",
-    maxHeight: 480,
+    maxHeight: 600,
     preferredWidth: 352,
     side: "top",
   });
@@ -243,8 +243,8 @@ export function StudioChatComposer({
 
         <Input.TextArea
           autoSize={{ maxRows: 5, minRows: 2 }}
-          className="w-full text-sm leading-relaxed resize-none rounded-2xl bg-surface/80 shadow-xs focus:shadow-sm focus:ring-3 focus:ring-accent-primary/10 transition-all placeholder:text-text-tertiary"
-          placeholder={canChat ? "写你的要求，或直接带文件进来一起改。" : "先启用可用模型后再开始提问"}
+          className="studio-composer-textarea w-full resize-none"
+          placeholder={canChat ? "输入要求，或拖入文件…" : "先配置模型连接"}
           value={composerText}
           onChange={onComposerTextChange}
           onKeyDown={handleComposerKeyDown}
@@ -282,6 +282,7 @@ export function StudioChatComposer({
             <div className="relative">
               <ToolbarChipButton
                 active={showModelPicker}
+                iconOnly={iconLayout}
                 label={modelButtonLabel}
                 onClick={handleToggleModelPicker}
                 buttonRef={modelButtonRef}
@@ -290,25 +291,28 @@ export function StudioChatComposer({
               </ToolbarChipButton>
 
               {showModelPicker ? renderFloatingPanel(
-                <>
-                  {/* 遮罩层 */}
+                <div style={{ position: 'fixed', inset: 0, zIndex: 100 }}>
                   <div
                     className="chat-panel-overlay"
+                    style={{ position: 'absolute', inset: 0, zIndex: 1 }}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => {
                       setShowProviderList(false);
                       setShowModelPicker(false);
                     }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setShowProviderList(false); setShowModelPicker(false); } }}
                   />
                   <div
                     className="chat-model-panel overflow-y-auto"
                     ref={modelPickerRef}
-                    style={modelPickerStyle}
+                    style={{ ...modelPickerStyle, zIndex: 2, position: 'absolute' }}
                   >
                     <div className="chat-panel-header">
                       <div>
                         <h3 className="chat-panel-header__title">切换模型</h3>
                         <p className="chat-panel-header__subtitle">
-                          {selectedCredentialLabel ?? "先选可用渠道，再决定模型名。"}
+                          {selectedCredentialLabel ?? "先选可用渠道，再决定模型名"}
                         </p>
                       </div>
                       <button
@@ -323,28 +327,29 @@ export function StudioChatComposer({
                       </button>
                     </div>
                     <div className="chat-model-form">
+                      {/* 渠道选择 */}
                       <div className="chat-model-form__group">
                         <label className="chat-model-form__label">渠道</label>
                         <div className="relative">
                           <button
                             aria-expanded={showProviderList}
-                            className="chat-model-form__select flex items-center justify-between"
+                            className="chat-model-form__select flex items-center justify-between text-left"
                             type="button"
                             onClick={handleToggleProviderList}
                           >
-                            <span className="min-w-0 flex-1 truncate font-medium">
-                              {currentProviderOption?.label ?? (isCredentialLoading ? "正在读取渠道..." : "选择可用渠道")}
+                            <span className="min-w-0 flex-1 truncate font-semibold text-[14px]">
+                              {currentProviderOption?.label ?? (isCredentialLoading ? "读取中..." : "选择渠道")}
                             </span>
-                            <span className={`shrink-0 text-[10px] opacity-60 transition-transform ${showProviderList ? "rotate-180" : ""}`}>⌄</span>
+                            <span className={`shrink-0 text-[11px] text-[#686e77] transition-transform duration-200 ${showProviderList ? "rotate-180" : ""}`}>▾</span>
                           </button>
                           {showProviderList ? (
-                            <div className={MODEL_PICKER_PROVIDER_LIST_CLASS}>
+                            <div className="mt-2 grid gap-1 rounded-xl bg-[#1e2129] border border-[rgba(150,158,170,0.10)] p-2 max-h-64 overflow-y-auto shadow-lg">
                               {providerOptions.length > 0 ? (
                                 providerOptions.map((option) => {
                                   const selected = option.value === settings.provider;
                                   return (
                                     <button
-                                      className={`flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${selected ? "bg-accent-primary/10 text-accent-primary" : "text-text-primary hover:bg-accent-soft"}`}
+                                      className={`flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${selected ? "bg-[rgba(160,150,130,0.10)] text-[#a09682]" : "text-[#dde1e6] hover:bg-[rgba(150,158,170,0.06)]"}`}
                                       key={option.value}
                                       type="button"
                                       onMouseDown={(event) => {
@@ -352,15 +357,15 @@ export function StudioChatComposer({
                                         handleSelectProvider(option.value);
                                       }}
                                     >
-                                      <span className="text-sm font-medium leading-relaxed">{option.label}</span>
+                                      <span className="text-[14px] font-semibold leading-relaxed">{option.label}</span>
                                       {option.description ? (
-                                        <span className="text-xs leading-relaxed text-text-tertiary">{option.description}</span>
+                                        <span className="text-[12px] leading-relaxed text-[#686e77]">{option.description}</span>
                                       ) : null}
                                     </button>
                                   );
                                 })
                               ) : (
-                                <p className="px-3 py-3 text-sm text-text-tertiary">
+                                <p className="px-3 py-3 text-[14px] text-[#686e77]">
                                   {isCredentialLoading ? "正在读取渠道..." : "当前没有可用渠道"}
                                 </p>
                               )}
@@ -368,6 +373,8 @@ export function StudioChatComposer({
                           ) : null}
                         </div>
                       </div>
+
+                      {/* 模型输入 */}
                       <div className="chat-model-form__group">
                         <label className="chat-model-form__label">模型</label>
                         <input
@@ -379,11 +386,15 @@ export function StudioChatComposer({
                           onChange={(e) => onModelNameChange(e.target.value)}
                         />
                       </div>
+
+                      {/* 推理控制 */}
                       <div className="chat-model-form__section">
-                        <p className="m-0 text-[12px] font-medium text-text-primary">{reasoningControl.title}</p>
-                        <p className="mt-1 text-[11px] leading-4 text-text-secondary">{reasoningControl.description}</p>
+                        <p className="m-0 text-[14px] font-bold text-[#dde1e6]">{reasoningControl.title}</p>
+                        {reasoningControl.description ? (
+                          <p className="mt-1 text-[13px] leading-5 text-[#9299a3]">{reasoningControl.description}</p>
+                        ) : null}
                         {reasoningControl.kind === "gemini_budget" ? (
-                          <div className="mt-2.5 space-y-2">
+                          <div className="mt-3 space-y-3">
                             <div className="flex flex-wrap gap-2">
                               <ReasoningChipButton
                                 active={settings.thinkingBudget === ""}
@@ -416,7 +427,7 @@ export function StudioChatComposer({
                             />
                           </div>
                         ) : reasoningControl.kind === "none" ? null : (
-                          <div className="mt-2.5">
+                          <div className="mt-3">
                             <AppSelect
                               ariaLabel={reasoningControl.title}
                               className="min-w-0"
@@ -430,12 +441,11 @@ export function StudioChatComposer({
                           </div>
                         )}
                       </div>
-                      <div className="chat-model-form__section mt-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="m-0 text-[12px] font-medium text-text-primary">回复显示方式</p>
-                            <p className="m-0 text-[11px] leading-4 text-text-secondary">仅当前项目聊天生效</p>
-                          </div>
+
+                      {/* 回复显示方式 */}
+                      <div className="chat-model-form__section mt-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <p className="m-0 text-[14px] font-bold text-[#dde1e6]">回复显示方式</p>
                           <Radio.Group
                             aria-label="回复显示方式"
                             mode="fill"
@@ -444,14 +454,14 @@ export function StudioChatComposer({
                             value={settings.streamOutput ? "stream" : "buffered"}
                             onChange={(value) => onStreamOutputChange(value === "stream")}
                           >
-                            <Radio value="stream">边写边显示</Radio>
-                            <Radio value="buffered">生成后整体显示</Radio>
+                            <Radio value="stream">流式</Radio>
+                            <Radio value="buffered">非流式</Radio>
                           </Radio.Group>
                         </div>
                       </div>
                     </div>
                   </div>
-                </>,
+                </div>,
               ) : null}
             </div>
 
@@ -483,9 +493,10 @@ export function StudioChatComposer({
         </div>
 
         {writeIntentNotice ? (
-          <p className={`mt-1.5 px-1 text-[11px] leading-4 ${isWriteToCurrentDocumentEnabled ? "text-accent-primary" : "text-text-tertiary"}`}>
-            {writeIntentNotice}
-          </p>
+          <div className={`studio-write-notice ${!isWriteToCurrentDocumentEnabled ? "studio-write-notice--disabled" : ""}`}>
+            <WriteIcon />
+            <span>{writeIntentNotice}</span>
+          </div>
         ) : null}
 
         <input
@@ -532,8 +543,14 @@ function ToolbarIconButton({
   onClick: () => void;
 }) {
   return (
-    <button aria-label={label} className="ink-toolbar-icon" type="button" onClick={onClick}>
-      {children}
+    <button
+      aria-label={label}
+      className="ink-toolbar-icon"
+      title={label}
+      type="button"
+      onClick={onClick}
+    >
+      <span className="opacity-80">{children}</span>
     </button>
   );
 }
@@ -566,11 +583,15 @@ function ToolbarChipButton({
       type="button"
       onClick={onClick}
     >
-      <span className="opacity-70">{children}</span>
+      <span className="opacity-80">{children}</span>
       {!iconOnly ? <span className="min-w-0 truncate">{label}</span> : null}
-      {!iconOnly ? <span className="opacity-50 text-[10px]">⌄</span> : null}
+      {!iconOnly ? (
+        <span className={`text-[10px] transition-transform ${active ? "rotate-180 opacity-70" : "opacity-40"}`}>
+          ▾
+        </span>
+      ) : null}
       {iconOnly && badge ? (
-        <span className="absolute -right-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-accent-primary px-1 text-[9px] leading-4 text-white">
+        <span className="absolute -right-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-accent-primary px-1 text-[9px] leading-4 text-white shadow-sm">
           {badge}
         </span>
       ) : null}
@@ -606,7 +627,7 @@ function ToolbarToggleButton({
       type="button"
       onClick={onClick}
     >
-      <span className="opacity-70">{children}</span>
+      <span className={active ? "opacity-100" : "opacity-80"}>{children}</span>
       {!iconOnly ? <span className="min-w-0 truncate">{label}</span> : null}
     </button>
   );

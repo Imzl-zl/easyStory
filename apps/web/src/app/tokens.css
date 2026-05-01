@@ -172,6 +172,10 @@
   /* Chat */
   --chat-user-bubble-bg: var(--bg-muted);
   --chat-assistant-bubble-bg: var(--accent-primary-soft);
+  --chat-panel-bg: #252a33;
+  --chat-panel-input-bg: #1a1d24;
+  --chat-panel-hover-bg: #232830;
+  --chat-panel-placeholder: #5a616b;
   --chat-skill-panel-bg: var(--bg-surface);
   --chat-skill-option-active-bg: var(--accent-primary-soft);
 

@@ -76,14 +76,14 @@ export function AppSelect({
       triggerProps={{
         autoAlignPopupMinWidth: true,
         className: buildClassName(
-          "p-[0.28rem] border border-[var(--dropdown-border)] rounded-4 bg-[var(--dropdown-bg)] shadow-[var(--dropdown-shadow)] backdrop-blur-xl",
+          "p-[0.28rem] border border-[rgba(150,158,170,0.10)] rounded-xl bg-[#252a33] shadow-[0_12px_40px_rgba(0,0,0,0.40)]",
           popupClassName,
         ),
       }}
       value={resolvedValue}
       renderFormat={() => (
         currentOption ? (
-          <span className={`text-text-primary text-[0.88rem] leading-normal ${currentOption.isInvalid ? "text-accent-warning" : ""}`}>
+          <span className={`text-[#dde1e6] text-[14px] leading-normal ${currentOption.isInvalid ? "text-[#d4a85a]" : ""}`}>
             {currentOption.label}
           </span>
         ) : undefined
@@ -92,10 +92,10 @@ export function AppSelect({
     >
       {resolvedOptions.map((option) => (
         <Select.Option key={option.value} disabled={option.disabled} value={option.value}>
-          <span className={`grid gap-[0.16rem] p-[0.62rem_0.82rem] rounded-2xl transition-all ${option.isInvalid ? "callout-warning border-dashed" : ""}`}>
-            <span className="text-text-primary text-[0.86rem] leading-relaxed">{option.label}</span>
+          <span className={`grid gap-[0.16rem] p-[0.62rem_0.82rem] rounded-xl transition-all ${option.isInvalid ? "callout-warning border-dashed" : ""}`}>
+            <span className="text-[#dde1e6] text-[14px] leading-relaxed">{option.label}</span>
             {option.description ? (
-              <span className="text-text-secondary text-[0.74rem] leading-relaxed">{option.description}</span>
+              <span className="text-[#9299a3] text-[12px] leading-relaxed">{option.description}</span>
             ) : null}
           </span>
         </Select.Option>

@@ -81,10 +81,12 @@ export function StudioChatHistoryPanel({
   const popup = isOpen && panelStyle
     ? createPortal(
       <>
-        {/* 遮罩层 */}
         <div
           className="chat-panel-overlay"
+          role="button"
+          tabIndex={0}
           onClick={() => onOpenChange(false)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onOpenChange(false); }}
         />
         <div
           className="chat-history-panel"
@@ -93,7 +95,7 @@ export function StudioChatHistoryPanel({
         >
           <div className="chat-panel-header">
             <div>
-              <h3 className="chat-panel-header__title">选择历史对话</h3>
+              <h3 className="chat-panel-header__title">历史对话</h3>
               <p className="chat-panel-header__subtitle">{conversations.length} 条对话记录</p>
             </div>
             <button
@@ -104,7 +106,7 @@ export function StudioChatHistoryPanel({
               ×
             </button>
           </div>
-          <ul className="chat-panel-list max-h-[260px]">
+          <ul className="chat-panel-list max-h-[320px]">
             {conversations.map((conversation) => {
               const isActive = conversation.id === activeConversationId;
               return (
@@ -113,7 +115,7 @@ export function StudioChatHistoryPanel({
                     className={`chat-panel-item ${isActive ? "chat-panel-item--active" : ""}`}
                   >
                     <button
-                      className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed"
+                      className="min-w-0 flex-1 rounded-xl px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed"
                       disabled={disabled}
                       type="button"
                       onClick={() => {
@@ -121,23 +123,23 @@ export function StudioChatHistoryPanel({
                         onOpenChange(false);
                       }}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
                         <span className="chat-panel-item__title">
                           {conversation.title}
                         </span>
                         {isActive ? (
-                          <span className="inline-flex shrink-0 items-center rounded-full bg-elevated px-1.5 py-0.5 text-[9.5px] leading-4 text-accent-primary">
+                          <span className="inline-flex shrink-0 items-center rounded-full bg-[#2f343e] px-2 py-0.5 text-[11px] leading-4 text-[#a09682]">
                             当前
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-0.5 text-[10.5px] leading-4 text-text-secondary">
+                      <p className="mt-1 text-[12px] leading-4 text-[#686e77]">
                         {formatConversationUpdatedAt(conversation.updatedAt)}
                       </p>
                     </button>
                     <button
                       aria-label={`删除对话：${conversation.title}`}
-                      className="ink-icon-button text-accent-danger shrink-0"
+                      className="ink-toolbar-icon text-[#c47070] shrink-0"
                       disabled={disabled}
                       type="button"
                       onClick={(event) => {
@@ -160,10 +162,10 @@ export function StudioChatHistoryPanel({
     : null;
 
   return (
-    <div className={`relative flex min-w-0 items-center gap-2 ${compactLayout ? "w-full justify-stretch" : "ml-auto w-[min(228px,100%)] justify-end"}`} ref={containerRef}>
+    <div className={`relative flex min-w-0 items-center gap-2 ${compactLayout ? "w-full justify-stretch" : "ml-auto w-[min(240px,100%)] justify-end"}`} ref={containerRef}>
       <button
         aria-label="新对话"
-        className={`inline-flex h-[30px] shrink-0 items-center rounded-full bg-surface shadow-sm text-[11px] font-medium text-text-primary transition-[border-color,background-color] hover:border-accent-primary-muted hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-60 ${iconLayout ? "w-[30px] justify-center px-0" : "gap-1.5 px-3"}`}
+        className={`studio-new-chat-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-40 ${iconLayout ? "" : "gap-1.5 px-3 w-auto"}`}
         disabled={disabled}
         title="新对话"
         type="button"
@@ -172,29 +174,31 @@ export function StudioChatHistoryPanel({
           onOpenChange(false);
         }}
       >
-        <span className="text-[13px] leading-none">+</span>
-        {!iconLayout ? <span>新对话</span> : null}
+        <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeLinecap="round" strokeWidth="2"/>
+        </svg>
+        {!iconLayout ? <span className="text-[13px] font-medium">新对话</span> : null}
       </button>
       <button
         aria-expanded={isOpen}
-        className="group flex h-[30px] min-w-0 flex-1 items-center gap-2 rounded-full bg-surface shadow-sm px-3 text-left transition-[border-color,background-color,box-shadow] hover:border-accent-primary-muted hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
+        className="group flex h-[32px] min-w-0 flex-1 items-center gap-2 rounded-full bg-[#1e2129] px-3 text-left transition-all hover:bg-[#252a33] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-40"
         disabled={disabled}
         title={activeConversation?.title ?? "新对话"}
         type="button"
         onClick={() => onOpenChange(!isOpen)}
       >
-        <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[9.5px] leading-4 text-text-secondary">
+        <span className="inline-flex shrink-0 items-center rounded-full bg-[#2f343e] px-2 py-0.5 text-[10px] font-semibold leading-4 text-[#9299a3]">
           历史
         </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-5 text-text-primary">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-5 text-[#dde1e6]">
           {activeConversation?.title ?? "新对话"}
         </span>
-        <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 py-0.5 text-[9px] leading-4 text-text-secondary">
+        <span className="inline-flex shrink-0 items-center rounded-full bg-[#2f343e] px-1.5 py-0.5 text-[10px] leading-4 text-[#686e77]">
           {conversations.length} 条
         </span>
         <span
           aria-hidden="true"
-          className={`shrink-0 text-[10px] text-text-secondary transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`shrink-0 text-[11px] text-[#686e77] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
         >
           ▾
         </span>
@@ -204,9 +208,9 @@ export function StudioChatHistoryPanel({
   );
 }
 
-const HISTORY_PANEL_MIN_WIDTH = 300;
-const HISTORY_PANEL_VIEWPORT_MARGIN = 12;
-const HISTORY_PANEL_OFFSET = 8;
+const HISTORY_PANEL_MIN_WIDTH = 320;
+const HISTORY_PANEL_VIEWPORT_MARGIN = 16;
+const HISTORY_PANEL_OFFSET = 10;
 
 function resolveHistoryPanelStyle(container: HTMLDivElement | null): CSSProperties | null {
   if (!container) {
@@ -225,7 +229,7 @@ function resolveHistoryPanelStyle(container: HTMLDivElement | null): CSSProperti
     position: "fixed",
     top: rect.bottom + HISTORY_PANEL_OFFSET,
     width,
-    zIndex: 170,
+    zIndex: 200,
   };
 }
 

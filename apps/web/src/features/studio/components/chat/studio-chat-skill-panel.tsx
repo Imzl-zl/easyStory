@@ -72,13 +72,13 @@ export function StudioChatSkillPanel({
   }, [closeDrawer, isOpen, updateLayout]);
 
   return (
-    <div className={`relative min-w-0 shrink-0 ${compactLayout ? "w-full max-w-none" : "max-w-[152px]"}`} ref={containerRef}>
+    <div className={`relative min-w-0 shrink-0 ${compactLayout ? "w-full max-w-none" : "max-w-[160px]"}`} ref={containerRef}>
       <button
         aria-expanded={isOpen}
-        className={`group flex h-[30px] min-w-0 items-center gap-2 rounded-full px-3 text-left transition-[background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-60 ${compactLayout ? "w-full max-w-none" : "min-w-[132px] max-w-[152px]"} ${
+        className={`group flex h-[32px] min-w-0 items-center gap-2 rounded-full px-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed disabled:opacity-40 ${compactLayout ? "w-full max-w-none" : "min-w-[140px] max-w-[160px]"} ${
           isOpen
-            ? "bg-surface shadow-md"
-            : "bg-surface shadow-xs hover:shadow-sm"
+            ? "bg-[#252a33] shadow-md"
+            : "bg-[#1e2129] shadow-xs hover:shadow-sm"
         }`}
         disabled={disabled}
         title={model.skillState.headline}
@@ -92,27 +92,28 @@ export function StudioChatSkillPanel({
           onOpenChange(true);
         }}
       >
-        <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[10px] leading-4 text-text-secondary">
+        <span className="inline-flex shrink-0 items-center rounded-full bg-[#2f343e] px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#a09682]">
           Skill
         </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-5 text-text-primary">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-5 text-[#dde1e6]">
           {resolveTriggerLabel(model.skillState.headline)}
         </span>
         <span
           aria-hidden="true"
-          className={`shrink-0 text-[10px] text-text-secondary transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`shrink-0 text-[11px] text-[#686e77] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
         >
           ▾
         </span>
       </button>
       {isOpen && layout ? createPortal(
         <>
-          {/* 遮罩层 */}
-          <button
+          <div
             aria-label="关闭 Skill 面板"
             className="chat-panel-overlay"
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={closeDrawer}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") closeDrawer(); }}
           />
           <SkillDrawer
             disabled={disabled}
@@ -161,14 +162,14 @@ function SkillDrawer({
       role="dialog"
       style={layout.panelStyle}
     >
-      <div className="shrink-0 border-b border-line-soft px-3 pb-2 pt-3">
-        <div className="flex items-start justify-between gap-3">
+      <div className="shrink-0 px-5 pt-5 pb-4">
+        <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="m-0 text-[10px] font-medium tracking-[0.08em] text-text-secondary">Skill 模式</p>
-            <h3 className="mt-1 text-[13px] font-semibold leading-5 text-text-primary">
-              这轮对话怎么套 Skill
+            <p className="m-0 text-[11px] font-semibold tracking-[0.1em] text-[#a09682] uppercase">Skill 模式</p>
+            <h3 className="mt-1.5 text-[16px] font-bold leading-6 text-[#dde1e6]">
+              选择 Skill
             </h3>
-            <p className="mt-0.5 text-[10.5px] leading-4 text-text-secondary">
+            <p className="mt-1 text-[13px] leading-5 text-[#9299a3]">
               {resultSummary}
             </p>
           </div>
@@ -183,12 +184,12 @@ function SkillDrawer({
         <CurrentModeCard disabled={disabled} model={model} onClose={onClose} />
       </div>
 
-      <div className="shrink-0 border-b border-line-soft px-3 py-2">
+      <div className="shrink-0 px-5 py-3 border-t border-[rgba(150,158,170,0.08)]">
         <label className="block">
           <span className="sr-only">筛选 Skill</span>
           <input
             className="chat-panel-search"
-            placeholder="按名称、描述或作用域筛选 Skill"
+            placeholder="按名称、描述或作用域筛选..."
             ref={searchInputRef}
             type="text"
             value={query}
@@ -197,26 +198,16 @@ function SkillDrawer({
         </label>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
         {model.skillErrorMessage ? (
-          <StateNotice tone="danger">
-            {model.skillErrorMessage}
-          </StateNotice>
+          <StateNotice tone="danger">{model.skillErrorMessage}</StateNotice>
         ) : null}
-        {model.skillsLoading ? (
-          <StateNotice>
-            正在读取可用 Skill…
-          </StateNotice>
-        ) : null}
+        {model.skillsLoading ? <StateNotice>读取中…</StateNotice> : null}
         {!model.skillErrorMessage && !model.skillsLoading && model.skillOptions.length === 0 ? (
-          <StateNotice>
-            当前还没有可直接套用的项目或全局 Skill。
-          </StateNotice>
+          <StateNotice>暂无可用 Skill</StateNotice>
         ) : null}
         {!model.skillErrorMessage && !model.skillsLoading && model.skillOptions.length > 0 && filteredSkillOptions.length === 0 ? (
-          <StateNotice>
-            没找到和“{query.trim()}”匹配的 Skill，可以换个关键词再试。
-          </StateNotice>
+          <StateNotice>无匹配结果</StateNotice>
         ) : null}
         {!model.skillErrorMessage && !model.skillsLoading && filteredSkillOptions.length > 0 ? (
           <ul className="space-y-2">
@@ -246,24 +237,24 @@ function CurrentModeCard({
   onClose: () => void;
 }>) {
   return (
-    <div className="mt-2 rounded-2xl bg-[var(--bg-panel-warm-gradient)] shadow-sm px-3 py-2">
-      <div className="flex items-start justify-between gap-2">
+    <div className="chat-skill-current-mode">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="m-0 text-[10px] font-medium tracking-[0.08em] text-text-secondary">当前模式</p>
-          <p className="mt-1 text-[12px] font-semibold leading-5 text-text-primary">
+          <p className="m-0 text-[11px] font-semibold tracking-[0.1em] text-[#686e77] uppercase">当前模式</p>
+          <p className="mt-1.5 text-[14px] font-bold leading-5 text-[#dde1e6]">
             {model.skillState.headline}
           </p>
           {model.skillState.detail ? (
-            <p className="mt-1 text-[10.5px] leading-4 text-text-secondary">
+            <p className="mt-1 text-[13px] leading-5 text-[#9299a3]">
               {model.skillState.detail}
             </p>
           ) : null}
         </div>
         <button
-          className={`inline-flex h-7 shrink-0 items-center rounded-full border px-2.5 text-[10.5px] font-medium transition ${
+          className={`inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[13px] font-semibold transition-all ${
             isPlainChatMode(model)
-              ? "border-accent-primary-muted bg-accent-primary-soft text-accent-primary"
-              : "bg-surface shadow-xs text-text-secondary hover:shadow-sm hover:text-text-primary"
+              ? "border-[rgba(160,150,130,0.25)] bg-[rgba(160,150,130,0.12)] text-[#a09682]"
+              : "bg-[#252a33] border-[rgba(150,158,170,0.12)] text-[#9299a3] hover:text-[#dde1e6]"
           }`}
           disabled={disabled}
           type="button"
@@ -275,7 +266,7 @@ function CurrentModeCard({
           普通对话
         </button>
       </div>
-      <div className="mt-1.5 flex flex-wrap gap-1.5">
+      <div className="mt-2 flex flex-wrap gap-2">
         {model.skillState.nextTurnSkillId ? (
           <button
             className={DRAWER_ACTION_BUTTON_CLASS}
@@ -324,44 +315,32 @@ function SkillOptionCard({
 
   return (
     <li>
-      <div
-        className={`rounded-2xl border px-3 py-2 transition ${
-          hasActiveMode
-            ? "border-accent-primary-muted bg-[var(--chat-skill-option-active-bg)] shadow-sm"
-            : "bg-[var(--chat-skill-panel-bg)] shadow-xs"
-        }`}
-      >
+      <div className={`chat-skill-option ${hasActiveMode ? "chat-skill-option--active" : ""}`}>
         <div className="min-w-0">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[12px] font-semibold leading-5 text-text-primary">
-                {option.label}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[14px] font-bold leading-5 text-[#dde1e6]">
+              {option.label}
+            </span>
+            <span className="inline-flex items-center rounded-full bg-[#2f343e] px-2 py-0.5 text-[11px] leading-4 text-[#9299a3]">
+              {option.scopeLabel}
+            </span>
+            {nextSelected ? (
+              <span className="inline-flex items-center rounded-full bg-[rgba(160,150,130,0.12)] px-2 py-0.5 text-[11px] leading-4 text-[#a09682]">
+                本次
               </span>
-              <span className="inline-flex items-center rounded-full bg-surface px-2 py-0.5 text-[10px] leading-4 text-text-secondary">
-                {option.scopeLabel}
+            ) : null}
+            {conversationSelected ? (
+              <span className="inline-flex items-center rounded-full bg-[rgba(212,168,90,0.12)] px-2 py-0.5 text-[11px] leading-4 text-[#d4a85a]">
+                会话
               </span>
-              {nextSelected ? (
-                <span className="inline-flex items-center rounded-full bg-accent-primary/10 px-2 py-0.5 text-[10px] leading-4 text-accent-primary">
-                  本次
-                </span>
-              ) : null}
-              {conversationSelected ? (
-                <span className="inline-flex items-center rounded-full bg-accent-warning/15 px-2 py-0.5 text-[10px] leading-4 text-accent-tertiary">
-                  会话
-                </span>
-              ) : null}
-            </div>
-            {option.description ? (
-              <p className="mt-1.5 line-clamp-2 text-[10.5px] leading-4 text-text-secondary">
-                {option.description}
-              </p>
-            ) : (
-              <p className="mt-1.5 text-[10.5px] leading-4 text-text-tertiary">
-                这个 Skill 没有补充说明，适合你已经熟悉它的用途时直接套用。
-              </p>
-            )}
+            ) : null}
           </div>
-          <div className="mt-2 flex justify-end gap-1.5">
+          {option.description ? (
+            <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-[#9299a3]">
+              {option.description}
+            </p>
+          ) : null}
+          <div className="mt-3 flex justify-end gap-2">
             <button
               className={resolveModeButtonClassName(nextSelected)}
               disabled={disabled}
@@ -400,10 +379,10 @@ function StateNotice({
 }>) {
   return (
     <div
-      className={`rounded-2xl px-3 py-2.5 text-[11px] leading-5 ${
+      className={`rounded-xl px-4 py-3 text-[13px] leading-5 ${
         tone === "danger"
-          ? "bg-accent-danger/10 text-accent-danger"
-          : "bg-muted text-text-secondary"
+          ? "bg-[rgba(196,112,112,0.10)] text-[#c47070]"
+          : "bg-[#2f343e] text-[#9299a3]"
       }`}
     >
       {children}
@@ -421,14 +400,14 @@ function resolveSkillDrawerLayout(container: HTMLDivElement | null): SkillDrawer
   }
   const rect = chatPanel.getBoundingClientRect();
   const triggerRect = container.getBoundingClientRect();
-  const gutter = rect.width > 460 ? 14 : 10;
-  const panelWidth = Math.min(320, Math.max(rect.width - gutter * 2 - 44, 248));
+  const gutter = rect.width > 460 ? 16 : 12;
+  const panelWidth = Math.min(360, Math.max(rect.width - gutter * 2 - 44, 280));
   const panelLeft = Math.max(
     rect.left + gutter,
     Math.min(triggerRect.left, rect.right - gutter - panelWidth),
   );
-  const panelTop = Math.max(rect.top + gutter, triggerRect.bottom + 6);
-  const panelHeight = Math.max(Math.min(rect.bottom - panelTop - gutter, 520), 240);
+  const panelTop = Math.max(rect.top + gutter, triggerRect.bottom + 8);
+  const panelHeight = Math.max(Math.min(rect.bottom - panelTop - gutter, 560), 280);
 
   return {
     backdropStyle: {
@@ -437,7 +416,7 @@ function resolveSkillDrawerLayout(container: HTMLDivElement | null): SkillDrawer
       position: "fixed",
       top: panelTop,
       width: rect.width,
-      zIndex: 165,
+      zIndex: 145,
     },
     panelStyle: {
       height: panelHeight,
@@ -445,30 +424,30 @@ function resolveSkillDrawerLayout(container: HTMLDivElement | null): SkillDrawer
       position: "fixed",
       top: panelTop,
       width: panelWidth,
-      zIndex: 170,
+      zIndex: 200,
     },
   };
 }
 
 function buildResultSummary(visibleCount: number, totalCount: number, query: string) {
   if (!query.trim()) {
-    return `共 ${totalCount} 个可用 Skill，点一下就能从侧边套用。`;
+    return `共 ${totalCount} 个可用 Skill`;
   }
-  return `筛到 ${visibleCount} / ${totalCount} 个 Skill，可以继续缩小范围后再套用。`;
+  return `筛到 ${visibleCount} / ${totalCount} 个 Skill`;
 }
 
 const DRAWER_ACTION_BUTTON_CLASS =
-  "inline-flex h-7 items-center rounded-full bg-surface shadow-xs px-2.5 text-[10.5px] text-text-secondary transition hover:shadow-sm hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-8 items-center rounded-full bg-[#252a33] border border-[rgba(150,158,170,0.10)] px-3 text-[13px] text-[#9299a3] transition-all hover:border-[rgba(150,158,170,0.18)] hover:text-[#dde1e6] disabled:cursor-not-allowed disabled:opacity-40";
 
 function isPlainChatMode(model: StudioChatSkillModel) {
   return model.skillState.conversationSkillId === null && model.skillState.nextTurnSkillId === null;
 }
 
 function resolveModeButtonClassName(active: boolean) {
-  return `inline-flex h-7 items-center justify-center rounded-full px-2.5 text-[10.5px] font-medium transition ${
+  return `inline-flex h-8 items-center justify-center rounded-full px-3 text-[13px] font-semibold transition-all ${
     active
-      ? "bg-accent-primary-soft text-accent-primary"
-      : "bg-surface text-text-secondary hover:bg-surface hover:text-text-primary"
+      ? "bg-[rgba(160,150,130,0.12)] text-[#a09682] border border-[rgba(160,150,130,0.20)]"
+      : "bg-[#252a33] text-[#9299a3] border border-[rgba(150,158,170,0.10)] hover:text-[#dde1e6] hover:border-[rgba(150,158,170,0.18)]"
   }`;
 }
 

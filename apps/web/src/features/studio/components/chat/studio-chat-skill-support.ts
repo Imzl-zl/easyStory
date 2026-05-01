@@ -169,7 +169,7 @@ export function resolveStudioActiveSkillState(options: {
     return {
       conversationSkillId,
       conversationSkillLabel: null,
-      detail: "Skill 列表仍在读取，确认完成后才会按当前 Skill 发送。",
+      detail: null,
       headline: "Skill 待确认",
       nextTurnSkillId: normalizedNextTurnSkillId,
       nextTurnSkillLabel: null,
@@ -179,7 +179,7 @@ export function resolveStudioActiveSkillState(options: {
     return {
       conversationSkillId,
       conversationSkillLabel: null,
-      detail: "当前已选 Skill 暂时无法确认，请稍后重试，或先切回普通对话。",
+      detail: null,
       headline: "Skill 暂不可用",
       nextTurnSkillId: normalizedNextTurnSkillId,
       nextTurnSkillLabel: null,
@@ -189,7 +189,7 @@ export function resolveStudioActiveSkillState(options: {
     return {
       conversationSkillId,
       conversationSkillLabel: null,
-      detail: "当前已选 Skill 已失效，请重新选择或切回普通对话。",
+      detail: null,
       headline: "Skill 已失效",
       nextTurnSkillId: normalizedNextTurnSkillId,
       nextTurnSkillLabel: null,
@@ -205,7 +205,7 @@ export function resolveStudioActiveSkillState(options: {
     return {
       conversationSkillId,
       conversationSkillLabel,
-      detail: `成功发送后回到当前会话 · ${conversationSkillLabel}`,
+      detail: null,
       headline: `本次 · ${nextTurnSkillLabel}`,
       nextTurnSkillId: normalizedNextTurnSkillId,
       nextTurnSkillLabel,
@@ -215,7 +215,7 @@ export function resolveStudioActiveSkillState(options: {
     return {
       conversationSkillId,
       conversationSkillLabel,
-      detail: "只影响下一次成功发送，完成后自动清除",
+      detail: null,
       headline: `本次 · ${nextTurnSkillLabel}`,
       nextTurnSkillId: normalizedNextTurnSkillId,
       nextTurnSkillLabel,
@@ -225,7 +225,7 @@ export function resolveStudioActiveSkillState(options: {
     return {
       conversationSkillId,
       conversationSkillLabel,
-      detail: "后续消息都会沿用这个 Skill",
+      detail: null,
       headline: `当前会话 · ${conversationSkillLabel}`,
       nextTurnSkillId: null,
       nextTurnSkillLabel: null,
@@ -234,7 +234,7 @@ export function resolveStudioActiveSkillState(options: {
   return {
     conversationSkillId: null,
     conversationSkillLabel: null,
-    detail: "不额外套用 Skill，只使用规则、文稿上下文和当前会话。",
+    detail: null,
     headline: "普通对话",
     nextTurnSkillId: null,
     nextTurnSkillLabel: null,

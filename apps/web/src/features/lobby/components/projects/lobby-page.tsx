@@ -37,7 +37,7 @@ export function LobbyPage() {
 
   return (
     <div
-      className="relative h-screen flex flex-col workspace-shell--studio"
+      className="relative workspace-shell--lobby"
     >
       {/* === 背景层：微光渐变 === */}
       <div

@@ -32,14 +32,14 @@ body {
   --arco-menu-selected-color: var(--accent-primary);
   --arco-menu-selected-bg: var(--accent-primary-soft);
 
-  --arco-dropdown-color: var(--text-primary);
-  --arco-dropdown-bg: rgba(34, 38, 46, 0.96);
-  --arco-dropdown-hover-color: var(--text-primary);
-  --arco-dropdown-hover-bg: rgba(150, 158, 170, 0.10);
-  --arco-dropdown-active-color: var(--accent-primary);
-  --arco-dropdown-active-bg: var(--accent-primary-soft);
-  --arco-dropdown-selected-color: var(--accent-primary);
-  --arco-dropdown-selected-bg: var(--accent-primary-soft);
+  --arco-dropdown-color: #dde1e6;
+  --arco-dropdown-bg: #252a33;
+  --arco-dropdown-hover-color: #dde1e6;
+  --arco-dropdown-hover-bg: rgba(150, 158, 170, 0.08);
+  --arco-dropdown-active-color: #a09682;
+  --arco-dropdown-active-bg: rgba(160, 150, 130, 0.10);
+  --arco-dropdown-selected-color: #a09682;
+  --arco-dropdown-selected-bg: rgba(160, 150, 130, 0.10);
 }
 
 .arco-btn-primary {
@@ -79,17 +79,54 @@ body {
 }
 
 .arco-select-view {
-  border-color: var(--line-soft) !important;
-  border-radius: var(--radius-md) !important;
+  border-color: rgba(150, 158, 170, 0.10) !important;
+  border-radius: 12px !important;
+  background: #1a1d24 !important;
+  color: #dde1e6 !important;
 }
 
 .arco-select-view:hover {
-  border-color: var(--line-medium) !important;
+  border-color: rgba(150, 158, 170, 0.18) !important;
 }
 
 .arco-select-view-focus {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 3px var(--line-focus) !important;
+  border-color: rgba(160, 150, 130, 0.35) !important;
+  box-shadow: 0 0 0 3px rgba(160, 150, 130, 0.10) !important;
+}
+
+/* Arco Select 下拉菜单 */
+.arco-select-popup {
+  background: #252a33 !important;
+  border: 1px solid rgba(150, 158, 170, 0.10) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.40) !important;
+}
+
+.arco-select-popup .arco-select-dropdown {
+  background: #252a33 !important;
+}
+
+.arco-select-popup .arco-select-dropdown-list {
+  background: #252a33 !important;
+}
+
+.arco-select-popup .arco-select-option {
+  color: #dde1e6 !important;
+  background: transparent !important;
+  font-size: 14px !important;
+}
+
+.arco-select-popup .arco-select-option:hover {
+  background: rgba(150, 158, 170, 0.06) !important;
+}
+
+.arco-select-popup .arco-select-option.arco-select-option-selected {
+  background: rgba(160, 150, 130, 0.10) !important;
+  color: #a09682 !important;
+}
+
+.arco-select-popup .arco-select-empty {
+  color: #686e77 !important;
 }
 
 .arco-dropdown-menu {
@@ -177,12 +214,99 @@ body {
   border-radius: var(--radius-xs) !important;
 }
 
+/* Arco Radio 深色主题 */
+.arco-radio .arco-radio-icon {
+  border-color: rgba(150, 158, 170, 0.30) !important;
+  background: transparent !important;
+}
+
+.arco-radio:hover .arco-radio-icon {
+  border-color: rgba(160, 150, 130, 0.40) !important;
+}
+
 .arco-radio-checked .arco-radio-icon {
-  border-color: var(--accent-primary) !important;
+  border-color: #a09682 !important;
+  background: #a09682 !important;
 }
 
 .arco-radio-checked .arco-radio-icon::after {
-  background-color: var(--accent-primary) !important;
+  background-color: #1a1d24 !important;
+}
+
+.arco-radio .arco-radio-label {
+  color: #9299a3 !important;
+}
+
+.arco-radio:hover .arco-radio-label {
+  color: #dde1e6 !important;
+}
+
+.arco-radio-checked .arco-radio-label {
+  color: #a09682 !important;
+}
+
+/* Arco Radio Group mode=fill 深色主题 */
+.arco-radio-group-type-button {
+  background: #1e2129 !important;
+  border: 1px solid rgba(150, 158, 170, 0.12) !important;
+  border-radius: 10px !important;
+  padding: 2px !important;
+}
+
+/* 按钮式 radio 项 */
+.arco-radio-group-type-button .arco-radio-button {
+  background: transparent !important;
+  color: #9299a3 !important;
+  border-color: transparent !important;
+  border-radius: 8px !important;
+}
+
+/* 按钮式 radio 的 after 伪元素（白色背景的元凶） */
+.arco-radio-group-type-button .arco-radio-button::after {
+  background: transparent !important;
+}
+
+.arco-radio-group-type-button .arco-radio-button:hover {
+  background: rgba(150, 158, 170, 0.06) !important;
+  color: #dde1e6 !important;
+}
+
+.arco-radio-group-type-button .arco-radio-button:hover::after {
+  background: transparent !important;
+}
+
+.arco-radio-group-type-button .arco-radio-button.arco-radio-checked {
+  background: rgba(160, 150, 130, 0.12) !important;
+  color: #a09682 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.arco-radio-group-type-button .arco-radio-button.arco-radio-checked::after {
+  background: transparent !important;
+}
+
+/* 分隔线 */
+.arco-radio-group-type-button .arco-radio-button:not(:first-of-type)::before {
+  background: rgba(150, 158, 170, 0.10) !important;
+}
+
+.arco-radio-group-type-button .arco-radio-button.arco-radio-checked + .arco-radio-button::before,
+.arco-radio-group-type-button .arco-radio-button.arco-radio-checked::before,
+.arco-radio-group-type-button .arco-radio-button:hover + .arco-radio-button::before,
+.arco-radio-group-type-button .arco-radio-button:hover::before {
+  background: transparent !important;
+}
+
+/* 隐藏圆形 radio 图标 */
+.arco-radio-group-type-button .arco-radio-button .arco-radio-icon,
+.arco-radio-group-type-button .arco-radio-button .arco-radio-mask {
+  display: none !important;
+}
+
+/* 文字颜色 */
+.arco-radio-group-type-button .arco-radio-button .arco-radio-button-inner {
+  color: inherit !important;
 }
 
 .arco-notification {

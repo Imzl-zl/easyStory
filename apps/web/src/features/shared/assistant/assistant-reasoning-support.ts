@@ -120,7 +120,7 @@ export function resolveAssistantReasoningControl(options: {
     };
   }
   return {
-    description: "当前协议没有额外的官方思考控制参数。",
+    description: "",
     kind: "none",
     title: "思考设置",
   };
@@ -291,26 +291,8 @@ export function describeAssistantReasoningSelection(
   return null;
 }
 
-function resolveOpenAIReasoningDescription(apiDialect: string, modelName: string) {
-  const compatibilityNote =
-    "这里展示的是 OpenAI 协议族常见值集合，不代表当前模型的官方逐型号支持表。";
-  if (apiDialect === "openai_responses") {
-    if (modelName) {
-      return `按当前 OpenAI 协议发送官方 \`reasoning.effort\` 参数；${compatibilityNote}具体是否支持由模型或网关决定，不支持时会由上游显式返回错误。`;
-    }
-    return `按当前 OpenAI 协议发送官方 \`reasoning.effort\` 参数；留空表示跟随当前模型默认行为。${compatibilityNote}`;
-  }
-  if (apiDialect === "openai_chat_completions") {
-    const tokenNote = "官方 OpenAI 端点会配合 `max_completion_tokens`，兼容网关可能仍使用 `max_tokens`。";
-    if (modelName) {
-      return `按当前 OpenAI 协议发送官方 \`reasoning_effort\` 参数；${tokenNote}${compatibilityNote}具体是否支持由模型或网关决定，不支持时会由上游显式返回错误。`;
-    }
-    return `按当前 OpenAI 协议发送官方 \`reasoning_effort\` 参数；${tokenNote}留空表示跟随当前模型默认行为。${compatibilityNote}`;
-  }
-  if (modelName) {
-    return `按最终 OpenAI 协议发送官方 reasoning 参数；若最终走 Responses 将使用 \`reasoning.effort\`，若最终走 Chat Completions 将使用 \`reasoning_effort\`。${compatibilityNote}具体是否支持由模型或网关决定，不支持时会由上游显式返回错误。`;
-  }
-  return `按最终 OpenAI 协议发送官方 reasoning 参数；若最终走 Responses 将使用 \`reasoning.effort\`，若最终走 Chat Completions 将使用 \`reasoning_effort\`。留空表示跟随当前模型默认行为。${compatibilityNote}`;
+function resolveOpenAIReasoningDescription(_apiDialect: string, _modelName: string) {
+  return "控制模型思考深度";
 }
 
 function buildOpenAIReasoningOptions(
@@ -329,23 +311,18 @@ function resolveGeminiThinkingLevelOptions(_modelName: string): AssistantReasoni
   }));
 }
 
-function resolveGeminiLevelDescription(modelName: string) {
-  if (modelName) {
-    return "按 Gemini 原生接口发送官方 thinkingLevel 参数；这里展示的是 Gemini 3 协议族常见值集合，不代表当前模型的官方逐型号支持表，例如部分 Pro 型号不支持 minimal。不支持时会由上游显式返回错误。";
-  }
-  return "按 Gemini 原生接口发送官方 thinkingLevel 参数；留空表示跟随当前模型默认行为。这里展示的是 Gemini 3 协议族常见值集合，不代表当前模型的官方逐型号支持表。";
+function resolveGeminiLevelDescription(_modelName: string) {
+  return "控制模型思考深度";
 }
 
-function resolveGeminiBudgetConfig(modelName: string) {
+function resolveGeminiBudgetConfig(_modelName: string) {
   return {
     allowDisable: true,
     allowDynamic: true,
-    description: modelName
-      ? "按 Gemini 原生接口发送官方 thinkingBudget 参数；这里仅校验基本格式，可留空跟随默认，也可填 0、-1 或正整数。0/-1/正整数范围是否有效按具体模型决定，例如 2.5 Pro 不能用 0，Flash Lite 的正整数预算最小是 512。不支持时会由上游显式返回错误。"
-      : "按 Gemini 原生接口发送官方 thinkingBudget 参数；留空表示跟随当前模型默认行为。",
+    description: "控制模型思考深度",
     maxBudget: Number.MAX_SAFE_INTEGER,
     minBudget: 1,
-    placeholder: "留空跟随默认，也可填 0、-1 或按模型范围填写正整数",
+    placeholder: "留空跟随默认，或填 0 / -1 / 正整数",
   };
 }
 

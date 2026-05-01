@@ -246,7 +246,7 @@ function Field({
         {label}
       </span>
       <input
-        className="ink-input ink-input-roomy"
+        className="ink-input-roomy"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         {...props}
