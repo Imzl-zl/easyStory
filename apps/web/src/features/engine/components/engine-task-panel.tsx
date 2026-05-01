@@ -176,23 +176,23 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
       <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
         <section ref={taskListSectionRef} tabIndex={-1}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[12px] font-medium" style={{ color: "#6b7280" }}>
+            <span className="text-[12px] font-medium" style={{ color: "var(--text-tertiary)" }}>
               当前章节任务
             </span>
             <StatusPill tone={workflow.status} label={workflow.status} />
           </div>
 
           {tasksQuery.isLoading ? (
-            <p className="text-[11px]" style={{ color: "#6b7280" }}>正在加载章节任务...</p>
+            <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>正在加载章节任务...</p>
           ) : null}
           {tasksQuery.error ? (
-            <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+            <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
               {getErrorMessage(tasksQuery.error)}
             </div>
           ) : null}
 
           {hasStaleTasks(tasks) ? (
-            <div className="rounded px-3 py-2 text-[11px] mb-2" style={{ background: "rgba(234, 179, 8, 0.08)", color: "#fbbf24" }}>
+            <div className="rounded px-3 py-2 text-[11px] mb-2" style={{ background: "var(--accent-warning-soft)", color: "var(--accent-warning)" }}>
               部分任务已过期，请重建章节计划后继续。
             </div>
           ) : null}
@@ -212,24 +212,24 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
                     key={task.task_id}
                     className="rounded p-3 cursor-pointer transition-colors"
                     style={{
-                      background: selectedTaskNumber === task.chapter_number ? "#1f2328" : "#111418",
-                      border: `1px solid ${selectedTaskNumber === task.chapter_number ? "#2a2f35" : "#1f2328"}`,
+                      background: selectedTaskNumber === task.chapter_number ? "var(--line-soft)" : "var(--bg-canvas)",
+                      border: `1px solid ${selectedTaskNumber === task.chapter_number ? "var(--bg-muted)" : "var(--line-soft)"}`,
                     }}
                     onClick={() => startEditingTask(task.chapter_number)}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#1f2328", color: "#9ca3af" }}>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--bg-surface)", color: "var(--text-secondary)" }}>
                             第 {task.chapter_number} 章
                           </span>
                           <StatusPill tone={status.badgeStatus} label={status.badgeLabel} />
                         </div>
-                        <p className="text-[12px] font-medium truncate" style={{ color: "#e8e6e3" }}>{task.title}</p>
+                        <p className="text-[12px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{task.title}</p>
                       </div>
                       <button
                         className="flex-shrink-0 px-2 py-1 rounded text-[10px] font-medium transition-colors disabled:opacity-40"
-                        style={{ background: "#1f2328", color: "#9ca3af" }}
+                        style={{ background: "var(--bg-surface)", color: "var(--text-secondary)" }}
                         disabled={Boolean(editDisabledReason)}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -240,7 +240,7 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
                         编辑
                       </button>
                     </div>
-                    <p className="mt-1.5 text-[11px] leading-relaxed line-clamp-2" style={{ color: "#6b7280" }}>
+                    <p className="mt-1.5 text-[11px] leading-relaxed line-clamp-2" style={{ color: "var(--text-tertiary)" }}>
                       {task.brief}
                     </p>
                   </article>
@@ -302,12 +302,12 @@ export function EngineTaskPanel({ projectId, workflow }: EngineTaskPanelProps) {
 
 function StatusPill({ tone, label }: { tone: string; label: string }) {
   const colors: Record<string, { bg: string; text: string }> = {
-    completed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
-    failed: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
-    warning: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
-    active: { bg: "rgba(232, 184, 109, 0.12)", text: "#e8b86d" },
-    outline: { bg: "#1f2328", text: "#9ca3af" },
-    draft: { bg: "#1f2328", text: "#6b7280" },
+    completed: { bg: "var(--accent-success-soft)", text: "var(--accent-success)" },
+    failed: { bg: "var(--accent-danger-soft)", text: "var(--accent-danger)" },
+    warning: { bg: "var(--accent-warning-soft)", text: "var(--accent-warning)" },
+    active: { bg: "var(--accent-primary-soft)", text: "var(--accent-primary)" },
+    outline: { bg: "var(--line-soft)", text: "var(--text-secondary)" },
+    draft: { bg: "var(--line-soft)", text: "var(--text-tertiary)" },
   };
   const c = colors[tone] || colors.outline;
   return (

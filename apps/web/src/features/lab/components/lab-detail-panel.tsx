@@ -26,15 +26,15 @@ export function LabDetailPanel({
   onRequestDelete,
 }: Readonly<LabDetailPanelProps>) {
   return (
-    <div className="h-full flex flex-col rounded" style={{ background: "#1a1d23", border: "1px solid #2a2f35" }}>
-      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #2a2f35" }}>
-        <span className="text-[12px] font-medium" style={{ color: "#9ca3af" }}>
+    <div className="h-full flex flex-col rounded" style={{ background: "var(--bg-muted)", border: "1px solid var(--line-soft)" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--line-soft)" }}>
+        <span className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
           {analysis ? formatLabAnalysisTitle(analysis) : "洞察详情"}
         </span>
         {analysis ? (
           <button
             className="px-3 py-1.5 rounded text-[11px] font-medium transition-all disabled:opacity-40"
-            style={{ background: "rgba(220, 38, 38, 0.1)", color: "#f87171", border: "1px solid rgba(220, 38, 38, 0.2)" }}
+            style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)", border: "1px solid var(--accent-danger-muted)" }}
             disabled={isDeletePending}
             onClick={() => onRequestDelete(analysis.id)}
             type="button"
@@ -78,11 +78,11 @@ function LabDetailContent({
     );
   }
   if (isLoading && !analysis) {
-    return <p className="text-[11px]" style={{ color: "#6b7280" }}>正在加载洞察详情...</p>;
+    return <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>正在加载洞察详情...</p>;
   }
   if (errorMessage && !analysis) {
     return (
-      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
         {errorMessage}
       </div>
     );
@@ -93,24 +93,24 @@ function LabDetailContent({
   return (
     <div className="space-y-3">
       {errorMessage ? (
-        <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+        <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
           {errorMessage}
         </div>
       ) : null}
       <LabAnalysisMeta analysis={analysis} />
       {analysis.analysis_scope ? (
-        <div className="rounded p-4" style={{ background: "#111418", border: "1px solid #1f2328" }}>
-          <h3 className="text-[12px] font-medium mb-2" style={{ color: "#6b7280" }}>分析范围</h3>
+        <div className="rounded p-4" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
+          <h3 className="text-[12px] font-medium mb-2" style={{ color: "var(--text-tertiary)" }}>分析范围</h3>
           <CodeBlock value={analysis.analysis_scope} />
         </div>
       ) : null}
-      <div className="rounded p-4" style={{ background: "#111418", border: "1px solid #1f2328" }}>
-        <h3 className="text-[12px] font-medium mb-2" style={{ color: "#6b7280" }}>分析结果</h3>
+      <div className="rounded p-4" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
+        <h3 className="text-[12px] font-medium mb-2" style={{ color: "var(--text-tertiary)" }}>分析结果</h3>
         <CodeBlock value={analysis.result} />
       </div>
       {analysis.suggestions ? (
-        <div className="rounded p-4" style={{ background: "#111418", border: "1px solid #1f2328" }}>
-          <h3 className="text-[12px] font-medium mb-2" style={{ color: "#6b7280" }}>后续建议</h3>
+        <div className="rounded p-4" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
+          <h3 className="text-[12px] font-medium mb-2" style={{ color: "var(--text-tertiary)" }}>后续建议</h3>
           <CodeBlock value={analysis.suggestions} />
         </div>
       ) : null}
@@ -120,7 +120,7 @@ function LabDetailContent({
 
 function LabAnalysisMeta({ analysis }: Readonly<{ analysis: AnalysisDetail }>) {
   return (
-    <div className="rounded p-3" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+    <div className="rounded p-3" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
       <div className="grid gap-2 grid-cols-2">
         <MetaItem label="分析类型" value={analysis.analysis_type} />
         <MetaItem label="来源标题" value={analysis.source_title ?? "未命名来源"} />
@@ -137,8 +137,8 @@ function LabAnalysisMeta({ analysis }: Readonly<{ analysis: AnalysisDetail }>) {
 function MetaItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] mb-0.5" style={{ color: "#4b5563" }}>{label}</p>
-      <p className="text-[12px] font-medium" style={{ color: "#9ca3af" }}>{value}</p>
+      <p className="text-[10px] mb-0.5" style={{ color: "var(--text-tertiary)" }}>{label}</p>
+      <p className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>{value}</p>
     </div>
   );
 }

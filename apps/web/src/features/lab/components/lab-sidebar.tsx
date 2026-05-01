@@ -39,10 +39,10 @@ export function LabSidebar({
   return (
     <aside className="h-full flex flex-col space-y-3">
       {/* Filters */}
-      <div className="rounded p-3" style={{ background: "#1a1d23", border: "1px solid #2a2f35" }}>
+      <div className="rounded p-3" style={{ background: "var(--bg-muted)", border: "1px solid var(--line-soft)" }}>
         <div className="space-y-2.5">
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>分析类型</span>
+            <span className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>分析类型</span>
             <AppSelect
               disabled={isPending}
               options={[
@@ -54,29 +54,29 @@ export function LabSidebar({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>关联正文片段</span>
+            <span className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>关联正文片段</span>
             <input
               className="w-full px-3 py-2 rounded text-[12px] outline-none"
               disabled={isPending}
               placeholder="可选，输入内容 ID"
-              style={{ background: "#111418", color: "#e8e6e3", border: "1px solid #2a2f35" }}
+              style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-soft)" }}
               value={filters.contentId}
               onChange={(event) => onFilterChange({ contentId: event.target.value })}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "#e8b86d"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "#2a2f35"; }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = "var(--accent-primary)"; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = "var(--bg-muted)"; }}
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>来源 Skill</span>
+            <span className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>来源 Skill</span>
             <input
               className="w-full px-3 py-2 rounded text-[12px] outline-none"
               disabled={isPending}
               placeholder="可选，例如 skill.style.river"
-              style={{ background: "#111418", color: "#e8e6e3", border: "1px solid #2a2f35" }}
+              style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-soft)" }}
               value={filters.generatedSkillKey}
               onChange={(event) => onFilterChange({ generatedSkillKey: event.target.value })}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "#e8b86d"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "#2a2f35"; }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = "var(--accent-primary)"; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = "var(--bg-muted)"; }}
             />
           </label>
         </div>
@@ -85,10 +85,10 @@ export function LabSidebar({
       {/* List */}
       <div className="flex-1 overflow-auto min-h-0">
         {isLoading ? (
-          <p className="text-[11px]" style={{ color: "#6b7280" }}>正在加载分析列表...</p>
+          <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>正在加载分析列表...</p>
         ) : null}
         {errorMessage ? (
-          <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+          <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
             {errorMessage}
           </div>
         ) : null}
@@ -128,8 +128,8 @@ function LabAnalysisList({
             key={analysis.id}
             className="w-full rounded p-3 text-left transition-all disabled:opacity-40"
             style={{
-              background: analysis.id === activeId ? "#1f2328" : "#111418",
-              border: `1px solid ${analysis.id === activeId ? "#2a2f35" : "#1f2328"}`,
+              background: analysis.id === activeId ? "var(--line-soft)" : "var(--bg-canvas)",
+              border: `1px solid ${analysis.id === activeId ? "var(--bg-muted)" : "var(--line-soft)"}`,
             }}
             disabled={isPending}
             onClick={() => onSelect(analysis.id)}
@@ -141,10 +141,10 @@ function LabAnalysisList({
                 <StatusPill tone="outline" label={analysis.generated_skill_key} />
               ) : null}
             </div>
-            <p className="text-[12px] font-medium truncate" style={{ color: "#e8e6e3" }}>
+            <p className="text-[12px] font-medium truncate" style={{ color: "var(--text-primary)" }}>
               {formatLabAnalysisTitle(analysis)}
             </p>
-            <p className="text-[10px] mt-1" style={{ color: "#4b5563" }}>
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>
               {formatLabAnalysisTime(analysis.created_at)}
             </p>
           </button>
@@ -169,12 +169,12 @@ function LabAnalysisList({
 
 function StatusPill({ tone, label }: { tone: string; label: string }) {
   const colors: Record<string, { bg: string; text: string }> = {
-    completed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
-    failed: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
-    warning: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
-    active: { bg: "rgba(232, 184, 109, 0.12)", text: "#e8b86d" },
-    outline: { bg: "#1f2328", text: "#9ca3af" },
-    draft: { bg: "#1f2328", text: "#6b7280" },
+    completed: { bg: "var(--accent-success-soft)", text: "var(--accent-success)" },
+    failed: { bg: "var(--accent-danger-soft)", text: "var(--accent-danger)" },
+    warning: { bg: "var(--accent-warning-soft)", text: "var(--accent-warning)" },
+    active: { bg: "var(--accent-primary-soft)", text: "var(--accent-primary)" },
+    outline: { bg: "var(--line-soft)", text: "var(--text-secondary)" },
+    draft: { bg: "var(--line-soft)", text: "var(--text-tertiary)" },
   };
   const c = colors[tone] || colors.outline;
   return (

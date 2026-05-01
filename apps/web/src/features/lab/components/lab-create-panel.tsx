@@ -30,12 +30,12 @@ export function LabCreatePanel({
   };
 
   return (
-    <div className="h-full flex flex-col rounded" style={{ background: "#1a1d23", border: "1px solid #2a2f35" }}>
-      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid #2a2f35" }}>
-        <span className="text-[12px] font-medium" style={{ color: "#9ca3af" }}>记录新的洞察</span>
+    <div className="h-full flex flex-col rounded" style={{ background: "var(--bg-muted)", border: "1px solid var(--line-soft)" }}>
+      <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--line-soft)" }}>
+        <span className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>记录新的洞察</span>
         <button
           className="px-3 py-1.5 rounded text-[11px] font-medium transition-colors"
-          style={{ background: "#1f2328", color: "#9ca3af" }}
+          style={{ background: "var(--bg-surface)", color: "var(--text-secondary)" }}
           onClick={onCancel}
           type="button"
         >
@@ -45,7 +45,7 @@ export function LabCreatePanel({
       <div className="flex-1 overflow-auto p-4">
         <form className="space-y-3" onSubmit={handleSubmit}>
           <label className="block space-y-1">
-            <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>洞察类型</span>
+            <span className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>洞察类型</span>
             <AppSelect
               disabled={isPending}
               options={LAB_ANALYSIS_TYPES.map((item) => ({ label: item, value: item }))}
@@ -82,7 +82,7 @@ export function LabCreatePanel({
           />
           <button
             className="w-full px-4 py-2 rounded text-[12px] font-medium transition-all disabled:opacity-40"
-            style={{ background: "#e8b86d", color: "#111418" }}
+            style={{ background: "var(--accent-primary)", color: "var(--bg-canvas)" }}
             disabled={isPending}
             type="submit"
           >
@@ -108,14 +108,14 @@ function LabTextField({
 >) {
   return (
     <label className="block space-y-1">
-      <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>{label}</span>
+      <span className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>{label}</span>
       <input
         className="w-full px-3 py-2 rounded text-[12px] outline-none"
-        style={{ background: "#111418", color: "#e8e6e3", border: "1px solid #2a2f35" }}
+        style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-soft)" }}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        onFocus={(e) => { e.currentTarget.style.borderColor = "#e8b86d"; }}
-        onBlur={(e) => { e.currentTarget.style.borderColor = "#2a2f35"; }}
+        onFocus={(e) => { e.currentTarget.style.borderColor = "var(--accent-primary)"; }}
+        onBlur={(e) => { e.currentTarget.style.borderColor = "var(--bg-muted)"; }}
         {...props}
       />
     </label>
@@ -138,14 +138,14 @@ function LabTextAreaField({
 >) {
   return (
     <label className="block space-y-1">
-      <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>{label}</span>
+      <span className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>{label}</span>
       <textarea
         className={`w-full px-3 py-2 rounded text-[12px] outline-none resize-y ${minHeightClassName}`}
-        style={{ background: "#111418", color: "#e8e6e3", border: "1px solid #2a2f35" }}
+        style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-soft)" }}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        onFocus={(e) => { e.currentTarget.style.borderColor = "#e8b86d"; }}
-        onBlur={(e) => { e.currentTarget.style.borderColor = "#2a2f35"; }}
+        onFocus={(e) => { e.currentTarget.style.borderColor = "var(--accent-primary)"; }}
+        onBlur={(e) => { e.currentTarget.style.borderColor = "var(--bg-muted)"; }}
         {...props}
       />
     </label>

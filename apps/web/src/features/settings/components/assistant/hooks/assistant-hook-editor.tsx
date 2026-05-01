@@ -133,7 +133,7 @@ export function AssistantHookEditor({
             setDocumentError(null);
             setFieldErrors({});
           }}
-          style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+          style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
           type="button"
         >
           还原
@@ -337,7 +337,7 @@ function GuidedHookEditor({
       >
         <div className="flex items-center justify-between mb-2">
           <span className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>保存后的文件</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--line-soft)", color: "var(--text-tertiary)" }}>{ASSISTANT_HOOK_FILE_LABEL}</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--bg-surface)", color: "var(--text-tertiary)" }}>{ASSISTANT_HOOK_FILE_LABEL}</span>
         </div>
         <pre
           className="text-[11px] leading-4 overflow-auto rounded px-2 py-2"

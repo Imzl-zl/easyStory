@@ -104,7 +104,7 @@ function ReplaySelection({
 }>) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>选择节点执行记录</span>
+      <span className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>选择节点执行记录</span>
       <AppSelect
         options={[
           { label: "先选择一个节点", value: "" },
@@ -124,7 +124,7 @@ function ReplayExecutionSummary({
   execution,
 }: Readonly<{ execution: NodeExecutionView }>) {
   return (
-    <div className="rounded p-3" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+    <div className="rounded p-3" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1.5 min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -132,21 +132,21 @@ function ReplayExecutionSummary({
             <StatusPill tone="active" label={execution.node_type} />
           </div>
           <div>
-            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
+            <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>
               {execution.node_id} · 序列 {execution.sequence}
             </p>
-            <p className="text-[11px]" style={{ color: "#6b7280" }}>
+            <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
               开始 {formatDateTime(execution.started_at)} · 完成 {formatDateTime(execution.completed_at)}
             </p>
           </div>
         </div>
         <div className="text-right flex-shrink-0">
-          <p className="text-[11px]" style={{ color: "#4b5563" }}>{formatShortId(execution.id)}</p>
-          <p className="text-[11px]" style={{ color: "#4b5563" }}>{formatDuration(execution.execution_time_ms)}</p>
+          <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>{formatShortId(execution.id)}</p>
+          <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>{formatDuration(execution.execution_time_ms)}</p>
         </div>
       </div>
       {execution.error_message ? (
-        <div className="mt-2 rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+        <div className="mt-2 rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
           {execution.error_message}
         </div>
       ) : null}
@@ -202,21 +202,21 @@ function ReplayCard({
   index: number;
 }>) {
   return (
-    <div className="rounded" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+    <div className="rounded" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
       <div className="p-3 flex items-start justify-between gap-3">
         <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#1f2328", color: "#9ca3af" }}>#{index + 1}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--bg-surface)", color: "var(--text-secondary)" }}>#{index + 1}</span>
             <StatusPill tone="draft" label={formatReplayTypeLabel(replay.replay_type)} />
           </div>
           <div>
-            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>{replay.model_name}</p>
-            <p className="text-[11px]" style={{ color: "#6b7280" }}>
+            <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>{replay.model_name}</p>
+            <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
               {formatReplayTokenUsage(replay)} · {formatDateTime(replay.created_at)}
             </p>
           </div>
         </div>
-        <p className="text-[11px] flex-shrink-0" style={{ color: "#4b5563" }}>
+        <p className="text-[11px] flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
           {formatShortId(replay.id)}
         </p>
       </div>
@@ -239,18 +239,18 @@ function ReplayTextDisclosure({
   return (
     <details
       className="border-t"
-      style={{ borderColor: "#1f2328" }}
+      style={{ borderColor: "var(--line-soft)" }}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-medium flex items-center justify-between" style={{ color: "#9ca3af" }}>
+      <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-medium flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
         <span>{title}</span>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </summary>
       <div className="px-3 pb-3">
-        <pre className="whitespace-pre-wrap break-words text-[11px] leading-relaxed" style={{ color: "#9ca3af" }}>{value}</pre>
+        <pre className="whitespace-pre-wrap break-words text-[11px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{value}</pre>
       </div>
     </details>
   );
@@ -258,12 +258,12 @@ function ReplayTextDisclosure({
 
 function StatusPill({ tone, label }: { tone: string; label: string }) {
   const colors: Record<string, { bg: string; text: string }> = {
-    completed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
-    failed: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
-    warning: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
-    active: { bg: "rgba(232, 184, 109, 0.12)", text: "#e8b86d" },
-    outline: { bg: "#1f2328", text: "#9ca3af" },
-    draft: { bg: "#1f2328", text: "#6b7280" },
+    completed: { bg: "var(--accent-success-soft)", text: "var(--accent-success)" },
+    failed: { bg: "var(--accent-danger-soft)", text: "var(--accent-danger)" },
+    warning: { bg: "var(--accent-warning-soft)", text: "var(--accent-warning)" },
+    active: { bg: "var(--accent-primary-soft)", text: "var(--accent-primary)" },
+    outline: { bg: "var(--line-soft)", text: "var(--text-secondary)" },
+    draft: { bg: "var(--line-soft)", text: "var(--text-tertiary)" },
   };
   const c = colors[tone] || colors.outline;
   return (
@@ -285,10 +285,10 @@ function FeedbackMessage({
 }>) {
   if (tone === "danger") {
     return (
-      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
         {message}
       </div>
     );
   }
-  return <div className="rounded px-3 py-2 text-[11px]" style={{ background: "#1f2328", color: "#6b7280" }}>{message}</div>;
+  return <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--bg-surface)", color: "var(--text-tertiary)" }}>{message}</div>;
 }

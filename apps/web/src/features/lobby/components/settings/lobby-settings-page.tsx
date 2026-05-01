@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { PageEntrance } from "@/components/ui/page-entrance";
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import {
   useLobbySettingsRouteState,
@@ -42,10 +43,12 @@ export function LobbySettingsPage() {
   const navigationGuard = useUnsavedChangesGuard({ currentUrl, isDirty, router });
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg-canvas)" }}>
-      {/* Sidebar */}
-      <div className="w-[200px] flex-shrink-0 h-full" style={{ borderRight: "1px solid var(--line-soft)" }}>
-        <LobbySettingsSidebar
+    <div className="h-full overflow-hidden" style={{ background: "var(--bg-canvas)" }}>
+      <PageEntrance>
+        <div className="flex h-full">
+          {/* Sidebar */}
+          <div className="w-[200px] flex-shrink-0 h-full" style={{ borderRight: "1px solid var(--line-soft)" }}>
+            <LobbySettingsSidebar
           isDirty={isDirty}
           isPending={route.isPending}
           onNavigateAway={navigationGuard.attemptNavigation}
@@ -77,6 +80,8 @@ export function LobbySettingsPage() {
         onClose={navigationGuard.handleDialogClose}
         onConfirm={navigationGuard.handleDialogConfirm}
       />
+        </div>
+    </PageEntrance>
     </div>
   );
 }

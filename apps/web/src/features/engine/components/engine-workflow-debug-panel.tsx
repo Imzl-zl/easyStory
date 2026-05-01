@@ -11,10 +11,10 @@ export function EngineWorkflowDebugPanel({
   workflow,
 }: Readonly<EngineWorkflowDebugPanelProps>) {
   return (
-    <details className="rounded" style={{ background: "#1a1d23", border: "1px solid #2a2f35" }}>
+    <details className="rounded" style={{ background: "var(--bg-muted)", border: "1px solid var(--line-soft)" }}>
       <summary
         className="cursor-pointer list-none px-4 py-3 text-[11px] font-medium flex items-center justify-between"
-        style={{ color: "#4b5563" }}
+        style={{ color: "var(--text-tertiary)" }}
       >
         <span>调试数据</span>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

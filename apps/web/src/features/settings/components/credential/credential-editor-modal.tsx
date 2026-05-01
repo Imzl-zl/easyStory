@@ -42,7 +42,7 @@ export function CredentialEditorModal({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "var(--overlay-bg)" }}>
       <div
         className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl"
         style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-medium)" }}
@@ -59,7 +59,7 @@ export function CredentialEditorModal({
           </div>
           <button
             className="w-7 h-7 rounded-md flex items-center justify-center"
-            style={{ background: "var(--line-soft)", color: "var(--text-tertiary)" }}
+            style={{ background: "var(--bg-surface)", color: "var(--text-tertiary)" }}
             onClick={onClose}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -160,7 +160,7 @@ export function CredentialEditorModal({
             </button>
             <button
               className="h-9 px-4 rounded-md text-[12px] font-medium"
-              style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+              style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
               onClick={onClose}
               type="button"
             >

@@ -67,8 +67,8 @@ export function EngineReviewPanel({ summary, actions, isLoading, errorMessage }:
 function ReviewSummarySection({ summary }: Readonly<{ summary: WorkflowReviewSummary }>) {
   return (
     <div className="space-y-2">
-      <h3 className="text-[12px] font-medium" style={{ color: "#6b7280" }}>审核总览</h3>
-      <div className="rounded p-3 space-y-3" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+      <h3 className="text-[12px] font-medium" style={{ color: "var(--text-tertiary)" }}>审核总览</h3>
+      <div className="rounded p-3 space-y-3" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
         <div className="flex flex-wrap gap-1.5">
           <StatusPill tone="completed" label={`通过 ${formatCount(summary.statuses.passed)}`} />
           <StatusPill tone="warning" label={`警告 ${formatCount(summary.statuses.warning)}`} />
@@ -89,15 +89,15 @@ function ReviewSummarySection({ summary }: Readonly<{ summary: WorkflowReviewSum
 function ReviewTypesSection({ summary }: Readonly<{ summary: WorkflowReviewSummary }>) {
   return (
     <div className="space-y-2">
-      <h3 className="text-[12px] font-medium" style={{ color: "#6b7280" }}>审核类型拆分</h3>
+      <h3 className="text-[12px] font-medium" style={{ color: "var(--text-tertiary)" }}>审核类型拆分</h3>
       {summary.review_types.length > 0 ? (
         <div className="space-y-2">
           {summary.review_types.map((item) => (
-            <div key={item.review_type} className="rounded p-3" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+            <div key={item.review_type} className="rounded p-3" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>{formatReviewTypeLabel(item.review_type)}</p>
-                  <p className="text-[10px]" style={{ color: "#4b5563" }}>
+                  <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>{formatReviewTypeLabel(item.review_type)}</p>
+                  <p className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>
                     {formatCount(item.action_count)} 次动作
                   </p>
                 </div>
@@ -107,7 +107,7 @@ function ReviewTypesSection({ summary }: Readonly<{ summary: WorkflowReviewSumma
                   <StatusPill tone="failed" label={formatCount(item.statuses.failed)} />
                 </div>
               </div>
-              <p className="mt-2 text-[11px]" style={{ color: "#6b7280" }}>
+              <p className="mt-2 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
                 共 {formatCount(item.issues.total)} 条问题，其中严重 {formatCount(item.issues.critical)}、主要{" "}
                 {formatCount(item.issues.major)}、次要 {formatCount(item.issues.minor)}、建议{" "}
                 {formatCount(item.issues.suggestion)}。
@@ -125,7 +125,7 @@ function ReviewTypesSection({ summary }: Readonly<{ summary: WorkflowReviewSumma
 function ReviewActionsSection({ actions }: Readonly<{ actions: WorkflowReviewAction[] }>) {
   return (
     <div className="space-y-2">
-      <h3 className="text-[12px] font-medium" style={{ color: "#6b7280" }}>审核动作</h3>
+      <h3 className="text-[12px] font-medium" style={{ color: "var(--text-tertiary)" }}>审核动作</h3>
       {actions.length > 0 ? (
         <div className="space-y-2">
           {actions.map((action) => (
@@ -141,7 +141,7 @@ function ReviewActionsSection({ actions }: Readonly<{ actions: WorkflowReviewAct
 
 function ReviewActionCard({ action }: Readonly<{ action: WorkflowReviewAction }>) {
   return (
-    <div className="rounded p-3" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+    <div className="rounded p-3" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1.5 min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -149,21 +149,21 @@ function ReviewActionCard({ action }: Readonly<{ action: WorkflowReviewAction }>
             <StatusPill tone="active" label={formatReviewTypeLabel(action.review_type)} />
           </div>
           <div>
-            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>{formatNodeLabel(action)}</p>
-            <p className="text-[11px]" style={{ color: "#6b7280" }}>
+            <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>{formatNodeLabel(action)}</p>
+            <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
               {formatReviewerLabel(action)} · 序列 {action.sequence} · {formatDateTime(action.created_at)}
             </p>
           </div>
         </div>
         <div className="text-right flex-shrink-0">
-          <p className="text-[11px]" style={{ color: "#4b5563" }}>评分：{formatScore(action.score)}</p>
-          <p className="text-[11px]" style={{ color: "#4b5563" }}>耗时：{formatExecutionTime(action.execution_time_ms)}</p>
-          <p className="text-[11px]" style={{ color: "#4b5563" }}>Tokens：{formatTokensUsed(action.tokens_used)}</p>
+          <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>评分：{formatScore(action.score)}</p>
+          <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>耗时：{formatExecutionTime(action.execution_time_ms)}</p>
+          <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>Tokens：{formatTokensUsed(action.tokens_used)}</p>
         </div>
       </div>
-      <p className="mt-2 text-[12px] leading-relaxed" style={{ color: "#9ca3af" }}>{action.summary ?? "审核器未返回摘要。"}</p>
+      <p className="mt-2 text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{action.summary ?? "审核器未返回摘要。"}</p>
       {action.issues.length > 0 ? (
-        <div className="mt-3 space-y-2 pt-3" style={{ borderTop: "1px solid #1f2328" }}>
+        <div className="mt-3 space-y-2 pt-3" style={{ borderTop: "1px solid var(--line-soft)" }}>
           {action.issues.map((issue, index) => (
             <ReviewIssueCard key={`${action.id}-${issue.category}-${index}`} issue={issue} />
           ))}
@@ -177,51 +177,51 @@ function ReviewIssueCard({ issue }: Readonly<{ issue: WorkflowReviewIssue }>) {
   const locationText = formatIssueLocation(issue);
 
   return (
-    <div className="rounded p-2.5" style={{ background: "#1a1d23" }}>
+    <div className="rounded p-2.5" style={{ background: "var(--bg-muted)" }}>
       <div className="flex flex-wrap items-center gap-1.5 mb-1">
         <StatusPill tone={resolveIssueTone(issue.severity)} label={formatIssueSeverityLabel(issue.severity)} />
-        <span className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>{formatIssueCategoryLabel(issue.category)}</span>
+        <span className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>{formatIssueCategoryLabel(issue.category)}</span>
       </div>
-      <p className="text-[11px]" style={{ color: "#9ca3af" }}>{issue.description}</p>
-      {locationText ? <p className="text-[10px] mt-1" style={{ color: "#4b5563" }}>{locationText}</p> : null}
+      <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{issue.description}</p>
+      {locationText ? <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>{locationText}</p> : null}
       {issue.location?.quoted_text ? (
-        <p className="text-[11px] mt-1" style={{ color: "#6b7280" }}>摘录：{issue.location.quoted_text}</p>
+        <p className="text-[11px] mt-1" style={{ color: "var(--text-tertiary)" }}>摘录：{issue.location.quoted_text}</p>
       ) : null}
-      {issue.evidence ? <p className="text-[11px] mt-1" style={{ color: "#6b7280" }}>依据：{issue.evidence}</p> : null}
-      {issue.suggested_fix ? <p className="text-[11px] mt-1" style={{ color: "#6b7280" }}>建议：{issue.suggested_fix}</p> : null}
+      {issue.evidence ? <p className="text-[11px] mt-1" style={{ color: "var(--text-tertiary)" }}>依据：{issue.evidence}</p> : null}
+      {issue.suggested_fix ? <p className="text-[11px] mt-1" style={{ color: "var(--text-tertiary)" }}>建议：{issue.suggested_fix}</p> : null}
     </div>
   );
 }
 
 function MetricItem({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="rounded p-3" style={{ background: "#111418", border: "1px solid #1f2328" }}>
-      <p className="text-[10px] mb-1" style={{ color: "#4b5563" }}>{label}</p>
-      <p className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>{value}</p>
-      {detail ? <p className="text-[10px] mt-0.5" style={{ color: "#4b5563" }}>{detail}</p> : null}
+    <div className="rounded p-3" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
+      <p className="text-[10px] mb-1" style={{ color: "var(--text-tertiary)" }}>{label}</p>
+      <p className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>{value}</p>
+      {detail ? <p className="text-[10px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>{detail}</p> : null}
     </div>
   );
 }
 
 function MiniMetric({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="rounded p-2" style={{ background: "#1a1d23" }}>
-      <p className="text-[9px] mb-0.5" style={{ color: "#4b5563" }}>{label}</p>
-      <p className="text-[12px] font-medium" style={{ color: "#9ca3af" }}>{value}</p>
-      {detail ? <p className="text-[9px] mt-0.5" style={{ color: "#4b5563" }}>{detail}</p> : null}
+    <div className="rounded p-2" style={{ background: "var(--bg-muted)" }}>
+      <p className="text-[9px] mb-0.5" style={{ color: "var(--text-tertiary)" }}>{label}</p>
+      <p className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>{value}</p>
+      {detail ? <p className="text-[9px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>{detail}</p> : null}
     </div>
   );
 }
 
 function StatusPill({ tone, label }: { tone: string; label: string }) {
   const colors: Record<string, { bg: string; text: string }> = {
-    completed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
-    failed: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
-    warning: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
-    active: { bg: "rgba(232, 184, 109, 0.12)", text: "#e8b86d" },
-    outline: { bg: "#1f2328", text: "#9ca3af" },
-    draft: { bg: "#1f2328", text: "#6b7280" },
-    passed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
+    completed: { bg: "var(--accent-success-soft)", text: "var(--accent-success)" },
+    failed: { bg: "var(--accent-danger-soft)", text: "var(--accent-danger)" },
+    warning: { bg: "var(--accent-warning-soft)", text: "var(--accent-warning)" },
+    active: { bg: "var(--accent-primary-soft)", text: "var(--accent-primary)" },
+    outline: { bg: "var(--line-soft)", text: "var(--text-secondary)" },
+    draft: { bg: "var(--line-soft)", text: "var(--text-tertiary)" },
+    passed: { bg: "var(--accent-success-soft)", text: "var(--accent-success)" },
   };
   const c = colors[tone] || colors.outline;
   return (
@@ -243,11 +243,11 @@ function FeedbackMessage({
 }>) {
   if (tone === "danger") {
     return (
-      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
         {message}
       </div>
     );
   }
 
-  return <div className="rounded px-3 py-2 text-[11px]" style={{ background: "#1f2328", color: "#6b7280" }}>{message}</div>;
+  return <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--bg-surface)", color: "var(--text-tertiary)" }}>{message}</div>;
 }

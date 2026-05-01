@@ -190,19 +190,19 @@ function DetailTabButton({
     <button
       className="px-3 py-1.5 rounded text-[11px] font-medium transition-all"
       style={{
-        background: isActive ? "#e8b86d" : "transparent",
-        color: isActive ? "#111418" : "#6b7280",
+        background: isActive ? "var(--accent-primary)" : "transparent",
+        color: isActive ? "var(--bg-canvas)" : "var(--text-tertiary)",
       }}
       onClick={onClick}
       onMouseEnter={(e) => {
         if (!isActive) {
-          e.currentTarget.style.color = "#9ca3af";
-          e.currentTarget.style.background = "#1f2328";
+          e.currentTarget.style.color = "var(--text-secondary)";
+          e.currentTarget.style.background = "var(--bg-surface)";
         }
       }}
       onMouseLeave={(e) => {
         if (!isActive) {
-          e.currentTarget.style.color = "#6b7280";
+          e.currentTarget.style.color = "var(--text-tertiary)";
           e.currentTarget.style.background = "transparent";
         }
       }}

@@ -31,7 +31,7 @@ export function EngineBillingPanel({
 }: EngineBillingPanelProps) {
   if (errorMessage) {
     return (
-      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
         {errorMessage}
       </div>
     );
@@ -39,7 +39,7 @@ export function EngineBillingPanel({
 
   if (isLoading && summary === null) {
     return (
-      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "#1f2328", color: "#6b7280" }}>
+      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--bg-surface)", color: "var(--text-tertiary)" }}>
         正在汇总预算窗口、类型拆分和调用明细…
       </div>
     );
@@ -66,26 +66,26 @@ export function EngineBillingPanel({
       <div className="grid gap-3 xl:grid-cols-[0.92fr_1.08fr]">
         <div className="space-y-3">
           <section className="space-y-2">
-            <h3 className="text-[12px] font-medium" style={{ color: "#6b7280" }}>预算状态</h3>
+            <h3 className="text-[12px] font-medium" style={{ color: "var(--text-tertiary)" }}>预算状态</h3>
             <div className="space-y-2">
               {summary.budget_statuses.map((status) => (
                 <div
                   key={status.scope}
                   className="rounded p-3"
-                  style={{ background: "#111418", border: "1px solid #1f2328" }}
+                  style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="space-y-0.5">
-                      <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
+                      <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>
                         {formatBudgetScopeLabel(status.scope)}
                       </p>
-                      <p className="text-[11px]" style={{ color: "#6b7280" }}>
+                      <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
                         已用 {formatTokenCount(status.used_tokens)} / 上限 {formatTokenCount(status.limit_tokens)}
                       </p>
                     </div>
                     <StatusPill tone={resolveBudgetTone(status)} label={resolveBudgetLabel(status)} />
                   </div>
-                  <p className="mt-2 text-[10px]" style={{ color: "#4b5563" }}>
+                  <p className="mt-2 text-[10px]" style={{ color: "var(--text-tertiary)" }}>
                     告警阈值 {formatWarningThreshold(status.warning_threshold)}
                   </p>
                 </div>
@@ -94,58 +94,58 @@ export function EngineBillingPanel({
           </section>
 
           <section className="space-y-2">
-            <h3 className="text-[12px] font-medium" style={{ color: "#6b7280" }}>用途拆分</h3>
+            <h3 className="text-[12px] font-medium" style={{ color: "var(--text-tertiary)" }}>用途拆分</h3>
             {summary.usage_by_type.length > 0 ? (
               <div className="space-y-2">
                 {summary.usage_by_type.map((usage) => (
                   <div
                     key={usage.usage_type}
                     className="rounded p-3"
-                    style={{ background: "#111418", border: "1px solid #1f2328" }}
+                    style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
+                        <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>
                           {formatUsageTypeLabel(usage.usage_type)}
                         </p>
-                        <p className="text-[11px]" style={{ color: "#6b7280" }}>
+                        <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
                           {usage.call_count} 次调用，{formatTokenCount(usage.total_tokens)} tokens
                         </p>
                       </div>
-                      <p className="text-[12px] font-medium" style={{ color: "#e8b86d" }}>
+                      <p className="text-[12px] font-medium" style={{ color: "var(--accent-primary)" }}>
                         {formatUsdCost(usage.estimated_cost)}
                       </p>
                     </div>
-                    <p className="mt-2 text-[10px]" style={{ color: "#4b5563" }}>
+                    <p className="mt-2 text-[10px]" style={{ color: "var(--text-tertiary)" }}>
                       输入 {formatTokenCount(usage.input_tokens)} / 输出 {formatTokenCount(usage.output_tokens)}
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[11px]" style={{ color: "#6b7280" }}>暂无用量记录。</p>
+              <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>暂无用量记录。</p>
             )}
           </section>
         </div>
 
         <section className="space-y-2">
-          <h3 className="text-[12px] font-medium" style={{ color: "#6b7280" }}>调用明细</h3>
+          <h3 className="text-[12px] font-medium" style={{ color: "var(--text-tertiary)" }}>调用明细</h3>
           {usages.length > 0 ? (
             <div className="space-y-2">
               {usages.map((usage) => (
                 <div
                   key={usage.id}
                   className="rounded p-3"
-                  style={{ background: "#111418", border: "1px solid #1f2328" }}
+                  style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-1.5">
                       <StatusPill tone="active" label={formatUsageTypeLabel(usage.usage_type)} />
-                      <span className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
+                      <span className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>
                         {usage.model_name}
                       </span>
                     </div>
-                    <span className="text-[11px]" style={{ color: "#4b5563" }}>
+                    <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
                       {formatDateTime(usage.created_at)}
                     </span>
                   </div>
@@ -159,7 +159,7 @@ export function EngineBillingPanel({
               ))}
             </div>
           ) : (
-            <p className="text-[11px]" style={{ color: "#6b7280" }}>暂无调用记录。</p>
+            <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>暂无调用记录。</p>
           )}
         </section>
       </div>
@@ -169,33 +169,33 @@ export function EngineBillingPanel({
 
 function MetricItem({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="rounded p-3" style={{ background: "#111418", border: "1px solid #1f2328" }}>
-      <p className="text-[10px] mb-1" style={{ color: "#4b5563" }}>{label}</p>
-      <p className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>{value}</p>
-      {detail ? <p className="text-[10px] mt-0.5" style={{ color: "#4b5563" }}>{detail}</p> : null}
+    <div className="rounded p-3" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
+      <p className="text-[10px] mb-1" style={{ color: "var(--text-tertiary)" }}>{label}</p>
+      <p className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>{value}</p>
+      {detail ? <p className="text-[10px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>{detail}</p> : null}
     </div>
   );
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded p-2" style={{ background: "#1a1d23" }}>
-      <p className="text-[9px] mb-0.5" style={{ color: "#4b5563" }}>{label}</p>
-      <p className="text-[11px] font-medium" style={{ color: "#9ca3af" }}>{value}</p>
+    <div className="rounded p-2" style={{ background: "var(--bg-muted)" }}>
+      <p className="text-[9px] mb-0.5" style={{ color: "var(--text-tertiary)" }}>{label}</p>
+      <p className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>{value}</p>
     </div>
   );
 }
 
 function StatusPill({ tone, label }: { tone: string; label: string }) {
   const colors: Record<string, { bg: string; text: string }> = {
-    completed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
-    failed: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
-    warning: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
-    active: { bg: "rgba(232, 184, 109, 0.12)", text: "#e8b86d" },
-    outline: { bg: "#1f2328", text: "#9ca3af" },
-    draft: { bg: "#1f2328", text: "#6b7280" },
-    success: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
-    danger: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
+    completed: { bg: "var(--accent-success-soft)", text: "var(--accent-success)" },
+    failed: { bg: "var(--accent-danger-soft)", text: "var(--accent-danger)" },
+    warning: { bg: "var(--accent-warning-soft)", text: "var(--accent-warning)" },
+    active: { bg: "var(--accent-primary-soft)", text: "var(--accent-primary)" },
+    outline: { bg: "var(--line-soft)", text: "var(--text-secondary)" },
+    draft: { bg: "var(--line-soft)", text: "var(--text-tertiary)" },
+    success: { bg: "var(--accent-success-soft)", text: "var(--accent-success)" },
+    danger: { bg: "var(--accent-danger-soft)", text: "var(--accent-danger)" },
   };
   const c = colors[tone] || colors.outline;
   return (

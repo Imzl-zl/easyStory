@@ -24,42 +24,42 @@ export function ProjectDeleteConfirmDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.6)" }}
+      style={{ background: "var(--overlay-bg)" }}
       onClick={onClose}
     >
       <div
         className="w-full max-w-[380px] rounded-lg overflow-hidden"
-        style={{ background: "#111418", border: "1px solid #1f2328" }}
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="px-5 py-4" style={{ borderBottom: "1px solid #1f2328" }}>
-          <h2 className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--line-soft)" }}>
+          <h2 className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
             移入回收站
           </h2>
         </div>
         <div className="px-5 py-4 space-y-3">
           <div
             className="rounded-md px-3 py-2.5"
-            style={{ background: "#16191e", border: "1px solid #1f2328" }}
+            style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
           >
-            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
+            <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>
               {project.name}
             </p>
           </div>
-          <p className="text-[11px]" style={{ color: "#f59e0b" }}>
+          <p className="text-[11px]" style={{ color: "var(--accent-warning)" }}>
             项目会移入回收站并保留 30 天，期间可随时恢复。
           </p>
           {errorMessage ? (
-            <p className="rounded-md px-3 py-2 text-[11px]" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+            <p className="rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
               {errorMessage}
             </p>
           ) : null}
         </div>
-        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid #1f2328" }}>
+        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid var(--line-soft)" }}>
           <button
             className="h-8 px-4 rounded-md text-[12px] font-medium"
             disabled={isPending}
-            style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b" }}
+            style={{ background: "var(--accent-warning-soft)", color: "var(--accent-warning)" }}
             onClick={onConfirm}
             type="button"
           >
@@ -68,7 +68,7 @@ export function ProjectDeleteConfirmDialog({
           <button
             className="h-8 px-4 rounded-md text-[12px] font-medium"
             disabled={isPending}
-            style={{ background: "#1f2328", color: "#9ca3af", border: "1px solid #2d3139" }}
+            style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
             onClick={onClose}
             type="button"
           >
@@ -102,42 +102,42 @@ export function RecycleBinDeleteDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.6)" }}
+      style={{ background: "var(--overlay-bg)" }}
       onClick={onClose}
     >
       <div
         className="w-full max-w-[380px] rounded-lg overflow-hidden"
-        style={{ background: "#111418", border: "1px solid #1f2328" }}
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="px-5 py-4" style={{ borderBottom: "1px solid #1f2328" }}>
-          <h2 className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--line-soft)" }}>
+          <h2 className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
             彻底删除
           </h2>
         </div>
         <div className="px-5 py-4 space-y-3">
           <div
             className="rounded-md px-3 py-2.5"
-            style={{ background: "#16191e", border: "1px solid #1f2328" }}
+            style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
           >
-            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
+            <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>
               {project.name}
             </p>
           </div>
-          <p className="text-[11px]" style={{ color: "#ef4444" }}>
+          <p className="text-[11px]" style={{ color: "var(--accent-danger)" }}>
             删除后无法恢复，所有关联数据将一并清理。
           </p>
           {errorMessage ? (
-            <p className="rounded-md px-3 py-2 text-[11px]" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+            <p className="rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
               {errorMessage}
             </p>
           ) : null}
         </div>
-        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid #1f2328" }}>
+        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid var(--line-soft)" }}>
           <button
             className="h-8 px-4 rounded-md text-[12px] font-medium"
             disabled={isPending}
-            style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}
+            style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}
             onClick={onConfirm}
             type="button"
           >
@@ -146,7 +146,7 @@ export function RecycleBinDeleteDialog({
           <button
             className="h-8 px-4 rounded-md text-[12px] font-medium"
             disabled={isPending}
-            style={{ background: "#1f2328", color: "#9ca3af", border: "1px solid #2d3139" }}
+            style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
             onClick={onClose}
             type="button"
           >
@@ -178,37 +178,37 @@ export function RecycleBinClearDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.6)" }}
+      style={{ background: "var(--overlay-bg)" }}
       onClick={onClose}
     >
       <div
         className="w-full max-w-[380px] rounded-lg overflow-hidden"
-        style={{ background: "#111418", border: "1px solid #1f2328" }}
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="px-5 py-4" style={{ borderBottom: "1px solid #1f2328" }}>
-          <h2 className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--line-soft)" }}>
+          <h2 className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
             清空回收站
           </h2>
         </div>
         <div className="px-5 py-4 space-y-3">
           <div
             className="rounded-md px-3 py-2.5"
-            style={{ background: "#16191e", border: "1px solid #1f2328" }}
+            style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
           >
-            <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>
+            <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>
               {projectCount} 个项目
             </p>
           </div>
-          <p className="text-[11px]" style={{ color: "#ef4444" }}>
+          <p className="text-[11px]" style={{ color: "var(--accent-danger)" }}>
             此操作会一次性清空回收站中的全部项目，无法恢复。
           </p>
         </div>
-        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid #1f2328" }}>
+        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid var(--line-soft)" }}>
           <button
             className="h-8 px-4 rounded-md text-[12px] font-medium"
             disabled={isPending}
-            style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}
+            style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}
             onClick={onConfirm}
             type="button"
           >
@@ -217,7 +217,7 @@ export function RecycleBinClearDialog({
           <button
             className="h-8 px-4 rounded-md text-[12px] font-medium"
             disabled={isPending}
-            style={{ background: "#1f2328", color: "#9ca3af", border: "1px solid #2d3139" }}
+            style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
             onClick={onClose}
             type="button"
           >

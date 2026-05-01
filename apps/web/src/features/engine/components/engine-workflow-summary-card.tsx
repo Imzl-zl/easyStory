@@ -10,10 +10,10 @@ export function EngineWorkflowSummaryCard({
   summary,
 }: Readonly<EngineWorkflowSummaryCardProps>) {
   return (
-    <div className="rounded p-4" style={{ background: "#1a1d23", border: "1px solid #2a2f35" }}>
+    <div className="rounded p-4" style={{ background: "var(--bg-muted)", border: "1px solid var(--line-soft)" }}>
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>
+          <span className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>
             执行摘要
           </span>
           <span
@@ -21,26 +21,26 @@ export function EngineWorkflowSummaryCard({
             style={{
               background:
                 summary.statusTone === "completed"
-                  ? "rgba(34, 197, 94, 0.12)"
+                  ? "var(--accent-success-soft)"
                   : summary.statusTone === "failed"
-                    ? "rgba(220, 38, 38, 0.12)"
+                    ? "var(--accent-danger-soft)"
                     : summary.statusTone === "running"
-                      ? "rgba(232, 184, 109, 0.12)"
-                      : "#1f2328",
+                      ? "var(--accent-primary-soft)"
+                      : "var(--line-soft)",
               color:
                 summary.statusTone === "completed"
-                  ? "#4ade80"
+                  ? "var(--accent-success)"
                   : summary.statusTone === "failed"
-                    ? "#f87171"
+                    ? "var(--accent-danger)"
                     : summary.statusTone === "running"
-                      ? "#e8b86d"
-                      : "#9ca3af",
+                      ? "var(--accent-primary)"
+                      : "var(--text-secondary)",
             }}
           >
             {summary.statusLabel}
           </span>
         </div>
-        <p className="text-[12px]" style={{ color: "#e8e6e3" }}>
+        <p className="text-[12px]" style={{ color: "var(--text-primary)" }}>
           {summary.description}
         </p>
         <div className="grid grid-cols-2 gap-2">
@@ -48,12 +48,12 @@ export function EngineWorkflowSummaryCard({
             <div
               key={row.label}
               className="rounded p-2.5"
-              style={{ background: "#111418" }}
+              style={{ background: "var(--bg-canvas)" }}
             >
-              <p className="text-[10px] mb-0.5" style={{ color: "#4b5563" }}>
+              <p className="text-[10px] mb-0.5" style={{ color: "var(--text-tertiary)" }}>
                 {row.label}
               </p>
-              <p className="text-[12px] font-medium" style={{ color: "#9ca3af" }}>
+              <p className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>
                 {row.value}
               </p>
             </div>

@@ -73,7 +73,7 @@ export function CredentialAuditTimeline({
                   style={{ background: index === 0 ? "var(--accent-primary)" : "var(--text-tertiary)" }}
                 />
                 {index < (query.data?.length ?? 0) - 1 && (
-                  <div className="w-px flex-1 mt-1" style={{ background: "var(--line-soft)" }} />
+                  <div className="w-px flex-1 mt-1" style={{ background: "var(--bg-surface)" }} />
                 )}
               </div>
 
@@ -83,7 +83,7 @@ export function CredentialAuditTimeline({
                   <span className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>
                     {item.event_type}
                   </span>
-                  <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "var(--line-soft)", color: "var(--text-tertiary)" }}>
+                  <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "var(--bg-surface)", color: "var(--text-tertiary)" }}>
                     {item.entity_type}
                   </span>
                   <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>

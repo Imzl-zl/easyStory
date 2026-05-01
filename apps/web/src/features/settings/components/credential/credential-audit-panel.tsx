@@ -72,7 +72,7 @@ export function CredentialAuditPanel({ credentialId }: { credentialId: string | 
               <span className="text-[11px] font-medium truncate" style={{ color: "var(--text-primary)" }}>
                 {item.event_type}
               </span>
-              <span className="text-[9px] flex-shrink-0 px-1 py-0.5 rounded" style={{ background: "var(--line-soft)", color: "var(--text-tertiary)" }}>
+              <span className="text-[9px] flex-shrink-0 px-1 py-0.5 rounded" style={{ background: "var(--bg-surface)", color: "var(--text-tertiary)" }}>
                 {item.entity_type}
               </span>
             </div>

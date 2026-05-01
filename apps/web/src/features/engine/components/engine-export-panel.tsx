@@ -91,8 +91,8 @@ export function EngineExportPanel({
     >
       <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
         <div className="space-y-3">
-          <div className="rounded p-4" style={{ background: "#111418", border: "1px solid #1f2328" }}>
-            <h3 className="text-[12px] font-medium mb-3" style={{ color: "#6b7280" }}>导出前预检</h3>
+          <div className="rounded p-4" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
+            <h3 className="text-[12px] font-medium mb-3" style={{ color: "var(--text-tertiary)" }}>导出前预检</h3>
             {!workflowId ? (
               <EmptyState title="尚未载入工作流" description="请先载入工作流，再发起导出。" />
             ) : (
@@ -101,9 +101,9 @@ export function EngineExportPanel({
                   selectedFormats={selectedFormats}
                   onToggle={(value) => setSelectedFormats((current) => toggleExportFormat(current, value))}
                 />
-                {tasksQuery.isPending ? <p className="text-[11px]" style={{ color: "#6b7280" }}>正在检查章节状态...</p> : null}
+                {tasksQuery.isPending ? <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>正在检查章节状态...</p> : null}
                 {tasksQuery.error ? (
-                  <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+                  <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
                     {getErrorMessage(tasksQuery.error)}
                   </div>
                 ) : null}
@@ -115,7 +115,7 @@ export function EngineExportPanel({
                     {tasks.length === 0 ? (
                       <EmptyState title="当前没有章节计划" description="工作流尚未生成章节任务。" />
                     ) : precheck.blockingItems.length === 0 ? (
-                      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(34, 197, 94, 0.08)", color: "#4ade80" }}>
+                      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-success-soft)", color: "var(--accent-success)" }}>
                         当前章节任务已满足导出条件。
                         {precheck.warningItems.length > 0 ? "存在 warning，导出前请确认这些章节仍可接受。" : ""}
                       </div>
@@ -125,7 +125,7 @@ export function EngineExportPanel({
                 <div className="flex flex-wrap gap-2">
                   <button
                     className="px-4 py-2 rounded text-[12px] font-medium transition-all disabled:opacity-40"
-                    style={{ background: "#e8b86d", color: "#111418" }}
+                    style={{ background: "var(--accent-primary)", color: "var(--bg-canvas)" }}
                     disabled={Boolean(createDisabledReason) || createMutation.isPending}
                     onClick={() => createMutation.mutate()}
                     type="button"
@@ -134,7 +134,7 @@ export function EngineExportPanel({
                   </button>
                   <button
                     className="px-4 py-2 rounded text-[12px] font-medium transition-colors"
-                    style={{ background: "#1f2328", color: "#9ca3af" }}
+                    style={{ background: "var(--bg-surface)", color: "var(--text-secondary)" }}
                     onClick={onClose}
                     type="button"
                   >
@@ -142,43 +142,43 @@ export function EngineExportPanel({
                   </button>
                 </div>
                 {createDisabledReason ? (
-                  <p className="text-[11px]" style={{ color: "#fbbf24" }}>{createDisabledReason}</p>
+                  <p className="text-[11px]" style={{ color: "var(--accent-warning)" }}>{createDisabledReason}</p>
                 ) : null}
               </div>
             )}
           </div>
         </div>
 
-        <div className="rounded p-4" style={{ background: "#111418", border: "1px solid #1f2328" }}>
-          <h3 className="text-[12px] font-medium mb-3" style={{ color: "#6b7280" }}>项目导出历史</h3>
-          {exportsQuery.isPending ? <p className="text-[11px]" style={{ color: "#6b7280" }}>正在加载导出历史...</p> : null}
+        <div className="rounded p-4" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
+          <h3 className="text-[12px] font-medium mb-3" style={{ color: "var(--text-tertiary)" }}>项目导出历史</h3>
+          {exportsQuery.isPending ? <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>正在加载导出历史...</p> : null}
           {exportsQuery.error ? (
-            <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+            <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
               {getErrorMessage(exportsQuery.error)}
             </div>
           ) : null}
           {exports?.length ? (
             <div className="grid gap-2 grid-cols-2">
               {exports.map((item) => (
-                <article key={item.id} className="rounded p-3" style={{ background: "#1a1d23" }}>
+                <article key={item.id} className="rounded p-3" style={{ background: "var(--bg-muted)" }}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-0.5 min-w-0">
-                      <h4 className="break-all text-[12px] font-medium truncate" style={{ color: "#e8e6e3" }}>{item.filename}</h4>
-                      <p className="text-[10px]" style={{ color: "#4b5563" }}>
+                      <h4 className="break-all text-[12px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{item.filename}</h4>
+                      <p className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>
                         {formatExportTimestamp(item.created_at)}
                       </p>
                     </div>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: "rgba(34, 197, 94, 0.12)", color: "#4ade80" }}>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: "var(--accent-success-soft)", color: "var(--accent-success)" }}>
                       {item.format.toUpperCase()}
                     </span>
                   </div>
                   <div className="mt-2 space-y-0.5">
-                    <p className="text-[11px]" style={{ color: "#6b7280" }}>体积：{formatExportFileSize(item.file_size)}</p>
-                    <p className="text-[11px]" style={{ color: "#6b7280" }}>格式：{item.format}</p>
+                    <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>体积：{formatExportFileSize(item.file_size)}</p>
+                    <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>格式：{item.format}</p>
                   </div>
                   <button
                     className="w-full mt-2 px-3 py-1.5 rounded text-[11px] font-medium transition-colors"
-                    style={{ background: "#1f2328", color: "#9ca3af" }}
+                    style={{ background: "var(--bg-surface)", color: "var(--text-secondary)" }}
                     disabled={downloadMutation.isPending}
                     onClick={() => downloadMutation.mutate(item)}
                     type="button"
@@ -206,7 +206,7 @@ function FormatSelection({
 }>) {
   return (
     <div className="space-y-2">
-      <p className="text-[11px] font-medium" style={{ color: "#6b7280" }}>导出格式</p>
+      <p className="text-[11px] font-medium" style={{ color: "var(--text-tertiary)" }}>导出格式</p>
       <div className="flex flex-wrap gap-1.5">
         {DEFAULT_EXPORT_FORMATS.map((format) => {
           const selected = selectedFormats.includes(format);
@@ -215,8 +215,8 @@ function FormatSelection({
               aria-pressed={selected}
               className="px-3 py-1.5 rounded text-[11px] font-medium transition-all"
               style={{
-                background: selected ? "#e8b86d" : "#1f2328",
-                color: selected ? "#111418" : "#9ca3af",
+                background: selected ? "var(--accent-primary)" : "var(--line-soft)",
+                color: selected ? "var(--bg-canvas)" : "var(--text-secondary)",
               }}
               key={format}
               onClick={() => onToggle(format)}
@@ -248,20 +248,20 @@ function PrecheckGroup({
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <StatusPill tone={tone} label={title} />
-        <span className="text-[11px]" style={{ color: "#6b7280" }}>{items.length} 项</span>
+        <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>{items.length} 项</span>
       </div>
       <div className="space-y-1.5">
         {items.map((item) => (
           <div
             className="rounded p-2.5"
-            style={{ background: "#1a1d23" }}
+            style={{ background: "var(--bg-muted)" }}
             key={`${title}-${item.chapterNumber}-${item.title}`}
           >
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#1f2328", color: "#9ca3af" }}>第 {item.chapterNumber} 章</span>
-              <span className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>{item.title}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--bg-surface)", color: "var(--text-secondary)" }}>第 {item.chapterNumber} 章</span>
+              <span className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>{item.title}</span>
             </div>
-            <p className="mt-1 text-[11px]" style={{ color: "#6b7280" }}>{item.detail}</p>
+            <p className="mt-1 text-[11px]" style={{ color: "var(--text-tertiary)" }}>{item.detail}</p>
           </div>
         ))}
       </div>
@@ -271,12 +271,12 @@ function PrecheckGroup({
 
 function StatusPill({ tone, label }: { tone: string; label: string }) {
   const colors: Record<string, { bg: string; text: string }> = {
-    completed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
-    failed: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
-    warning: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
-    active: { bg: "rgba(232, 184, 109, 0.12)", text: "#e8b86d" },
-    outline: { bg: "#1f2328", text: "#9ca3af" },
-    draft: { bg: "#1f2328", text: "#6b7280" },
+    completed: { bg: "var(--accent-success-soft)", text: "var(--accent-success)" },
+    failed: { bg: "var(--accent-danger-soft)", text: "var(--accent-danger)" },
+    warning: { bg: "var(--accent-warning-soft)", text: "var(--accent-warning)" },
+    active: { bg: "var(--accent-primary-soft)", text: "var(--accent-primary)" },
+    outline: { bg: "var(--line-soft)", text: "var(--text-secondary)" },
+    draft: { bg: "var(--line-soft)", text: "var(--text-tertiary)" },
   };
   const c = colors[tone] || colors.outline;
   return (

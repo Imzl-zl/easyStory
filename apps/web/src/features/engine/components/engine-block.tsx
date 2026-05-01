@@ -9,7 +9,7 @@ export function EngineBlock({
 }>) {
   return (
     <div className="space-y-3">
-      <h2 className="text-[13px] font-semibold" style={{ color: "#9ca3af" }}>
+      <h2 className="text-[13px] font-semibold" style={{ color: "var(--text-secondary)" }}>
         {title}
       </h2>
       {children}

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
+import { PageEntrance } from "@/components/ui/page-entrance";
 import { showAppNotice } from "@/components/ui/app-notice";
 import { getErrorMessage } from "@/lib/api/client";
 import { createAnalysis, deleteAnalysis, getAnalysis, listAnalyses } from "@/lib/api/analysis";
@@ -148,24 +149,26 @@ export function LabPage({ projectId }: Readonly<LabPageProps>) {
   };
 
   return (
-    <div className="h-full flex flex-col" style={{ background: "#111418" }}>
-      {/* Header */}
-      <header className="px-6 pt-6 pb-4 flex-shrink-0" style={{ borderBottom: "1px solid #1f2328" }}>
+    <div className="h-full" style={{ background: "var(--bg-canvas)" }}>
+      <PageEntrance>
+        <div className="h-full flex flex-col">
+          {/* Header */}
+      <header className="px-6 pt-6 pb-4 flex-shrink-0" style={{ borderBottom: "1px solid var(--line-soft)" }}>
         <div className="flex items-end justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#e8b86d" }} />
-              <span className="text-[10px] font-semibold tracking-[0.15em] uppercase" style={{ color: "#e8b86d" }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--accent-primary)" }} />
+              <span className="text-[10px] font-semibold tracking-[0.15em] uppercase" style={{ color: "var(--accent-primary)" }}>
                 分析实验室
               </span>
             </div>
-            <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: "#e8e6e3" }}>
+            <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
               项目洞察
             </h1>
           </div>
           <button
             className="px-4 py-2 rounded text-[12px] font-medium transition-all disabled:opacity-40"
-            style={{ background: "#e8b86d", color: "#111418" }}
+            style={{ background: "var(--accent-primary)", color: "var(--bg-canvas)" }}
             disabled={isPending || createMutation.isPending}
             onClick={handleStartCreate}
             type="button"
@@ -211,14 +214,14 @@ export function LabPage({ projectId }: Readonly<LabPageProps>) {
 
       {/* Delete Dialog */}
       {deleteTarget ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}>
-          <div className="rounded p-5 w-full max-w-sm" style={{ background: "#1a1d23", border: "1px solid #2a2f35" }}>
-            <h3 className="text-[14px] font-semibold mb-2" style={{ color: "#e8e6e3" }}>删除洞察</h3>
-            <p className="text-[12px] mb-4" style={{ color: "#9ca3af" }}>确定要删除这条洞察记录吗？此操作不可撤销。</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "var(--overlay-bg)" }}>
+          <div className="rounded p-5 w-full max-w-sm" style={{ background: "var(--bg-muted)", border: "1px solid var(--line-soft)" }}>
+            <h3 className="text-[14px] font-semibold mb-2" style={{ color: "var(--text-primary)" }}>删除洞察</h3>
+            <p className="text-[12px] mb-4" style={{ color: "var(--text-secondary)" }}>确定要删除这条洞察记录吗？此操作不可撤销。</p>
             <div className="flex gap-2 justify-end">
               <button
                 className="px-3 py-1.5 rounded text-[12px] font-medium transition-colors"
-                style={{ background: "#1f2328", color: "#9ca3af" }}
+                style={{ background: "var(--bg-surface)", color: "var(--text-secondary)" }}
                 onClick={handleCancelDelete}
                 type="button"
               >
@@ -226,7 +229,7 @@ export function LabPage({ projectId }: Readonly<LabPageProps>) {
               </button>
               <button
                 className="px-3 py-1.5 rounded text-[12px] font-medium transition-all disabled:opacity-40"
-                style={{ background: "rgba(220, 38, 38, 0.12)", color: "#f87171", border: "1px solid rgba(220, 38, 38, 0.2)" }}
+                style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)", border: "1px solid var(--accent-danger-muted)" }}
                 disabled={deleteMutation.isPending}
                 onClick={handleConfirmDelete}
                 type="button"
@@ -237,6 +240,8 @@ export function LabPage({ projectId }: Readonly<LabPageProps>) {
           </div>
         </div>
       ) : null}
+        </div>
+    </PageEntrance>
     </div>
   );
 }

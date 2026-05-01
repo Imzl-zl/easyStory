@@ -198,7 +198,7 @@ export function AssistantPreferencesForm({
             const resetControl = resolvePreferencesReasoningControl(resetDraft, inheritedPreferences, providerOptions);
             setDraft(normalizeAssistantPreferencesDraft(resetDraft, resetControl));
           }}
-          style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+          style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
           type="button"
         >
           还原

@@ -82,7 +82,7 @@ export function CredentialHealthPanel({
           <div className="flex items-center gap-2">
             <button
               className="h-7 px-3 rounded text-[11px] font-medium"
-              style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+              style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
               onClick={() => onEdit(credential.id)}
               disabled={isPending}
             >
@@ -200,7 +200,7 @@ function LinkageRow({
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <button
           className="h-6 px-2 rounded text-[10px] font-medium"
-          style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+          style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
           onClick={onVerifyConnection}
           disabled={isPending}
         >
@@ -208,7 +208,7 @@ function LinkageRow({
         </button>
         <button
           className="h-6 px-2 rounded text-[10px] font-medium"
-          style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+          style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
           onClick={onVerifyTools}
           disabled={isPending}
         >

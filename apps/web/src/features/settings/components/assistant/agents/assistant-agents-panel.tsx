@@ -201,7 +201,7 @@ export function AssistantAgentsPanel({ onDirtyChange }: Readonly<AssistantAgents
 
       {/* Editor Modal */}
       {editorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "var(--overlay-bg)" }}>
           <div className="w-full max-w-[800px] max-h-[90vh] overflow-hidden rounded-lg flex flex-col" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
             {/* Modal Header */}
             <div className="px-5 py-4 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--line-soft)" }}>
@@ -215,7 +215,7 @@ export function AssistantAgentsPanel({ onDirtyChange }: Readonly<AssistantAgents
               </div>
               <button
                 className="w-7 h-7 rounded-md flex items-center justify-center"
-                style={{ background: "var(--line-soft)", color: "var(--text-secondary)" }}
+                style={{ background: "var(--bg-surface)", color: "var(--text-secondary)" }}
                 onClick={handleCloseEditor}
                 type="button"
               >
@@ -325,7 +325,7 @@ function AgentCard({
       <div className="flex gap-2 mt-3">
         <button
           className="h-7 px-3 rounded text-[11px] font-medium"
-          style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+          style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
           onClick={onEdit}
           type="button"
         >

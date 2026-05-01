@@ -18,7 +18,7 @@ export function CredentialDeleteConfirmDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.6)" }}
+      style={{ background: "var(--overlay-bg)" }}
       onClick={onClose}
     >
       <div
@@ -67,7 +67,7 @@ export function CredentialDeleteConfirmDialog({
           </button>
           <button
             className="h-8 px-4 rounded-md text-[12px] font-medium"
-            style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+            style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
             onClick={onClose}
             type="button"
           >

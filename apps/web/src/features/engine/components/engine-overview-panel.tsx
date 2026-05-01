@@ -66,10 +66,10 @@ export function EngineOverviewPanel({
 
 function MetricItem({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="rounded p-3" style={{ background: "#111418", border: "1px solid #1f2328" }}>
-      <p className="text-[10px] mb-1" style={{ color: "#4b5563" }}>{label}</p>
-      <p className="text-[14px] font-semibold" style={{ color: "#e8e6e3" }}>{value}</p>
-      {detail ? <p className="text-[10px] mt-0.5" style={{ color: "#4b5563" }}>{detail}</p> : null}
+    <div className="rounded p-3" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
+      <p className="text-[10px] mb-1" style={{ color: "var(--text-tertiary)" }}>{label}</p>
+      <p className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>{value}</p>
+      {detail ? <p className="text-[10px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>{detail}</p> : null}
     </div>
   );
 }
@@ -83,7 +83,7 @@ function TimelineSection({
 }>) {
   return (
     <section className="space-y-2">
-      <h3 className="text-[12px] font-medium" style={{ color: "#6b7280" }}>节点时间线</h3>
+      <h3 className="text-[12px] font-medium" style={{ color: "var(--text-tertiary)" }}>节点时间线</h3>
       <div className="space-y-2">
         {overview.timeline.map((item, index) => (
           <TimelineItem
@@ -117,10 +117,10 @@ function TimelineItem({
           style={{ background: resolveTimelineDotColor(item.statusTone) }}
         />
         {!isLast ? (
-          <span className="mt-1.5 w-px flex-1" style={{ background: "#2a2f35" }} />
+          <span className="mt-1.5 w-px flex-1" style={{ background: "var(--bg-muted)" }} />
         ) : null}
       </div>
-      <div className="flex-1 rounded p-3 mb-2" style={{ background: "#111418", border: "1px solid #1f2328" }}>
+      <div className="flex-1 rounded p-3 mb-2" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}>
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1.5 min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
@@ -130,29 +130,29 @@ function TimelineItem({
               ))}
             </div>
             <div>
-              <p className="text-[12px] font-medium" style={{ color: "#e8e6e3" }}>{item.title}</p>
-              <p className="text-[11px]" style={{ color: "#6b7280" }}>{item.subtitle}</p>
+              <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>{item.title}</p>
+              <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>{item.subtitle}</p>
             </div>
           </div>
-          <p className="text-[11px] flex-shrink-0" style={{ color: "#4b5563" }}>
+          <p className="text-[11px] flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
             {item.timeDetail}
           </p>
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed" style={{ color: "#6b7280" }}>{item.detail}</p>
+        <p className="mt-2 text-[11px] leading-relaxed" style={{ color: "var(--text-tertiary)" }}>{item.detail}</p>
         {latestExecutionId && onOpenReplayExecution ? (
           <div className="mt-2">
             <button
               className="px-3 py-1.5 rounded text-[11px] font-medium transition-colors"
-              style={{ background: "#1f2328", color: "#9ca3af" }}
+              style={{ background: "var(--bg-surface)", color: "var(--text-secondary)" }}
               onClick={() => onOpenReplayExecution(latestExecutionId)}
               type="button"
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#2a2f35";
-                e.currentTarget.style.color = "#e8e6e3";
+                e.currentTarget.style.background = "var(--bg-muted)";
+                e.currentTarget.style.color = "var(--text-primary)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#1f2328";
-                e.currentTarget.style.color = "#9ca3af";
+                e.currentTarget.style.background = "var(--bg-surface)";
+                e.currentTarget.style.color = "var(--text-secondary)";
               }}
             >
               查看 Prompt 回放
@@ -160,7 +160,7 @@ function TimelineItem({
           </div>
         ) : null}
         {item.errorMessage ? (
-          <div className="mt-2 rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+          <div className="mt-2 rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
             {item.errorMessage}
           </div>
         ) : null}
@@ -171,13 +171,13 @@ function TimelineItem({
 
 function StatusPill({ tone, label }: { tone: string; label: string }) {
   const colors: Record<string, { bg: string; text: string }> = {
-    completed: { bg: "rgba(34, 197, 94, 0.12)", text: "#4ade80" },
-    failed: { bg: "rgba(220, 38, 38, 0.12)", text: "#f87171" },
-    warning: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
-    stale: { bg: "rgba(234, 179, 8, 0.12)", text: "#fbbf24" },
-    active: { bg: "rgba(232, 184, 109, 0.12)", text: "#e8b86d" },
-    outline: { bg: "#1f2328", text: "#9ca3af" },
-    draft: { bg: "#1f2328", text: "#6b7280" },
+    completed: { bg: "var(--accent-success-soft)", text: "var(--accent-success)" },
+    failed: { bg: "var(--accent-danger-soft)", text: "var(--accent-danger)" },
+    warning: { bg: "var(--accent-warning-soft)", text: "var(--accent-warning)" },
+    stale: { bg: "var(--accent-warning-soft)", text: "var(--accent-warning)" },
+    active: { bg: "var(--accent-primary-soft)", text: "var(--accent-primary)" },
+    outline: { bg: "var(--line-soft)", text: "var(--text-secondary)" },
+    draft: { bg: "var(--line-soft)", text: "var(--text-tertiary)" },
   };
   const c = colors[tone] || colors.outline;
   return (
@@ -199,27 +199,27 @@ function FeedbackMessage({
 }>) {
   if (tone === "danger") {
     return (
-      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "rgba(220, 38, 38, 0.08)", color: "#f87171" }}>
+      <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
         {message}
       </div>
     );
   }
 
-  return <div className="rounded px-3 py-2 text-[11px]" style={{ background: "#1f2328", color: "#6b7280" }}>{message}</div>;
+  return <div className="rounded px-3 py-2 text-[11px]" style={{ background: "var(--bg-surface)", color: "var(--text-tertiary)" }}>{message}</div>;
 }
 
 function resolveTimelineDotColor(status: EngineOverviewTimelineItem["statusTone"]): string {
   switch (status) {
     case "completed":
-      return "#22c55e";
+      return "var(--accent-success)";
     case "failed":
-      return "#dc2626";
+      return "var(--accent-danger)";
     case "warning":
     case "stale":
-      return "#eab308";
+      return "var(--accent-warning)";
     case "active":
-      return "#e8b86d";
+      return "var(--accent-primary)";
     default:
-      return "#6b7280";
+      return "var(--text-tertiary)";
   }
 }
