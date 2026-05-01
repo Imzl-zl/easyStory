@@ -54,35 +54,53 @@ export function CredentialCenterContent({
   onSubmitCreate,
   onSubmitUpdate,
 }: Readonly<CredentialCenterContentProps>) {
+  const listItems = credentials
+    ? credentials.map((c) => ({
+        id: c.id,
+        name: c.display_name,
+        provider: c.provider,
+        dialect: (c as any).dialect ?? c.provider,
+        model: c.default_model,
+        isActive: c.is_active,
+        isSelected:
+          mode === "audit"
+            ? c.id === activeAuditCredentialId
+            : c.id === (editableCredential?.id ?? null),
+        overrideInfo: overrideInfoByCredentialId[c.id],
+        streamStatus: resolveStreamStatus(c),
+        bufferedStatus: resolveBufferedStatus(c),
+      }))
+    : [];
+
   if (credentials && credentials.length > 0) {
     return (
-      <div className="space-y-4">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.92fr)]">
+      <div className="flex gap-5">
+        {/* List Panel */}
+        <div className="flex-1 min-w-0">
           <CredentialCenterList
-            activeCredentialId={mode === "audit" ? activeAuditCredentialId : editableCredential?.id ?? null}
-            credentials={credentials}
+            items={listItems}
             isPending={isFormPending}
-            mode={mode}
-            overrideInfoByCredentialId={overrideInfoByCredentialId}
-            pendingAction={pendingAction}
             onAction={onAction}
-            onStartCreate={onStartCreate}
-            onSelectCredential={onSelectCredential ? (credentialId) => onSelectCredential(credentialId) : undefined}
-            onSelectCredentialForEdit={
-              onSelectCredentialForEdit ? (credentialId) => onSelectCredentialForEdit(credentialId) : undefined
-            }
+            onEdit={(id) => onSelectCredentialForEdit?.(id)}
+            onSelect={(id) => onSelectCredential?.(id)}
+            pendingAction={pendingAction}
           />
+        </div>
+
+        {/* Side Panel */}
+        <div className="w-[380px] flex-shrink-0">
           {mode === "audit" ? (
             <CredentialAuditPanel credentialId={activeAuditCredentialId} />
           ) : shouldShowEditLoadingState ? (
-            <div className="panel-muted px-4 py-4 text-[13px] leading-6 text-text-secondary">正在加载连接详情…</div>
+            <div className="rounded-lg px-4 py-5 text-[13px]" style={{ background: "var(--bg-canvas)", color: "var(--text-tertiary)", border: "1px solid var(--line-soft)" }}>
+              正在加载连接详情…
+            </div>
           ) : (
             <CredentialCenterForm
               key={activeFormKey}
               credential={editableCredential}
               feedback={null}
               initialState={activeInitialState}
-              layout="split"
               mode={editableCredential ? "edit" : "create"}
               isPending={isFormPending}
               onDirtyChange={onDirtyChange}
@@ -100,23 +118,60 @@ export function CredentialCenterContent({
       </div>
     );
   }
+
   if (mode === "audit") {
-    return <EmptyState title="暂无模型连接" description="创建模型连接后可查看操作记录。" />;
+    return (
+      <div className="rounded-lg px-6 py-8 text-center" style={{ background: "var(--bg-canvas)", border: "1px dashed var(--line-medium)" }}>
+        <p className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>暂无模型连接</p>
+        <p className="mt-1 text-[11px]" style={{ color: "var(--text-tertiary)" }}>创建模型连接后可查看操作记录。</p>
+      </div>
+    );
   }
+
   if (shouldShowEditLoadingState) {
-    return <div className="panel-muted px-4 py-4 text-[13px] leading-6 text-text-secondary">正在加载连接详情…</div>;
+    return (
+      <div className="rounded-lg px-4 py-5 text-[13px]" style={{ background: "var(--bg-canvas)", color: "var(--text-tertiary)", border: "1px solid var(--line-soft)" }}>
+        正在加载连接详情…
+      </div>
+    );
   }
+
   return (
-    <CredentialCenterForm
-      key={activeFormKey}
-      credential={null}
-      feedback={null}
-      initialState={createInitialCredentialForm()}
-      layout="full"
-      mode="create"
-      isPending={isFormPending}
-      onDirtyChange={onDirtyChange}
-      onSubmit={onSubmitCreate}
-    />
+    <div className="flex gap-5">
+      <div className="flex-1">
+        <div className="rounded-lg px-6 py-8 text-center" style={{ background: "var(--bg-canvas)", border: "1px dashed var(--line-medium)" }}>
+          <p className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>还没有模型连接</p>
+          <p className="mt-1 text-[11px]" style={{ color: "var(--text-tertiary)" }}>在右侧表单中添加你的第一个连接</p>
+        </div>
+      </div>
+      <div className="w-[380px] flex-shrink-0">
+        <CredentialCenterForm
+          key={activeFormKey}
+          credential={null}
+          feedback={null}
+          initialState={createInitialCredentialForm()}
+          mode="create"
+          isPending={isFormPending}
+          onDirtyChange={onDirtyChange}
+          onSubmit={onSubmitCreate}
+        />
+      </div>
+    </div>
   );
+}
+
+function resolveStreamStatus(c: CredentialView): "ok" | "warning" | "error" | "unknown" {
+  const s = (c as any).capabilities?.stream;
+  if (!s) return "unknown";
+  if (s.connection_verified && s.tools_verified) return "ok";
+  if (s.connection_verified || s.tools_verified) return "warning";
+  return "error";
+}
+
+function resolveBufferedStatus(c: CredentialView): "ok" | "warning" | "error" | "unknown" {
+  const s = (c as any).capabilities?.buffered;
+  if (!s) return "unknown";
+  if (s.connection_verified && s.tools_verified) return "ok";
+  if (s.connection_verified || s.tools_verified) return "warning";
+  return "error";
 }

@@ -19,30 +19,26 @@ export function CredentialScopeTabs({
   onScopeChange?: (scope: CredentialCenterScope) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      <button
-        className="ink-tab"
-        data-active={scope === "user"}
-        disabled={isPending}
-        onClick={() => onScopeChange?.("user")}
-        type="button"
-      >
-        全局连接
-      </button>
-      <button
-        className="ink-tab"
-        data-active={scope === "project"}
-        disabled={!canUseProjectScope || isPending}
-        onClick={() => onScopeChange?.("project")}
-        type="button"
-      >
-        当前项目连接
-      </button>
-      {!canUseProjectScope ? (
-        <p className="text-sm text-text-secondary">当前没有项目上下文，只能管理全局连接。</p>
-      ) : projectId ? (
-        <p className="text-sm text-text-secondary">项目上下文：{projectId}</p>
-      ) : null}
+    <div className="flex gap-0.5">
+      {[
+        { value: "user" as const, label: "全局" },
+        { value: "project" as const, label: "项目" },
+      ].map((item) => (
+        <button
+          key={item.value}
+          className="px-3 py-1.5 rounded-md text-[11px] font-medium transition-all"
+          data-active={scope === item.value}
+          disabled={item.value === "project" && !canUseProjectScope || isPending}
+          onClick={() => onScopeChange?.(item.value)}
+          style={{
+            background: scope === item.value ? "var(--bg-elevated)" : "transparent",
+            color: scope === item.value ? "var(--text-primary)" : "var(--text-tertiary)",
+          }}
+          type="button"
+        >
+          {item.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -57,20 +53,24 @@ export function CredentialModeTabs({
   onModeChange?: (mode: CredentialCenterMode) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex gap-0.5">
       {[
-        ["list", "连接列表"],
-        ["audit", "审计日志"],
-      ].map(([value, label]) => (
+        { value: "list" as const, label: "列表" },
+        { value: "audit" as const, label: "审计" },
+      ].map((item) => (
         <button
-          key={value}
-          className="ink-tab"
-          data-active={mode === value}
+          key={item.value}
+          className="px-3 py-1.5 rounded-md text-[11px] font-medium transition-all"
+          data-active={mode === item.value}
           disabled={isPending}
-          onClick={() => onModeChange?.(value as CredentialCenterMode)}
+          onClick={() => onModeChange?.(item.value)}
+          style={{
+            background: mode === item.value ? "var(--bg-elevated)" : "transparent",
+            color: mode === item.value ? "var(--text-primary)" : "var(--text-tertiary)",
+          }}
           type="button"
         >
-          {label}
+          {item.label}
         </button>
       ))}
     </div>

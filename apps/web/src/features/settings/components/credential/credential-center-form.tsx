@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState } from "react";
 
 import { CredentialClientIdentityFields } from "@/features/settings/components/credential/credential-center-client-identity-fields";
 import { CredentialCompatibilityPanel } from "@/features/settings/components/credential/credential-center-compatibility-panel";
@@ -21,7 +21,6 @@ type CredentialCenterFormMode = "create" | "edit";
 type CredentialCenterFormProps = {
   mode: CredentialCenterFormMode;
   initialState?: CredentialFormState;
-  layout?: "full" | "split";
   feedback: CredentialCenterFeedback;
   credential?: CredentialView | null;
   isPending: boolean;
@@ -33,7 +32,6 @@ type CredentialCenterFormProps = {
 export function CredentialCenterForm({
   mode,
   initialState = createInitialCredentialForm(),
-  layout = "split",
   feedback,
   credential = null,
   isPending,
@@ -51,200 +49,149 @@ export function CredentialCenterForm({
 
   return (
     <form
-      className="panel-muted space-y-4 p-4 sm:p-5"
+      className="rounded-lg"
+      style={{
+        background: "var(--bg-canvas)",
+        border: "1px solid var(--line-soft)",
+      }}
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit(formState);
       }}
     >
-      <FormIntro mode={mode} />
-      <BasicFields formState={formState} layout={layout} mode={mode} setFormState={setFormState} />
-      <ClientIdentityPanel formState={formState} layout={layout} setFormState={setFormState} />
-      <CredentialCompatibilityPanel formState={formState} layout={layout} setFormState={setFormState} />
-      <FeedbackNotice feedback={feedback} />
-      <FormActions isDirty={isDirty} isPending={isPending} mode={mode} onReset={onReset} />
+      {/* Form Header */}
+      <div className="px-4 pt-4 pb-3" style={{ borderBottom: "1px solid var(--line-soft)" }}>
+        <h3 className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+          {mode === "edit" ? "修改连接" : "添加连接"}
+        </h3>
+        <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+          {mode === "edit" ? "更新这条模型连接的设置" : "配置新的模型 API 连接"}
+        </p>
+      </div>
+
+      <div className="px-4 py-4 space-y-5">
+        {/* Basic Fields */}
+        <div className="space-y-3">
+          <SectionLabel>基本信息</SectionLabel>
+          {mode === "create" ? (
+            <FieldInput
+              autoComplete="off"
+              description="建议用英文或拼音，例如 openai-main"
+              label="连接代号"
+              name="provider"
+              placeholder="例如：openai-main"
+              required
+              value={formState.provider}
+              onChange={(value) => setFormState((c) => ({ ...c, provider: value }))}
+            />
+          ) : (
+            <StaticField description="连接代号创建后不可修改" label="连接代号" value={formState.provider} />
+          )}
+          <CredentialSelectField
+            label="服务类型"
+            options={API_DIALECT_SELECT_OPTIONS}
+            value={formState.apiDialect}
+            onChange={(value) => setFormState((c) => updateApiDialectState(c, value as CredentialApiDialect))}
+          />
+          <FieldInput
+            autoComplete="off"
+            label="显示名称"
+            name="displayName"
+            placeholder="例如：薄荷 Gemini"
+            required
+            value={formState.displayName}
+            onChange={(value) => setFormState((c) => ({ ...c, displayName: value }))}
+          />
+          <FieldInput
+            autoComplete="new-password"
+            label="访问密钥"
+            name="apiKey"
+            placeholder={mode === "edit" ? "留空表示不修改" : undefined}
+            required={mode === "create"}
+            type="password"
+            value={formState.apiKey}
+            onChange={(value) => setFormState((c) => ({ ...c, apiKey: value }))}
+          />
+          <FieldInput
+            autoComplete="url"
+            label="服务地址"
+            name="baseUrl"
+            placeholder="https://api.openai.com"
+            type="url"
+            value={formState.baseUrl}
+            onChange={(value) => setFormState((c) => ({ ...c, baseUrl: value }))}
+          />
+          <FieldInput
+            autoComplete="off"
+            label="默认模型"
+            name="defaultModel"
+            placeholder="例如：gpt-4.1 / gemini-2.5-pro"
+            required
+            value={formState.defaultModel}
+            onChange={(value) => setFormState((c) => ({ ...c, defaultModel: value }))}
+          />
+          <CredentialTokenFields formState={formState} setFormState={setFormState} />
+        </div>
+
+        {/* Client Identity */}
+        <div className="space-y-2">
+          <SectionLabel>客户端标识</SectionLabel>
+          <p className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>
+            某些中转站会按客户端标识分流，需要伪装时在此设置
+          </p>
+          <CredentialClientIdentityFields formState={formState} setFormState={setFormState} />
+        </div>
+
+        {/* Compatibility */}
+        <CredentialCompatibilityPanel formState={formState} layout="full" setFormState={setFormState} />
+
+        {/* Feedback */}
+        {feedback?.message ? (
+          <div
+            className="rounded-md px-3 py-2 text-[11px]"
+            style={{
+              background: feedback.tone === "danger" ? "var(--accent-danger-soft)" : "var(--accent-info-soft)",
+              color: feedback.tone === "danger" ? "var(--accent-danger)" : "var(--accent-info)",
+            }}
+          >
+            {feedback.message}
+          </div>
+        ) : null}
+
+        {/* Actions */}
+        <div className="flex gap-2 pt-1">
+          <button
+            className="flex-1 h-8 rounded-md text-[12px] font-medium transition-colors"
+            disabled={isPending || !isDirty}
+            style={{
+              background: isDirty ? "var(--accent-primary)" : "var(--bg-surface)",
+              color: isDirty ? "var(--text-on-accent)" : "var(--text-tertiary)",
+            }}
+            type="submit"
+          >
+            {isPending ? "提交中…" : mode === "edit" ? "保存修改" : "添加连接"}
+          </button>
+          {mode === "edit" && onReset ? (
+            <button
+              className="h-8 px-3 rounded-md text-[12px] font-medium"
+              disabled={isPending}
+              onClick={onReset}
+              style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+              type="button"
+            >
+              新建
+            </button>
+          ) : null}
+        </div>
+      </div>
     </form>
   );
 }
 
-function FormIntro({ mode }: { mode: CredentialCenterFormMode }) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
-      <h3 className="text-[1.02rem] font-semibold text-text-primary">
-        {mode === "edit" ? "修改模型连接" : "添加模型连接"}
-      </h3>
-      <p className="text-[13px] leading-6 text-text-secondary">
-        填好下面几项就能保存一条连接。以后想再接别的模型，继续添加新的连接即可。
-      </p>
-    </div>
-  );
-}
-
-function BasicFields({
-  formState,
-  layout,
-  mode,
-  setFormState,
-}: {
-  formState: CredentialFormState;
-  layout: CredentialCenterFormProps["layout"];
-  mode: CredentialCenterFormMode;
-  setFormState: Dispatch<SetStateAction<CredentialFormState>>;
-}) {
-  const fieldClassName = layout === "full" ? "xl:col-span-1" : undefined;
-
-  return (
-    <div className={layout === "full" ? "grid gap-4 xl:grid-cols-2" : "grid gap-4"}>
-      {mode === "create" ? (
-        <FieldInput
-          autoComplete="off"
-          className={fieldClassName}
-          description="用于区分不同连接，建议填英文、拼音或短横线，例如 openai-main。"
-          label="连接代号"
-          name="provider"
-          placeholder="例如：openai-main"
-          required
-          value={formState.provider}
-          onChange={(value) => setFormState((current) => ({ ...current, provider: value }))}
-        />
-      ) : (
-        <StaticField
-          className={fieldClassName}
-          description="连接代号创建后不能修改。"
-          label="连接代号"
-          value={formState.provider}
-        />
-      )}
-      <CredentialSelectField
-        className={fieldClassName}
-        label="服务类型"
-        options={API_DIALECT_SELECT_OPTIONS}
-        value={formState.apiDialect}
-        onChange={(value) =>
-          setFormState((current) => updateApiDialectState(current, value as CredentialApiDialect))
-        }
-      />
-      <FieldInput
-        autoComplete="off"
-        className={fieldClassName}
-        label="显示名称"
-        name="displayName"
-        placeholder="例如：薄荷 Gemini"
-        required
-        value={formState.displayName}
-        onChange={(value) => setFormState((current) => ({ ...current, displayName: value }))}
-      />
-      <FieldInput
-        autoComplete="new-password"
-        className={fieldClassName}
-        label="访问密钥"
-        name="apiKey"
-        placeholder={mode === "edit" ? "留空表示继续使用当前访问密钥" : undefined}
-        required={mode === "create"}
-        type="password"
-        value={formState.apiKey}
-        onChange={(value) => setFormState((current) => ({ ...current, apiKey: value }))}
-      />
-      <FieldInput
-        autoComplete="url"
-        className={fieldClassName}
-        label="服务地址"
-        name="baseUrl"
-        placeholder="https://api.openai.com"
-        type="url"
-        value={formState.baseUrl}
-        onChange={(value) => setFormState((current) => ({ ...current, baseUrl: value }))}
-      />
-      <FieldInput
-        autoComplete="off"
-        className={fieldClassName}
-        label="默认模型"
-        name="defaultModel"
-        placeholder="例如：gpt-4.1 / gemini-2.5-pro"
-        required
-        value={formState.defaultModel}
-        onChange={(value) => setFormState((current) => ({ ...current, defaultModel: value }))}
-      />
-      <CredentialTokenFields
-        className={fieldClassName}
-        formState={formState}
-        setFormState={setFormState}
-      />
-    </div>
-  );
-}
-
-function ClientIdentityPanel({
-  formState,
-  layout,
-  setFormState,
-}: {
-  formState: CredentialFormState;
-  layout: CredentialCenterFormProps["layout"];
-  setFormState: Dispatch<SetStateAction<CredentialFormState>>;
-}) {
-  const fieldClassName = layout === "full" ? "xl:col-span-1" : undefined;
-  const descriptionClassName = layout === "full" ? "xl:col-span-2" : undefined;
-
-  return (
-    <section className="rounded-2xl bg-muted shadow-sm p-4">
-      <div className="space-y-1">
-        <h4 className="text-[13px] font-medium leading-5 text-text-primary">客户端标识</h4>
-        <p className="text-[12px] leading-5 text-text-secondary">
-          某些中转站会按客户端标识分流。需要伪装成 Codex CLI、Claude Code、Gemini CLI 或浏览器时，优先在这里设置。
-        </p>
-      </div>
-      <div className={layout === "full" ? "mt-4 grid gap-4 xl:grid-cols-2" : "mt-4 grid gap-4"}>
-        <CredentialClientIdentityFields
-          className={fieldClassName}
-          descriptionClassName={descriptionClassName}
-          formState={formState}
-          setFormState={setFormState}
-        />
-      </div>
-    </section>
-  );
-}
-
-function FeedbackNotice({ feedback }: { feedback: CredentialCenterFeedback }) {
-  if (!feedback?.message) {
-    return null;
-  }
-  return (
-    <div
-      className={
-        feedback.tone === "danger"
-          ? "rounded-2xl bg-accent-danger/10 px-3.5 py-2.5 text-[13px] leading-5 text-accent-danger"
-          : "callout-info px-3.5 py-2.5 text-[13px] leading-5 text-accent-info"
-      }
-      data-tone={feedback.tone}
-    >
-      {feedback.message}
-    </div>
-  );
-}
-
-function FormActions({
-  isDirty,
-  isPending,
-  mode,
-  onReset,
-}: {
-  isDirty: boolean;
-  isPending: boolean;
-  mode: CredentialCenterFormMode;
-  onReset?: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-3 pt-1">
-      <button className="ink-button min-w-[140px] flex-1" disabled={isPending || !isDirty} type="submit">
-        {isPending ? "提交中…" : mode === "edit" ? "保存修改" : "添加连接"}
-      </button>
-      {mode === "edit" && onReset ? (
-        <button className="ink-button-secondary min-w-[140px]" disabled={isPending} onClick={onReset} type="button">
-          添加另一条连接
-        </button>
-      ) : null}
-    </div>
+    <span className="text-[10px] font-semibold tracking-[0.1em] uppercase" style={{ color: "var(--accent-primary)" }}>
+      {children}
+    </span>
   );
 }

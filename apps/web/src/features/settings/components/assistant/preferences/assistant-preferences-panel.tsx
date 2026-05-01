@@ -4,7 +4,6 @@ import { useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { showAppNotice } from "@/components/ui/app-notice";
-import { SectionCard } from "@/components/ui/section-card";
 import {
   getMyAssistantPreferences,
   getProjectAssistantPreferences,
@@ -30,7 +29,6 @@ type AssistantPreferencesPanelProps = {
 };
 
 export function AssistantPreferencesPanel({
-  headerAction,
   onDirtyChange,
   projectId,
   scope = "user",
@@ -54,48 +52,43 @@ export function AssistantPreferencesPanel({
     mutationFn: (payload: AssistantPreferencesUpdatePayload) =>
       saveAssistantPreferences(scope, projectId, payload),
     onSuccess: async () => {
-      const message = scope === "project" ? "项目 AI 偏好已保存。" : "AI 偏好已保存。";
-      showAppNotice({
-        content: message,
-        title: copy.title,
-        tone: "success",
-      });
-      await queryClient.invalidateQueries({
-        queryKey: buildAssistantPreferencesQueryKey(scope, projectId),
-      });
+      showAppNotice({ content: scope === "project" ? "项目 AI 偏好已保存。" : "AI 偏好已保存。", title: copy.title, tone: "success" });
+      await queryClient.invalidateQueries({ queryKey: buildAssistantPreferencesQueryKey(scope, projectId) });
     },
-    onError: (error) => {
-      showAppNotice({
-        content: getErrorMessage(error),
-        tone: "danger",
-      });
-    },
+    onError: (error) => showAppNotice({ content: getErrorMessage(error), tone: "danger" }),
   });
-  const formKey = useMemo(
-    () => buildAssistantPreferencesFormKey(preferencesQuery.data),
-    [preferencesQuery.data],
-  );
-  const providerOptions = useMemo(
-    () => buildAssistantProviderOptions(credentialsQuery.data, scope),
-    [credentialsQuery.data, scope],
-  );
+  const formKey = useMemo(() => buildAssistantPreferencesFormKey(preferencesQuery.data), [preferencesQuery.data]);
+  const providerOptions = useMemo(() => buildAssistantProviderOptions(credentialsQuery.data, scope), [credentialsQuery.data, scope]);
   const hasAvailableProvider = providerOptions.some((item) => item.value !== "");
   const showCredentialEmptyState = !credentialsQuery.isLoading && !hasAvailableProvider;
 
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   return (
-    <SectionCard
-      action={headerAction}
-      description={copy.cardDescription}
-      title={copy.title}
+    <section
+      className="rounded-lg"
+      style={{
+        background: "var(--bg-canvas)",
+        border: "1px solid var(--line-soft)",
+      }}
     >
-      <div className="space-y-4">
+      {/* Section Header */}
+      <div className="px-4 pt-4 pb-3" style={{ borderBottom: "1px solid var(--line-soft)" }}>
+        <h2 className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+          {copy.title}
+        </h2>
+        <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+          {copy.cardDescription}
+        </p>
+      </div>
+
+      {/* Form */}
+      <div className="px-4 py-4">
         {preferencesQuery.isLoading && !preferencesQuery.data ? (
-          <div className="panel-muted px-4 py-5 text-sm text-text-secondary">{copy.loadingText}</div>
+          <p className="text-[13px]" style={{ color: "var(--text-tertiary)" }}>{copy.loadingText}</p>
         ) : null}
         {preferencesQuery.error ? (
-          <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
+          <div className="rounded-md px-3.5 py-2.5 text-[13px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
             {getErrorMessage(preferencesQuery.error)}
           </div>
         ) : null}
@@ -115,7 +108,7 @@ export function AssistantPreferencesPanel({
           />
         ) : null}
       </div>
-    </SectionCard>
+    </section>
   );
 }
 
@@ -123,7 +116,7 @@ function buildAssistantPreferencesCopy(scope: AssistantPreferencesScope) {
   if (scope === "project") {
     return {
       cardDescription: "只影响当前项目里的聊天默认方式；留空时继续跟随个人 AI 偏好。",
-      emptyStateText: "当前项目和个人账号里都还没有可用连接。可以先去“模型连接”页添加或启用。",
+      emptyStateText: "当前项目和个人账号里都还没有可用连接。可以先去「模型连接」页添加或启用。",
       formDescription: "覆盖此项目的默认设置。",
       loadingText: "正在加载项目 AI 偏好...",
       maxOutputPlaceholder: "留空则跟随个人设置",
@@ -132,7 +125,7 @@ function buildAssistantPreferencesCopy(scope: AssistantPreferencesScope) {
   }
   return {
     cardDescription: "新聊天会优先使用默认连接和模型，临时切换只影响当前对话。",
-    emptyStateText: "你还没有启用可用连接。可以先去“模型连接”页添加或启用，再回来设置默认聊天方式。",
+    emptyStateText: "你还没有启用可用连接。可以先去「模型连接」页添加或启用，再回来设置默认聊天方式。",
     formDescription: "新聊天的默认设置。",
     loadingText: "正在加载 AI 偏好...",
     maxOutputPlaceholder: "留空则不单独指定",
@@ -149,7 +142,7 @@ async function loadAssistantPreferenceCredentials(
   projectId?: string,
 ): Promise<CredentialView[]> {
   if (scope === "project") {
-    const resolvedProjectId = requireProjectId(projectId);
+    const resolvedProjectId = projectId ?? "";
     const [projectCredentials, userCredentials] = await Promise.all([
       listCredentials("project", resolvedProjectId),
       listCredentials("user"),
@@ -164,7 +157,7 @@ function loadAssistantPreferences(
   projectId?: string,
 ): Promise<AssistantPreferences> {
   if (scope === "project") {
-    return getProjectAssistantPreferences(requireProjectId(projectId));
+    return getProjectAssistantPreferences(projectId ?? "");
   }
   return getMyAssistantPreferences();
 }
@@ -175,14 +168,7 @@ function saveAssistantPreferences(
   payload: AssistantPreferencesUpdatePayload,
 ) {
   if (scope === "project") {
-    return updateProjectAssistantPreferences(requireProjectId(projectId), payload);
+    return updateProjectAssistantPreferences(projectId ?? "", payload);
   }
   return updateMyAssistantPreferences(payload);
-}
-
-function requireProjectId(projectId: string | undefined) {
-  if (projectId) {
-    return projectId;
-  }
-  throw new Error("缺少项目 ID，无法读取项目 AI 偏好。");
 }

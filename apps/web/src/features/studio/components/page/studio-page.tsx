@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useTransition, useCallback, useState, useRef } from "react";
 import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Message } from "@arco-design/web-react";
 
@@ -36,7 +37,7 @@ import {
 } from "@/features/studio/components/page/studio-page-support";
 import { useChatPanelResize, useLeftPanelResize } from "@/features/studio/components/page/use-studio-panel-resize";
 import { useStudioDocumentTreeActions } from "@/features/studio/components/page/use-studio-document-tree-actions";
-import { ExportIcon, SaveIcon, SidebarExpandIcon, SparkleIcon } from "@/features/studio/components/page/studio-page-icons";
+import { AnalysisIcon, ExportIcon, SaveIcon, SidebarExpandIcon, SparkleIcon, WorkflowIcon } from "@/features/studio/components/page/studio-page-icons";
 import { listChapters } from "@/lib/api/content";
 import { getProject, listProjectDocumentTree } from "@/lib/api/projects";
 import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
@@ -261,7 +262,23 @@ export function StudioPage({ projectId }: StudioPageProps) {
               <SaveIcon />
               <span className="hidden sm:inline">{saveButtonLabel}</span>
             </button>
-            <span className="studio-topbar__divider" style={{ margin: "0 4px" }} />
+            <span className="studio-topbar__divider" />
+            <Link
+              className="studio-topbar-btn"
+              href={`/workspace/project/${projectId}/engine`}
+              title="跳转工作流引擎"
+            >
+              <WorkflowIcon />
+              <span className="hidden sm:inline">工作流</span>
+            </Link>
+            <Link
+              className="studio-topbar-btn"
+              href={`/workspace/project/${projectId}/lab`}
+              title="跳转分析实验室"
+            >
+              <AnalysisIcon />
+              <span className="hidden sm:inline">分析</span>
+            </Link>
             <button
               className="studio-topbar-btn studio-topbar-btn--icon"
               type="button"

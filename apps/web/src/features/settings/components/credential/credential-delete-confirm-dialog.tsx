@@ -1,11 +1,5 @@
 "use client";
 
-import { DialogShell } from "@/components/ui/dialog-shell";
-import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  buildCredentialDeleteImpactItems,
-  getCredentialScopeLabel,
-} from "@/features/settings/components/credential/credential-delete-confirm-support";
 import type { CredentialView } from "@/lib/api/types";
 
 type CredentialDeleteConfirmDialogProps = {
@@ -19,63 +13,68 @@ export function CredentialDeleteConfirmDialog({
   onClose,
   onConfirm,
 }: Readonly<CredentialDeleteConfirmDialogProps>) {
-  const items = buildCredentialDeleteImpactItems(credential);
-  const scopeLabel = getCredentialScopeLabel(credential);
+  const scopeLabel = credential.owner_type === "project" ? "项目级" : "全局";
 
   return (
-    <DialogShell
-      title={`确认删除${scopeLabel}`}
-      description="删除后无法恢复，请确认影响范围。"
-      onClose={onClose}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
     >
-      <div className="grid gap-4 xl:grid-cols-[0.96fr_1.04fr]">
-        <section className="panel-muted space-y-4 p-5">
-          <div className="space-y-3">
-            <StatusBadge status="failed" label="删除确认" />
-            <div className="rounded-2xl border border-accent-danger/15 bg-accent-danger/10 px-4 py-4 text-sm leading-6 text-accent-danger">
-              删除后不会自动补一条替代连接。请确认移除后，相关模型还能按你的预期继续使用。
-            </div>
-          </div>
-          <div className="space-y-3 rounded-2xl bg-glass shadow-glass px-4 py-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-accent-primary">{scopeLabel}</p>
-            <h3 className="font-serif text-xl font-semibold text-text-primary">
+      <div
+        className="w-full max-w-[420px] rounded-lg overflow-hidden"
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--line-soft)" }}>
+          <h2 className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
+            确认删除{scopeLabel}连接
+          </h2>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>
+            删除后无法恢复，请谨慎操作
+          </p>
+        </div>
+
+        {/* Content */}
+        <div className="px-5 py-4 space-y-3">
+          <div
+            className="rounded-md px-3 py-2.5"
+            style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
+          >
+            <p className="text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>
               {credential.display_name}
-            </h3>
-            <p className="text-sm leading-6 text-text-secondary">
-              连接标识：{credential.provider} · 接口类型：{credential.api_dialect}
             </p>
-            <p className="text-sm leading-6 text-text-secondary">
-              当前状态：{credential.is_active ? "启用中" : "已停用"} · 密钥尾号：{credential.masked_key}
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>
+              {credential.provider} · {credential.is_active ? "启用中" : "已停用"}
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button className="ink-button-danger" onClick={onConfirm} type="button">
-              确认删除
-            </button>
-            <button className="ink-button-secondary" onClick={onClose} type="button">
-              先保留
-            </button>
+
+          <div className="rounded-md px-3 py-2.5 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
+            删除后，引用这条连接的模型调用可能会直接失败。如果已产生用量历史，后端会拒绝删除。
           </div>
-        </section>
-        <section className="panel-muted space-y-4 p-5">
-          <div className="space-y-1">
-            <h3 className="font-serif text-lg font-semibold">删除影响</h3>
-            <p className="text-sm leading-6 text-text-secondary">
-              这里只展示当前已经确认的影响，不会替你假设额外回退规则。
-            </p>
-          </div>
-          <div className="space-y-3">
-            {items.map((item) => (
-              <article
-                className="rounded-2xl bg-glass shadow-glass px-4 py-3"
-                key={item}
-              >
-                <p className="text-sm leading-6 text-text-secondary">{item}</p>
-              </article>
-            ))}
-          </div>
-        </section>
+        </div>
+
+        {/* Actions */}
+        <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid var(--line-soft)" }}>
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}
+            onClick={onConfirm}
+            type="button"
+          >
+            确认删除
+          </button>
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+            onClick={onClose}
+            type="button"
+          >
+            取消
+          </button>
+        </div>
       </div>
-    </DialogShell>
+    </div>
   );
 }

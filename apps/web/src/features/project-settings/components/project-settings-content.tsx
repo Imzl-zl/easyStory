@@ -84,11 +84,7 @@ export function ProjectSettingsContent({
       ) : null}
       {tab === "mcp" ? (
         <div className="rounded-2xl bg-surface shadow-sm p-6">
-          <AssistantMcpPanel
-            onDirtyChange={onProjectMcpDirtyChange}
-            projectId={projectId}
-            scope="project"
-          />
+          <AssistantMcpPanel onDirtyChange={onProjectMcpDirtyChange} />
         </div>
       ) : null}
       {tab === "audit" ? (

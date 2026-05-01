@@ -11,10 +11,10 @@ export type { AssistantHookFieldErrorKey } from "@/features/settings/components/
 
 type AssistantHookGuidedEditorProps = {
   agentErrorMessage?: string | null;
-  agentOptions: { label: string; value: string; description?: string }[];
+  agentOptions?: { label: string; value: string; description?: string }[];
   draft: AssistantHookDraft;
   mcpErrorMessage?: string | null;
-  mcpOptions: { label: string; value: string; description?: string }[];
+  mcpOptions?: { label: string; value: string; description?: string }[];
   onChange: (draft: AssistantHookDraft) => void;
   onFieldErrorChange: (field: AssistantHookFieldErrorKey, message: string | null) => void;
   preview: string;

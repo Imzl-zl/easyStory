@@ -1,6 +1,5 @@
 "use client";
 
-import { StatusBadge } from "@/components/ui/status-badge";
 import {
   buildCredentialTransportCapabilityItem,
   formatAuditTime,
@@ -47,193 +46,214 @@ export function CredentialCenterListItem({
   const streamCapability = buildCredentialTransportCapabilityItem(credential, "stream");
   const bufferedCapability = buildCredentialTransportCapabilityItem(credential, "buffered");
   const toggleActionType = credential.is_active ? "disable" : "enable";
-  const isVerifyStreamConnectionPending = isPendingCredentialAction(
-    pendingAction,
-    "verify_stream_connection",
-    credential.id,
-  );
-  const isVerifyBufferedConnectionPending = isPendingCredentialAction(
-    pendingAction,
-    "verify_buffered_connection",
-    credential.id,
-  );
-  const isVerifyStreamToolsPending = isPendingCredentialAction(
-    pendingAction,
-    "verify_stream_tools",
-    credential.id,
-  );
-  const isVerifyBufferedToolsPending = isPendingCredentialAction(
-    pendingAction,
-    "verify_buffered_tools",
-    credential.id,
-  );
+
+  const isVerifyStreamConnectionPending = isPendingCredentialAction(pendingAction, "verify_stream_connection", credential.id);
+  const isVerifyBufferedConnectionPending = isPendingCredentialAction(pendingAction, "verify_buffered_connection", credential.id);
+  const isVerifyStreamToolsPending = isPendingCredentialAction(pendingAction, "verify_stream_tools", credential.id);
+  const isVerifyBufferedToolsPending = isPendingCredentialAction(pendingAction, "verify_buffered_tools", credential.id);
   const isTogglePending = isPendingCredentialAction(pendingAction, toggleActionType, credential.id);
   const isDeletePending = isPendingCredentialAction(pendingAction, "delete", credential.id);
 
   return (
     <article
-      className="panel-muted overflow-hidden p-0"
-      data-active={isActive}
+      className="rounded-lg transition-all duration-150"
+      style={{
+        background: isActive ? "var(--bg-muted)" : "var(--bg-canvas)",
+        border: isActive ? "1px solid var(--line-medium)" : "1px solid transparent",
+        boxShadow: isActive ? "0 0 0 1px var(--line-medium)" : "none",
+      }}
     >
-      <div className="flex flex-col">
-        <header className="flex flex-wrap items-start justify-between gap-4 px-5 py-4">
-          <div className="min-w-0 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-base font-semibold text-text-primary">{credential.display_name}</h3>
-              <StatusBadge
-                status={credential.is_active ? "active" : "archived"}
-                label={credential.is_active ? "启用中" : "已停用"}
-              />
+      {/* Header Row - Always visible */}
+      <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Status Dot */}
+          <span
+            className="w-2 h-2 rounded-full flex-shrink-0"
+            style={{
+              background: credential.is_active ? "var(--accent-success)" : "var(--text-tertiary)",
+              boxShadow: credential.is_active ? "0 0 8px var(--accent-success-soft)" : "none",
+            }}
+          />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+                {credential.display_name}
+              </h3>
               {overrideInfo ? (
                 <span
-                  className="inline-flex rounded-lg border border-line-strong bg-surface-hover px-2.5 py-1 text-[11px] font-medium text-accent-primary"
-                  title={`当前项目已配置项目级模型连接「${overrideInfo.projectCredentialDisplayName}」，运行时会优先使用项目级连接。`}
+                  className="flex-shrink-0 text-[9px] font-medium px-1 py-0.5 rounded"
+                  style={{ background: "var(--accent-primary-soft)", color: "var(--accent-primary)" }}
+                  title={`当前项目已配置项目级模型连接「${overrideInfo.projectCredentialDisplayName}」`}
                 >
-                  项目级覆盖
+                  覆盖
                 </span>
               ) : null}
             </div>
-            <div className="flex flex-wrap gap-2 text-[12px] leading-5 text-text-secondary">
-              <span className="inline-flex rounded-lg border border-line-soft bg-surface px-2.5 py-1">
-                {credential.provider}
-              </span>
-              <span className="inline-flex rounded-lg border border-line-soft bg-surface px-2.5 py-1">
-                {getApiDialectLabel(credential.api_dialect)}
-              </span>
-              <span className="inline-flex rounded-lg border border-line-soft bg-surface px-2.5 py-1">
-                默认模型：{credential.default_model ?? "未配置"}
-              </span>
-              <span className="inline-flex rounded-lg border border-line-soft bg-surface px-2.5 py-1">
-                密钥尾号：{credential.masked_key}
-              </span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>{credential.provider}</span>
+              <span style={{ color: "var(--text-tertiary)" }}>·</span>
+              <span className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>{getApiDialectLabel(credential.api_dialect)}</span>
+              <span style={{ color: "var(--text-tertiary)" }}>·</span>
+              <span className="text-[10px] truncate" style={{ color: "var(--text-tertiary)" }}>{credential.default_model ?? "无默认模型"}</span>
             </div>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Capability Dots */}
+          <div className="flex items-center gap-1 mr-2">
+            <CapabilityDot capability={streamCapability} />
+            <CapabilityDot capability={bufferedCapability} />
+          </div>
+
           {mode === "audit" ? (
             <button
-              className="ink-tab"
+              className="px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors"
               data-active={isActive}
               disabled={isPending}
               onClick={() => onSelectCredential?.(credential.id)}
+              style={{
+                background: isActive ? "var(--bg-elevated)" : "transparent",
+                color: isActive ? "var(--text-primary)" : "var(--text-tertiary)",
+                border: "1px solid var(--line-medium)",
+              }}
               type="button"
             >
               审计
             </button>
           ) : (
             <button
-              className="ink-button-secondary h-9 px-4 text-[13px]"
+              className="px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors"
               disabled={isPending}
               onClick={() => onSelectCredentialForEdit?.(credential.id)}
+              style={{
+                background: isActive ? "var(--bg-elevated)" : "transparent",
+                color: isActive ? "var(--text-primary)" : "var(--text-tertiary)",
+                border: "1px solid var(--line-medium)",
+              }}
               type="button"
             >
-              编辑
+              {isActive ? "编辑中" : "编辑"}
             </button>
           )}
-        </header>
-
-        <div className="border-t border-line-soft px-5 py-4">
-          <div className="grid gap-3 text-[13px] leading-6 text-text-secondary sm:grid-cols-2">
-            <p>{formatCredentialTokenSummary(credential)}</p>
-            <p>服务地址：{formatCredentialBaseUrl(credential.api_dialect, credential.base_url)}</p>
-            {credential.last_verified_at ? (
-              <p>历史基础验证：{formatAuditTime(credential.last_verified_at)}</p>
-            ) : (
-              <p>当前以两条链路状态作为页面真值。</p>
-            )}
-            {mode === "list" ? (
-              <p>下面的按钮会直接更新流式链路和非流链路的验证状态。</p>
-            ) : (
-              <p>审计模式只查看记录，不改动任何验证状态。</p>
-            )}
-          </div>
         </div>
+      </div>
 
-        <div className="border-t border-line-soft px-5 py-4">
-          <div className="space-y-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-text-secondary">链路验证</p>
-            {[streamCapability, bufferedCapability].map((item) => (
-              <section
-                key={item.title}
-                className="flex flex-wrap items-start justify-between gap-3 border-t border-line-soft pt-3 first:border-t-0 first:pt-0"
-              >
-                <div className="min-w-0 space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-text-primary">{item.title}</span>
-                    <StatusBadge status={item.tone} label={item.summary} />
-                  </div>
-                  <p className="text-[12px] leading-5 text-text-secondary">{item.detail}</p>
-                </div>
-                <p className="text-[12px] leading-5 text-text-secondary">
-                  {item.lastVerifiedAt ? `最近验证：${formatAuditTime(item.lastVerifiedAt)}` : "未验证"}
-                </p>
-              </section>
-            ))}
+      {/* Expanded Details */}
+      {isActive && (
+        <div className="px-4 pb-4" style={{ borderTop: "1px solid var(--line-soft)" }}>
+          {/* Info Grid */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 py-3">
+            <InfoRow label="密钥" value={`尾号 ${credential.masked_key}`} />
+            <InfoRow label="地址" value={formatCredentialBaseUrl(credential.api_dialect, credential.base_url)} />
+            <InfoRow label="Token" value={formatCredentialTokenSummary(credential)} />
+            <InfoRow label="验证" value={credential.last_verified_at ? formatAuditTime(credential.last_verified_at) : "从未验证"} />
           </div>
-          {overrideInfo ? (
-            <p className="mt-3 text-[12px] leading-5 text-accent-primary">
-              当前项目已配置同连接标识的项目级模型连接“{overrideInfo.projectCredentialDisplayName}”，运行时会优先使用项目级连接。
-            </p>
-          ) : null}
-        </div>
 
-        {mode === "list" ? (
-          <div className="border-t border-line-soft px-5 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className="ink-button-secondary h-9 px-3.5 text-[13px]"
-                  disabled={isPending}
-                  onClick={() => onAction("verify_stream_connection", credential.id)}
-                  type="button"
-                >
-                  {resolveCredentialActionButtonLabel("verify_stream_connection", isVerifyStreamConnectionPending)}
-                </button>
-                <button
-                  className="ink-button-secondary h-9 px-3.5 text-[13px]"
-                  disabled={isPending}
-                  onClick={() => onAction("verify_buffered_connection", credential.id)}
-                  type="button"
-                >
-                  {resolveCredentialActionButtonLabel("verify_buffered_connection", isVerifyBufferedConnectionPending)}
-                </button>
-                <button
-                  className="ink-button-secondary h-9 px-3.5 text-[13px]"
-                  disabled={isPending}
-                  onClick={() => onAction("verify_stream_tools", credential.id)}
-                  type="button"
-                >
-                  {resolveCredentialActionButtonLabel("verify_stream_tools", isVerifyStreamToolsPending)}
-                </button>
-                <button
-                  className="ink-button-secondary h-9 px-3.5 text-[13px]"
-                  disabled={isPending}
-                  onClick={() => onAction("verify_buffered_tools", credential.id)}
-                  type="button"
-                >
-                  {resolveCredentialActionButtonLabel("verify_buffered_tools", isVerifyBufferedToolsPending)}
-                </button>
+          {/* Capability Details */}
+          <div className="space-y-1.5 py-2" style={{ borderTop: "1px solid var(--line-soft)" }}>
+            <CapabilityRow capability={streamCapability} />
+            <CapabilityRow capability={bufferedCapability} />
+          </div>
+
+          {/* Actions */}
+          {mode === "list" && (
+            <div className="flex items-center justify-between gap-3 pt-3" style={{ borderTop: "1px solid var(--line-soft)" }}>
+              <div className="flex flex-wrap gap-1.5">
+                <ActionButton label={resolveCredentialActionButtonLabel("verify_stream_connection", isVerifyStreamConnectionPending)} onClick={() => onAction("verify_stream_connection", credential.id)} isPending={isVerifyStreamConnectionPending} />
+                <ActionButton label={resolveCredentialActionButtonLabel("verify_buffered_connection", isVerifyBufferedConnectionPending)} onClick={() => onAction("verify_buffered_connection", credential.id)} isPending={isVerifyBufferedConnectionPending} />
+                <ActionButton label={resolveCredentialActionButtonLabel("verify_stream_tools", isVerifyStreamToolsPending)} onClick={() => onAction("verify_stream_tools", credential.id)} isPending={isVerifyStreamToolsPending} />
+                <ActionButton label={resolveCredentialActionButtonLabel("verify_buffered_tools", isVerifyBufferedToolsPending)} onClick={() => onAction("verify_buffered_tools", credential.id)} isPending={isVerifyBufferedToolsPending} />
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex gap-1.5">
+                <ActionButton label={resolveCredentialActionButtonLabel(toggleActionType, isTogglePending)} onClick={() => onAction(toggleActionType, credential.id)} isPending={isTogglePending} />
                 <button
-                  className="ink-button-secondary h-9 px-3.5 text-[13px]"
-                  disabled={isPending}
-                  onClick={() => onAction(toggleActionType, credential.id)}
-                  type="button"
-                >
-                  {resolveCredentialActionButtonLabel(toggleActionType, isTogglePending)}
-                </button>
-                <button
-                  className="ink-button-danger h-9 px-3.5 text-[13px]"
+                  className="h-6 px-2 rounded text-[10px] font-medium transition-colors"
                   disabled={isPending}
                   onClick={() => onOpenDelete(credential)}
+                  style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}
                   type="button"
                 >
                   {resolveCredentialActionButtonLabel("delete", isDeletePending)}
                 </button>
               </div>
             </div>
-          </div>
-        ) : null}
-      </div>
+          )}
+
+          {overrideInfo && (
+            <p className="mt-3 text-[10px]" style={{ color: "var(--accent-primary)" }}>
+              当前项目已配置同标识的项目级连接「{overrideInfo.projectCredentialDisplayName}」，运行时会优先使用。
+            </p>
+          )}
+        </div>
+      )}
     </article>
+  );
+}
+
+function CapabilityDot({ capability }: { capability: { tone: string; summary: string } }) {
+  const colorMap: Record<string, string> = {
+    completed: "var(--accent-success)",
+    ready: "var(--accent-primary)",
+    warning: "var(--accent-warning)",
+    draft: "var(--text-tertiary)",
+  };
+  return (
+    <span
+      className="w-1.5 h-1.5 rounded-full"
+      style={{
+        background: colorMap[capability.tone] || "var(--text-tertiary)",
+        boxShadow: capability.tone === "completed" ? "0 0 4px var(--accent-success-soft)" : "none",
+      }}
+      title={capability.summary}
+    />
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] flex-shrink-0" style={{ color: "var(--text-tertiary)", width: "32px" }}>{label}</span>
+      <span className="text-[11px] truncate" style={{ color: "var(--text-secondary)" }}>{value}</span>
+    </div>
+  );
+}
+
+function CapabilityRow({ capability }: { capability: { title: string; summary: string; detail: string; tone: string; lastVerifiedAt?: string | null } }) {
+  const colorMap: Record<string, { bg: string; text: string }> = {
+    completed: { bg: "var(--accent-success-soft)", text: "var(--accent-success)" },
+    ready: { bg: "var(--accent-primary-soft)", text: "var(--accent-primary)" },
+    warning: { bg: "var(--accent-warning-soft)", text: "var(--accent-warning)" },
+    draft: { bg: "var(--bg-surface)", text: "var(--text-tertiary)" },
+  };
+  const colors = colorMap[capability.tone] || colorMap.draft;
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-[10px] flex-shrink-0" style={{ color: "var(--text-tertiary)", width: "40px" }}>{capability.title}</span>
+        <span className="text-[10px] font-medium px-1 py-0.5 rounded flex-shrink-0" style={{ background: colors.bg, color: colors.text }}>
+          {capability.summary}
+        </span>
+        <span className="text-[10px] truncate" style={{ color: "var(--text-tertiary)" }}>{capability.detail}</span>
+      </div>
+      {capability.lastVerifiedAt && (
+        <span className="text-[9px] flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>{formatAuditTime(capability.lastVerifiedAt)}</span>
+      )}
+    </div>
+  );
+}
+
+function ActionButton({ label, onClick, isPending }: { label: string; onClick: () => void; isPending: boolean }) {
+  return (
+    <button
+      className="h-6 px-2 rounded text-[10px] font-medium transition-colors"
+      disabled={isPending}
+      onClick={onClick}
+      style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+      type="button"
+    >
+      {label}
+    </button>
   );
 }

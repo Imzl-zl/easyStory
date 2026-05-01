@@ -4,6 +4,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import Link from "next/link";
 import { showAppNotice } from "@/components/ui/app-notice";
 import { createAnalysis, deleteAnalysis, getAnalysis, listAnalyses } from "@/lib/api/analysis";
 import { getErrorMessage } from "@/lib/api/client";
@@ -81,6 +82,7 @@ export function LabPage({ projectId }: LabPageProps) {
         activeTitle={detailQuery.data ? formatLabAnalysisTitle(detailQuery.data) : null}
         analysesCount={analyses.length}
         hasActiveFilters={hasActiveFilters}
+        projectId={projectId}
       />
       <div className="hero-card grid gap-4.5 p-4.5 [grid-template-columns:1fr] xl:[grid-template-columns:minmax(260px,320px)_minmax(0,1fr)_minmax(300px,360px)]">
         <aside className="min-w-0">
@@ -138,15 +140,17 @@ function LabHero({
   activeTitle,
   analysesCount,
   hasActiveFilters,
+  projectId,
 }: Readonly<{
   activeTitle: string | null;
   analysesCount: number;
   hasActiveFilters: boolean;
+  projectId: string;
 }>) {
   return (
     <section className="hero-card grid gap-4.5 p-6">
       <div>
-        <p className="label-overline">洞察工作台</p>
+        <p className="label-overline">分析实验室</p>
         <h1 className="max-w-[900px] font-serif text-[clamp(2rem,4vw,3.6rem)] leading-tight">把灵感拆解、文风判断和结构分析留在项目语境里。</h1>
       </div>
       <div className="grid gap-3 [grid-template-columns:repeat(3,minmax(0,1fr))]">
@@ -162,6 +166,14 @@ function LabHero({
           <span className="label-overline">当前焦点</span>
           <strong className="font-serif text-2xl leading-tight">{activeTitle ?? "选择一条洞察"}</strong>
         </article>
+      </div>
+      <div className="flex gap-2.5">
+        <Link className="ink-link-button" href={`/workspace/project/${projectId}/studio`}>
+          创作
+        </Link>
+        <Link className="ink-link-button" href={`/workspace/project/${projectId}/engine`}>
+          工作流
+        </Link>
       </div>
     </section>
   );

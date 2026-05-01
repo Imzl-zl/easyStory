@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { showAppNotice } from "@/components/ui/app-notice";
-import { SectionCard } from "@/components/ui/section-card";
 import {
   getMyAssistantRules,
   getProjectAssistantRules,
@@ -75,13 +74,33 @@ export function AssistantRulesEditor({
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   return (
-    <SectionCard action={headerAction} title={title}>
-      <div className="space-y-4">
+    <section
+      className="rounded-lg"
+      style={{
+        background: "var(--bg-canvas)",
+        border: "1px solid var(--line-soft)",
+      }}
+    >
+      {/* Section Header */}
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--line-soft)" }}>
+        <div>
+          <h2 className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+            {title}
+          </h2>
+          <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+            {scope === "user" ? "适用于所有对话的默认长期规则" : "仅适用于当前项目的长期规则"}
+          </p>
+        </div>
+        {headerAction}
+      </div>
+
+      {/* Content */}
+      <div className="px-4 py-4">
         {query.isLoading && !query.data ? (
-          <div className="panel-muted px-4 py-5 text-sm text-text-secondary">正在加载规则...</div>
+          <p className="text-[13px]" style={{ color: "var(--text-tertiary)" }}>正在加载规则...</p>
         ) : null}
         {query.error ? (
-          <div className="rounded-2xl bg-accent-danger/10 px-4 py-3 text-sm text-accent-danger">
+          <div className="rounded-md px-3.5 py-2.5 text-[13px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
             {getErrorMessage(query.error)}
           </div>
         ) : null}
@@ -100,7 +119,7 @@ export function AssistantRulesEditor({
           />
         ) : null}
       </div>
-    </SectionCard>
+    </section>
   );
 }
 
@@ -129,58 +148,81 @@ function AssistantRulesForm({
 
   return (
     <form
-      className="panel-muted space-y-10 p-10"
+      className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit(draft);
       }}
     >
-      <label className="flex items-start gap-3 rounded-2xl bg-glass-heavy px-4 py-3 cursor-pointer">
-        <span className="flex items-start gap-3">
-          <input
-            checked={draft.enabled}
-            className="mt-1 size-4 accent-accent-primary"
-            onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })}
-            type="checkbox"
-          />
-          <span className="space-y-1">
-            <span className="block text-[13px] font-medium text-text-primary">
-              在每次聊天时自动带上这份规则
-            </span>
-            <span className="block text-[12px] leading-5 text-text-secondary">
-              会在基础对话要求上叠加这份长期规则。
-            </span>
+      {/* Enable Toggle */}
+      <label
+        className="flex items-start gap-3 rounded-md px-3 py-2.5 cursor-pointer transition-colors"
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-medium)" }}
+      >
+        <input
+          checked={draft.enabled}
+          className="mt-0.5 size-3.5 accent-[var(--accent-primary)]"
+          onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })}
+          type="checkbox"
+        />
+        <span className="space-y-0.5">
+          <span className="block text-[12px] font-medium" style={{ color: "var(--text-primary)" }}>
+            在每次聊天时自动带上这份规则
+          </span>
+          <span className="block text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+            会在基础对话要求上叠加这份长期规则
           </span>
         </span>
       </label>
 
-      <div className="space-y-3">
-        <label className="text-sm font-medium text-text-primary" htmlFor={buildAssistantRuleFieldId(scope)}>
+      {/* Rule Content */}
+      <div className="space-y-2">
+        <label
+          className="block text-[12px] font-medium"
+          style={{ color: "var(--text-secondary)" }}
+          htmlFor={buildAssistantRuleFieldId(scope)}
+        >
           规则内容
         </label>
         <textarea
-          className="ink-textarea min-h-48"
+          className="w-full rounded-md px-3 py-2.5 text-[12px] resize-y transition-colors focus:outline-none"
+          style={{
+            background: "var(--bg-canvas)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--line-medium)",
+            minHeight: "120px",
+          }}
           id={buildAssistantRuleFieldId(scope)}
           onChange={(event) => setDraft({ ...draft, content: event.target.value })}
-          placeholder="例如：\n1. 先给结论，再展开。\n2. 不要让我先填一堆表单。\n3. 如果信息不足，每次只追问一个关键问题。"
+          placeholder="例如：&#10;1. 先给结论，再展开。&#10;2. 不要让我先填一堆表单。&#10;3. 如果信息不足，每次只追问一个关键问题。"
           value={draft.content}
         />
-        <p className="text-[12px] leading-5 text-text-secondary">
-          写入口吻偏好和固定要求。
+        <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+          写入口吻偏好和固定要求
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <button className="ink-button" disabled={isPending || !isDirty} type="submit">
+      {/* Actions */}
+      <div className="flex gap-2 pt-1">
+        <button
+          className="h-8 px-4 rounded-md text-[12px] font-medium transition-colors"
+          disabled={isPending || !isDirty}
+          style={{
+            background: isDirty ? "var(--accent-primary)" : "var(--line-soft)",
+            color: isDirty ? "var(--text-on-accent)" : "var(--text-tertiary)",
+          }}
+          type="submit"
+        >
           {isPending ? "保存中..." : "保存规则"}
         </button>
         <button
-          className="ink-button-secondary"
+          className="h-8 px-4 rounded-md text-[12px] font-medium"
           disabled={isPending || !isDirty}
           onClick={() => {
             onResetFeedback();
             setDraft(toAssistantRuleDraft(profile));
           }}
+          style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
           type="button"
         >
           还原

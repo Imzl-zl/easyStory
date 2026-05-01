@@ -52,10 +52,10 @@ export function AssistantSkillEditor({
 
   return (
     <form
-      className="panel-muted space-y-10 p-10"
+      className="px-5 py-4 space-y-5"
       onSubmit={(event) => {
         event.preventDefault();
-      onSubmit(draft);
+        onSubmit(draft);
       }}
     >
       <AssistantDocumentModeToggle
@@ -64,6 +64,7 @@ export function AssistantSkillEditor({
         mode={editorMode}
         onChange={setEditorMode}
       />
+
       {editorMode === "guided" ? (
         <GuidedSkillEditor
           draft={draft}
@@ -75,38 +76,42 @@ export function AssistantSkillEditor({
           documentError={documentError}
           documentValue={documentValue}
           mode={mode}
-          onChange={(value) =>
-            applySkillDocument(
-              value,
-              detail?.id ?? null,
-              setDraft,
-              setDocumentValue,
-              setDocumentError,
-            )
-          }
+          onChange={(value) => applySkillDocument(value, detail?.id ?? null, setDraft, setDocumentValue, setDocumentError)}
         />
       )}
-      <div className="flex flex-wrap items-center justify-end gap-2">
+
+      {/* Actions */}
+      <div className="flex gap-2 pt-1">
         {documentError ? (
-          <p className="mr-auto rounded-2xl bg-accent-danger/10 px-3 py-2 text-[12px] leading-5 text-accent-danger">
+          <p className="mr-auto rounded-md px-3 py-2 text-[12px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
             {documentError}
           </p>
         ) : null}
-        <button className="ink-button" disabled={isPending || !isDirty || Boolean(documentError)} type="submit">
+        <button
+          className="h-8 px-4 rounded-md text-[12px] font-medium transition-colors"
+          disabled={isPending || !isDirty || Boolean(documentError)}
+          style={{
+            background: isDirty && !documentError ? "var(--accent-primary)" : "var(--line-soft)",
+            color: isDirty && !documentError ? "var(--text-on-accent)" : "var(--text-tertiary)",
+          }}
+          type="submit"
+        >
           {isPending ? "保存中..." : mode === "create" ? "创建 Skill" : "保存修改"}
         </button>
         <button
-          className="ink-button-secondary"
+          className="h-8 px-4 rounded-md text-[12px] font-medium"
           disabled={isPending || !isDirty}
-          type="button"
           onClick={() => resetEditor(detail, setDraft, setDocumentValue, setDocumentError)}
+          style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+          type="button"
         >
           还原
         </button>
         {mode === "edit" && onDelete ? (
           <button
-            className="ink-button-secondary"
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
             disabled={isPending}
+            style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}
             type="button"
             onClick={onDelete}
           >
@@ -132,43 +137,135 @@ function GuidedSkillEditor({
   skillId: string | null;
 }>) {
   return (
-    <>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)]">
-        <div className="space-y-4">
-          <div className="rounded-2xl bg-glass-heavy px-4 py-3 text-xs leading-6 text-text-secondary">
-            把常用聊天方式写成一份长期说明就行。重点告诉助手应该怎么帮你，不需要去描述系统实现。
-          </div>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-text-primary">名称</span>
-            <input className="ink-input" maxLength={80} placeholder="例如：故事方向助手" value={draft.name} onChange={(event) => onChange({ ...draft, name: event.target.value })} />
+    <div className="space-y-4">
+      {/* Basic Info */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <FormField label="名称">
+          <input
+            className="w-full h-8 px-3 rounded-md text-[12px]"
+            style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)" }}
+            maxLength={80}
+            placeholder="例如：故事方向助手"
+            value={draft.name}
+            onChange={(event) => onChange({ ...draft, name: event.target.value })}
+          />
+        </FormField>
+
+        <FormField label="启用状态">
+          <label className="flex items-center gap-2 h-8 px-3 rounded-md cursor-pointer" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-medium)" }}>
+            <input
+              checked={draft.enabled}
+              className="size-3.5 accent-[var(--accent-primary)]"
+              type="checkbox"
+              onChange={(event) => onChange({ ...draft, enabled: event.target.checked })}
+            />
+            <span className="text-[12px]" style={{ color: "var(--text-primary)" }}>{draft.enabled ? "已启用" : "已停用"}</span>
           </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-text-primary">一句说明</span>
-            <textarea className="ink-input min-h-[88px]" maxLength={280} placeholder="例如：适合先陪我收拢方向，再一点点追问。" value={draft.description} onChange={(event) => onChange({ ...draft, description: event.target.value })} />
-          </label>
-          <label className="flex items-start gap-3 rounded-2xl bg-glass shadow-glass px-4 py-3">
-            <input checked={draft.enabled} className="mt-1 size-4 shrink-0 accent-accent-primary" type="checkbox" onChange={(event) => onChange({ ...draft, enabled: event.target.checked })} />
-            <span className="space-y-1">
-              <span className="block text-sm font-medium text-text-primary">启用</span>
-              <span className="block text-[12px] leading-5 text-text-secondary">关闭后不会出现在聊天切换里，但文件会保留。</span>
-            </span>
-          </label>
-        </div>
-        <SkillHelperCards
-          draft={draft}
-          onChange={onChange}
-          showPreview
-          skillId={skillId}
-        />
+        </FormField>
       </div>
-      <label className="block space-y-2">
-        <span className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-medium text-text-primary">正文</span>
-          <span className="text-[12px] leading-5 text-text-secondary">建议写成一份长期说明，而不是一次性的提问。</span>
-        </span>
-        <textarea className="ink-input min-h-[320px] text-[13px] leading-7" placeholder={"例如：\n你是一位擅长帮新手收拢故事方向的写作助手。\n先给 2 到 3 个具体方向，再告诉我你最推荐哪一个。\n如果信息还不够，每次只追问一个关键问题。\n\n用户输入：{{ user_input }}"} spellCheck={false} value={draft.content} onChange={(event) => onChange({ ...draft, content: event.target.value })} />
-      </label>
-    </>
+
+      <FormField label="一句说明">
+        <textarea
+          className="w-full px-3 py-2 rounded-md text-[12px] resize-y"
+          style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)", minHeight: "64px" }}
+          maxLength={280}
+          placeholder="例如：适合先陪我收拢方向，再一点点追问。"
+          value={draft.description}
+          onChange={(event) => onChange({ ...draft, description: event.target.value })}
+        />
+      </FormField>
+
+      {/* Content */}
+      <FormField label="正文">
+        <textarea
+          className="w-full px-3 py-2 rounded-md text-[12px] resize-y"
+          style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)", minHeight: "200px" }}
+          placeholder={"例如：\n你是一位擅长帮新手收拢故事方向的写作助手。\n先给 2 到 3 个具体方向，再告诉我你最推荐哪一个。\n如果信息还不够，每次只追问一个关键问题。\n\n用户输入：{{ user_input }}"}
+          spellCheck={false}
+          value={draft.content}
+          onChange={(event) => onChange({ ...draft, content: event.target.value })}
+        />
+        <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>建议写成一份长期说明，而不是一次性的提问</p>
+      </FormField>
+
+      {/* Model Override */}
+      <div
+        className="rounded-md p-3 space-y-3"
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
+      >
+        <p className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>可选：覆盖默认模型</p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <FormField label="默认连接">
+            <input
+              className="w-full h-8 px-3 rounded-md text-[12px]"
+              style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)" }}
+              placeholder="留空则跟随 AI 偏好"
+              value={draft.defaultProvider}
+              onChange={(event) => onChange({ ...draft, defaultProvider: event.target.value })}
+            />
+          </FormField>
+          <FormField label="默认模型">
+            <input
+              className="w-full h-8 px-3 rounded-md text-[12px]"
+              style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)" }}
+              placeholder="例如：claude-sonnet-4"
+              value={draft.defaultModelName}
+              onChange={(event) => onChange({ ...draft, defaultModelName: event.target.value })}
+            />
+          </FormField>
+          <FormField label="单次回复上限">
+            <input
+              className="w-full h-8 px-3 rounded-md text-[12px]"
+              style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)" }}
+              inputMode="numeric"
+              placeholder="留空则跟随默认设置"
+              value={draft.defaultMaxOutputTokens}
+              onChange={(event) => onChange({ ...draft, defaultMaxOutputTokens: sanitizeAssistantSkillMaxOutputTokensInput(event.target.value) })}
+            />
+          </FormField>
+        </div>
+      </div>
+
+      {/* Preview & Tips */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div
+          className="rounded-md p-3"
+          style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>保存后的文件</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--line-soft)", color: "var(--text-tertiary)" }}>{ASSISTANT_SKILL_FILE_LABEL}</span>
+          </div>
+          <pre
+            className="text-[11px] leading-4 overflow-auto rounded px-2 py-2"
+            style={{ background: "var(--bg-canvas)", color: "var(--text-secondary)", maxHeight: "160px" }}
+          >
+            {buildAssistantSkillDocumentPreview(draft, { skillId })}
+          </pre>
+        </div>
+
+        <div
+          className="rounded-md p-3"
+          style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
+        >
+          <p className="text-[11px] font-medium mb-2" style={{ color: "var(--text-secondary)" }}>可直接用的变量</p>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {ASSISTANT_SKILL_VARIABLE_TIPS.map((item) => (
+              <span
+                className="px-2 py-0.5 rounded text-[10px] font-medium"
+                style={{ background: "var(--accent-primary-soft)", color: "var(--accent-primary)" }}
+                key={item}
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+          <p className="text-[10px] leading-4" style={{ color: "var(--text-tertiary)" }}>
+            常见写法：先规定语气和做事方式，再在正文里引用 {"{{ user_input }}"}；如果你希望助手参考前文，再加上 {"{{ conversation_history }}"}。
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -184,94 +281,46 @@ function RawSkillEditor({
   onChange: (value: string) => void;
 }>) {
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.02fr)_minmax(320px,0.98fr)]">
-      <label className="block space-y-2">
-        <span className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-medium text-text-primary">SKILL.md</span>
-          <span className="text-[12px] leading-5 text-text-secondary">按约定直接写，保存后立即生效。</span>
-        </span>
-        <textarea className="ink-input min-h-[420px] font-mono text-[12px] leading-6" spellCheck={false} value={documentValue} onChange={(event) => onChange(event.target.value)} />
-      </label>
-        <div className="space-y-3">
-          <div className="rounded-3xl bg-glass shadow-glass px-4 py-4">
-          <p className="text-sm font-medium text-text-primary">文件约定</p>
-          <p className="mt-1 text-[12px] leading-5 text-text-secondary">
-            支持标准 Markdown frontmatter。`name`、`enabled`、`description`、`model` 都能直接写；多行说明可用 `description: |`。
+    <div className="space-y-4">
+      <FormField label="SKILL.md">
+        <textarea
+          className="w-full px-3 py-2 rounded-md text-[12px] resize-y font-mono"
+          style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)", minHeight: "320px" }}
+          spellCheck={false}
+          value={documentValue}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>按约定直接写，保存后立即生效</p>
+      </FormField>
+
+      <div
+        className="rounded-md p-3"
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
+      >
+        <p className="text-[11px] font-medium mb-2" style={{ color: "var(--text-secondary)" }}>文件约定</p>
+        <p className="text-[11px] leading-4" style={{ color: "var(--text-tertiary)" }}>
+          支持标准 Markdown frontmatter。name、enabled、description、model 都能直接写；多行说明可用 description: |。
+        </p>
+        {mode === "create" ? (
+          <p className="mt-2 text-[11px]" style={{ color: "var(--accent-warning)" }}>
+            第一次保存后，系统会自动补上这份 Skill 的 id。
           </p>
-          {mode === "create" ? (
-            <p className="mt-3 callout-warning px-4 py-3 text-xs leading-6 text-accent-warning">
-              第一次保存后，系统会自动补上这份 Skill 的 id。
-            </p>
-          ) : null}
-          {documentError ? (
-            <p className="mt-3 rounded-2xl bg-accent-danger/10 px-3 py-2 text-[12px] leading-5 text-accent-danger">
-              当前文件还没写对，修正后才能保存。
-            </p>
-          ) : null}
-        </div>
-        <SkillHelperCards draft={parseDraftFromRawValue(documentValue)} showPreview={false} skillId={null} />
+        ) : null}
+        {documentError ? (
+          <p className="mt-2 rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
+            {documentError}
+          </p>
+        ) : null}
       </div>
     </div>
   );
 }
 
-function SkillHelperCards({
-  draft,
-  onChange,
-  showPreview,
-  skillId,
-}: Readonly<{
-  draft: AssistantSkillDraft;
-  onChange?: (draft: AssistantSkillDraft) => void;
-  showPreview: boolean;
-  skillId: string | null;
-}>) {
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-3">
-      {showPreview ? (
-        <div className="rounded-3xl bg-glass shadow-glass p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-text-primary">保存后的文件</p>
-            </div>
-            <span className="rounded-pill bg-glass-heavy px-3 py-1 text-[12px] font-medium text-text-secondary">{ASSISTANT_SKILL_FILE_LABEL}</span>
-          </div>
-          <pre className="mt-3 max-h-[320px] overflow-auto rounded-2xl bg-glass px-4 py-4 text-[12px] leading-6 text-text-primary">{buildAssistantSkillDocumentPreview(draft, { skillId })}</pre>
-        </div>
-      ) : null}
-      <div className="rounded-3xl bg-glass shadow-glass p-4">
-        <div>
-          <p className="text-sm font-medium text-text-primary">可直接用的变量</p>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {ASSISTANT_SKILL_VARIABLE_TIPS.map((item) => (
-            <span className="rounded-pill bg-accent-soft px-3 py-1 text-[12px] font-medium text-accent-primary" key={item}>
-              {item}
-            </span>
-          ))}
-        </div>
-        <div className="mt-3 rounded-2xl bg-glass-heavy px-4 py-3 text-xs leading-6 text-text-secondary">
-          常见写法：先规定语气和做事方式，再在正文里引用 <code>{"{{ user_input }}"}</code>；
-          如果你希望助手参考前文，再加上 <code>{"{{ conversation_history }}"}</code>。
-        </div>
-        <details className="mt-3 rounded-2xl bg-muted shadow-sm">
-          <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-text-primary">可选：覆盖默认模型</summary>
-          <div className="grid gap-3 border-t border-line-soft px-4 py-4 md:grid-cols-3">
-            <label className="space-y-2">
-              <span className="text-[12px] font-medium text-text-primary">默认连接</span>
-              <input className="ink-input" placeholder="留空则跟随 AI 偏好" readOnly={!onChange} value={draft.defaultProvider} onChange={(event) => onChange?.({ ...draft, defaultProvider: event.target.value })} />
-            </label>
-            <label className="space-y-2">
-              <span className="text-[12px] font-medium text-text-primary">默认模型</span>
-              <input className="ink-input" placeholder="例如：claude-sonnet-4" readOnly={!onChange} value={draft.defaultModelName} onChange={(event) => onChange?.({ ...draft, defaultModelName: event.target.value })} />
-            </label>
-            <label className="space-y-2">
-              <span className="text-[12px] font-medium text-text-primary">单次回复上限</span>
-              <input className="ink-input" inputMode="numeric" placeholder="留空则跟随默认设置" readOnly={!onChange} value={draft.defaultMaxOutputTokens} onChange={(event) => onChange?.({ ...draft, defaultMaxOutputTokens: sanitizeAssistantSkillMaxOutputTokensInput(event.target.value) })} />
-            </label>
-          </div>
-        </details>
-      </div>
+    <div className="space-y-1.5">
+      <label className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>{label}</label>
+      {children}
     </div>
   );
 }
@@ -314,12 +363,4 @@ function resetEditor(
   setDraft(nextDraft);
   setDocumentValue(buildAssistantSkillDocumentPreview(nextDraft, { skillId: detail?.id ?? null }));
   setDocumentError(null);
-}
-
-function parseDraftFromRawValue(value: string) {
-  try {
-    return parseAssistantSkillDocument(value);
-  } catch {
-    return createEmptyAssistantSkillDraft();
-  }
 }

@@ -49,11 +49,7 @@ export function AssistantPreferencesForm({
 }: Readonly<AssistantPreferencesFormProps>) {
   const [draft, setDraft] = useState<AssistantPreferencesDraft>(() => {
     const initialDraft = toAssistantPreferencesDraft(preferences);
-    const initialControl = resolvePreferencesReasoningControl(
-      initialDraft,
-      inheritedPreferences,
-      providerOptions,
-    );
+    const initialControl = resolvePreferencesReasoningControl(initialDraft, inheritedPreferences, providerOptions);
     return normalizeAssistantPreferencesDraft(initialDraft, initialControl);
   });
   const reasoningControl = resolvePreferencesReasoningControl(draft, inheritedPreferences, providerOptions);
@@ -67,11 +63,7 @@ export function AssistantPreferencesForm({
   const updateDraft = (updater: (current: AssistantPreferencesDraft) => AssistantPreferencesDraft) =>
     setDraft((current) => {
       const nextDraft = updater(current);
-      const nextControl = resolvePreferencesReasoningControl(
-        nextDraft,
-        inheritedPreferences,
-        providerOptions,
-      );
+      const nextControl = resolvePreferencesReasoningControl(nextDraft, inheritedPreferences, providerOptions);
       return normalizeAssistantPreferencesDraft(nextDraft, nextControl);
     });
 
@@ -82,56 +74,131 @@ export function AssistantPreferencesForm({
 
   return (
     <form
-      className="panel-muted space-y-10 p-10"
+      className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit(buildAssistantPreferencesPayload(draft, reasoningControl));
       }}
     >
-      <div className="rounded-2xl bg-glass-heavy px-4 py-3 text-sm leading-6 text-text-secondary">
-        {formDescription}
+      <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>{formDescription}</p>
+
+      {/* Connection Card */}
+      <div
+        className="rounded-md p-3 space-y-3"
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
+      >
+        <div className="flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeLinecap="round">
+            <path d="M5 12h14" />
+            <path d="M12 5v14" />
+          </svg>
+          <span className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>连接配置</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="默认连接">
+            <AppSelect
+              className="min-w-0"
+              emptyText="暂无可用连接"
+              id="assistant-default-provider"
+              options={providerOptions}
+              value={draft.defaultProvider}
+              onChange={(value) => updateDraft((current) => ({ ...current, defaultProvider: value }))}
+            />
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>建议直接从可用连接里选择</p>
+          </FormField>
+
+          <FormField label="默认模型">
+            <input
+              className="w-full h-8 px-3 rounded-md text-[12px]"
+              style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)" }}
+              onChange={(event) => updateDraft((current) => ({ ...current, defaultModelName: event.target.value }))}
+              placeholder={inheritedPreferences?.default_model_name ? `当前继承：${inheritedPreferences.default_model_name}` : "例如：gpt-4.1-mini"}
+              value={draft.defaultModelName}
+            />
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>通常留空即可</p>
+          </FormField>
+        </div>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <AssistantProviderField draft={draft} providerOptions={providerOptions} updateDraft={updateDraft} />
-        <AssistantModelField
+
+      {/* Parameters Card */}
+      <div
+        className="rounded-md p-3 space-y-3"
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
+      >
+        <div className="flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeLinecap="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 1v6m0 6v6m4.22-10.22 4.24-4.24M6.34 6.34 2.1 2.1m17.8 17.8-4.24-4.24M6.34 17.66l-4.24 4.24M23 12h-6m-6 0H1m20.07-4.93-4.24 4.24M6.34 6.34l-4.24-4.24" />
+          </svg>
+          <span className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>生成参数</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FormField label="单次回复上限">
+            <input
+              className="w-full h-8 px-3 rounded-md text-[12px]"
+              style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)" }}
+              inputMode="numeric"
+              min={128}
+              onChange={(event) => updateDraft((current) => ({ ...current, defaultMaxOutputTokens: normalizeAssistantMaxOutputTokenDraft(event.target.value) }))}
+              placeholder={inheritedPreferences?.default_max_output_tokens ? `当前继承：${inheritedPreferences.default_max_output_tokens}` : placeholderText}
+              value={draft.defaultMaxOutputTokens}
+            />
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>只控制单次回复长度</p>
+          </FormField>
+        </div>
+      </div>
+
+      {/* Reasoning Card */}
+      <div
+        className="rounded-md p-3 space-y-3"
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
+      >
+        <div className="flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeLinecap="round">
+            <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" />
+            <path d="M8.5 8.5v.01" />
+            <path d="M16 15.5v.01" />
+            <path d="M12 12v.01" />
+            <path d="M8 16v.01" />
+            <path d="M16 8v.01" />
+          </svg>
+          <span className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>思考设置</span>
+        </div>
+        <ReasoningControl
+          control={reasoningControl}
           draft={draft}
-          inheritedModelName={inheritedPreferences?.default_model_name ?? undefined}
-          updateDraft={updateDraft}
-        />
-        <AssistantMaxOutputTokensField
-          draft={draft}
-          inheritedMaxOutputTokens={inheritedPreferences?.default_max_output_tokens ?? undefined}
-          placeholderText={placeholderText}
-          updateDraft={updateDraft}
-        />
-        <AssistantReasoningField
-          draft={draft}
-          reasoningControl={reasoningControl}
-          reasoningShapeError={reasoningShapeError}
-          updateDraft={updateDraft}
+          error={reasoningShapeError}
+          onUpdate={updateDraft}
         />
       </div>
+
       {showCredentialEmptyState ? (
-        <div className="callout-warning px-4 py-3 text-sm text-accent-warning">
+        <div className="rounded-md px-3.5 py-2.5 text-[12px]" style={{ background: "var(--accent-warning-soft)", color: "var(--accent-warning)" }}>
           {emptyStateText}
         </div>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <button className="ink-button" disabled={isPending || !isDirty || reasoningShapeError !== null} type="submit">
-          {isPending ? "保存中..." : reasoningShapeError ? "先处理冲突字段" : "保存设置"}
+
+      <div className="flex gap-2 pt-1">
+        <button
+          className="h-8 px-4 rounded-md text-[12px] font-medium transition-colors"
+          disabled={isPending || !isDirty || reasoningShapeError !== null}
+          style={{
+            background: isDirty && !reasoningShapeError ? "var(--accent-primary)" : "var(--line-soft)",
+            color: isDirty && !reasoningShapeError ? "var(--text-on-accent)" : "var(--text-tertiary)",
+          }}
+          type="submit"
+        >
+          {isPending ? "保存中..." : reasoningShapeError ? "先处理冲突" : "保存设置"}
         </button>
         <button
-          className="ink-button-secondary"
+          className="h-8 px-4 rounded-md text-[12px] font-medium"
           disabled={isPending || !isDirty}
           onClick={() => {
             const resetDraft = toAssistantPreferencesDraft(preferences);
-            const resetControl = resolvePreferencesReasoningControl(
-              resetDraft,
-              inheritedPreferences,
-              providerOptions,
-            );
+            const resetControl = resolvePreferencesReasoningControl(resetDraft, inheritedPreferences, providerOptions);
             setDraft(normalizeAssistantPreferencesDraft(resetDraft, resetControl));
           }}
+          style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
           type="button"
         >
           还原
@@ -141,266 +208,91 @@ export function AssistantPreferencesForm({
   );
 }
 
-function AssistantProviderField({
-  draft,
-  providerOptions,
-  updateDraft,
-}: Readonly<{
-  draft: AssistantPreferencesDraft;
-  providerOptions: AssistantProviderOption[];
-  updateDraft: (updater: (current: AssistantPreferencesDraft) => AssistantPreferencesDraft) => void;
-}>) {
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium text-text-primary" htmlFor="assistant-default-provider">
-        默认连接
-      </label>
-      <AppSelect
-        className="min-w-0"
-        emptyText="暂无可用连接"
-        id="assistant-default-provider"
-        options={providerOptions}
-        value={draft.defaultProvider}
-        onChange={(value) =>
-          updateDraft((current) => ({
-            ...current,
-            defaultProvider: value,
-          }))
-        }
-      />
-      <p className="text-[12px] leading-5 text-text-secondary">
-        建议直接从可用连接里选择，不需要自己记任何渠道标识。
-      </p>
+    <div className="space-y-1.5">
+      <label className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>{label}</label>
+      {children}
     </div>
   );
 }
 
-function AssistantModelField({
+function ReasoningControl({
+  control,
   draft,
-  inheritedModelName,
-  updateDraft,
-}: Readonly<{
+  error,
+  onUpdate,
+}: {
+  control: AssistantReasoningControl;
   draft: AssistantPreferencesDraft;
-  inheritedModelName?: string;
-  updateDraft: (updater: (current: AssistantPreferencesDraft) => AssistantPreferencesDraft) => void;
-}>) {
-  const placeholder = inheritedModelName
-    ? `当前继承：${inheritedModelName}`
-    : "例如：gpt-4.1-mini";
-
-  return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium text-text-primary" htmlFor="assistant-default-model-name">
-        默认模型
-      </label>
-      <input
-        className="ink-input"
-        id="assistant-default-model-name"
-        onChange={(event) =>
-          updateDraft((current) => ({
-            ...current,
-            defaultModelName: event.target.value,
-          }))
-        }
-        placeholder={placeholder}
-        value={draft.defaultModelName}
-      />
-      <p className="text-[12px] leading-5 text-text-secondary">
-        通常留空即可。只有你想固定某个模型时，再单独填写。
-      </p>
-    </div>
-  );
-}
-
-function AssistantMaxOutputTokensField({
-  draft,
-  inheritedMaxOutputTokens,
-  placeholderText,
-  updateDraft,
-}: Readonly<{
-  draft: AssistantPreferencesDraft;
-  inheritedMaxOutputTokens?: number;
-  placeholderText: string;
-  updateDraft: (updater: (current: AssistantPreferencesDraft) => AssistantPreferencesDraft) => void;
-}>) {
-  const placeholder = inheritedMaxOutputTokens
-    ? `当前继承：${inheritedMaxOutputTokens}`
-    : placeholderText;
-
-  return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium text-text-primary" htmlFor="assistant-default-max-output-tokens">
-        默认单次回复上限
-      </label>
-      <input
-        className="ink-input"
-        id="assistant-default-max-output-tokens"
-        inputMode="numeric"
-        min={128}
-        onChange={(event) =>
-          updateDraft((current) => ({
-            ...current,
-            defaultMaxOutputTokens: normalizeAssistantMaxOutputTokenDraft(event.target.value),
-          }))
-        }
-        placeholder={placeholder}
-        value={draft.defaultMaxOutputTokens}
-      />
-      <p className="text-[12px] leading-5 text-text-secondary">
-        只控制显式默认的单次回复长度，不影响模型本身的输入容量。留空时不单独覆写，继续沿用当前作用域的默认处理。
-      </p>
-    </div>
-  );
-}
-
-function AssistantReasoningField({
-  draft,
-  reasoningControl,
-  reasoningShapeError,
-  updateDraft,
-}: Readonly<{
-  draft: AssistantPreferencesDraft;
-  reasoningControl: AssistantReasoningControl;
-  reasoningShapeError: string | null;
-  updateDraft: (updater: (current: AssistantPreferencesDraft) => AssistantPreferencesDraft) => void;
-}>) {
-  const conflictNotice = reasoningShapeError ? (
-    <div className="callout-warning px-4 py-3 text-[12px] leading-5 text-accent-warning">
-      当前偏好里存在历史冲突字段：{reasoningShapeError}。先清掉冲突项，再保存新的思考设置。
-      <div className="mt-2">
+  error: string | null;
+  onUpdate: (updater: (current: AssistantPreferencesDraft) => AssistantPreferencesDraft) => void;
+}) {
+  if (error) {
+    return (
+      <div className="rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--accent-warning-soft)", color: "var(--accent-warning)" }}>
+        {error}
         <button
-          className="ink-button-secondary"
-          type="button"
-          onClick={() =>
-            updateDraft((current) => ({
-              ...current,
-              defaultReasoningEffort: "",
-              defaultThinkingBudget: "",
-              defaultThinkingLevel: "",
-            }))}
+          className="ml-2 text-[10px] underline"
+          onClick={() => onUpdate((current) => ({ ...current, defaultReasoningEffort: "", defaultThinkingBudget: "", defaultThinkingLevel: "" }))}
         >
-          清空冲突设置
+          清空冲突
         </button>
       </div>
-    </div>
-  ) : null;
-  if (reasoningControl.kind === "none") {
-    return (
-      <div className="space-y-2 lg:col-span-2">
-        <p className="text-sm font-medium text-text-primary">思考设置</p>
-        {conflictNotice}
-        <div className="rounded-2xl bg-glass-heavy px-4 py-3 text-[12px] leading-5 text-text-secondary">
-          {reasoningControl.description}
-        </div>
-      </div>
     );
   }
-  if (reasoningControl.kind === "gemini_budget") {
+
+  if (control.kind === "none") {
+    return <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>{control.description}</p>;
+  }
+
+  if (control.kind === "gemini_budget") {
     return (
-      <div className="space-y-2 lg:col-span-2">
-        <label className="text-sm font-medium text-text-primary" htmlFor="assistant-default-thinking-budget">
-          {reasoningControl.title}
-        </label>
-        {conflictNotice}
-        <div className="flex flex-wrap gap-2">
-          <ReasoningPresetButton
-            active={draft.defaultThinkingBudget === ""}
-            label="跟随默认"
-            onClick={() =>
-              updateDraft((current) => ({
-                ...current,
-                defaultThinkingBudget: "",
-              }))}
-          />
-          {reasoningControl.allowDisable ? (
-            <ReasoningPresetButton
-              active={draft.defaultThinkingBudget === "0"}
-              label="关闭思考"
-              onClick={() =>
-                updateDraft((current) => ({
-                  ...current,
-                  defaultThinkingBudget: "0",
-                }))}
-            />
-          ) : null}
-          {reasoningControl.allowDynamic ? (
-            <ReasoningPresetButton
-              active={draft.defaultThinkingBudget === "-1"}
-              label="动态思考"
-              onClick={() =>
-                updateDraft((current) => ({
-                  ...current,
-                  defaultThinkingBudget: "-1",
-                }))}
-            />
-          ) : null}
+      <div className="space-y-1.5">
+        <div className="flex gap-1.5">
+          <ReasoningButton active={draft.defaultThinkingBudget === ""} label="跟随默认" onClick={() => onUpdate((c) => ({ ...c, defaultThinkingBudget: "" }))} />
+          {control.allowDisable && <ReasoningButton active={draft.defaultThinkingBudget === "0"} label="关闭" onClick={() => onUpdate((c) => ({ ...c, defaultThinkingBudget: "0" }))} />}
+          {control.allowDynamic && <ReasoningButton active={draft.defaultThinkingBudget === "-1"} label="动态" onClick={() => onUpdate((c) => ({ ...c, defaultThinkingBudget: "-1" }))} />}
         </div>
         <input
-          className="ink-input"
-          id="assistant-default-thinking-budget"
+          className="w-full h-8 px-3 rounded-md text-[12px]"
+          style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)" }}
           inputMode="numeric"
-          onChange={(event) =>
-            updateDraft((current) => ({
-              ...current,
-              defaultThinkingBudget: normalizeAssistantThinkingBudgetInput(event.target.value),
-            }))}
-          placeholder={reasoningControl.placeholder}
+          onChange={(event) => onUpdate((c) => ({ ...c, defaultThinkingBudget: normalizeAssistantThinkingBudgetInput(event.target.value) }))}
+          placeholder={control.placeholder}
           value={draft.defaultThinkingBudget}
         />
-        <p className="text-[12px] leading-5 text-text-secondary">
-          {reasoningControl.description}
-        </p>
+        <p className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>{control.description}</p>
       </div>
     );
   }
-  const optionValue = reasoningControl.kind === "openai"
-    ? draft.defaultReasoningEffort
-    : draft.defaultThinkingLevel;
+
+  const optionValue = control.kind === "openai" ? draft.defaultReasoningEffort : draft.defaultThinkingLevel;
 
   return (
-    <div className="space-y-2 lg:col-span-2">
-      <label className="text-sm font-medium text-text-primary" htmlFor="assistant-default-reasoning">
-        {reasoningControl.title}
-      </label>
-      {conflictNotice}
+    <div className="space-y-1.5">
       <AppSelect
         className="min-w-0"
         id="assistant-default-reasoning"
-        options={reasoningControl.options}
+        options={control.options}
         value={optionValue}
-        onChange={(value) =>
-          updateDraft((current) => ({
-            ...current,
-            ...(reasoningControl.kind === "openai"
-              ? { defaultReasoningEffort: value }
-              : { defaultThinkingLevel: value }),
-          }))}
+        onChange={(value) => onUpdate((c) => ({ ...c, ...(control.kind === "openai" ? { defaultReasoningEffort: value } : { defaultThinkingLevel: value }) }))}
       />
-      <p className="text-[12px] leading-5 text-text-secondary">
-        {reasoningControl.description}
-      </p>
+      <p className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>{control.description}</p>
     </div>
   );
 }
 
-function ReasoningPresetButton({
-  active,
-  label,
-  onClick,
-}: Readonly<{
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}>) {
+function ReasoningButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
     <button
-      className={`rounded-full px-3 py-1.5 text-[12px] transition ${
-        active
-          ? "bg-accent-primary/10 text-accent-primary shadow-sm"
-          : "bg-surface text-text-secondary shadow-xs hover:bg-surface-hover"
-      }`}
-      type="button"
+      className="px-2.5 py-1 rounded text-[11px] font-medium transition-colors"
       onClick={onClick}
+      style={{
+        background: active ? "var(--accent-primary-soft)" : "var(--line-soft)",
+        color: active ? "var(--accent-primary)" : "var(--text-tertiary)",
+        border: active ? "1px solid var(--accent-primary-muted)" : "1px solid var(--line-medium)",
+      }}
     >
       {label}
     </button>
@@ -421,16 +313,8 @@ function resolvePreferencesReasoningControl(
   const apiDialect = selectedProviderOption?.apiDialect ?? null;
   const preferredKind = resolveAssistantReasoningPreferredKind({
     reasoningEffort: draft.defaultReasoningEffort || (inheritedPreferences?.default_reasoning_effort ?? ""),
-    thinkingBudget: draft.defaultThinkingBudget || (
-      inheritedPreferences?.default_thinking_budget == null
-        ? ""
-        : String(inheritedPreferences.default_thinking_budget)
-    ),
+    thinkingBudget: draft.defaultThinkingBudget || (inheritedPreferences?.default_thinking_budget == null ? "" : String(inheritedPreferences.default_thinking_budget)),
     thinkingLevel: draft.defaultThinkingLevel || (inheritedPreferences?.default_thinking_level ?? ""),
   });
-  return resolveAssistantReasoningControl({
-    apiDialect,
-    modelName: effectiveModelName,
-    preferredKind,
-  });
+  return resolveAssistantReasoningControl({ apiDialect, modelName: effectiveModelName, preferredKind });
 }

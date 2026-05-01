@@ -10,7 +10,6 @@ import {
   AssistantDocumentModeToggle,
   type AssistantDocumentEditMode,
 } from "@/features/settings/components/assistant/common/assistant-document-mode-toggle";
-import { AssistantMcpRawEditor } from "@/features/settings/components/assistant/mcp/assistant-mcp-raw-editor";
 import {
   ASSISTANT_MCP_FILE_LABEL,
   buildAssistantMcpDocumentPreview,
@@ -59,56 +58,77 @@ export function AssistantMcpEditor({
   }, [isDirty, onDirtyChange]);
 
   return (
-    <form className="panel-muted space-y-10 p-10" onSubmit={(event) => submitDraft(event, draft, onSubmit)}>
+    <form
+      className="px-5 py-4 space-y-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(draft);
+      }}
+    >
       <AssistantDocumentModeToggle
         fileLabel={ASSISTANT_MCP_FILE_LABEL}
         guidedDisabled={Boolean(documentError)}
         mode={editorMode}
         onChange={setEditorMode}
       />
+
       {editorMode === "guided" ? (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.92fr)]">
-          <div className="space-y-4">
-            <div className="rounded-2xl bg-glass-heavy px-4 py-3 text-xs leading-6 text-text-secondary">
-              MCP 用来保存你自己的外部工具连接。创建好以后，就可以在 Hooks 里直接选它来执行。
-            </div>
-            <TextField label="名称" maxLength={80} placeholder="例如：资料检索" value={draft.name} onChange={(value) => applyDraft({ ...draft, name: value }, detail?.id ?? null, setDraft, setDocumentValue, setDocumentError)} />
-            <TextareaField label="一句说明" maxLength={240} placeholder="例如：给 Hook 调用的资料查询工具。" value={draft.description} onChange={(value) => applyDraft({ ...draft, description: value }, detail?.id ?? null, setDraft, setDocumentValue, setDocumentError)} />
-            <ToggleField checked={draft.enabled} description="停用后会保留这条连接，但聊天里的 Hook 暂时不会执行它。" label="启用" onChange={(checked) => applyDraft({ ...draft, enabled: checked }, detail?.id ?? null, setDraft, setDocumentValue, setDocumentError)} />
-            <TextField label="地址" maxLength={2000} placeholder="https://example.com/mcp" value={draft.url} onChange={(value) => applyDraft({ ...draft, url: value }, detail?.id ?? null, setDraft, setDocumentValue, setDocumentError)} />
-            <TextField label="超时（秒）" maxLength={4} placeholder="30" value={draft.timeout} onChange={(value) => applyDraft({ ...draft, timeout: sanitizeAssistantMcpTimeoutInput(value) }, detail?.id ?? null, setDraft, setDocumentValue, setDocumentError)} />
-            <JsonTextAreaField emptyValue={{}} helpText='例如：{ "Authorization": "Bearer ..." }' label="请求头" parseValue={validateAssistantMcpHeaders} value={draft.headers} onChange={(value) => applyDraft({ ...draft, headers: value ?? {} }, detail?.id ?? null, setDraft, setDocumentValue, setDocumentError)} onErrorChange={setHeadersError} />
-          </div>
-          <div className="space-y-3">
-            <PreviewCard fileLabel={ASSISTANT_MCP_FILE_LABEL} preview={documentValue} />
-            <div className="rounded-3xl bg-glass shadow-glass px-4 py-3">
-              <p className="text-sm font-medium text-text-primary">当前效果</p>
-              <p className="mt-1 text-[12px] leading-5 text-text-secondary">这个 MCP 会通过 `streamable_http` 方式连接，保存后可以在 Hooks 里直接选用。</p>
-            </div>
-          </div>
-        </div>
+        <GuidedMcpEditor
+          draft={draft}
+          serverId={detail?.id ?? null}
+          onChange={(nextDraft) => applyDraft(nextDraft, detail?.id ?? null, setDraft, setDocumentValue, setDocumentError)}
+          onHeadersErrorChange={setHeadersError}
+        />
       ) : (
-        <AssistantMcpRawEditor
+        <RawMcpEditor
           documentError={documentError}
           documentValue={documentValue}
           mode={mode}
           onChange={(value) => applyDocument(value, detail?.id ?? null, setDraft, setDocumentValue, setDocumentError)}
         />
       )}
-      <div className="flex flex-wrap items-center justify-end gap-2">
+
+      {/* Actions */}
+      <div className="flex gap-2 pt-1">
         {hasFieldError || documentError ? (
-          <p className="mr-auto rounded-2xl bg-accent-danger/10 px-3 py-2 text-[12px] leading-5 text-accent-danger">
+          <p className="mr-auto rounded-md px-3 py-2 text-[12px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
             {documentError ?? "请先修正请求头格式，再保存。"}
           </p>
         ) : null}
-        <button className="ink-button" disabled={isPending || !isDirty || hasFieldError || Boolean(documentError)} type="submit">
+        <button
+          className="h-8 px-4 rounded-md text-[12px] font-medium transition-colors"
+          disabled={isPending || !isDirty || hasFieldError || Boolean(documentError)}
+          style={{
+            background: isDirty && !hasFieldError && !documentError ? "var(--accent-primary)" : "var(--line-soft)",
+            color: isDirty && !hasFieldError && !documentError ? "var(--text-on-accent)" : "var(--text-tertiary)",
+          }}
+          type="submit"
+        >
           {isPending ? "保存中..." : mode === "create" ? "创建 MCP" : "保存修改"}
         </button>
-        <button className="ink-button-secondary" disabled={isPending || !isDirty} type="button" onClick={() => { const nextDraft = buildInitialDraft(detail); setDraft(nextDraft); setDocumentValue(buildAssistantMcpDocumentPreview(nextDraft, { serverId: detail?.id ?? null })); setDocumentError(null); setHeadersError(null); }}>
+        <button
+          className="h-8 px-4 rounded-md text-[12px] font-medium"
+          disabled={isPending || !isDirty}
+          onClick={() => {
+            const nextDraft = buildInitialDraft(detail);
+            setDraft(nextDraft);
+            setDocumentValue(buildAssistantMcpDocumentPreview(nextDraft, { serverId: detail?.id ?? null }));
+            setDocumentError(null);
+            setHeadersError(null);
+          }}
+          style={{ background: "var(--line-soft)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
+          type="button"
+        >
           还原
         </button>
         {mode === "edit" && detail && onDelete ? (
-          <button className="ink-button-secondary" disabled={isPending} type="button" onClick={onDelete}>
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            disabled={isPending}
+            style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}
+            type="button"
+            onClick={onDelete}
+          >
             删除
           </button>
         ) : null}
@@ -117,75 +137,175 @@ export function AssistantMcpEditor({
   );
 }
 
-function PreviewCard({
-  fileLabel,
-  preview,
+function buildInitialDraft(detail: AssistantMcpDetail | null) {
+  return detail ? toAssistantMcpDraft(detail) : createEmptyAssistantMcpDraft();
+}
+
+function GuidedMcpEditor({
+  draft,
+  serverId,
+  onChange,
+  onHeadersErrorChange,
 }: Readonly<{
-  fileLabel: string;
-  preview: string;
+  draft: AssistantMcpDraft;
+  serverId: string | null;
+  onChange: (draft: AssistantMcpDraft) => void;
+  onHeadersErrorChange: (message: string | null) => void;
 }>) {
   return (
-    <div className="rounded-3xl bg-glass shadow-glass p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-text-primary">保存后的文件</p>
-          <p className="mt-1 text-[12px] leading-5 text-text-secondary">右侧会同步预览这条 MCP 最终保存成什么样。</p>
-        </div>
-        <span className="rounded-pill bg-glass-heavy px-3 py-1 text-[12px] font-medium text-text-secondary">{fileLabel}</span>
+    <div className="space-y-4">
+      {/* Info Banner */}
+      <div className="rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--accent-primary-soft)", color: "var(--accent-primary)", border: "1px solid var(--accent-primary-soft)" }}>
+        MCP 用来保存你自己的外部工具连接。创建好以后，就可以在 Hooks 里直接选它来执行。
       </div>
-      <pre className="mt-3 max-h-[320px] overflow-auto rounded-2xl bg-glass px-4 py-4 text-[12px] leading-6 text-text-primary">{preview}</pre>
+
+      {/* Basic Info */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <FormField label="名称">
+          <input
+            className="w-full h-8 px-3 rounded-md text-[12px]"
+            style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)" }}
+            maxLength={80}
+            placeholder="例如：资料检索"
+            value={draft.name}
+            onChange={(event) => onChange({ ...draft, name: event.target.value })}
+          />
+        </FormField>
+
+        <FormField label="启用状态">
+          <label className="flex items-center gap-2 h-8 px-3 rounded-md cursor-pointer" style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-medium)" }}>
+            <input
+              checked={draft.enabled}
+              className="size-3.5 accent-[var(--accent-primary)]"
+              type="checkbox"
+              onChange={(event) => onChange({ ...draft, enabled: event.target.checked })}
+            />
+            <span className="text-[12px]" style={{ color: "var(--text-primary)" }}>{draft.enabled ? "已启用" : "已停用"}</span>
+          </label>
+        </FormField>
+      </div>
+
+      <FormField label="一句说明">
+        <textarea
+          className="w-full px-3 py-2 rounded-md text-[12px] resize-y"
+          style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)", minHeight: "64px" }}
+          maxLength={240}
+          placeholder="例如：给 Hook 调用的资料查询工具。"
+          value={draft.description}
+          onChange={(event) => onChange({ ...draft, description: event.target.value })}
+        />
+      </FormField>
+
+      {/* Connection Info */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <FormField label="地址">
+          <input
+            className="w-full h-8 px-3 rounded-md text-[12px]"
+            style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)" }}
+            maxLength={2000}
+            placeholder="https://example.com/mcp"
+            value={draft.url}
+            onChange={(event) => onChange({ ...draft, url: event.target.value })}
+          />
+        </FormField>
+
+        <FormField label="超时（秒）">
+          <input
+            className="w-full h-8 px-3 rounded-md text-[12px]"
+            style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)" }}
+            inputMode="numeric"
+            maxLength={4}
+            placeholder="30"
+            value={draft.timeout}
+            onChange={(event) => onChange({ ...draft, timeout: sanitizeAssistantMcpTimeoutInput(event.target.value) })}
+          />
+        </FormField>
+      </div>
+
+      <JsonTextAreaField
+        emptyValue={{}}
+        helpText='例如：{ "Authorization": "Bearer ..." }'
+        label="请求头"
+        parseValue={validateAssistantMcpHeaders}
+        value={draft.headers}
+        onChange={(value) => onChange({ ...draft, headers: value ?? {} })}
+        onErrorChange={onHeadersErrorChange}
+      />
+
+      {/* Preview */}
+      <div
+        className="rounded-md p-3"
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>保存后的文件</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--line-soft)", color: "var(--text-tertiary)" }}>{ASSISTANT_MCP_FILE_LABEL}</span>
+        </div>
+        <pre
+          className="text-[11px] leading-4 overflow-auto rounded px-2 py-2"
+          style={{ background: "var(--bg-canvas)", color: "var(--text-secondary)", maxHeight: "160px" }}
+        >
+          {buildAssistantMcpDocumentPreview(draft, { serverId })}
+        </pre>
+      </div>
     </div>
   );
 }
 
-function TextField({
-  label,
-  maxLength,
-  placeholder,
-  value,
+function RawMcpEditor({
+  documentError,
+  documentValue,
+  mode,
   onChange,
 }: Readonly<{
-  label: string;
-  maxLength: number;
-  placeholder: string;
-  value: string;
+  documentError: string | null;
+  documentValue: string;
+  mode: "create" | "edit";
   onChange: (value: string) => void;
 }>) {
-  return <label className="block space-y-2"><span className="text-sm font-medium text-text-primary">{label}</span><input className="ink-input" maxLength={maxLength} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+  return (
+    <div className="space-y-4">
+      <FormField label="MCP.yaml">
+        <textarea
+          className="w-full px-3 py-2 rounded-md text-[12px] resize-y font-mono"
+          style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-medium)", minHeight: "320px" }}
+          spellCheck={false}
+          value={documentValue}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <p className="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>按约定直接写，保存后立即生效</p>
+      </FormField>
+
+      <div
+        className="rounded-md p-3"
+        style={{ background: "var(--bg-canvas)", border: "1px solid var(--line-soft)" }}
+      >
+        <p className="text-[11px] font-medium mb-2" style={{ color: "var(--text-secondary)" }}>文件约定</p>
+        <p className="text-[11px] leading-4" style={{ color: "var(--text-tertiary)" }}>
+          支持标准 YAML frontmatter。name、enabled、url、transport、timeout 都能直接写。
+        </p>
+        {mode === "create" ? (
+          <p className="mt-2 text-[11px]" style={{ color: "var(--accent-warning)" }}>
+            第一次保存后，系统会自动补上这份 MCP 的 id。
+          </p>
+        ) : null}
+        {documentError ? (
+          <p className="mt-2 rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--accent-danger-soft)", color: "var(--accent-danger)" }}>
+            {documentError}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
-function TextareaField({
-  label,
-  maxLength,
-  placeholder,
-  value,
-  onChange,
-}: Readonly<{
-  label: string;
-  maxLength: number;
-  placeholder: string;
-  value: string;
-  onChange: (value: string) => void;
-}>) {
-  return <label className="block space-y-2"><span className="text-sm font-medium text-text-primary">{label}</span><textarea className="ink-input min-h-[88px]" maxLength={maxLength} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
-}
-
-function ToggleField({
-  checked,
-  description,
-  label,
-  onChange,
-}: Readonly<{
-  checked: boolean;
-  description: string;
-  label: string;
-  onChange: (value: boolean) => void;
-}>) {
-  return <label className="flex items-start gap-3 rounded-2xl bg-glass shadow-glass px-4 py-3"><input checked={checked} className="mt-1 size-4 shrink-0 accent-accent-primary" type="checkbox" onChange={(event) => onChange(event.target.checked)} /><span className="space-y-1"><span className="block text-sm font-medium text-text-primary">{label}</span><span className="block text-[12px] leading-5 text-text-secondary">{description}</span></span></label>;
-}
-
-function buildInitialDraft(detail: AssistantMcpDetail | null) {
-  return detail ? toAssistantMcpDraft(detail) : createEmptyAssistantMcpDraft();
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>{label}</label>
+      {children}
+    </div>
+  );
 }
 
 function applyDraft(
@@ -214,13 +334,4 @@ function applyDocument(
   } catch (error) {
     setDocumentError(error instanceof Error ? error.message : "MCP.yaml 解析失败。");
   }
-}
-
-function submitDraft(
-  event: FormEvent<HTMLFormElement>,
-  draft: AssistantMcpDraft,
-  onSubmit: (draft: AssistantMcpDraft) => void,
-) {
-  event.preventDefault();
-  onSubmit(draft);
 }

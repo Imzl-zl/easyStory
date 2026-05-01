@@ -67,7 +67,7 @@ export function EnginePageShell({
       <section className="hero-card p-9 flex flex-col justify-between gap-6">
         <div className="absolute -right-10 -bottom-14 w-[180px] h-[180px] rounded-full bg-accent-soft" />
         <div className="max-w-[620px]">
-          <p className="label-overline">推进中心</p>
+          <p className="label-overline">工作流引擎</p>
           <h1 className="mt-4.5 font-serif text-[clamp(2.6rem,5vw,4.4rem)] font-semibold leading-tight">创作进度</h1>
           {workflowSummary ? (
             <div className="flex flex-wrap gap-2 mt-4">
@@ -108,6 +108,9 @@ export function EnginePageShell({
             </button>
             <Link className="ink-button-secondary text-center" href={`/workspace/project/${projectId}/studio?panel=chapter`}>
               返回创作
+            </Link>
+            <Link className="ink-button-secondary text-center" href={`/workspace/project/${projectId}/lab`}>
+              分析
             </Link>
             {secondaryControls.map((control) => (
               <button

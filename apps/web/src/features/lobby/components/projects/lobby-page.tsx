@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LobbyProjectShelf } from "@/features/lobby/components/projects/lobby-project-shelf";
 import { useLobbyProjectModel } from "@/features/lobby/components/projects/lobby-project-model";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 import { BinIcon, GearIcon } from "@/components/icons/shared-icons";
 
 export function LobbyPage() {
@@ -14,6 +15,7 @@ export function LobbyPage() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const clearSession = useAuthStore((state) => state.clearSession);
+  const lastProjectId = useWorkspaceStore((state) => state.lastProjectId);
   const [mounted, setMounted] = useState(false);
 
   const handleCreateProject = useCallback(async () => {
@@ -207,24 +209,27 @@ export function LobbyPage() {
           transition: "all 1s cubic-bezier(0.4, 0, 0.2, 1) 1.2s",
         }}
       >
-        <div
-          className="pointer-events-auto flex items-center gap-1 px-2 py-2 rounded-2xl"
-          style={{
-            background: "var(--bg-glass-heavy)",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            border: "1px solid var(--line-soft)",
-            boxShadow: "var(--shadow-glass-heavy)",
-          }}
-        >
+        <div className="pointer-events-auto lobby-toolbar">
           <ToolButton
-            icon={<BinIcon />}
-            label="回收"
-            href="/workspace/lobby/recycle-bin"
+            icon={<WorkflowToolbarIcon />}
+            label="工作流"
+            href={lastProjectId ? `/workspace/project/${lastProjectId}/engine` : ""}
+            disabled={!lastProjectId}
+          />
+          <ToolButton
+            icon={<AnalysisToolbarIcon />}
+            label="分析"
+            href={lastProjectId ? `/workspace/project/${lastProjectId}/lab` : ""}
+            disabled={!lastProjectId}
           />
           <NewProjectButton
             isPending={model.createProjectMutation.isPending}
             onClick={handleCreateProject}
+          />
+          <ToolButton
+            icon={<BinIcon />}
+            label="回收"
+            href="/workspace/lobby/recycle-bin"
           />
           <ToolButton
             icon={<GearIcon />}
@@ -248,27 +253,17 @@ function NewProjectButton({
   isPending: boolean;
   onClick: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
-
   return (
     <button
-      className="relative flex flex-col items-center gap-1 px-5 py-2 rounded-xl transition-all duration-300"
+      className="lobby-toolbar-btn lobby-toolbar-btn--new"
       disabled={isPending}
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: hovered
-          ? "var(--accent-primary-hover)"
-          : "var(--accent-primary)",
-        transform: hovered ? "translateY(-2px) scale(1.05)" : "translateY(0)",
-        boxShadow: hovered
-          ? "0 4px 20px var(--accent-primary-soft)"
-          : "0 2px 8px var(--accent-primary-soft)",
-      }}
+      type="button"
     >
       <svg
-        className="w-4 h-4"
+        className="lobby-toolbar-btn__icon"
+        width="16"
+        height="16"
         viewBox="0 0 24 24"
         fill="none"
         stroke="var(--text-on-accent)"
@@ -277,10 +272,7 @@ function NewProjectButton({
       >
         <path d="M12 5v14M5 12h14" />
       </svg>
-      <span
-        className="text-[11px] tracking-[0.08em] font-medium"
-        style={{ color: "var(--text-on-accent)" }}
-      >
+      <span className="lobby-toolbar-btn__label">
         {isPending ? "创建中..." : "新建"}
       </span>
     </button>
@@ -292,59 +284,54 @@ function ToolButton({
   label,
   href,
   tone,
+  disabled,
 }: {
   icon: React.ReactNode;
   label: string;
   href: string;
   tone?: "primary" | "default";
+  disabled?: boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
   const isPrimary = tone === "primary";
+
+  if (disabled) {
+    return (
+      <span
+        className="lobby-toolbar-btn lobby-toolbar-btn--disabled"
+        title="最近没有打开过项目"
+      >
+        <span className="lobby-toolbar-btn__icon">{icon}</span>
+        <span className="lobby-toolbar-btn__label">{label}</span>
+      </span>
+    );
+  }
 
   return (
     <Link
       href={href}
-      className="relative flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: hovered
-          ? isPrimary
-            ? "var(--accent-primary-soft)"
-            : "var(--bg-surface-hover)"
-          : "transparent",
-        transform: hovered ? "translateY(-2px)" : "translateY(0)",
-      }}
+      className={`lobby-toolbar-btn ${isPrimary ? "lobby-toolbar-btn--primary" : ""}`}
     >
-      <span
-        style={{
-          color: isPrimary
-            ? hovered
-              ? "var(--accent-primary-hover)"
-              : "var(--accent-primary)"
-            : hovered
-              ? "var(--text-secondary)"
-              : "var(--text-tertiary)",
-          transition: "color 0.3s ease",
-        }}
-      >
-        {icon}
-      </span>
-      <span
-        className="text-[10px] tracking-[0.1em]"
-        style={{
-          color: isPrimary
-            ? hovered
-              ? "var(--accent-primary)"
-              : "var(--accent-primary-dark)"
-            : hovered
-              ? "var(--text-secondary)"
-              : "var(--text-tertiary)",
-          transition: "color 0.3s ease",
-        }}
-      >
-        {label}
-      </span>
+      <span className="lobby-toolbar-btn__icon">{icon}</span>
+      <span className="lobby-toolbar-btn__label">{label}</span>
     </Link>
+  );
+}
+
+function WorkflowToolbarIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+      <path d="m5.64 5.64 2.83 2.83M15.54 8.47l2.83-2.83M5.64 18.36l2.83-2.83M15.54 15.54l2.83 2.83" />
+    </svg>
+  );
+}
+
+function AnalysisToolbarIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3v18h18" />
+      <path d="m7 16 4-8 4 4 4-6" />
+    </svg>
   );
 }

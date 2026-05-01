@@ -2,16 +2,12 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { Avatar } from "@arco-design/web-react";
 import { usePathname } from "next/navigation";
 
 import { AuthGuard } from "@/features/auth/components/auth-guard";
 import {
-  buildWorkspaceItems,
-  isWorkspaceItemActive,
   resolveWorkspaceProjectId,
   resolveWorkspaceUserBadge,
-  type WorkspaceNavItem,
 } from "@/features/workspace/components/workspace-shell-support";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
@@ -30,8 +26,8 @@ function resolvePageMode(pathname: string): PageMode {
 
 function resolveContextTitle(pathname: string): string {
   if (pathname.includes("/studio")) return "创作工作台";
-  if (pathname.includes("/engine")) return "作品推进";
-  if (pathname.includes("/lab")) return "作品洞察";
+  if (pathname.includes("/engine")) return "工作流引擎";
+  if (pathname.includes("/lab")) return "分析实验室";
   if (pathname.includes("/settings")) return "项目设置";
   return "当前项目";
 }
@@ -59,7 +55,6 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
   const lastProjectId = useWorkspaceStore((state) => state.lastProjectId);
   const setLastProjectId = useWorkspaceStore((state) => state.setLastProjectId);
   const currentProjectId = resolveWorkspaceProjectId(pathname);
-  const workspaceItems = buildWorkspaceItems(currentProjectId, lastProjectId);
   const pageMode = resolvePageMode(pathname);
   const shellClassName = pageMode === "project-workspace"
     ? "workspace-shell--studio"
@@ -90,10 +85,8 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
         <WorkspaceHeader
           currentProjectId={currentProjectId}
           onLogout={clearSession}
-          pageMode={pageMode}
           pathname={pathname}
           userName={user?.username ?? "未登录"}
-          workspaceItems={workspaceItems}
         />
         <main className={pageMode === "project-workspace" ? "w-full flex-1 min-h-0 overflow-hidden" : "w-[min(100%-2.5rem,1560px)] mx-auto"} id="workspace-main">
           <div className={pageMode === "project-workspace" ? "h-full min-h-0 overflow-hidden" : "min-h-[calc(100vh-72px)] py-5 pb-7"}>{children}</div>
@@ -106,35 +99,14 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
 function WorkspaceHeader({
   currentProjectId,
   onLogout,
-  pageMode,
   pathname,
   userName,
-  workspaceItems,
 }: Readonly<{
   currentProjectId: string | null;
   onLogout: () => void;
-  pageMode: PageMode;
   pathname: string;
   userName: string;
-  workspaceItems: WorkspaceNavItem[];
 }>) {
-  if (pageMode === "lobby") {
-    return (
-      <header className="sticky top-0 z-20 bg-glass-heavy backdrop-blur-xl lg:ml-16">
-        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 md:gap-6 w-[min(100%-2.5rem,1560px)] mx-auto py-3 md:py-3.5">
-          <WorkspaceBrand />
-          <WorkspaceNav items={workspaceItems} pathname={pathname} />
-          <WorkspaceActions
-            onLogout={onLogout}
-            settingsHref="/workspace/lobby/settings?tab=assistant"
-            settingsLabel="我的助手"
-            userName={userName}
-          />
-        </div>
-      </header>
-    );
-  }
-
   return (
     <header className="workspace-header--project">
       <div className="workspace-header__inner">
@@ -146,11 +118,6 @@ function WorkspaceHeader({
           <div className="workspace-header__divider" />
           <span className="workspace-header__page-title">{resolveContextTitle(pathname)}</span>
         </div>
-        <WorkspaceNav
-          items={workspaceItems.filter((item) => item.segment !== "lobby")}
-          pathname={pathname}
-          variant="project"
-        />
         <WorkspaceActions
           onLogout={onLogout}
           settingsHref={resolveSettingsHref(currentProjectId)}
@@ -159,61 +126,6 @@ function WorkspaceHeader({
         />
       </div>
     </header>
-  );
-}
-
-function WorkspaceBrand() {
-  return (
-    <Link className="inline-flex flex-col gap-0.5 min-w-0" href="/workspace/lobby">
-      <span className="text-text-tertiary text-[0.68rem] tracking-[0.14em] uppercase font-medium">easyStory</span>
-      <span className="text-text-primary text-lg font-semibold tracking-[-0.03em]">写作空间</span>
-    </Link>
-  );
-}
-
-function WorkspaceNav({
-  items,
-  pathname,
-  variant = "default",
-}: Readonly<{
-  items: WorkspaceNavItem[];
-  pathname: string;
-  variant?: "default" | "project";
-}>) {
-  return (
-    <nav aria-label="工作台导航" className={`flex min-w-0 items-center gap-1 overflow-x-auto scrollbar-hide ${variant === "project" ? "justify-center" : ""}`}>
-      {items.map((item) => (
-        <WorkspaceNavLink item={item} key={`${variant}-${item.segment}`} pathname={pathname} />
-      ))}
-    </nav>
-  );
-}
-
-function WorkspaceNavLink({
-  item,
-  pathname,
-}: Readonly<{
-  item: WorkspaceNavItem;
-  pathname: string;
-}>) {
-  const isActive = isWorkspaceItemActive(item, pathname);
-  if (!item.href) {
-    return (
-      <span aria-disabled="true" className="relative inline-flex items-center h-8 px-2.5 text-text-tertiary text-sm font-medium whitespace-nowrap opacity-40 cursor-not-allowed" title={item.meta || "请先打开一个项目"}>
-        {item.label}
-      </span>
-    );
-  }
-
-  return (
-    <Link
-      className="ink-tab text-sm h-8 rounded-2xl"
-      data-active={isActive ? "true" : "false"}
-      href={item.href}
-      title={item.meta}
-    >
-      {item.label}
-    </Link>
   );
 }
 

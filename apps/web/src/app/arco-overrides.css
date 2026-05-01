@@ -309,11 +309,48 @@ body {
   color: inherit !important;
 }
 
+/* Arco Notification 深色主题 */
 .arco-notification {
-  border-radius: var(--radius-xl) !important;
-  box-shadow: var(--shadow-float) !important;
-  -webkit-backdrop-filter: blur(var(--blur-md)) !important;
-  backdrop-filter: blur(var(--blur-md)) !important;
+  border-radius: 12px !important;
+  background: #1e2129 !important;
+  border: 1px solid rgba(150, 158, 170, 0.12) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+.arco-notification .arco-notification-title {
+  color: #e8e6e3 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.arco-notification .arco-notification-content {
+  color: #9ca3af !important;
+  font-size: 12px !important;
+}
+
+.arco-notification .arco-notification-close-btn {
+  color: #6b7280 !important;
+}
+
+.arco-notification .arco-notification-close-btn:hover {
+  color: #e8e6e3 !important;
+}
+
+/* Notification 图标颜色 */
+.arco-notification-success .arco-notification-icon {
+  color: #22c55e !important;
+}
+
+.arco-notification-warning .arco-notification-icon {
+  color: #f59e0b !important;
+}
+
+.arco-notification-error .arco-notification-icon {
+  color: #ef4444 !important;
+}
+
+.arco-notification-info .arco-notification-icon {
+  color: #3b82f6 !important;
 }
 
 .arco-modal {

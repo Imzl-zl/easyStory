@@ -4,12 +4,12 @@ type SelectOption = { label: string; value: string; description?: string };
 
 type AssistantHookRawEditorProps = {
   agentErrorMessage?: string | null;
-  agentOptions: SelectOption[];
+  agentOptions?: SelectOption[];
   documentError: string | null;
   documentValue: string;
   mode: "create" | "edit";
   mcpErrorMessage?: string | null;
-  mcpOptions: SelectOption[];
+  mcpOptions?: SelectOption[];
   onChange: (value: string) => void;
 };
 
@@ -92,7 +92,7 @@ function ReferenceCard({
 }: Readonly<{
   emptyText: string;
   errorMessage?: string | null;
-  items: SelectOption[];
+  items?: SelectOption[];
   title: string;
 }>) {
   return (
@@ -104,12 +104,12 @@ function ReferenceCard({
         </p>
       ) : null}
       <div className="mt-3 space-y-2">
-        {items.length === 0 ? (
+        {(items ?? []).length === 0 ? (
           <div className="rounded-2xl bg-glass px-3 py-2.5 text-[12px] leading-5 text-text-secondary">
             {emptyText}
           </div>
         ) : (
-          items.map((item) => (
+          (items ?? []).map((item) => (
             <div className="rounded-2xl bg-glass px-3 py-2.5" key={item.value}>
               <p className="text-[12px] font-medium text-text-primary">{item.label}</p>
               <p className="mt-1 break-all font-mono text-[11px] leading-5 text-text-secondary">

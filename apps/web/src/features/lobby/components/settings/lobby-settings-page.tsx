@@ -42,8 +42,9 @@ export function LobbySettingsPage() {
   const navigationGuard = useUnsavedChangesGuard({ currentUrl, isDirty, router });
 
   return (
-    <>
-      <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg-canvas)" }}>
+      {/* Sidebar */}
+      <div className="w-[200px] flex-shrink-0 h-full" style={{ borderRight: "1px solid var(--line-soft)" }}>
         <LobbySettingsSidebar
           isDirty={isDirty}
           isPending={route.isPending}
@@ -53,6 +54,10 @@ export function LobbySettingsPage() {
           }
           tab={route.tab}
         />
+      </div>
+
+      {/* Main Content */}
+      <main className="flex-1 min-w-0 overflow-hidden">
         <LobbySettingsContent
           navigationGuard={navigationGuard.attemptNavigation}
           route={route}
@@ -64,14 +69,15 @@ export function LobbySettingsPage() {
           onAssistantSkillsDirtyChange={setAssistantSkillsDirty}
           onCredentialDirtyChange={setCredentialDirty}
         />
-      </div>
+      </main>
+
       <UnsavedChangesDialog
         isOpen={navigationGuard.isConfirmOpen}
         isPending={false}
         onClose={navigationGuard.handleDialogClose}
         onConfirm={navigationGuard.handleDialogConfirm}
       />
-    </>
+    </div>
   );
 }
 
@@ -96,15 +102,41 @@ function LobbySettingsContent({
   onAssistantSkillsDirtyChange: (isDirty: boolean) => void;
   onCredentialDirtyChange: (isDirty: boolean) => void;
 }>) {
+  if (route.tab === "credentials") {
+    return (
+      <CredentialCenter
+        isNavigationPending={route.isPending}
+        onDirtyChange={onCredentialDirtyChange}
+        projectId={route.projectId}
+        scope={route.scope}
+        selectedCredentialId={route.credentialId}
+        onSyncCredentialForEdit={(nextCredentialId) =>
+          route.setParams({
+            credential: nextCredentialId,
+            scope: route.scope,
+            sub: "list",
+            tab: "credentials",
+          })
+        }
+        onScopeChange={(nextScope) =>
+          navigationGuard(() =>
+            route.setParams({
+              credential: null,
+              scope: nextScope,
+              sub: "list",
+              tab: "credentials",
+            }),
+          )
+        }
+      />
+    );
+  }
+
   if (route.tab === "assistant") {
     return (
       <LobbyAssistantSettingsPanel
         onAssistantPreferencesDirtyChange={onAssistantPreferencesDirtyChange}
         onAssistantRulesDirtyChange={onAssistantRulesDirtyChange}
-        onOpenCredentials={() =>
-          navigationGuard(() => handleLobbySettingsTabChange("credentials", route.setParams))
-        }
-        onOpenSkills={() => navigationGuard(() => handleLobbySettingsTabChange("skills", route.setParams))}
       />
     );
   }
@@ -121,86 +153,7 @@ function LobbySettingsContent({
     return <AssistantHooksPanel onDirtyChange={onAssistantHooksDirtyChange} />;
   }
 
-  if (route.tab === "mcp") {
-    return <AssistantMcpPanel onDirtyChange={onAssistantMcpDirtyChange} />;
-  }
-
-  return (
-    <CredentialCenter
-      isNavigationPending={route.isPending}
-      mode={route.mode}
-      onDirtyChange={onCredentialDirtyChange}
-      projectId={route.projectId}
-      scope={route.scope}
-      selectedCredentialId={route.credentialId}
-      onSyncCredential={(nextCredentialId) =>
-        route.setParams({
-          credential: nextCredentialId,
-          scope: route.scope,
-          sub: "audit",
-          tab: "credentials",
-        })
-      }
-      onSyncCredentialForEdit={(nextCredentialId) =>
-        route.setParams({
-          credential: nextCredentialId,
-          scope: route.scope,
-          sub: "list",
-          tab: "credentials",
-        })
-      }
-      onModeChange={(nextMode) =>
-        navigationGuard(() =>
-          route.setParams({
-            credential: nextMode === "audit" ? route.credentialId : null,
-            scope: route.scope,
-            sub: nextMode,
-            tab: "credentials",
-          }),
-        )
-      }
-      onScopeChange={(nextScope) =>
-        navigationGuard(() =>
-          route.setParams({
-            credential: null,
-            scope: nextScope,
-            sub: route.mode,
-            tab: "credentials",
-          }),
-        )
-      }
-      onSelectCredential={(nextCredentialId) =>
-        navigationGuard(() =>
-          route.setParams({
-            credential: nextCredentialId,
-            scope: route.scope,
-            sub: "audit",
-            tab: "credentials",
-          }),
-        )
-      }
-      onSelectCredentialForEdit={(nextCredentialId) =>
-        navigationGuard(() =>
-          route.setParams({
-            credential: nextCredentialId,
-            scope: route.scope,
-            sub: "list",
-            tab: "credentials",
-          }),
-        )
-      }
-      onResetEditor={() =>
-        navigationGuard(() =>
-          route.setParams({
-            credential: null,
-            scope: route.scope,
-            sub: "list",
-            tab: "credentials",
-          }),
-        )
-      }
-    />
-  );
+  return <AssistantMcpPanel onDirtyChange={onAssistantMcpDirtyChange} />;
 }
 
 function handleLobbySettingsTabChange(
@@ -212,52 +165,22 @@ function handleLobbySettingsTabChange(
     return;
   }
   if (tab === "skills") {
-    setParams({
-      credential: null,
-      project: null,
-      scope: null,
-      sub: null,
-      tab: "skills",
-    });
+    setParams({ credential: null, project: null, scope: null, sub: null, tab: "skills" });
     return;
   }
   if (tab === "hooks") {
-    setParams({
-      credential: null,
-      project: null,
-      scope: null,
-      sub: null,
-      tab: "hooks",
-    });
+    setParams({ credential: null, project: null, scope: null, sub: null, tab: "hooks" });
     return;
   }
   if (tab === "mcp") {
-    setParams({
-      credential: null,
-      project: null,
-      scope: null,
-      sub: null,
-      tab: "mcp",
-    });
+    setParams({ credential: null, project: null, scope: null, sub: null, tab: "mcp" });
     return;
   }
   if (tab === "agents") {
-    setParams({
-      credential: null,
-      project: null,
-      scope: null,
-      sub: null,
-      tab: "agents",
-    });
+    setParams({ credential: null, project: null, scope: null, sub: null, tab: "agents" });
     return;
   }
-  setParams({
-    credential: null,
-    project: null,
-    scope: null,
-    sub: null,
-    tab: "assistant",
-  });
+  setParams({ credential: null, project: null, scope: null, sub: null, tab: "assistant" });
 }
 
 function resolveLobbySettingsDirtyState(

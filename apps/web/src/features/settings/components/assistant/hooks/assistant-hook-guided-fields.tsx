@@ -22,10 +22,10 @@ type HookOption = { label: string; value: string; description?: string };
 
 type HookGuidedFormPanelProps = {
   agentErrorMessage?: string | null;
-  agentOptions: HookOption[];
+  agentOptions?: HookOption[];
   draft: AssistantHookDraft;
   mcpErrorMessage?: string | null;
-  mcpOptions: HookOption[];
+  mcpOptions?: HookOption[];
   onChange: (draft: AssistantHookDraft) => void;
   onFieldErrorChange: (field: AssistantHookFieldErrorKey, message: string | null) => void;
 };
@@ -107,7 +107,7 @@ function HookAgentFields({
   onFieldErrorChange,
 }: Readonly<{
   agentErrorMessage?: string | null;
-  agentOptions: HookOption[];
+  agentOptions?: HookOption[];
   draft: AssistantHookDraft;
   onChange: (draft: AssistantHookDraft) => void;
   onFieldErrorChange: (field: AssistantHookFieldErrorKey, message: string | null) => void;
@@ -117,7 +117,7 @@ function HookAgentFields({
       <AssistantSelectField
         description={agentErrorMessage ?? "这个 Agent 会在指定时机自动执行。"}
         label="选择 Agent"
-        options={[{ label: "请选择 Agent", value: "" }, ...agentOptions]}
+        options={[{ label: "请选择 Agent", value: "" }, ...(agentOptions ?? [])]}
         tone={agentErrorMessage ? "danger" : "default"}
         value={draft.agentId}
         onChange={(value) => onChange({ ...draft, agentId: value })}
@@ -144,7 +144,7 @@ function HookMcpFields({
 }: Readonly<{
   draft: AssistantHookDraft;
   mcpErrorMessage?: string | null;
-  mcpOptions: HookOption[];
+  mcpOptions?: HookOption[];
   onChange: (draft: AssistantHookDraft) => void;
   onFieldErrorChange: (field: AssistantHookFieldErrorKey, message: string | null) => void;
 }>) {
@@ -153,7 +153,7 @@ function HookMcpFields({
       <AssistantSelectField
         description={mcpErrorMessage ?? "先选一个你自己的 MCP，再填写要调用的工具名称。"}
         label="选择 MCP"
-        options={[{ label: "请选择 MCP", value: "" }, ...mcpOptions]}
+        options={[{ label: "请选择 MCP", value: "" }, ...(mcpOptions ?? [])]}
         tone={mcpErrorMessage ? "danger" : "default"}
         value={draft.serverId}
         onChange={(value) => onChange({ ...draft, serverId: value })}

@@ -195,17 +195,34 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           </form>
 
           {/* 切换模式 */}
-          <div
-            className="flex gap-2 justify-center mt-7 pt-6 border-t border-line-soft"
-          >
+          <div className="flex items-center justify-center gap-3 mt-8">
             <span className="text-[13px] text-text-tertiary">
               {copy.switchPrompt}
             </span>
             <Link
-              className="text-[13px] font-semibold text-accent-primary"
+              className="group inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent-primary transition-colors hover:text-accent-primary-hover"
               href={copy.switchHref}
             >
-              {copy.switchLabel}
+              <span className="relative">
+                {copy.switchLabel}
+                <span
+                  className="absolute -bottom-0.5 left-0 h-px w-0 bg-accent-primary transition-all duration-300 group-hover:w-full"
+                />
+              </span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="transition-transform duration-300 group-hover:translate-x-0.5"
+              >
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
             </Link>
           </div>
         </div>
@@ -259,6 +276,7 @@ function ErrorNotice({ message }: Readonly<{ message: string }>) {
   return (
     <div
       className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-[13px] leading-relaxed bg-accent-danger-soft text-accent-danger"
+      role="alert"
     >
       <span
         className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full font-bold text-[10px] bg-accent-danger-muted"

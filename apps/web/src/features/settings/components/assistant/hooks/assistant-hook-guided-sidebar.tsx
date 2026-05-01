@@ -16,9 +16,9 @@ export function HookGuidedSidebar({
   mcpOptions,
   preview,
 }: Readonly<{
-  agentOptions: HookOption[];
+  agentOptions?: HookOption[];
   draft: AssistantHookDraft;
-  mcpOptions: HookOption[];
+  mcpOptions?: HookOption[];
   preview: string;
 }>) {
   return (
@@ -86,6 +86,6 @@ function HookPreviewCard({ preview }: Readonly<{ preview: string }>) {
   );
 }
 
-function findOptionLabel(options: ReadonlyArray<HookOption>, value: string) {
-  return options.find((item) => item.value === value)?.label ?? null;
+function findOptionLabel(options: ReadonlyArray<HookOption> | undefined, value: string) {
+  return options?.find((item) => item.value === value)?.label ?? null;
 }

@@ -27,6 +27,25 @@ export function ExportIcon() {
   );
 }
 
+export function WorkflowIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+      <path d="m5.64 5.64 2.83 2.83M15.54 8.47l2.83-2.83M5.64 18.36l2.83-2.83M15.54 15.54l2.83 2.83" />
+    </svg>
+  );
+}
+
+export function AnalysisIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3v18h18" />
+      <path d="m7 16 4-8 4 4 4-6" />
+    </svg>
+  );
+}
+
 export function SidebarExpandIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
