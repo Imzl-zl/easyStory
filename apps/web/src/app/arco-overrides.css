@@ -22,6 +22,24 @@ body {
   --arco-border-radius-small: var(--radius-sm);
   --arco-border-radius-medium: var(--radius-md);
   --arco-border-radius-large: var(--radius-lg);
+
+  --arco-menu-default-color: var(--text-primary);
+  --arco-menu-default-bg: transparent;
+  --arco-menu-hover-color: var(--text-primary);
+  --arco-menu-hover-bg: rgba(150, 158, 170, 0.10);
+  --arco-menu-active-color: var(--accent-primary);
+  --arco-menu-active-bg: var(--accent-primary-soft);
+  --arco-menu-selected-color: var(--accent-primary);
+  --arco-menu-selected-bg: var(--accent-primary-soft);
+
+  --arco-dropdown-color: var(--text-primary);
+  --arco-dropdown-bg: rgba(34, 38, 46, 0.96);
+  --arco-dropdown-hover-color: var(--text-primary);
+  --arco-dropdown-hover-bg: rgba(150, 158, 170, 0.10);
+  --arco-dropdown-active-color: var(--accent-primary);
+  --arco-dropdown-active-bg: var(--accent-primary-soft);
+  --arco-dropdown-selected-color: var(--accent-primary);
+  --arco-dropdown-selected-bg: var(--accent-primary-soft);
 }
 
 .arco-btn-primary {
@@ -74,8 +92,79 @@ body {
   box-shadow: 0 0 0 3px var(--line-focus) !important;
 }
 
+.arco-dropdown-menu {
+  background: linear-gradient(180deg, rgba(42, 47, 56, 0.98) 0%, rgba(34, 38, 46, 0.96) 100%) !important;
+  border-radius: var(--radius-xl) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  border: none !important;
+  padding: 6px !important;
+  min-width: 160px !important;
+}
+
+.arco-dropdown-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px !important;
+  border-radius: var(--radius-lg) !important;
+  color: var(--text-primary) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+  cursor: pointer;
+  margin: 1px 0;
+  background: transparent !important;
+}
+
 .arco-dropdown-menu-item:hover {
   background-color: var(--bg-surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.arco-dropdown-menu-item-active,
+.arco-dropdown-menu-item-selected {
+  background-color: var(--accent-primary-soft) !important;
+  color: var(--accent-primary) !important;
+}
+
+/* 右键菜单 — Dropdown 内嵌 Menu（SubMenu 弹出层） */
+.arco-dropdown-menu-pop-header {
+  padding: 9px 14px !important;
+  border-radius: var(--radius-lg) !important;
+  color: var(--text-secondary) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+  background: transparent !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+  margin: 1px 0;
+  cursor: pointer;
+}
+
+.arco-dropdown-menu-pop-header:hover {
+  background-color: rgba(150, 158, 170, 0.10) !important;
+  color: var(--text-primary) !important;
+}
+
+.arco-dropdown-menu-icon-suffix {
+  color: var(--text-tertiary) !important;
+  font-size: 10px !important;
+}
+
+.arco-dropdown-menu-indent,
+.arco-dropdown-menu-item-indent {
+  display: none !important;
+}
+
+.arco-dropdown-menu-inner {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
 }
 
 .arco-tag {

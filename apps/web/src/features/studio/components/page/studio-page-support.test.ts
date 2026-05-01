@@ -60,15 +60,15 @@ test("resolveSelectedChapterNumber prefers explicit chapter, then first stale, t
 });
 
 test("studio chat sidebar width clamps within desktop bounds", () => {
-  assert.equal(clampStudioChatSidebarWidth(200, 1024), 320);
+  assert.equal(clampStudioChatSidebarWidth(200, 1024), 280);
   assert.equal(clampStudioChatSidebarWidth(999, 1024), 368);
   assert.equal(clampStudioChatSidebarWidth(520, 1440), 520);
-  assert.equal(clampStudioChatSidebarWidth(1200, 1440), 760);
+  assert.equal(clampStudioChatSidebarWidth(1200, 1440), 720);
 });
 
 test("studio chat sidebar default width follows previous layout targets", () => {
-  assert.equal(resolveDefaultStudioChatSidebarWidth(1024), 368);
-  assert.equal(resolveDefaultStudioChatSidebarWidth(1280), 408);
+  assert.equal(resolveDefaultStudioChatSidebarWidth(1024), 360);
+  assert.equal(resolveDefaultStudioChatSidebarWidth(1280), 376);
 });
 
 test("studio chat layout mode switches from default to compact to icon", () => {
@@ -85,7 +85,7 @@ test("studio chat grid template columns only apply when chat width is available 
   );
   assert.equal(
     buildStudioChatGridTemplateColumns({ chatOpen: true, chatWidth: 200, containerWidth: 1024 }),
-    "236px minmax(0, 1fr) 320px",
+    "236px minmax(0, 1fr) 280px",
   );
   assert.equal(
     buildStudioChatGridTemplateColumns({ chatOpen: false, chatWidth: 480, containerWidth: 1280 }),

@@ -12,9 +12,6 @@ import {
   filterStudioContextTree,
 } from "@/features/studio/components/chat/studio-chat-context-support";
 
-const CONTEXT_PICKER_PANEL_CLASS =
-  "overflow-hidden rounded-2xl bg-surface/95 shadow-lg backdrop-blur-sm";
-
 type StudioChatContextSelectorContentProps = {
   availableContexts: DocumentTreeNode[];
   onToggleContext: (path: string) => void;
@@ -57,20 +54,25 @@ export function StudioChatContextSelectorContent({
 
   return (
     <div
-      className={CONTEXT_PICKER_PANEL_CLASS}
+      className="chat-context-panel"
       ref={panelRef}
       style={panelStyle}
     >
-      <p className="border-b border-line-soft px-3 py-2 text-xs font-medium text-text-secondary">
-        附加文档上下文 ({selectedContextPaths.length}/{totalFileCount})
-      </p>
-      <input
-        type="text"
-        className="w-full border-b border-line-soft bg-transparent px-3 py-2 text-sm focus:bg-accent-soft focus:outline-none"
-        placeholder="搜索文稿..."
-        value={contextSearchQuery}
-        onChange={(event) => setContextSearchQuery(event.target.value)}
-      />
+      <div className="chat-panel-header">
+        <div>
+          <h3 className="chat-panel-header__title">附加文档上下文</h3>
+          <p className="chat-panel-header__subtitle">已选 {selectedContextPaths.length} / {totalFileCount} 个文件</p>
+        </div>
+      </div>
+      <div className="px-3 py-2 border-b border-line-soft">
+        <input
+          type="text"
+          className="chat-panel-search"
+          placeholder="搜索文稿..."
+          value={contextSearchQuery}
+          onChange={(event) => setContextSearchQuery(event.target.value)}
+        />
+      </div>
       <div className="max-h-52 overflow-y-auto scrollbar-thin py-1">
         {filteredContexts.length > 0 ? (
           filteredContexts.map((node) => (
@@ -87,7 +89,7 @@ export function StudioChatContextSelectorContent({
             />
           ))
         ) : (
-          <p className="px-3 py-3 text-sm text-text-tertiary">没有找到匹配的文稿。</p>
+          <p className="chat-panel-empty">没有找到匹配的文稿。</p>
         )}
       </div>
     </div>
@@ -122,7 +124,7 @@ function StudioChatContextTreeNode({
   if (node.type === "file") {
     return (
       <label
-        className="flex cursor-pointer items-center gap-2 py-1 pr-3 hover:bg-accent-soft"
+        className="flex cursor-pointer items-center gap-2 py-1 pr-3 hover:bg-accent-soft transition-colors"
         style={rowPaddingStyle}
       >
         <Checkbox
@@ -145,7 +147,7 @@ function StudioChatContextTreeNode({
   return (
     <div>
       <button
-        className={`flex w-full items-center gap-2 py-1.5 pr-3 text-left text-xs font-medium text-text-secondary hover:bg-accent-soft ${isExpanded ? "bg-accent-soft" : ""}`}
+        className={`flex w-full items-center gap-2 py-1.5 pr-3 text-left text-xs font-medium text-text-secondary hover:bg-accent-soft transition-colors ${isExpanded ? "bg-accent-soft" : ""}`}
         style={rowPaddingStyle}
         type="button"
         onClick={() => onToggleFolder(node.path, isExpanded)}

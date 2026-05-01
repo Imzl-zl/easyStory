@@ -80,65 +80,81 @@ export function StudioChatHistoryPanel({
 
   const popup = isOpen && panelStyle
     ? createPortal(
-      <div
-        className="overflow-hidden rounded-2xl bg-surface shadow-sm p-2 shadow-lg ring-1 ring-white/90 animate-[slideFromRight_0.22s_cubic-bezier(0.16,1,0.3,1)]"
-        ref={popupRef}
-        style={panelStyle}
-      >
-        <div className="mb-1 flex items-center justify-between rounded-2xl bg-surface px-2 py-1">
-          <span className="text-[10px] font-medium tracking-[0.08em] text-text-secondary">选择历史对话</span>
-          <span className="text-[10px] text-text-tertiary">{conversations.length} 条</span>
-        </div>
-        <ul className="max-h-[260px] space-y-1 overflow-y-auto pr-0.5">
-          {conversations.map((conversation) => {
-            const isActive = conversation.id === activeConversationId;
-            return (
-              <li key={conversation.id}>
-                <div
-                  className={`flex items-center gap-1.5 rounded-2xl px-1 py-1 ${isActive ? "bg-accent-soft shadow-sm" : "bg-muted shadow-xs hover:bg-surface hover:shadow-sm"}`}
-                >
-                  <button
-                    className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed"
-                    disabled={disabled}
-                    type="button"
-                    onClick={() => {
-                      onSelectConversation(conversation.id);
-                      onOpenChange(false);
-                    }}
+      <>
+        {/* 遮罩层 */}
+        <div
+          className="chat-panel-overlay"
+          onClick={() => onOpenChange(false)}
+        />
+        <div
+          className="chat-history-panel"
+          ref={popupRef}
+          style={panelStyle}
+        >
+          <div className="chat-panel-header">
+            <div>
+              <h3 className="chat-panel-header__title">选择历史对话</h3>
+              <p className="chat-panel-header__subtitle">{conversations.length} 条对话记录</p>
+            </div>
+            <button
+              className="chat-panel-header__close"
+              type="button"
+              onClick={() => onOpenChange(false)}
+            >
+              ×
+            </button>
+          </div>
+          <ul className="chat-panel-list max-h-[260px]">
+            {conversations.map((conversation) => {
+              const isActive = conversation.id === activeConversationId;
+              return (
+                <li key={conversation.id}>
+                  <div
+                    className={`chat-panel-item ${isActive ? "chat-panel-item--active" : ""}`}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-[12px] font-medium leading-5 text-text-primary">
-                        {conversation.title}
-                      </span>
-                      {isActive ? (
-                        <span className="inline-flex shrink-0 items-center rounded-full bg-elevated px-1.5 py-0.5 text-[9.5px] leading-4 text-accent-primary">
-                          当前
+                    <button
+                      className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed"
+                      disabled={disabled}
+                      type="button"
+                      onClick={() => {
+                        onSelectConversation(conversation.id);
+                        onOpenChange(false);
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="chat-panel-item__title">
+                          {conversation.title}
                         </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-0.5 text-[10.5px] leading-4 text-text-secondary">
-                      {formatConversationUpdatedAt(conversation.updatedAt)}
-                    </p>
-                  </button>
-                  <button
-                    aria-label={`删除对话：${conversation.title}`}
-                    className="ink-icon-button text-accent-danger shrink-0"
-                    disabled={disabled}
-                    type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onDeleteConversation(conversation.id);
-                    }}
-                  >
-                    <TrashIcon />
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>,
+                        {isActive ? (
+                          <span className="inline-flex shrink-0 items-center rounded-full bg-elevated px-1.5 py-0.5 text-[9.5px] leading-4 text-accent-primary">
+                            当前
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 text-[10.5px] leading-4 text-text-secondary">
+                        {formatConversationUpdatedAt(conversation.updatedAt)}
+                      </p>
+                    </button>
+                    <button
+                      aria-label={`删除对话：${conversation.title}`}
+                      className="ink-icon-button text-accent-danger shrink-0"
+                      disabled={disabled}
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onDeleteConversation(conversation.id);
+                      }}
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </>,
       document.body,
     )
     : null;
@@ -209,7 +225,7 @@ function resolveHistoryPanelStyle(container: HTMLDivElement | null): CSSProperti
     position: "fixed",
     top: rect.bottom + HISTORY_PANEL_OFFSET,
     width,
-    zIndex: 160,
+    zIndex: 170,
   };
 }
 

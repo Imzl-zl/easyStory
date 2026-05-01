@@ -1,6 +1,7 @@
 "use client";
 
-import { Input, Modal } from "@arco-design/web-react";
+import { useEffect, useRef } from "react";
+import { StudioDialog } from "@/components/ui/studio-dialog";
 
 type StudioDocumentTreeDialogProps = {
   confirmLoading?: boolean;
@@ -26,29 +27,47 @@ export function StudioDocumentTreeDialog({
   title,
 }: Readonly<StudioDocumentTreeDialogProps>) {
   const isInputMode = typeof onNameChange === "function";
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }, 100);
+    }
+  }, [open]);
 
   return (
-    <Modal
+    <StudioDialog
+      open={open}
+      title={title}
+      description={description}
+      confirmText={okText}
       cancelText="取消"
       confirmLoading={confirmLoading}
-      okText={okText}
-      title={title}
-      visible={open}
+      confirmVariant={title.includes("删除") ? "danger" : "primary"}
+      onConfirm={onConfirm}
       onCancel={onCancel}
-      onOk={onConfirm}
+      width={420}
     >
-      <div className="flex flex-col gap-3">
-        <p className="m-0 text-sm leading-6 text-text-secondary">{description}</p>
-        {isInputMode ? (
-          <Input
-            autoFocus
+      {isInputMode ? (
+        <div className="studio-dialog-input-wrap">
+          <input
+            ref={inputRef}
+            className="studio-dialog-input"
             placeholder="输入名称"
+            type="text"
             value={nameValue}
-            onChange={onNameChange}
-            onPressEnter={onConfirm}
+            onChange={(e) => onNameChange?.(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onConfirm();
+              }
+            }}
           />
-        ) : null}
-      </div>
-    </Modal>
+        </div>
+      ) : null}
+    </StudioDialog>
   );
 }

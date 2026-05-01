@@ -107,10 +107,10 @@ export function StudioChatSkillPanel({
       </button>
       {isOpen && layout ? createPortal(
         <>
+          {/* 遮罩层 */}
           <button
             aria-label="关闭 Skill 面板"
-            className="rounded-3xl border-0 bg-surface-hover backdrop-blur-[1px]"
-            style={layout.backdropStyle}
+            className="chat-panel-overlay"
             type="button"
             onClick={closeDrawer}
           />
@@ -157,7 +157,7 @@ function SkillDrawer({
   return (
     <section
       aria-label="选择 Skill"
-      className="flex min-h-0 flex-col overflow-hidden rounded-2xl bg-[var(--bg-surface-warm-gradient)] shadow-lg ring-1 ring-white/90 animate-[slideFromLeft_0.24s_cubic-bezier(0.16,1,0.3,1)]"
+      className="chat-skill-panel"
       role="dialog"
       style={layout.panelStyle}
     >
@@ -173,7 +173,7 @@ function SkillDrawer({
             </p>
           </div>
           <button
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface shadow-xs text-[13px] text-text-secondary transition hover:shadow-sm hover:text-text-primary"
+            className="chat-panel-header__close"
             type="button"
             onClick={onClose}
           >
@@ -187,7 +187,7 @@ function SkillDrawer({
         <label className="block">
           <span className="sr-only">筛选 Skill</span>
           <input
-            className="h-9 w-full rounded-2xl bg-surface/90 shadow-xs px-3 text-[11.5px] text-text-primary outline-none transition placeholder:text-text-tertiary focus:shadow-sm focus:ring-2 focus:ring-accent-primary/10"
+            className="chat-panel-search"
             placeholder="按名称、描述或作用域筛选 Skill"
             ref={searchInputRef}
             type="text"

@@ -16,14 +16,14 @@ import {
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 
-type PageMode = "lobby" | "studio" | "project";
+type PageMode = "lobby" | "project" | "project-workspace";
 
 function resolvePageMode(pathname: string): PageMode {
   if (pathname.includes("/lobby") || pathname === "/workspace") {
     return "lobby";
   }
-  if (pathname.includes("/studio")) {
-    return "studio";
+  if (pathname.includes("/studio") || pathname.includes("/engine") || pathname.includes("/lab")) {
+    return "project-workspace";
   }
   return "project";
 }
@@ -34,6 +34,15 @@ function resolveContextTitle(pathname: string): string {
   if (pathname.includes("/lab")) return "作品洞察";
   if (pathname.includes("/settings")) return "项目设置";
   return "当前项目";
+}
+
+function BackArrowIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 12H5" />
+      <path d="M12 19l-7-7 7-7" />
+    </svg>
+  );
 }
 
 function resolveSettingsHref(currentProjectId: string | null): string {
@@ -52,7 +61,7 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
   const currentProjectId = resolveWorkspaceProjectId(pathname);
   const workspaceItems = buildWorkspaceItems(currentProjectId, lastProjectId);
   const pageMode = resolvePageMode(pathname);
-  const shellClassName = pageMode === "studio"
+  const shellClassName = pageMode === "project-workspace"
     ? "workspace-shell--studio"
     : "workspace-shell--default";
 
@@ -86,8 +95,8 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
           userName={user?.username ?? "未登录"}
           workspaceItems={workspaceItems}
         />
-        <main className={pageMode === "studio" ? "w-full flex-1 min-h-0 overflow-hidden" : "w-[min(100%-2.5rem,1560px)] mx-auto"} id="workspace-main">
-          <div className={pageMode === "studio" ? "h-full min-h-0 overflow-hidden" : "min-h-[calc(100vh-72px)] py-5 pb-7"}>{children}</div>
+        <main className={pageMode === "project-workspace" ? "w-full flex-1 min-h-0 overflow-hidden" : "w-[min(100%-2.5rem,1560px)] mx-auto"} id="workspace-main">
+          <div className={pageMode === "project-workspace" ? "h-full min-h-0 overflow-hidden" : "min-h-[calc(100vh-72px)] py-5 pb-7"}>{children}</div>
         </main>
       </div>
     </AuthGuard>
@@ -127,17 +136,15 @@ function WorkspaceHeader({
   }
 
   return (
-    <header className={`sticky top-0 z-20 border-b backdrop-blur-xl lg:ml-16 ${pageMode === "studio" ? "border-line-soft/50 bg-glass-heavy" : "border-line-soft bg-glass-heavy/90"}`}>
-      <div className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 md:gap-5 w-[min(100%-2.5rem,1560px)] mx-auto ${pageMode === "studio" ? "py-2.5" : "py-3"}`}>
-        <div className="flex items-center gap-4 min-w-0">
-          <Link className="inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap transition-colors text-text-secondary hover:text-text-primary" href="/workspace/lobby">
-            <span aria-hidden="true">←</span>
-            返回书架
+    <header className="workspace-header--project">
+      <div className="workspace-header__inner">
+        <div className="workspace-header__left">
+          <Link className="workspace-header__back" href="/workspace/lobby">
+            <BackArrowIcon />
+            <span>返回书架</span>
           </Link>
-          <div className="grid gap-0.5 min-w-0">
-            <span className="text-text-tertiary text-[0.68rem] tracking-[0.14em] uppercase">当前项目</span>
-            <span className="overflow-hidden text-text-primary text-sm font-semibold tracking-[-0.02em] text-ellipsis whitespace-nowrap">{resolveContextTitle(pathname)}</span>
-          </div>
+          <div className="workspace-header__divider" />
+          <span className="workspace-header__page-title">{resolveContextTitle(pathname)}</span>
         </div>
         <WorkspaceNav
           items={workspaceItems.filter((item) => item.segment !== "lobby")}
@@ -222,15 +229,17 @@ function WorkspaceActions({
   userName: string;
 }>) {
   return (
-    <div className="inline-flex min-w-0 items-center justify-end gap-1.5 md:gap-2.5">
-      <Link className="wsh-action-link hidden md:inline-flex text-sm" href={settingsHref}>
+    <div className="workspace-header__actions">
+      <Link className="workspace-header__action-link" href={settingsHref}>
         {settingsLabel}
       </Link>
-      <div className="wsh-user-badge">
-        <Avatar size={28}>{resolveWorkspaceUserBadge(userName)}</Avatar>
-        <span className="max-w-[8rem] overflow-hidden text-text-primary text-sm font-semibold text-ellipsis whitespace-nowrap max-md:hidden">{userName}</span>
+      <div className="workspace-header__user">
+        <div className="workspace-header__avatar">
+          {resolveWorkspaceUserBadge(userName)}
+        </div>
+        <span className="workspace-header__username">{userName}</span>
       </div>
-      <button className="wsh-action-btn text-sm" onClick={onLogout} type="button">
+      <button className="workspace-header__logout" onClick={onLogout} type="button">
         退出
       </button>
     </div>

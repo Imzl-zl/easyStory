@@ -19,6 +19,7 @@ type DocumentTreeProps = {
   onAddFolder?: (parentPath: string) => void;
   onRenameNode?: (node: DocumentTreeNode) => void;
   onDeleteNode?: (node: DocumentTreeNode) => void;
+  onCollapse?: () => void;
 };
 
 export function DocumentTree({
@@ -30,6 +31,7 @@ export function DocumentTree({
   onAddFolder,
   onRenameNode,
   onDeleteNode,
+  onCollapse,
 }: Readonly<DocumentTreeProps>) {
   const rootCreateTargets = tree.filter((node) => node.type === "folder" && node.canCreateChild);
   const rootCreateMenu = rootCreateTargets.length > 0 && (onAddDocument || onAddFolder) ? (
@@ -64,30 +66,43 @@ export function DocumentTree({
       ))}
     </Menu>
   ) : null;
-  const header = (
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <h2 className="m-0 font-serif text-[1.45rem] font-bold tracking-tight text-text-primary">创作结构</h2>
-      </div>
-    </div>
-  );
 
   return (
-    <nav aria-label="作品目录" className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-surface to-muted">
-      <div className="absolute inset-0 opacity-[0.02] pointer-events-none [background-image:url('data:image/svg+xml,%3Csvg_viewBox%3D%220%200%20400%20400%22_xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cfilter_id%3D%22n%22%3E%3CfeTurbulence_type%3D%22fractalNoise%22_baseFrequency%3D%221.2%22_numOctaves%3D%223%22_stitchTiles%3D%22stitch%22%2F%3E%3C%2Ffilter%3E%3Crect_width%3D%22100%25%22_height%3D%22100%25%22_filter%3D%22url(%23n)%22%2F%3E%3C%2Fsvg%3E')]" />
-      <div className="absolute top-0 left-0 right-0 h-[150px] bg-gradient-to-b from-elevated/50 to-transparent pointer-events-none" />
+    <nav aria-label="作品目录" className="dt-root">
+      {/* 顶部装饰 */}
+      <div className="dt-root__glow" />
 
-      <div className="relative z-10 px-4 pt-6 pb-4">
+      {/* 头部 */}
+      <div className="dt-header">
         {rootCreateMenu ? (
           <Dropdown trigger="contextMenu" droplist={rootCreateMenu} position="bl">
-            {header}
+            <div className="dt-header__content">
+              <h2 className="dt-header__title">创作结构</h2>
+              <span className="dt-header__count">{tree.length} 卷</span>
+            </div>
           </Dropdown>
         ) : (
-          header
+          <div className="dt-header__content">
+            <h2 className="dt-header__title">创作结构</h2>
+            <span className="dt-header__count">{tree.length} 卷</span>
+          </div>
         )}
+        {onCollapse ? (
+          <button
+            className="dt-header__collapse-btn"
+            onClick={onCollapse}
+            title="收起目录"
+            type="button"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+        ) : null}
       </div>
 
-      <ul className="relative z-10 flex-1 min-h-0 overflow-y-auto px-2.5 pb-4 scrollbar-thin [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-[2px] [&::-webkit-scrollbar-thumb]:bg-line-strong">
+      {/* 树列表 */}
+      <ul className="dt-list">
         {tree.map((node) => (
           <DocumentTreeNodeItem
             key={node.id}
@@ -181,46 +196,43 @@ function DocumentTreeNodeItem({
   const treeButton = (
     <button
       aria-expanded={isFolder ? isExpanded : undefined}
-      className={`flex min-w-0 flex-1 items-center gap-2 py-2 px-2.5 border-none rounded-2xl bg-transparent text-text-primary text-sm font-medium text-left cursor-pointer transition-all ${isSelected ? "bg-gradient-to-br from-accent-soft to-accent-soft ring-1 ring-inset ring-accent-primary/15 hover:bg-gradient-to-br hover:from-accent-primary-muted hover:to-accent-soft" : "hover:bg-accent-soft hover:translate-x-[3px]"}`}
-      style={{ paddingLeft: `${12 + depth * 16}px` }}
+      className={`dt-node ${isSelected ? "dt-node--selected" : ""} ${isFolder ? "dt-node--folder" : ""}`}
+      style={{ paddingLeft: `${14 + depth * 18}px` }}
       type="button"
       onClick={handleClick}
     >
       {isFolder ? (
-        <span className={`flex items-center justify-center w-[18px] h-[18px] text-accent-primary text-[0.7rem] transition-transform ${isExpanded ? "rotate-90" : ""}`}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <span className={`dt-node__chevron ${isExpanded ? "dt-node__chevron--open" : ""}`}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </span>
       ) : (
-        <span className="flex items-center justify-center w-[18px] h-[18px] text-accent-tertiary text-[0.85rem]">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <span className="dt-node__icon">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
           </svg>
         </span>
       )}
-      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap tracking-tight">{node.label}</span>
+      <span className="dt-node__label">{node.label}</span>
       {node.icon === "stale" ? (
-        <span className="inline-flex h-2.5 w-2.5 ml-auto rounded-full bg-text-tertiary/40 ring-3 ring-accent-warning/15" title="需要更新" />
+        <span className="dt-node__stale" title="需要更新" />
       ) : null}
     </button>
   );
-  const treeRow = <div className="group flex items-center gap-1">{treeButton}</div>;
+
+  const treeRow = <div className="dt-row">{treeButton}</div>;
 
   return (
-    <li className="mb-0.5">
+    <li className="dt-item">
       {hasContextMenu ? (
-        <Dropdown
-          trigger="contextMenu"
-          droplist={contextMenu}
-          position="bl"
-        >
+        <Dropdown trigger="contextMenu" droplist={contextMenu} position="bl">
           {treeRow}
         </Dropdown>
       ) : treeRow}
       {isFolder && isExpanded && hasChildren ? (
-        <ul className="overflow-y-auto px-3 pb-5 scrollbar-thin">
+        <ul className="dt-list dt-list--nested">
           {node.children!.map((child) => (
             <DocumentTreeNodeItem
               key={child.id}

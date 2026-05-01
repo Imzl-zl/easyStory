@@ -60,8 +60,6 @@ type StudioChatComposerProps = {
   isWriteToCurrentDocumentEnabled: boolean;
 };
 
-const MODEL_PICKER_PANEL_CLASS =
-  "overflow-y-auto rounded-2xl bg-surface/95 p-3.5 shadow-lg backdrop-blur-sm";
 const MODEL_PICKER_PROVIDER_LIST_CLASS =
   "mt-2 grid gap-1 rounded-2xl bg-glass shadow-glass-heavy p-1 max-h-56 overflow-y-auto";
 
@@ -212,12 +210,15 @@ export function StudioChatComposer({
   );
 
   return (
-    <div className="relative z-20 shrink-0 border-t border-line-soft bg-gradient-to-b from-surface to-glass-heavy">
+    <div className="relative z-20 shrink-0 bg-gradient-to-b from-surface to-glass-heavy">
       <div className="relative z-20 px-3 py-2.5">
         {credentialNotice ? (
-          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg bg-accent-danger/10 px-3 py-2 text-sm text-accent-danger">
-            <p className="min-w-0 flex-1">{credentialNotice}</p>
-            <Link className="inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:no-underline" href={credentialSettingsHref}>
+          <div className="studio-notice studio-notice--warning">
+            <div className="studio-notice__icon">
+              <AlertIcon />
+            </div>
+            <p className="studio-notice__text">{credentialNotice}</p>
+            <Link className="studio-notice__action" href={credentialSettingsHref}>
               模型连接
               <JumpLinkIcon />
             </Link>
@@ -289,144 +290,168 @@ export function StudioChatComposer({
               </ToolbarChipButton>
 
               {showModelPicker ? renderFloatingPanel(
-                <div
-                  className={MODEL_PICKER_PANEL_CLASS}
-                  ref={modelPickerRef}
-                  style={modelPickerStyle}
-                >
-                  <div className="mb-3">
-                    <p className="text-sm font-medium text-text-primary">切换模型</p>
-                    <p className="text-xs text-text-tertiary mt-0.5">
-                      {selectedCredentialLabel ?? "先选可用渠道，再决定模型名。"}
-                    </p>
-                  </div>
-                  <label className="grid gap-1.5">
-                    <span className="text-xs font-medium text-text-secondary">渠道</span>
-                    <div className="relative">
+                <>
+                  {/* 遮罩层 */}
+                  <div
+                    className="chat-panel-overlay"
+                    onClick={() => {
+                      setShowProviderList(false);
+                      setShowModelPicker(false);
+                    }}
+                  />
+                  <div
+                    className="chat-model-panel overflow-y-auto"
+                    ref={modelPickerRef}
+                    style={modelPickerStyle}
+                  >
+                    <div className="chat-panel-header">
+                      <div>
+                        <h3 className="chat-panel-header__title">切换模型</h3>
+                        <p className="chat-panel-header__subtitle">
+                          {selectedCredentialLabel ?? "先选可用渠道，再决定模型名。"}
+                        </p>
+                      </div>
                       <button
-                        aria-expanded={showProviderList}
-                        className="flex min-h-10 w-full items-center justify-between gap-3 rounded-2xl bg-surface/92 shadow-xs px-3 py-2.5 text-left text-sm text-text-primary transition-colors hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-primary/15"
+                        className="chat-panel-header__close"
                         type="button"
-                        onClick={handleToggleProviderList}
+                        onClick={() => {
+                          setShowProviderList(false);
+                          setShowModelPicker(false);
+                        }}
                       >
-                        <span className="min-w-0 flex-1 truncate font-medium">
-                          {currentProviderOption?.label ?? (isCredentialLoading ? "正在读取渠道..." : "选择可用渠道")}
-                        </span>
-                        <span className={`shrink-0 text-[10px] opacity-60 transition-transform ${showProviderList ? "rotate-180" : ""}`}>⌄</span>
+                        ×
                       </button>
-                      {showProviderList ? (
-                        <div className={MODEL_PICKER_PROVIDER_LIST_CLASS}>
-                          {providerOptions.length > 0 ? (
-                            providerOptions.map((option) => {
-                              const selected = option.value === settings.provider;
-                              return (
-                                <button
-                                  className={`flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${selected ? "bg-accent-primary/10 text-accent-primary" : "text-text-primary hover:bg-accent-soft"}`}
-                                  key={option.value}
-                                  type="button"
-                                  onMouseDown={(event) => {
-                                    event.preventDefault();
-                                    handleSelectProvider(option.value);
-                                  }}
-                                >
-                                  <span className="text-sm font-medium leading-relaxed">{option.label}</span>
-                                  {option.description ? (
-                                    <span className="text-xs leading-relaxed text-text-tertiary">{option.description}</span>
-                                  ) : null}
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <p className="px-3 py-3 text-sm text-text-tertiary">
-                              {isCredentialLoading ? "正在读取渠道..." : "当前没有可用渠道"}
-                            </p>
-                          )}
-                        </div>
-                      ) : null}
                     </div>
-                  </label>
-                  <label className="mt-3 grid gap-1.5">
-                    <span className="text-xs font-medium text-text-secondary">模型</span>
-                    <Input
-                      allowClear
-                      autoComplete="off"
-                      placeholder="留空则跟随当前渠道默认模型"
-                      spellCheck={false}
-                      value={settings.modelName}
-                      onChange={onModelNameChange}
-                    />
-                  </label>
-                  <div className="mt-3 rounded-2xl bg-glass shadow-glass-heavy px-3 py-2.5">
-                    <p className="m-0 text-[12px] font-medium text-text-primary">{reasoningControl.title}</p>
-                    <p className="mt-1 text-[11px] leading-4 text-text-secondary">{reasoningControl.description}</p>
-                    {reasoningControl.kind === "gemini_budget" ? (
-                      <div className="mt-2.5 space-y-2">
-                        <div className="flex flex-wrap gap-2">
-                          <ReasoningChipButton
-                            active={settings.thinkingBudget === ""}
-                            label="跟随默认"
-                            onClick={() => onThinkingBudgetChange("")}
-                          />
-                          {reasoningControl.allowDisable ? (
-                            <ReasoningChipButton
-                              active={settings.thinkingBudget === "0"}
-                              label="关闭思考"
-                              onClick={() => onThinkingBudgetChange("0")}
-                            />
-                          ) : null}
-                          {reasoningControl.allowDynamic ? (
-                            <ReasoningChipButton
-                              active={settings.thinkingBudget === "-1"}
-                              label="动态思考"
-                              onClick={() => onThinkingBudgetChange("-1")}
-                            />
+                    <div className="chat-model-form">
+                      <div className="chat-model-form__group">
+                        <label className="chat-model-form__label">渠道</label>
+                        <div className="relative">
+                          <button
+                            aria-expanded={showProviderList}
+                            className="chat-model-form__select flex items-center justify-between"
+                            type="button"
+                            onClick={handleToggleProviderList}
+                          >
+                            <span className="min-w-0 flex-1 truncate font-medium">
+                              {currentProviderOption?.label ?? (isCredentialLoading ? "正在读取渠道..." : "选择可用渠道")}
+                            </span>
+                            <span className={`shrink-0 text-[10px] opacity-60 transition-transform ${showProviderList ? "rotate-180" : ""}`}>⌄</span>
+                          </button>
+                          {showProviderList ? (
+                            <div className={MODEL_PICKER_PROVIDER_LIST_CLASS}>
+                              {providerOptions.length > 0 ? (
+                                providerOptions.map((option) => {
+                                  const selected = option.value === settings.provider;
+                                  return (
+                                    <button
+                                      className={`flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${selected ? "bg-accent-primary/10 text-accent-primary" : "text-text-primary hover:bg-accent-soft"}`}
+                                      key={option.value}
+                                      type="button"
+                                      onMouseDown={(event) => {
+                                        event.preventDefault();
+                                        handleSelectProvider(option.value);
+                                      }}
+                                    >
+                                      <span className="text-sm font-medium leading-relaxed">{option.label}</span>
+                                      {option.description ? (
+                                        <span className="text-xs leading-relaxed text-text-tertiary">{option.description}</span>
+                                      ) : null}
+                                    </button>
+                                  );
+                                })
+                              ) : (
+                                <p className="px-3 py-3 text-sm text-text-tertiary">
+                                  {isCredentialLoading ? "正在读取渠道..." : "当前没有可用渠道"}
+                                </p>
+                              )}
+                            </div>
                           ) : null}
                         </div>
-                        <Input
-                          allowClear
+                      </div>
+                      <div className="chat-model-form__group">
+                        <label className="chat-model-form__label">模型</label>
+                        <input
+                          className="chat-model-form__input"
                           autoComplete="off"
-                          inputMode="numeric"
-                          placeholder={reasoningControl.placeholder}
+                          placeholder="留空则跟随当前渠道默认模型"
                           spellCheck={false}
-                          value={settings.thinkingBudget}
-                          onChange={(value) => onThinkingBudgetChange(normalizeAssistantThinkingBudgetInput(value))}
+                          value={settings.modelName}
+                          onChange={(e) => onModelNameChange(e.target.value)}
                         />
                       </div>
-                    ) : reasoningControl.kind === "none" ? null : (
-                      <div className="mt-2.5">
-                        <AppSelect
-                          ariaLabel={reasoningControl.title}
-                          className="min-w-0"
-                          options={reasoningControl.options}
-                          value={reasoningControl.kind === "openai" ? settings.reasoningEffort : settings.thinkingLevel}
-                          onChange={(value) =>
-                            reasoningControl.kind === "openai"
-                              ? onReasoningEffortChange(value)
-                              : onThinkingLevelChange(value)}
-                        />
+                      <div className="chat-model-form__section">
+                        <p className="m-0 text-[12px] font-medium text-text-primary">{reasoningControl.title}</p>
+                        <p className="mt-1 text-[11px] leading-4 text-text-secondary">{reasoningControl.description}</p>
+                        {reasoningControl.kind === "gemini_budget" ? (
+                          <div className="mt-2.5 space-y-2">
+                            <div className="flex flex-wrap gap-2">
+                              <ReasoningChipButton
+                                active={settings.thinkingBudget === ""}
+                                label="跟随默认"
+                                onClick={() => onThinkingBudgetChange("")}
+                              />
+                              {reasoningControl.allowDisable ? (
+                                <ReasoningChipButton
+                                  active={settings.thinkingBudget === "0"}
+                                  label="关闭思考"
+                                  onClick={() => onThinkingBudgetChange("0")}
+                                />
+                              ) : null}
+                              {reasoningControl.allowDynamic ? (
+                                <ReasoningChipButton
+                                  active={settings.thinkingBudget === "-1"}
+                                  label="动态思考"
+                                  onClick={() => onThinkingBudgetChange("-1")}
+                                />
+                              ) : null}
+                            </div>
+                            <input
+                              className="chat-model-form__input"
+                              autoComplete="off"
+                              inputMode="numeric"
+                              placeholder={reasoningControl.placeholder}
+                              spellCheck={false}
+                              value={settings.thinkingBudget}
+                              onChange={(e) => onThinkingBudgetChange(normalizeAssistantThinkingBudgetInput(e.target.value))}
+                            />
+                          </div>
+                        ) : reasoningControl.kind === "none" ? null : (
+                          <div className="mt-2.5">
+                            <AppSelect
+                              ariaLabel={reasoningControl.title}
+                              className="min-w-0"
+                              options={reasoningControl.options}
+                              value={reasoningControl.kind === "openai" ? settings.reasoningEffort : settings.thinkingLevel}
+                              onChange={(value) =>
+                                reasoningControl.kind === "openai"
+                                  ? onReasoningEffortChange(value)
+                                  : onThinkingLevelChange(value)}
+                            />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="mt-3 rounded-2xl bg-glass shadow-glass-heavy px-3 py-2.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="m-0 text-[12px] font-medium text-text-primary">回复显示方式</p>
-                        <p className="m-0 text-[11px] leading-4 text-text-secondary">仅当前项目聊天生效</p>
+                      <div className="chat-model-form__section mt-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="m-0 text-[12px] font-medium text-text-primary">回复显示方式</p>
+                            <p className="m-0 text-[11px] leading-4 text-text-secondary">仅当前项目聊天生效</p>
+                          </div>
+                          <Radio.Group
+                            aria-label="回复显示方式"
+                            mode="fill"
+                            size="small"
+                            type="button"
+                            value={settings.streamOutput ? "stream" : "buffered"}
+                            onChange={(value) => onStreamOutputChange(value === "stream")}
+                          >
+                            <Radio value="stream">边写边显示</Radio>
+                            <Radio value="buffered">生成后整体显示</Radio>
+                          </Radio.Group>
+                        </div>
                       </div>
-                      <Radio.Group
-                        aria-label="回复显示方式"
-                        mode="fill"
-                        size="small"
-                        type="button"
-                        value={settings.streamOutput ? "stream" : "buffered"}
-                        onChange={(value) => onStreamOutputChange(value === "stream")}
-                      >
-                        <Radio value="stream">边写边显示</Radio>
-                        <Radio value="buffered">生成后整体显示</Radio>
-                      </Radio.Group>
                     </div>
                   </div>
-                </div>,
+                </>,
               ) : null}
             </div>
 
@@ -596,6 +621,20 @@ function JumpLinkIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+      <path
+        d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.42 0Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
       />
     </svg>
   );

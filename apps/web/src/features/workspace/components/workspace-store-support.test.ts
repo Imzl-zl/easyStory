@@ -14,8 +14,12 @@ test("buildWorkspacePersistedState keeps only durable workspace fields", () => {
     setLastWorkflow: () => {},
     setSidebarPreference: () => {},
     setStudioChatWidth: () => {},
+    setStudioLeftPanel: () => {},
+    setStudioLeftWidth: () => {},
     sidebarPreference: "collapsed",
     studioChatWidthByProject: { "project-1": 440 },
+    studioLeftPanelByProject: {},
+    studioLeftWidthByProject: {},
   });
 
   assert.deepEqual(persisted, {
@@ -23,6 +27,8 @@ test("buildWorkspacePersistedState keeps only durable workspace fields", () => {
     lastWorkflowByProject: { "project-1": "workflow-9" },
     sidebarPreference: "collapsed",
     studioChatWidthByProject: { "project-1": 440 },
+    studioLeftPanelByProject: {},
+    studioLeftWidthByProject: {},
   });
   assert.equal("hasHydrated" in persisted, false);
 });
@@ -34,6 +40,8 @@ test("workspace store clears project context without wiping sidebar preference",
     lastWorkflowByProject: { "project-1": "workflow-9" },
     sidebarPreference: "collapsed",
     studioChatWidthByProject: { "project-1": 440 },
+    studioLeftPanelByProject: {},
+    studioLeftWidthByProject: {},
   });
 
   useWorkspaceStore.getState().clearProjectContext();
@@ -50,5 +58,7 @@ test("workspace store clears project context without wiping sidebar preference",
     lastWorkflowByProject: {},
     sidebarPreference: "expanded",
     studioChatWidthByProject: {},
+    studioLeftPanelByProject: {},
+    studioLeftWidthByProject: {},
   });
 });
