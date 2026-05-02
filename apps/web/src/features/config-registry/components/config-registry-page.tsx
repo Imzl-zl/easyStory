@@ -174,14 +174,13 @@ export function ConfigRegistryPage() {
         title="系统配置"
         action={
           <div className="flex flex-wrap items-center justify-end gap-2.5">
-            <GuardedLink
+            <button
               className="ink-button-secondary h-9 px-4 text-[13px]"
-              href="/workspace/lobby"
-              isDirty={effectiveIsDirty}
-              onNavigate={navigationGuard.attemptNavigation}
+              type="button"
+              onClick={() => navigationGuard.attemptNavigation(() => router.back())}
             >
-              返回书架
-            </GuardedLink>
+              返回
+            </button>
             <GuardedLink
               className="ink-button-secondary h-9 px-4 text-[13px]"
               href="/workspace/lobby/settings?tab=credentials&sub=list"

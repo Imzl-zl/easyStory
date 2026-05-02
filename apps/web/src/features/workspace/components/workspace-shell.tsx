@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { AuthGuard } from "@/features/auth/components/auth-guard";
@@ -12,9 +11,12 @@ import {
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
 
-type PageMode = "lobby" | "project" | "project-workspace";
+type PageMode = "lobby" | "project" | "project-workspace" | "sub-page";
 
 function resolvePageMode(pathname: string): PageMode {
+  if (pathname.includes("/recycle-bin") || pathname.includes("/lobby/settings")) {
+    return "sub-page";
+  }
   if (pathname.includes("/lobby") || pathname === "/workspace") {
     return "lobby";
   }
@@ -28,6 +30,8 @@ function resolveContextTitle(pathname: string): string {
   if (pathname.includes("/studio")) return "创作工作台";
   if (pathname.includes("/engine")) return "工作流引擎";
   if (pathname.includes("/lab")) return "分析实验室";
+  if (pathname.includes("/recycle-bin")) return "回收站";
+  if (pathname.includes("/lobby/settings")) return "全局设置";
   if (pathname.includes("/settings")) return "项目设置";
   return "当前项目";
 }
@@ -41,13 +45,6 @@ function BackArrowIcon() {
   );
 }
 
-function resolveSettingsHref(currentProjectId: string | null): string {
-  if (currentProjectId) {
-    return `/workspace/project/${currentProjectId}/settings`;
-  }
-  return "/workspace/lobby/settings?tab=assistant";
-}
-
 export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
@@ -56,7 +53,7 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
   const setLastProjectId = useWorkspaceStore((state) => state.setLastProjectId);
   const currentProjectId = resolveWorkspaceProjectId(pathname);
   const pageMode = resolvePageMode(pathname);
-  const shellClassName = pageMode === "project-workspace"
+  const shellClassName = pageMode === "project-workspace" || pageMode === "sub-page"
     ? "workspace-shell--studio"
     : "workspace-shell--default";
 
@@ -83,13 +80,12 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
       <a className="absolute top-3 left-3 z-30 -translate-y-[140%] focus-visible:translate-y-0" href="#workspace-main">跳到主内容</a>
       <div className={shellClassName} data-page-mode={pageMode}>
         <WorkspaceHeader
-          currentProjectId={currentProjectId}
           onLogout={clearSession}
           pathname={pathname}
           userName={user?.username ?? "未登录"}
         />
-        <main className={pageMode === "project-workspace" ? "w-full flex-1 min-h-0 overflow-hidden" : "w-[min(100%-2.5rem,1560px)] mx-auto"} id="workspace-main">
-          <div className={pageMode === "project-workspace" ? "h-full min-h-0 overflow-hidden" : "min-h-[calc(100vh-72px)] py-5 pb-7"}>{children}</div>
+        <main className={pageMode === "project-workspace" || pageMode === "sub-page" ? "w-full flex-1 min-h-0 overflow-hidden" : "w-[min(100%-2.5rem,1560px)] mx-auto"} id="workspace-main">
+          <div className={pageMode === "project-workspace" || pageMode === "sub-page" ? "h-full min-h-0 overflow-hidden" : "min-h-[calc(100vh-72px)] py-5 pb-7"}>{children}</div>
         </main>
       </div>
     </AuthGuard>
@@ -97,12 +93,10 @@ export function WorkspaceShell({ children }: Readonly<{ children: React.ReactNod
 }
 
 function WorkspaceHeader({
-  currentProjectId,
   onLogout,
   pathname,
   userName,
 }: Readonly<{
-  currentProjectId: string | null;
   onLogout: () => void;
   pathname: string;
   userName: string;
@@ -111,17 +105,15 @@ function WorkspaceHeader({
     <header className="workspace-header--project">
       <div className="workspace-header__inner">
         <div className="workspace-header__left">
-          <Link className="workspace-header__back" href="/workspace/lobby">
+          <button className="workspace-header__back" onClick={() => window.history.back()} type="button">
             <BackArrowIcon />
-            <span>返回书架</span>
-          </Link>
+            <span>返回</span>
+          </button>
           <div className="workspace-header__divider" />
           <span className="workspace-header__page-title">{resolveContextTitle(pathname)}</span>
         </div>
         <WorkspaceActions
           onLogout={onLogout}
-          settingsHref={resolveSettingsHref(currentProjectId)}
-          settingsLabel="项目设置"
           userName={userName}
         />
       </div>
@@ -131,20 +123,13 @@ function WorkspaceHeader({
 
 function WorkspaceActions({
   onLogout,
-  settingsHref,
-  settingsLabel,
   userName,
 }: Readonly<{
   onLogout: () => void;
-  settingsHref: string;
-  settingsLabel: string;
   userName: string;
 }>) {
   return (
     <div className="workspace-header__actions">
-      <Link className="workspace-header__action-link" href={settingsHref}>
-        {settingsLabel}
-      </Link>
       <div className="workspace-header__user">
         <div className="workspace-header__avatar">
           {resolveWorkspaceUserBadge(userName)}

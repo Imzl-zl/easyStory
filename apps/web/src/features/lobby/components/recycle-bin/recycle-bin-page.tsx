@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 
 import { PageEntrance } from "@/components/ui/page-entrance";
 import { useLobbyProjectModel } from "@/features/lobby/components/projects/lobby-project-model";
@@ -17,59 +16,38 @@ export function RecycleBinPage() {
     <div className="h-full" style={{ background: "var(--bg-canvas)" }}>
       <PageEntrance>
         <div className="h-full flex flex-col">
-          {/* Header */}
-      <header className="px-6 pt-6 pb-4 flex-shrink-0" style={{ borderBottom: "1px solid var(--line-soft)" }}>
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--accent-primary)" }} />
-              <span className="text-[10px] font-semibold tracking-[0.15em] uppercase" style={{ color: "var(--accent-primary)" }}>
-                项目管理
-              </span>
-            </div>
-            <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: "var(--text-primary)" }}>
-              回收站
-            </h1>
-            <div className="flex items-center gap-3 mt-2">
-              <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
-                {model.deletedProjectCount} 个项目
-              </span>
-              <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
-                保留 30 天
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              className="h-8 px-3 rounded-md text-[12px] w-48"
-              placeholder="搜索项目"
-              style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-soft)" }}
-              value={model.searchText}
-              onChange={(event) => model.setSearchText(event.target.value)}
-            />
-            <button
-              className="h-8 px-4 rounded-md text-[12px] font-medium"
-              disabled={model.deletedProjectCount === 0 || model.emptyTrashMutation.isPending}
-              style={{
-                background: model.deletedProjectCount > 0 ? "var(--accent-danger-soft)" : "var(--bg-surface)",
-                color: model.deletedProjectCount > 0 ? "var(--accent-danger)" : "var(--text-tertiary)",
-                border: "1px solid var(--line-medium)",
-              }}
-              type="button"
-              onClick={() => setClearDialogOpen(true)}
-            >
-              {model.emptyTrashMutation.isPending ? "清空中..." : "清空"}
-            </button>
-            <Link
-              className="h-8 px-4 rounded-md text-[12px] font-medium flex items-center"
-              href="/workspace/lobby"
-              style={{ background: "var(--bg-surface)", color: "var(--text-secondary)", border: "1px solid var(--line-medium)" }}
-            >
-              返回书架
-            </Link>
-          </div>
+          <div className="flex-shrink-0 px-6 pt-4 pb-3 flex items-center justify-between gap-4" style={{ borderBottom: "1px solid var(--line-soft)" }}>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+            {model.deletedProjectCount} 个项目
+          </span>
+          <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+            保留 30 天
+          </span>
         </div>
-      </header>
+        <div className="flex items-center gap-2">
+          <input
+            className="h-8 px-3 rounded-md text-[12px] w-48"
+            placeholder="搜索项目"
+            style={{ background: "var(--bg-canvas)", color: "var(--text-primary)", border: "1px solid var(--line-soft)" }}
+            value={model.searchText}
+            onChange={(event) => model.setSearchText(event.target.value)}
+          />
+          <button
+            className="h-8 px-4 rounded-md text-[12px] font-medium"
+            disabled={model.deletedProjectCount === 0 || model.emptyTrashMutation.isPending}
+            style={{
+              background: model.deletedProjectCount > 0 ? "var(--accent-danger-soft)" : "var(--bg-surface)",
+              color: model.deletedProjectCount > 0 ? "var(--accent-danger)" : "var(--text-tertiary)",
+              border: "1px solid var(--line-medium)",
+            }}
+            type="button"
+            onClick={() => setClearDialogOpen(true)}
+          >
+            {model.emptyTrashMutation.isPending ? "清空中..." : "清空"}
+          </button>
+        </div>
+      </div>
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "var(--line-medium) transparent" }}>
