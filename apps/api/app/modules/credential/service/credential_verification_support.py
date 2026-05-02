@@ -149,18 +149,10 @@ async def _invalidate_failed_probe_state(
     transport_mode: CredentialVerifyTransportMode | None,
 ) -> None:
     if failed_probe_kind == "text_probe":
-        await db.execute(
-            update(ModelCredential)
-            .where(ModelCredential.id == credential_id)
-            .values(
-                last_verified_at=None,
-                verified_probe_kind=None,
-                stream_tool_verified_probe_kind=None,
-                stream_tool_last_verified_at=None,
-                buffered_tool_verified_probe_kind=None,
-                buffered_tool_last_verified_at=None,
-            )
-            .execution_options(synchronize_session=False)
+        await _invalidate_failed_text_probe_state(
+            db,
+            credential_id=credential_id,
+            transport_mode=transport_mode,
         )
         return
     if transport_mode is None:
@@ -184,6 +176,42 @@ async def _invalidate_failed_probe_state(
                     (current_rank >= failed_rank, None),
                     else_=timestamp_column,
                 ),
+            }
+        )
+        .execution_options(synchronize_session=False)
+    )
+
+
+async def _invalidate_failed_text_probe_state(
+    db: AsyncSession,
+    *,
+    credential_id: uuid.UUID,
+    transport_mode: CredentialVerifyTransportMode | None,
+) -> None:
+    if transport_mode is None:
+        await db.execute(
+            update(ModelCredential)
+            .where(ModelCredential.id == credential_id)
+            .values(
+                last_verified_at=None,
+                verified_probe_kind=None,
+                stream_tool_verified_probe_kind=None,
+                stream_tool_last_verified_at=None,
+                buffered_tool_verified_probe_kind=None,
+                buffered_tool_last_verified_at=None,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        return
+    kind_column, timestamp_column = _resolve_tool_verification_columns(transport_mode)
+    await db.execute(
+        update(ModelCredential)
+        .where(ModelCredential.id == credential_id)
+        .values(
+            **{
+                "verified_probe_kind": None,
+                kind_column.key: None,
+                timestamp_column.key: None,
             }
         )
         .execution_options(synchronize_session=False)

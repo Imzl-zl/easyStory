@@ -104,6 +104,18 @@ def _create_payload(**overrides) -> CredentialCreateDTO:
     return CredentialCreateDTO(**payload)
 
 
+def _seed_verified_transport_state(db, credential_id, verified_at):
+    stored = db.query(ModelCredential).filter(ModelCredential.id == credential_id).one()
+    stored.verified_probe_kind = "tool_continuation_probe"
+    stored.last_verified_at = verified_at
+    stored.stream_tool_verified_probe_kind = "tool_continuation_probe"
+    stored.stream_tool_last_verified_at = verified_at
+    stored.buffered_tool_verified_probe_kind = "tool_call_probe"
+    stored.buffered_tool_last_verified_at = verified_at
+    db.commit()
+    return stored
+
+
 def test_credential_crypto_round_trip(monkeypatch) -> None:
     monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
     crypto = CredentialCrypto()
@@ -632,6 +644,59 @@ def test_verify_credential_failed_higher_stream_probe_preserves_lower_stream_pro
     refreshed = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
     assert refreshed.stream_tool_verified_probe_kind == "tool_definition_probe"
     assert refreshed.stream_tool_last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
+
+
+@pytest.mark.parametrize(
+    ("transport_mode", "expected_stream_kind", "expected_buffered_kind"),
+    [
+        ("stream", None, "tool_call_probe"),
+        ("buffered", "tool_continuation_probe", None),
+    ],
+)
+def test_verify_credential_failed_mode_text_probe_only_clears_matching_transport(
+    db,
+    monkeypatch,
+    transport_mode,
+    expected_stream_kind,
+    expected_buffered_kind,
+) -> None:
+    monkeypatch.setenv("EASYSTORY_CREDENTIAL_MASTER_KEY", TEST_MASTER_KEY)
+    verified_at = datetime.now(timezone.utc).replace(microsecond=0)
+    user = create_user(db)
+    service = create_credential_service(verifier=FakeVerifier(verified_at=verified_at))
+    created = asyncio.run(
+        service.create_credential(
+            async_db(db),
+            _create_payload(display_name="OpenAI"),
+            actor_user_id=user.id,
+        )
+    )
+    stored = _seed_verified_transport_state(db, created.id, verified_at)
+
+    with pytest.raises(BusinessRuleError, match="当前探测失败"):
+        asyncio.run(
+            verify_credential_record(
+                async_db(db),
+                credential=stored,
+                verifier=FailingVerifier("当前探测失败"),
+                decrypt_api_key=service.crypto.decrypt,
+                actor_user_id=user.id,
+                event_type="credential_verify",
+                audit_log_service=service.audit_log_service,
+                probe_kind="text_probe",
+                transport_mode=transport_mode,
+            )
+        )
+
+    refreshed = db.query(ModelCredential).filter(ModelCredential.id == created.id).one()
+    audits = db.query(AuditLog).filter(AuditLog.event_type == "credential_verify").all()
+    assert refreshed.last_verified_at.replace(tzinfo=None) == verified_at.replace(tzinfo=None)
+    assert refreshed.verified_probe_kind is None
+    assert refreshed.stream_tool_verified_probe_kind == expected_stream_kind
+    assert refreshed.buffered_tool_verified_probe_kind == expected_buffered_kind
+    assert audits[-1].details["status"] == "failed"
+    assert audits[-1].details["stream_tool_verified_probe_kind"] == expected_stream_kind
+    assert audits[-1].details["buffered_tool_verified_probe_kind"] == expected_buffered_kind
 
 
 def test_verify_credential_failed_text_probe_clears_connection_and_tool_verification_state(
