@@ -43,6 +43,7 @@ const STUDIO_TOOL_LABELS: Record<string, string> = {
   "project.read_documents": "读取文稿",
   "project.search_documents": "检索文稿",
   "project.write_document": "写入文稿",
+  "project.edit_document": "编辑文稿",
 };
 
 export type StudioChatToolProgressTone = "running" | "success" | "danger" | "muted";

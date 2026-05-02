@@ -17,7 +17,7 @@ PROJECT_DOCUMENT_TEMPLATE_MARKER_PREFIX = ".studio-template-v"
 PROJECT_DOCUMENT_TREE_LOCK_FILE = ".document_tree.lock"
 PROJECT_DOCUMENT_DELETE_STAGING_DIR = ".delete-staging"
 SUPPORTED_PROJECT_DOCUMENT_FILE_SUFFIXES = {".json", ".md"}
-FILE_HASH_CHUNK_BYTES = 64 * 1024
+FILE_HASH_CHUNK_CHARS = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -484,10 +484,10 @@ def _build_file_content_hash(path: Path) -> str:
     import hashlib
 
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
+    with path.open("r", encoding="utf-8", newline=None) as handle:
         while True:
-            chunk = handle.read(FILE_HASH_CHUNK_BYTES)
+            chunk = handle.read(FILE_HASH_CHUNK_CHARS)
             if not chunk:
                 break
-            digest.update(chunk)
+            digest.update(chunk.encode("utf-8"))
     return digest.hexdigest()

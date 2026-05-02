@@ -26,6 +26,24 @@ test("resolveStudioWriteEffectFromToolCallStart keeps target path for write tool
   );
 });
 
+test("resolveStudioWriteEffectFromToolCallStart treats edit tool as write effect", () => {
+  assert.deepEqual(
+    resolveStudioWriteEffectFromToolCallStart({
+      target_summary: {
+        edit_count: 1,
+        path: "设定/人物.md",
+      },
+      tool_call_id: "call-edit-1",
+      tool_name: "project.edit_document",
+    }),
+    {
+      paths: ["设定/人物.md"],
+      status: "started",
+      toolCallId: "call-edit-1",
+    },
+  );
+});
+
 test("resolveStudioWriteEffectFromToolCallResult falls back to start paths when error summary has no path", () => {
   assert.deepEqual(
     resolveStudioWriteEffectFromToolCallResult(
@@ -88,6 +106,23 @@ test("collectStudioWriteEffectsFromTurnResult reads write paths from structured 
         status: "completed",
         tool_name: "project.write_document",
       },
+      {
+        call_id: "call-edit-1",
+        item_id: "item-edit-1",
+        item_type: "tool_result",
+        payload: {
+          resource_links: [
+            { path: "设定/时间轴.md" },
+          ],
+          structured_output: {
+            document_ref: "file:设定/时间轴.md",
+            path: "设定/时间轴.md",
+          },
+        },
+        provider_ref: null,
+        status: "completed",
+        tool_name: "project.edit_document",
+      },
     ],
     output_meta: {},
     output_tokens: null,
@@ -97,11 +132,18 @@ test("collectStudioWriteEffectsFromTurnResult reads write paths from structured 
     total_tokens: null,
   });
 
-  assert.deepEqual(effects, [{
-    paths: ["设定/人物.md"],
-    status: "completed",
-    toolCallId: "call-write-1",
-  }]);
+  assert.deepEqual(effects, [
+    {
+      paths: ["设定/人物.md"],
+      status: "completed",
+      toolCallId: "call-write-1",
+    },
+    {
+      paths: ["设定/时间轴.md"],
+      status: "completed",
+      toolCallId: "call-edit-1",
+    },
+  ]);
 });
 
 test("isStudioAssistantWriteSuccessStatus treats committed write as effective", () => {

@@ -291,7 +291,7 @@ def _resolve_tool_step_target_document_refs(
         ]
         if normalized:
             return tuple(dict.fromkeys(normalized))
-    if context.tool_name == "project.write_document" and context.active_document_ref is not None:
+    if context.tool_name in {"project.write_document", "project.edit_document"} and context.active_document_ref is not None:
         return (context.active_document_ref,)
     return ()
 
@@ -300,7 +300,7 @@ def _resolve_tool_step_idempotency_key(
     context: AssistantToolExecutionContext,
     target_document_refs: tuple[str, ...],
 ) -> str | None:
-    if context.tool_name != "project.write_document" or not target_document_refs:
+    if context.tool_name not in {"project.write_document", "project.edit_document"} or not target_document_refs:
         return None
     return f"{context.run_id}:{context.tool_call_id}:{target_document_refs[0]}"
 

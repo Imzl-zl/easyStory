@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .assistant_tool_runtime_dto import AssistantToolDescriptor
 
+PROJECT_READ_DOCUMENTS_MAX_PATHS = 8
+PROJECT_EDIT_DOCUMENT_MAX_EDITS = 20
 PROJECT_DOCUMENT_SOURCES = ["file", "outline", "opening_plan", "chapter"]
 PROJECT_DOCUMENT_CONTENT_STATES = ["ready", "empty", "placeholder"]
 PROJECT_DOCUMENT_CATALOG_ENTRY_SCHEMA = {
@@ -125,6 +127,30 @@ PROJECT_DOCUMENT_WRITE_DIFF_SUMMARY_SCHEMA = {
     },
     "required": ["changed", "previous_chars", "next_chars"],
 }
+PROJECT_DOCUMENT_TEXT_EDIT_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "old_text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "要替换的原文片段，必须能结合上下文锚点唯一定位。",
+        },
+        "new_text": {
+            "type": "string",
+            "description": "替换后的新文本；允许为空字符串表示删除。",
+        },
+        "context_before": {
+            "anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
+            "description": "紧邻 old_text 之前的原文锚点；old_text 多处命中时用于消歧。",
+        },
+        "context_after": {
+            "anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
+            "description": "紧邻 old_text 之后的原文锚点；old_text 多处命中时用于消歧。",
+        },
+    },
+    "required": ["old_text", "new_text"],
+}
 
 PROJECT_LIST_DOCUMENTS_DESCRIPTOR = AssistantToolDescriptor(
     name="project.list_documents",
@@ -231,14 +257,18 @@ PROJECT_READ_DOCUMENTS_DESCRIPTOR = AssistantToolDescriptor(
         "properties": {
             "paths": {
                 "type": "array",
+                "description": f"要读取的统一项目文稿路径，一次最多 {PROJECT_READ_DOCUMENTS_MAX_PATHS} 份。",
                 "items": {"type": "string", "minLength": 1},
                 "minItems": 1,
+                "maxItems": PROJECT_READ_DOCUMENTS_MAX_PATHS,
             },
             "cursors": {
                 "anyOf": [
                     {
                         "type": "array",
+                        "description": "与 paths 按顺序一一对应的分页 cursor。",
                         "items": {"type": "string", "minLength": 1},
+                        "maxItems": PROJECT_READ_DOCUMENTS_MAX_PATHS,
                     },
                     {"type": "null"},
                 ],
@@ -275,13 +305,21 @@ PROJECT_READ_DOCUMENTS_DESCRIPTOR = AssistantToolDescriptor(
 
 PROJECT_WRITE_DOCUMENT_DESCRIPTOR = AssistantToolDescriptor(
     name="project.write_document",
-    description="写回当前项目目录中的单份文稿。",
+    description=(
+        "基于 base_version 写回单份项目文稿的下一版完整全文。"
+        "content 必须是修改后的完整文稿全文，不是新增片段、diff、patch 或局部替换。"
+    ),
     input_schema={
         "type": "object",
         "additionalProperties": False,
         "properties": {
             "path": {"type": "string", "minLength": 1},
-            "content": {"type": "string"},
+            "content": {
+                "type": "string",
+                "description": (
+                    "修改后的完整文稿全文。不得只传新增段落、局部片段、diff、patch 或替换说明。"
+                ),
+            },
             "base_version": {"type": "string", "minLength": 1},
         },
         "required": ["path", "content", "base_version"],
@@ -323,6 +361,41 @@ PROJECT_WRITE_DOCUMENT_DESCRIPTOR = AssistantToolDescriptor(
     strict=True,
 )
 
+PROJECT_EDIT_DOCUMENT_DESCRIPTOR = AssistantToolDescriptor(
+    name="project.edit_document",
+    description=(
+        "对当前授权的单份项目文稿执行确定性局部文本替换。"
+        "每个 edit 使用 old_text 加可选的紧邻上下文锚点唯一定位；"
+        "命中 0 处、多处或重叠时会失败，不做模糊匹配或猜测。"
+    ),
+    input_schema={
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "path": {"type": "string", "minLength": 1},
+            "edits": {
+                "type": "array",
+                "description": f"要原子应用的文本替换列表，一次最多 {PROJECT_EDIT_DOCUMENT_MAX_EDITS} 个。",
+                "items": PROJECT_DOCUMENT_TEXT_EDIT_SCHEMA,
+                "minItems": 1,
+                "maxItems": PROJECT_EDIT_DOCUMENT_MAX_EDITS,
+            },
+            "base_version": {"type": "string", "minLength": 1},
+        },
+        "required": ["path", "edits", "base_version"],
+    },
+    output_schema=PROJECT_WRITE_DOCUMENT_DESCRIPTOR.output_schema,
+    origin="project_document",
+    trust_class="local_first_party",
+    plane="mutation",
+    mutability="write",
+    execution_locus="local_runtime",
+    approval_mode="grant_bound",
+    idempotency_class="conditional_write",
+    timeout_seconds=30,
+    strict=True,
+)
+
 
 class AssistantToolDescriptorRegistry:
     def __init__(
@@ -333,6 +406,7 @@ class AssistantToolDescriptorRegistry:
             PROJECT_SEARCH_DOCUMENTS_DESCRIPTOR,
             PROJECT_READ_DOCUMENTS_DESCRIPTOR,
             PROJECT_WRITE_DOCUMENT_DESCRIPTOR,
+            PROJECT_EDIT_DOCUMENT_DESCRIPTOR,
         ),
     ) -> None:
         self._descriptors = {item.name: item for item in descriptors}

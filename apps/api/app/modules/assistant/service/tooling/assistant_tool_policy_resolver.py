@@ -14,6 +14,8 @@ from .assistant_tool_runtime_dto import (
     AssistantToolPolicyDecision,
 )
 
+PROJECT_DOCUMENT_WRITE_TOOL_NAMES = ("project.write_document", "project.edit_document")
+
 
 class AssistantToolPolicyResolver:
     def resolve(
@@ -119,8 +121,9 @@ def _build_turn_approval_grant(
     )
     if trusted_snapshot is None:
         raise RuntimeError("grant_bound write access requires trusted active_buffer_state")
+    allowed_tool_names = _resolve_grant_allowed_tool_names(descriptor)
     grant_id = _build_turn_approval_grant_id(
-        descriptor=descriptor,
+        allowed_tool_names=allowed_tool_names,
         context=context,
         target_document_ref=target_document_ref,
         binding_version=binding_version,
@@ -130,7 +133,7 @@ def _build_turn_approval_grant(
     )
     return AssistantToolApprovalGrant(
         grant_id=grant_id,
-        allowed_tool_names=(descriptor.name,),
+        allowed_tool_names=allowed_tool_names,
         target_document_refs=(target_document_ref,),
         binding_version_constraints={target_document_ref: binding_version},
         base_version_constraints={target_document_ref: trusted_snapshot.base_version},
@@ -141,9 +144,15 @@ def _build_turn_approval_grant(
     )
 
 
+def _resolve_grant_allowed_tool_names(descriptor: AssistantToolDescriptor) -> tuple[str, ...]:
+    if descriptor.name in PROJECT_DOCUMENT_WRITE_TOOL_NAMES:
+        return PROJECT_DOCUMENT_WRITE_TOOL_NAMES
+    return (descriptor.name,)
+
+
 def _build_turn_approval_grant_id(
     *,
-    descriptor: AssistantToolDescriptor,
+    allowed_tool_names: tuple[str, ...],
     context: AssistantToolExposureContext,
     target_document_ref: str,
     binding_version: str,
@@ -157,7 +166,7 @@ def _build_turn_approval_grant_id(
         "buffer_hash": buffer_hash,
         "buffer_source": buffer_source,
         "binding_version": binding_version,
-        "descriptor_name": descriptor.name,
+        "allowed_tool_names": allowed_tool_names,
         "project_id": str(context.project_id) if context.project_id is not None else None,
         "requested_write_scope": context.requested_write_scope,
         "run_id": str(context.run_id) if context.run_id is not None else None,

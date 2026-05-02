@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 from urllib.parse import quote
 import uuid
 
+from .project_document_version_support import normalize_project_file_document_content
+
 from .project_document_capability_dto import (
     ProjectDocumentCatalogEntryDTO,
     ProjectDocumentContentState,
@@ -177,7 +179,8 @@ def _build_resource_uri(project_id: uuid.UUID, document_ref: str) -> str:
 
 
 def _build_content_hash(content: str) -> str:
-    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+    normalized_content = normalize_project_file_document_content(content)
+    return hashlib.sha256(normalized_content.encode("utf-8")).hexdigest()
 
 
 def _build_binding_version(

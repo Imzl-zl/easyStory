@@ -250,6 +250,8 @@ def build_project_tool_guidance_snapshot_from_discovery_decision(
         "- 当前对话已绑定项目。",
         "- 如果问题涉及跨文稿的一致性、人物关系、势力关系、时间轴、事件或伏笔回收，先调用 project.search_documents 缩小范围，再调用 project.read_documents 读取命中文稿。",
         "- 优先使用聚焦查询词：人物、人物关系、势力、势力关系、时间轴、事件、年表、伏笔、回收。",
+        "- 如果本轮可使用 project.edit_document，小范围改动优先用它；old_text 必须结合 context_before/context_after 唯一定位，命中 0 处或多处都会失败。",
+        "- 如果本轮可使用 project.write_document，content 必须是修改后的完整文稿全文，不要只传新增片段、diff、patch 或局部替换。",
     ]
     return AssistantProjectToolGuidanceDTO(
         guidance_type=decision.decision_type,

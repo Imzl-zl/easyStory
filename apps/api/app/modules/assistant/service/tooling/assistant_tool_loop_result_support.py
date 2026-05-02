@@ -25,6 +25,11 @@ RETURN_ERROR_TO_MODEL_CODES = frozenset(
         "document_not_found",
         "document_not_readable",
         "document_not_writable",
+        "edit_operations_required",
+        "edit_old_text_required",
+        "edit_target_ambiguous",
+        "edit_target_not_found",
+        "edit_target_overlaps",
         "invalid_arguments",
         "invalid_json",
         "revision_state_mismatch",
@@ -166,6 +171,9 @@ def _build_tool_target_summary(tool_call: dict[str, Any]) -> dict[str, Any]:
     cursors = arguments.get("cursors")
     if isinstance(cursors, list):
         summary["cursor_count"] = len([item for item in cursors if isinstance(item, str) and item.strip()])
+    edits = arguments.get("edits")
+    if isinstance(edits, list):
+        summary["edit_count"] = len([item for item in edits if isinstance(item, dict)])
     return summary
 
 
@@ -376,6 +384,7 @@ USER_ACTION_REQUIRED_ERROR_CODES = frozenset(
         "document_not_found",
         "document_not_readable",
         "document_not_writable",
+        "edit_target_overlaps",
         "revision_state_mismatch",
         "version_conflict",
         "write_target_mismatch",
@@ -392,6 +401,14 @@ def _resolve_recoverable_error_hint(code: str) -> str:
         return "请先重新读取目标文稿的最新状态，再决定是否继续写入。"
     if code in {"document_not_found", "document_not_readable", "document_not_writable"}:
         return "请重新选择当前项目内存在且可访问的目标文稿。"
+    if code == "edit_target_not_found":
+        return "请重新读取目标文稿，确认 old_text 和上下文锚点来自当前版本。"
+    if code in {"edit_operations_required", "edit_old_text_required"}:
+        return "请至少提供一个带 old_text 和 new_text 的编辑操作。"
+    if code == "edit_target_ambiguous":
+        return "请提供更长 old_text，或补充紧邻的 context_before / context_after。"
+    if code == "edit_target_overlaps":
+        return "请拆分或重排编辑操作，确保每个编辑目标互不重叠。"
     if code == "schema_validation_failed":
         return "请按目标文稿要求的结构重新生成内容。"
     if code == "write_target_mismatch":

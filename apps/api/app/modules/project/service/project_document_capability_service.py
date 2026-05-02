@@ -46,6 +46,11 @@ from .project_document_buffer_state_support import (
     TRUSTED_ACTIVE_BUFFER_SOURCE,
     build_project_document_buffer_hash,
 )
+from .project_document_edit_support import (
+    ProjectDocumentEditApplicationError,
+    ProjectDocumentTextEdit,
+    apply_project_document_text_edits,
+)
 from .project_document_search_support import (
     PROJECT_DOCUMENT_SEARCH_DEFAULT_LIMIT,
     _build_search_hit,
@@ -329,6 +334,88 @@ class ProjectDocumentCapabilityService:
             run_audit_id=run_audit_id,
         )
         return await self.commit_prepared_write_document(db, prepared)
+
+    async def edit_document(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        *,
+        path: str,
+        edits: Iterable[ProjectDocumentTextEdit],
+        base_version: str,
+        owner_id: uuid.UUID | None = None,
+        expected_document_ref: str | None = None,
+        expected_binding_version: str | None = None,
+        active_buffer_state: dict[str, object] | None = None,
+        allowed_target_document_refs: tuple[str, ...] = (),
+        require_trusted_buffer_state: bool = False,
+        run_audit_id: str,
+    ) -> ProjectDocumentWriteResultDTO:
+        prepared = await self.prepare_edit_document(
+            db,
+            project_id,
+            path=path,
+            edits=edits,
+            base_version=base_version,
+            owner_id=owner_id,
+            expected_document_ref=expected_document_ref,
+            expected_binding_version=expected_binding_version,
+            active_buffer_state=active_buffer_state,
+            allowed_target_document_refs=allowed_target_document_refs,
+            require_trusted_buffer_state=require_trusted_buffer_state,
+            run_audit_id=run_audit_id,
+        )
+        return await self.commit_prepared_write_document(db, prepared)
+
+    async def prepare_edit_document(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        *,
+        path: str,
+        edits: Iterable[ProjectDocumentTextEdit],
+        base_version: str,
+        owner_id: uuid.UUID | None = None,
+        expected_document_ref: str | None = None,
+        expected_binding_version: str | None = None,
+        active_buffer_state: dict[str, object] | None = None,
+        allowed_target_document_refs: tuple[str, ...] = (),
+        require_trusted_buffer_state: bool = False,
+        run_audit_id: str,
+    ) -> PreparedProjectDocumentWrite:
+        resolved = await self._resolve_document_by_path(db, project_id, path=path, owner_id=owner_id)
+        if resolved is None:
+            raise ProjectDocumentMutationError(
+                "document_not_found",
+                "目标文稿不存在于当前项目目录，无法编辑。",
+            )
+        _validate_edit_document_preconditions(
+            resolved,
+            base_version=base_version,
+            expected_document_ref=expected_document_ref,
+            expected_binding_version=expected_binding_version,
+            active_buffer_state=active_buffer_state,
+            allowed_target_document_refs=allowed_target_document_refs,
+            require_trusted_buffer_state=require_trusted_buffer_state,
+        )
+        try:
+            next_content = apply_project_document_text_edits(resolved.content, edits)
+        except ProjectDocumentEditApplicationError as exc:
+            raise ProjectDocumentMutationError(exc.code, str(exc)) from exc
+        return await self.prepare_write_document(
+            db,
+            project_id,
+            path=path,
+            content=next_content,
+            base_version=base_version,
+            owner_id=owner_id,
+            expected_document_ref=expected_document_ref,
+            expected_binding_version=expected_binding_version,
+            active_buffer_state=active_buffer_state,
+            allowed_target_document_refs=allowed_target_document_refs,
+            require_trusted_buffer_state=require_trusted_buffer_state,
+            run_audit_id=run_audit_id,
+        )
 
     async def prepare_write_document(
         self,
@@ -1166,6 +1253,50 @@ def _validate_active_buffer_state(
             "write_grant_expired",
             "当前写回授权缓冲区已变化，请刷新当前文稿后再尝试写入。",
         )
+
+
+def _validate_edit_document_preconditions(
+    resolved: ResolvedProjectDocument,
+    *,
+    base_version: str,
+    expected_document_ref: str | None = None,
+    expected_binding_version: str | None = None,
+    active_buffer_state: dict[str, object] | None = None,
+    allowed_target_document_refs: tuple[str, ...] = (),
+    require_trusted_buffer_state: bool = False,
+) -> None:
+    if not resolved.writable:
+        raise ProjectDocumentMutationError(
+            "document_not_writable",
+            "目标文稿当前不可写，请改为编辑项目文件层文稿。",
+        )
+    if allowed_target_document_refs and resolved.document_ref not in allowed_target_document_refs:
+        raise ProjectDocumentMutationError(
+            "write_target_not_allowed",
+            "目标文稿不在当前 turn 的写入授权范围内。",
+        )
+    if expected_document_ref is not None and resolved.document_ref != expected_document_ref:
+        raise ProjectDocumentMutationError(
+            "write_target_mismatch",
+            "目标文稿身份与当前写入授权不一致。",
+        )
+    binding_version = _build_binding_version(resolved)
+    if expected_binding_version is not None and binding_version != expected_binding_version:
+        raise ProjectDocumentMutationError(
+            "binding_version_mismatch",
+            "目标文稿绑定已变化，请重新读取当前上下文后再尝试编辑。",
+        )
+    if resolved.version != base_version:
+        raise ProjectDocumentMutationError(
+            "version_conflict",
+            "目标文稿版本已变化，请重新读取最新内容后再编辑。",
+        )
+    _validate_active_buffer_state(
+        active_buffer_state,
+        base_version=base_version,
+        current_content=resolved.content,
+        require_trusted_snapshot=require_trusted_buffer_state,
+    )
 
 
 def _validate_document_content(content: str, *, schema_id: str | None, path: str) -> None:

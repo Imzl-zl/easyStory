@@ -742,10 +742,11 @@ ordinary chat 不能继续把“当前文稿路径、截断正文、额外参考
 - 所有 `project.*` 工具都先经过 `AssistantToolDescriptorRegistry`
 - 若不在项目作用域内，全部 `project.*` 工具隐藏，原因是 `not_in_project_scope`
 - `approval_mode=always_confirm` 的工具一律隐藏，原因是 `unsupported_approval_mode`
-- `project.write_document` 只有在当前 turn 已拿到 `grant_bound` 写入前提时才可见；否则隐藏，原因是 `write_grant_unavailable`
+- `project.write_document / project.edit_document` 只有在当前 turn 已拿到 `grant_bound` 写入前提时才可见；否则隐藏，原因是 `write_grant_unavailable`
+- 同一活动文稿、同一基线下，`project.write_document / project.edit_document` 共享一个 `approval_grant`，其 `allowed_tool_names` 同时包含两个工具名
 - 当前可见工具集合因此稳定收口为：
   - 只读场景：`project.list_documents / project.search_documents / project.read_documents`
-  - 可写场景：在只读三件套基础上额外暴露 `project.write_document`
+  - 可写场景：在只读三件套基础上额外暴露 `project.write_document / project.edit_document`
 
 #### 当前 Tool Governance 合同
 

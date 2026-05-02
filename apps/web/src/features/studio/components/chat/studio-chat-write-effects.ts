@@ -16,6 +16,11 @@ export type StudioAssistantWriteEffect = {
   toolCallId: string | null;
 };
 
+const STUDIO_ASSISTANT_WRITE_TOOL_NAMES = new Set([
+  "project.write_document",
+  "project.edit_document",
+]);
+
 type StudioToolCallStartPayload = {
   target_summary?: unknown;
   tool_call_id: string;
@@ -32,7 +37,7 @@ type StudioToolCallResultPayload = {
 export function resolveStudioWriteEffectFromToolCallStart(
   payload: StudioToolCallStartPayload,
 ): StudioAssistantWriteEffect | null {
-  if (payload.tool_name !== "project.write_document") {
+  if (!isStudioAssistantWriteToolName(payload.tool_name)) {
     return null;
   }
   const paths = readStudioAssistantWritePaths(payload.target_summary);
@@ -47,7 +52,7 @@ export function resolveStudioWriteEffectFromToolCallResult(
   payload: StudioToolCallResultPayload,
   fallbackPaths: readonly string[] = [],
 ): StudioAssistantWriteEffect | null {
-  if (payload.tool_name !== "project.write_document") {
+  if (!isStudioAssistantWriteToolName(payload.tool_name)) {
     return null;
   }
   const status = normalizeStudioAssistantWriteStatus(payload.status);
@@ -70,7 +75,7 @@ export function collectStudioWriteEffectsFromTurnResult(
       return [];
     }
     const toolName = readStudioToolName(item);
-    if (toolName !== "project.write_document") {
+    if (!isStudioAssistantWriteToolName(toolName)) {
       return [];
     }
     const status = normalizeStudioAssistantWriteStatus(
@@ -106,6 +111,10 @@ function normalizeStudioAssistantWriteStatus(
     return status;
   }
   return null;
+}
+
+function isStudioAssistantWriteToolName(toolName: string | null | undefined) {
+  return typeof toolName === "string" && STUDIO_ASSISTANT_WRITE_TOOL_NAMES.has(toolName);
 }
 
 function readStudioToolName(item: AssistantTurnResult["output_items"][number]) {

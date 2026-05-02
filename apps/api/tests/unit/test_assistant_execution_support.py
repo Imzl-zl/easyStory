@@ -211,6 +211,8 @@ def test_build_project_tool_guidance_snapshot_projects_resolved_discovery_decisi
     assert guidance.tool_names == decision.tool_names
     assert guidance.trigger_keywords == decision.trigger_keywords
     assert guidance.discovery_source == decision.discovery_source
+    assert "完整文稿全文" in guidance.content
+    assert "patch" in guidance.content
 
 
 def _build_structured_agent() -> AgentConfig:

@@ -12,8 +12,10 @@ from app.modules.project.service.project_document_capability_dto import ProjectD
 from app.modules.project.service.project_document_buffer_state_support import (
     extract_trusted_project_document_buffer_snapshot,
 )
+from app.modules.project.service.project_document_edit_support import ProjectDocumentTextEdit
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
 
+from .assistant_tool_registry import PROJECT_EDIT_DOCUMENT_MAX_EDITS, PROJECT_READ_DOCUMENTS_MAX_PATHS
 from .assistant_tool_runtime_dto import (
     AssistantToolExecutionContext,
     AssistantToolLifecycleRecorder,
@@ -62,8 +64,8 @@ class ProjectListDocumentsToolArgs(BaseModel):
 class ProjectReadDocumentsToolArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    paths: list[str] = Field(min_length=1)
-    cursors: list[str] = Field(default_factory=list)
+    paths: list[str] = Field(min_length=1, max_length=PROJECT_READ_DOCUMENTS_MAX_PATHS)
+    cursors: list[str] = Field(default_factory=list, max_length=PROJECT_READ_DOCUMENTS_MAX_PATHS)
 
     @field_validator("paths", "cursors", mode="before")
     @classmethod
@@ -140,6 +142,26 @@ class ProjectWriteDocumentToolArgs(BaseModel):
     base_version: str = Field(min_length=1)
 
 
+class ProjectEditDocumentOperationArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    old_text: str = Field(min_length=1)
+    new_text: str
+    context_before: str | None = Field(default=None, min_length=1)
+    context_after: str | None = Field(default=None, min_length=1)
+
+
+class ProjectEditDocumentToolArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1)
+    edits: list[ProjectEditDocumentOperationArgs] = Field(
+        min_length=1,
+        max_length=PROJECT_EDIT_DOCUMENT_MAX_EDITS,
+    )
+    base_version: str = Field(min_length=1)
+
+
 class AssistantToolTerminalRunError(BusinessRuleError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
@@ -173,6 +195,12 @@ class AssistantToolExecutor:
             return await self._execute_search_documents(db, context)
         if context.tool_name == "project.write_document":
             return await self._execute_write_document(
+                db,
+                context,
+                on_lifecycle_update=on_lifecycle_update,
+            )
+        if context.tool_name == "project.edit_document":
+            return await self._execute_edit_document(
                 db,
                 context,
                 on_lifecycle_update=on_lifecycle_update,
@@ -290,26 +318,43 @@ class AssistantToolExecutor:
             db,
             prepared_write,
         )
-        return AssistantToolResultEnvelope(
-            tool_call_id=context.tool_call_id,
-            status="completed",
-            structured_output=result.model_dump(mode="json"),
-            content_items=[
-                {
-                    "type": "text",
-                    "text": _build_write_result_text(result),
-                },
-            ],
-            resource_links=[
-                {
-                    "path": result.path,
-                    "document_ref": result.document_ref,
-                    "resource_uri": result.resource_uri,
-                }
-            ],
-            error=None,
-            audit={"run_audit_id": result.run_audit_id},
+        return _build_write_result_envelope(context=context, result=result)
+
+    async def _execute_edit_document(
+        self,
+        db: AsyncSession,
+        context: AssistantToolExecutionContext,
+        *,
+        on_lifecycle_update: AssistantToolLifecycleRecorder | None = None,
+    ) -> AssistantToolResultEnvelope:
+        arguments = ProjectEditDocumentToolArgs.model_validate(context.arguments)
+        _validate_write_execution_context(context)
+        prepared_write = await self.project_document_capability_service.prepare_edit_document(
+            db,
+            context.project_id,
+            path=arguments.path,
+            edits=_to_project_document_text_edits(arguments.edits),
+            base_version=arguments.base_version,
+            owner_id=context.owner_id,
+            expected_document_ref=context.active_document_ref,
+            expected_binding_version=context.active_binding_version,
+            active_buffer_state=context.active_buffer_state,
+            allowed_target_document_refs=context.allowed_target_document_refs,
+            require_trusted_buffer_state=True,
+            run_audit_id=context.run_audit_id,
         )
+        if on_lifecycle_update is not None:
+            on_lifecycle_update(
+                AssistantToolLifecycleUpdate(
+                    status="writing",
+                    target_document_refs=(prepared_write.resolved_document.document_ref,),
+                )
+            )
+        result = await self.project_document_capability_service.commit_prepared_write_document(
+            db,
+            prepared_write,
+        )
+        return _build_write_result_envelope(context=context, result=result)
 
 
 def _build_catalog_content_items(documents: list[Any]) -> list[dict[str, Any]]:
@@ -414,6 +459,47 @@ def _build_search_resource_links(documents: list[Any]) -> list[dict[str, Any]]:
         }
         for item in documents
     ]
+
+
+def _to_project_document_text_edits(
+    edits: list[ProjectEditDocumentOperationArgs],
+) -> tuple[ProjectDocumentTextEdit, ...]:
+    return tuple(
+        ProjectDocumentTextEdit(
+            old_text=item.old_text,
+            new_text=item.new_text,
+            context_before=item.context_before,
+            context_after=item.context_after,
+        )
+        for item in edits
+    )
+
+
+def _build_write_result_envelope(
+    *,
+    context: AssistantToolExecutionContext,
+    result: Any,
+) -> AssistantToolResultEnvelope:
+    return AssistantToolResultEnvelope(
+        tool_call_id=context.tool_call_id,
+        status="completed",
+        structured_output=result.model_dump(mode="json"),
+        content_items=[
+            {
+                "type": "text",
+                "text": _build_write_result_text(result),
+            },
+        ],
+        resource_links=[
+            {
+                "path": result.path,
+                "document_ref": result.document_ref,
+                "resource_uri": result.resource_uri,
+            }
+        ],
+        error=None,
+        audit={"run_audit_id": result.run_audit_id},
+    )
 
 
 def _validate_write_execution_context(context: AssistantToolExecutionContext) -> None:

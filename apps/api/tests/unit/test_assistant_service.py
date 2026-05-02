@@ -3607,7 +3607,7 @@ async def test_assistant_service_runs_project_write_document_tool_loop(db, tmp_p
     assert step_history[-1].approval_grant_id is not None
     assert step_history[-1].approval_grant_snapshot == {
         "grant_id": step_history[-1].approval_grant_id,
-        "allowed_tool_names": ["project.write_document"],
+        "allowed_tool_names": ["project.write_document", "project.edit_document"],
         "target_document_refs": [target.document_ref],
         "binding_version_constraints": {
             target.document_ref: run_record.document_context_bindings_snapshot[0]["binding_version"]
@@ -3635,9 +3635,10 @@ async def test_assistant_service_runs_project_write_document_tool_loop(db, tmp_p
     assert run_record.requested_write_scope == "turn"
     assert run_record.requested_write_targets_snapshot == (target.document_ref,)
     assert len(run_record.approval_grants_snapshot) == 1
-    assert run_record.approval_grants_snapshot[0] == {
+    write_grant_snapshot = run_record.approval_grants_snapshot[0]
+    assert write_grant_snapshot == {
         "grant_id": step_history[-1].approval_grant_id,
-        "allowed_tool_names": ("project.write_document",),
+        "allowed_tool_names": ("project.write_document", "project.edit_document"),
         "target_document_refs": (target.document_ref,),
         "binding_version_constraints": {
             target.document_ref: run_record.document_context_bindings_snapshot[0]["binding_version"]
@@ -3693,6 +3694,7 @@ async def test_assistant_service_runs_project_write_document_tool_loop(db, tmp_p
         "project.search_documents",
         "project.read_documents",
         "project.write_document",
+        "project.edit_document",
     }
     assert run_record.budget_snapshot == _expected_run_budget(max_steps=8, tool_timeout_seconds=None)
     assert run_record.status == "completed"
@@ -3702,6 +3704,7 @@ async def test_assistant_service_runs_project_write_document_tool_loop(db, tmp_p
         "project.search_documents",
         "project.read_documents",
         "project.write_document",
+        "project.edit_document",
     }
     policy_by_name = {
         item["descriptor"]["name"]: item
@@ -3712,7 +3715,10 @@ async def test_assistant_service_runs_project_write_document_tool_loop(db, tmp_p
     assert policy_by_name["project.read_documents"]["visibility"] == "visible"
     assert policy_by_name["project.write_document"]["visibility"] == "visible"
     assert policy_by_name["project.write_document"]["allowed_target_document_refs"] == (target.document_ref,)
-    assert policy_by_name["project.write_document"]["approval_grant"] == run_record.approval_grants_snapshot[0]
+    assert policy_by_name["project.write_document"]["approval_grant"] == write_grant_snapshot
+    assert policy_by_name["project.edit_document"]["visibility"] == "visible"
+    assert policy_by_name["project.edit_document"]["allowed_target_document_refs"] == (target.document_ref,)
+    assert policy_by_name["project.edit_document"]["approval_grant"] == write_grant_snapshot
     assert (
         response.output_items[1].payload["structured_output"]["run_audit_id"]
         == f"{response.run_id}:call.project.write_document.1"

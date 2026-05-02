@@ -32,7 +32,10 @@ from app.modules.assistant.service.tooling.assistant_tool_loop_budget_support im
 )
 from app.modules.assistant.service.tooling.assistant_tool_loop_result_support import _build_tool_call_start_payload
 from app.modules.assistant.service.tooling.assistant_tool_executor import (
+    PROJECT_EDIT_DOCUMENT_MAX_EDITS,
+    PROJECT_READ_DOCUMENTS_MAX_PATHS,
     PROJECT_SEARCH_DOCUMENTS_DEFAULT_LIMIT,
+    ProjectEditDocumentToolArgs,
     ProjectReadDocumentsToolArgs,
     ProjectSearchDocumentsToolArgs,
 )
@@ -227,17 +230,21 @@ def test_assistant_tool_descriptor_registry_exposes_project_read_documents_descr
     assert descriptor.mutability == "read_only"
     assert descriptor.origin == "project_document"
     assert descriptor.trust_class == "local_first_party"
+    assert descriptor.input_schema["properties"]["paths"]["maxItems"] == PROJECT_READ_DOCUMENTS_MAX_PATHS
     assert descriptor.input_schema["properties"]["cursors"] == {
         "anyOf": [
             {
                 "type": "array",
+                "description": "与 paths 按顺序一一对应的分页 cursor。",
                 "items": {"type": "string", "minLength": 1},
+                "maxItems": PROJECT_READ_DOCUMENTS_MAX_PATHS,
             },
             {"type": "null"},
         ]
     }
 
     write_descriptor = registry.get_descriptor("project.write_document")
+    edit_descriptor = registry.get_descriptor("project.edit_document")
 
     assert write_descriptor is not None
     assert write_descriptor.execution_locus == "local_runtime"
@@ -245,6 +252,16 @@ def test_assistant_tool_descriptor_registry_exposes_project_read_documents_descr
     assert write_descriptor.plane == "mutation"
     assert write_descriptor.mutability == "write"
     assert write_descriptor.idempotency_class == "conditional_write"
+    assert "完整文稿全文" in write_descriptor.description
+    assert "diff" in write_descriptor.input_schema["properties"]["content"]["description"]
+    assert edit_descriptor is not None
+    assert edit_descriptor.execution_locus == "local_runtime"
+    assert edit_descriptor.approval_mode == "grant_bound"
+    assert edit_descriptor.plane == "mutation"
+    assert edit_descriptor.mutability == "write"
+    assert edit_descriptor.idempotency_class == "conditional_write"
+    assert edit_descriptor.input_schema["properties"]["edits"]["maxItems"] == PROJECT_EDIT_DOCUMENT_MAX_EDITS
+    assert "模糊匹配" in edit_descriptor.description
 
 
 def test_project_read_documents_tool_args_treats_null_cursors_as_empty_list():
@@ -256,6 +273,32 @@ def test_project_read_documents_tool_args_treats_null_cursors_as_empty_list():
     )
 
     assert arguments.cursors == []
+
+
+def test_project_read_documents_tool_args_rejects_too_many_paths():
+    with pytest.raises(ValidationError) as exc_info:
+        ProjectReadDocumentsToolArgs.model_validate(
+            {
+                "paths": [f"设定/资料-{index}.md" for index in range(PROJECT_READ_DOCUMENTS_MAX_PATHS + 1)],
+            }
+        )
+
+    error = exc_info.value.errors()[0]
+    assert error["type"] == "too_long"
+    assert error["ctx"]["max_length"] == PROJECT_READ_DOCUMENTS_MAX_PATHS
+
+
+def test_project_edit_document_tool_args_rejects_blank_old_text():
+    with pytest.raises(ValidationError) as exc_info:
+        ProjectEditDocumentToolArgs.model_validate(
+            {
+                "path": "设定/人物.md",
+                "base_version": "sha256:base",
+                "edits": [{"old_text": "", "new_text": "新文本"}],
+            }
+        )
+
+    assert exc_info.value.errors()[0]["type"] == "string_too_short"
 
 
 def test_project_search_documents_tool_args_treats_null_optional_filters_as_omitted():
@@ -540,6 +583,7 @@ def test_assistant_tool_exposure_policy_only_exposes_project_tools_inside_projec
         "project.search_documents",
         "project.read_documents",
         "project.write_document",
+        "project.edit_document",
     ]
     assert [item.name for item in policy.resolve_visible_tools(
         context=AssistantToolExposureContext(
@@ -631,10 +675,30 @@ def test_assistant_tool_policy_resolver_keeps_always_confirm_hidden_in_v1a():
 def test_assistant_tool_policy_resolver_builds_approval_grant_for_grant_bound_write():
     registry = AssistantToolDescriptorRegistry()
     descriptor = registry.get_descriptor("project.write_document")
+    edit_descriptor = registry.get_descriptor("project.edit_document")
     assert descriptor is not None
+    assert edit_descriptor is not None
     resolver = AssistantToolPolicyResolver()
     document_ref = "project_file:1"
     editor_content = "# 人物\n\n林渊"
+    visible_context = AssistantToolExposureContext(
+        project_id=uuid.uuid4(),
+        requested_write_scope="turn",
+        allowed_target_document_refs=(document_ref,),
+        active_document_ref=document_ref,
+        active_binding_version="binding-1",
+        active_buffer_state=_build_trusted_active_buffer_state(
+            base_version="sha256:base",
+            content=editor_content,
+        ),
+        document_context_bindings=(
+            {
+                "document_ref": document_ref,
+                "selection_role": "active",
+                "writable": True,
+            },
+        ),
+    )
 
     hidden_decision = resolver.resolve(
         descriptor=descriptor,
@@ -645,24 +709,11 @@ def test_assistant_tool_policy_resolver_builds_approval_grant_for_grant_bound_wr
     )
     visible_decision = resolver.resolve(
         descriptor=descriptor,
-        context=AssistantToolExposureContext(
-            project_id=uuid.uuid4(),
-            requested_write_scope="turn",
-            allowed_target_document_refs=(document_ref,),
-            active_document_ref=document_ref,
-            active_binding_version="binding-1",
-            active_buffer_state=_build_trusted_active_buffer_state(
-                base_version="sha256:base",
-                content=editor_content,
-            ),
-            document_context_bindings=(
-                {
-                    "document_ref": document_ref,
-                    "selection_role": "active",
-                    "writable": True,
-                },
-            ),
-        ),
+        context=visible_context,
+    )
+    edit_decision = resolver.resolve(
+        descriptor=edit_descriptor,
+        context=visible_context,
     )
 
     assert hidden_decision.visibility == "hidden"
@@ -670,6 +721,10 @@ def test_assistant_tool_policy_resolver_builds_approval_grant_for_grant_bound_wr
     assert visible_decision.visibility == "visible"
     assert visible_decision.allowed_target_document_refs == (document_ref,)
     assert visible_decision.approval_grant is not None
+    assert visible_decision.approval_grant.allowed_tool_names == (
+        "project.write_document",
+        "project.edit_document",
+    )
     assert visible_decision.approval_grant.target_document_refs == (document_ref,)
     assert visible_decision.approval_grant.binding_version_constraints == {
         document_ref: "binding-1"
@@ -683,6 +738,8 @@ def test_assistant_tool_policy_resolver_builds_approval_grant_for_grant_bound_wr
     assert visible_decision.approval_grant.buffer_source_constraints == {
         document_ref: TRUSTED_ACTIVE_BUFFER_SOURCE
     }
+    assert edit_decision.approval_grant is not None
+    assert edit_decision.approval_grant.grant_id == visible_decision.approval_grant.grant_id
 
 
 def test_assistant_tool_policy_resolver_hides_grant_bound_write_for_non_writable_active_binding():
@@ -2077,6 +2134,83 @@ def test_assistant_tool_executor_executes_project_write_document(db, tmp_path):
     assert result.audit == {"run_audit_id": run_audit_id}
 
 
+def test_assistant_tool_executor_executes_project_edit_document(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    file_store = ProjectDocumentFileStore(tmp_path)
+    identity_store = ProjectDocumentIdentityStore(tmp_path)
+    current_content = "# 人物\n\n林渊：沉默寡言。"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=ProjectService(
+            document_file_store=file_store,
+            document_identity_store=identity_store,
+        ),
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
+    target = next(item for item in catalog if item.path == "设定/人物.md")
+    executor = AssistantToolExecutor(project_document_capability_service=capability_service)
+    run_id = uuid.uuid4()
+    run_audit_id = f"{run_id}:tool-call-edit-1"
+    binding_version = _build_binding_version(
+        target.path,
+        target.document_ref,
+        source=target.source,
+        document_kind=target.document_kind,
+        writable=target.writable,
+    )
+
+    result = asyncio.run(
+        executor.execute(
+            async_db(db),
+            AssistantToolExecutionContext(
+                owner_id=project.owner_id,
+                project_id=project.id,
+                arguments={
+                    "path": "设定/人物.md",
+                    "edits": [
+                        {
+                            "old_text": "林渊：沉默寡言。",
+                            "new_text": "林渊：沉默寡言，对雨夜异常敏感。",
+                        }
+                    ],
+                    "base_version": target.version,
+                },
+                run_id=run_id,
+                run_audit_id=run_audit_id,
+                tool_call_id="tool-call-edit-1",
+                tool_name="project.edit_document",
+                execution_locus="local_runtime",
+                requested_write_scope="turn",
+                allowed_target_document_refs=(target.document_ref,),
+                approval_grant=_build_turn_approval_grant(
+                    tool_name="project.edit_document",
+                    document_ref=target.document_ref,
+                    binding_version=binding_version,
+                    base_version=target.version,
+                    buffer_hash=build_project_document_buffer_hash(current_content),
+                    buffer_source=TRUSTED_ACTIVE_BUFFER_SOURCE,
+                ),
+                active_document_ref=target.document_ref,
+                active_binding_version=binding_version,
+                active_buffer_state=_build_trusted_active_buffer_state(
+                    base_version=target.version,
+                    content=current_content,
+                ),
+            ),
+        )
+    )
+    saved = file_store.find_project_document(project.id, "设定/人物.md")
+
+    assert result.status == "completed"
+    assert result.structured_output["path"] == "设定/人物.md"
+    assert result.structured_output["document_ref"] == target.document_ref
+    assert result.structured_output["run_audit_id"] == run_audit_id
+    assert saved is not None
+    assert saved.content == "# 人物\n\n林渊：沉默寡言，对雨夜异常敏感。"
+
+
 def test_build_tool_call_start_payload_includes_write_and_search_target_summary() -> None:
     write_payload = _build_tool_call_start_payload(
         {
@@ -2085,6 +2219,20 @@ def test_build_tool_call_start_payload_includes_write_and_search_target_summary(
             "arguments": {
                 "path": "设定/人物.md",
                 "base_version": "sha256:base",
+            },
+        }
+    )
+    edit_payload = _build_tool_call_start_payload(
+        {
+            "tool_call_id": "tool-call-edit-1",
+            "tool_name": "project.edit_document",
+            "arguments": {
+                "path": "设定/人物.md",
+                "base_version": "sha256:base",
+                "edits": [
+                    {"old_text": "林渊", "new_text": "林渊：雨夜敏感"},
+                    {"old_text": "顾砚", "new_text": "顾砚：善于试探"},
+                ],
             },
         }
     )
@@ -2106,6 +2254,11 @@ def test_build_tool_call_start_payload_includes_write_and_search_target_summary(
     assert write_payload["target_summary"] == {
         "path": "设定/人物.md",
         "base_version": "sha256:base",
+    }
+    assert edit_payload["target_summary"] == {
+        "path": "设定/人物.md",
+        "base_version": "sha256:base",
+        "edit_count": 2,
     }
     assert "arguments" not in write_payload
     assert "arguments_text" not in write_payload

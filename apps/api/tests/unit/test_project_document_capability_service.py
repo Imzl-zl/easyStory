@@ -32,6 +32,7 @@ from app.modules.project.service.project_document_capability_service import (
     _build_catalog_version,
 )
 from app.modules.project.service.project_document_capability_dto import ProjectDocumentSearchHitDTO
+from app.modules.project.service.project_document_edit_support import ProjectDocumentTextEdit
 from app.modules.project.service.project_document_search_support import _sort_search_hits
 from app.modules.project.service.project_document_version_support import (
     build_project_file_document_version,
@@ -223,6 +224,33 @@ def test_project_document_capability_catalog_uses_metadata_only_file_resolution(
 
     assert target.document_ref.startswith("project_file:")
     assert file_store.metadata_reads >= 1
+
+
+def test_project_document_capability_catalog_file_version_matches_loaded_crlf_file(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    file_store = ProjectDocumentFileStore(tmp_path)
+    identity_store = ProjectDocumentIdentityStore(tmp_path)
+    document_path = "设定/人物.md"
+    file_store.save_project_document(project.id, document_path, "# 人物\r\n\r\n林渊")
+    project_service = ProjectService(
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=project_service,
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+
+    loaded = asyncio.run(
+        project_service.get_project_document(async_db(db), project.id, document_path)
+    )
+    catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
+    target = next(item for item in catalog if item.path == document_path)
+
+    assert loaded.content == "# 人物\n\n林渊"
+    assert loaded.version == build_project_file_document_version("# 人物\n\n林渊")
+    assert target.version == loaded.version
 
 
 def test_project_document_capability_catalog_requires_identity_store_for_file_documents(db, tmp_path):
@@ -909,6 +937,191 @@ def test_project_document_capability_write_document_reuses_revision_for_same_run
     assert repeated.document_revision_id == first.document_revision_id
     assert repeated.run_audit_id == first.run_audit_id
     assert repeated.diff_summary.changed is False
+
+
+def test_project_document_capability_edit_document_uses_context_to_disambiguate(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    file_store = ProjectDocumentFileStore(tmp_path)
+    identity_store = ProjectDocumentIdentityStore(tmp_path)
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=ProjectService(
+            document_file_store=file_store,
+            document_identity_store=identity_store,
+        ),
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    current_content = "# 片段\n\n雨声。她点头。\n\n灯火。她点头。\n\n结尾。"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
+    catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
+    target = next(item for item in catalog if item.path == "设定/人物.md")
+
+    result = asyncio.run(
+        capability_service.edit_document(
+            async_db(db),
+            project.id,
+            path="设定/人物.md",
+            edits=(
+                ProjectDocumentTextEdit(
+                    old_text="她点头。",
+                    new_text="她摇头。",
+                    context_before="灯火。",
+                    context_after="\n\n结尾。",
+                ),
+            ),
+            base_version=target.version,
+            expected_document_ref=target.document_ref,
+            expected_binding_version=_build_entry_binding_version(target),
+            active_buffer_state=_build_trusted_active_buffer_state(
+                base_version=target.version,
+                content=current_content,
+            ),
+            allowed_target_document_refs=(target.document_ref,),
+            require_trusted_buffer_state=True,
+            run_audit_id="run-audit-edit-context",
+        )
+    )
+
+    saved = file_store.find_project_document(project.id, "设定/人物.md")
+
+    assert result.diff_summary.changed is True
+    assert saved is not None
+    assert saved.content == "# 片段\n\n雨声。她点头。\n\n灯火。她摇头。\n\n结尾。"
+
+
+def test_project_document_capability_edit_document_rejects_ambiguous_target(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    file_store = ProjectDocumentFileStore(tmp_path)
+    identity_store = ProjectDocumentIdentityStore(tmp_path)
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=ProjectService(
+            document_file_store=file_store,
+            document_identity_store=identity_store,
+        ),
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    current_content = "# 片段\n\n她点头。\n\n她点头。"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
+    catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
+    target = next(item for item in catalog if item.path == "设定/人物.md")
+
+    with pytest.raises(ProjectDocumentMutationError) as exc_info:
+        asyncio.run(
+            capability_service.edit_document(
+                async_db(db),
+                project.id,
+                path="设定/人物.md",
+                edits=(ProjectDocumentTextEdit(old_text="她点头。", new_text="她摇头。"),),
+                base_version=target.version,
+                expected_document_ref=target.document_ref,
+                expected_binding_version=_build_entry_binding_version(target),
+                active_buffer_state=_build_trusted_active_buffer_state(
+                    base_version=target.version,
+                    content=current_content,
+                ),
+                allowed_target_document_refs=(target.document_ref,),
+                require_trusted_buffer_state=True,
+                run_audit_id="run-audit-edit-ambiguous",
+            )
+        )
+
+    saved = file_store.find_project_document(project.id, "设定/人物.md")
+
+    assert exc_info.value.code == "edit_target_ambiguous"
+    assert saved is not None
+    assert saved.content == current_content
+
+
+def test_project_document_capability_edit_document_rejects_missing_target(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    file_store = ProjectDocumentFileStore(tmp_path)
+    identity_store = ProjectDocumentIdentityStore(tmp_path)
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=ProjectService(
+            document_file_store=file_store,
+            document_identity_store=identity_store,
+        ),
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    current_content = "# 片段\n\n她点头。"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
+    catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
+    target = next(item for item in catalog if item.path == "设定/人物.md")
+
+    with pytest.raises(ProjectDocumentMutationError) as exc_info:
+        asyncio.run(
+            capability_service.edit_document(
+                async_db(db),
+                project.id,
+                path="设定/人物.md",
+                edits=(ProjectDocumentTextEdit(old_text="她摇头。", new_text="她点头。"),),
+                base_version=target.version,
+                expected_document_ref=target.document_ref,
+                expected_binding_version=_build_entry_binding_version(target),
+                active_buffer_state=_build_trusted_active_buffer_state(
+                    base_version=target.version,
+                    content=current_content,
+                ),
+                allowed_target_document_refs=(target.document_ref,),
+                require_trusted_buffer_state=True,
+                run_audit_id="run-audit-edit-missing",
+            )
+        )
+
+    saved = file_store.find_project_document(project.id, "设定/人物.md")
+
+    assert exc_info.value.code == "edit_target_not_found"
+    assert saved is not None
+    assert saved.content == current_content
+
+
+def test_project_document_capability_edit_document_rejects_overlapping_targets(db, tmp_path):
+    project = create_project(db, project_setting=ready_project_setting())
+    file_store = ProjectDocumentFileStore(tmp_path)
+    identity_store = ProjectDocumentIdentityStore(tmp_path)
+    capability_service = ProjectDocumentCapabilityService(
+        project_service=ProjectService(
+            document_file_store=file_store,
+            document_identity_store=identity_store,
+        ),
+        document_file_store=file_store,
+        document_identity_store=identity_store,
+    )
+    current_content = "# 人物\n\n林渊顾砚"
+    file_store.save_project_document(project.id, "设定/人物.md", current_content)
+    catalog = asyncio.run(capability_service.list_document_catalog(async_db(db), project.id))
+    target = next(item for item in catalog if item.path == "设定/人物.md")
+
+    with pytest.raises(ProjectDocumentMutationError) as exc_info:
+        asyncio.run(
+            capability_service.edit_document(
+                async_db(db),
+                project.id,
+                path="设定/人物.md",
+                edits=(
+                    ProjectDocumentTextEdit(old_text="林渊顾砚", new_text="林渊与顾砚"),
+                    ProjectDocumentTextEdit(old_text="顾砚", new_text="顾砚其人"),
+                ),
+                base_version=target.version,
+                expected_document_ref=target.document_ref,
+                expected_binding_version=_build_entry_binding_version(target),
+                active_buffer_state=_build_trusted_active_buffer_state(
+                    base_version=target.version,
+                    content=current_content,
+                ),
+                allowed_target_document_refs=(target.document_ref,),
+                require_trusted_buffer_state=True,
+                run_audit_id="run-audit-edit-overlap",
+            )
+        )
+
+    saved = file_store.find_project_document(project.id, "设定/人物.md")
+
+    assert exc_info.value.code == "edit_target_overlaps"
+    assert saved is not None
+    assert saved.content == current_content
 
 
 def test_project_document_capability_commit_prepared_write_document_surfaces_effective_write_on_revision_failure(

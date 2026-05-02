@@ -5,7 +5,8 @@ import uuid
 
 
 def build_project_file_document_version(content: str) -> str:
-    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    normalized_content = normalize_project_file_document_content(content)
+    content_hash = hashlib.sha256(normalized_content.encode("utf-8")).hexdigest()
     return f"sha256:{content_hash}"
 
 
@@ -18,3 +19,7 @@ def build_project_canonical_document_version(
     if content_id is None or version_number is None:
         return f"{document_ref}:empty"
     return f"{document_ref}:version:{content_id}:{version_number}"
+
+
+def normalize_project_file_document_content(content: str) -> str:
+    return content.replace("\r\n", "\n").replace("\r", "\n")
