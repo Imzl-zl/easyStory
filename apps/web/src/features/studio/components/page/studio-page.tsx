@@ -42,6 +42,7 @@ import { listChapters } from "@/lib/api/content";
 import { getProject, listProjectDocumentTree } from "@/lib/api/projects";
 import { useUnsavedChangesGuard } from "@/lib/hooks/use-unsaved-changes-guard";
 import { useWorkspaceStore } from "@/lib/stores/workspace-store";
+import { useAuthStore } from "@/lib/stores/auth-store";
 
 type StudioPageProps = {
   projectId: string;
@@ -71,6 +72,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
   const storedLeftWidth = useWorkspaceStore((s) => s.studioLeftWidthByProject[projectId] ?? null);
   const setStoredLeftWidth = useWorkspaceStore((s) => s.setStudioLeftWidth);
   const leftCollapsed = storedLeftPanel === "collapsed";
+  const username = useAuthStore((s) => s.user?.username);
 
   useEffect(() => { queueMicrotask(() => setMounted(true)); }, []);
 
@@ -422,6 +424,7 @@ export function StudioPage({ projectId }: StudioPageProps) {
               writeIntentNotice={chatModel.writeIntentNotice}
               writeTargetDisabledReason={chatModel.writeTargetDisabledReason}
               isWriteToCurrentDocumentEnabled={chatModel.isWriteToCurrentDocumentEnabled}
+              username={username}
             />
           </aside>
         ) : null}

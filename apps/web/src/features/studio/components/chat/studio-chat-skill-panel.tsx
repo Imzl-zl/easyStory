@@ -158,37 +158,34 @@ function SkillDrawer({
   return (
     <section
       aria-label="选择 Skill"
-      className="chat-skill-panel"
+      className="skill-panel"
       role="dialog"
       style={layout.panelStyle}
     >
-      <div className="shrink-0 px-5 pt-5 pb-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="m-0 text-[11px] font-semibold tracking-[0.1em] text-accent-primary uppercase">Skill 模式</p>
-            <h3 className="mt-1.5 text-[16px] font-bold leading-6 text-text-primary">
-              选择 Skill
-            </h3>
-            <p className="mt-1 text-[13px] leading-5 text-text-secondary">
-              {resultSummary}
-            </p>
-          </div>
-          <button
-            className="chat-panel-header__close"
-            type="button"
-            onClick={onClose}
-          >
-            ×
-          </button>
+      <div className="skill-panel-header">
+        <div>
+          <p className="skill-panel-header__eyebrow">Skill 模式</p>
+          <h3 className="skill-panel-header__title">选择 Skill</h3>
+          <p className="skill-panel-header__subtitle">{resultSummary}</p>
         </div>
-        <CurrentModeCard disabled={disabled} model={model} onClose={onClose} />
+        <button
+          className="skill-panel-header__close"
+          type="button"
+          onClick={onClose}
+        >
+          <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
+            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+          </svg>
+        </button>
       </div>
 
-      <div className="shrink-0 px-5 py-3 border-t border-line-soft">
+      <CurrentModeCard disabled={disabled} model={model} onClose={onClose} />
+
+      <div className="skill-search">
         <label className="block">
           <span className="sr-only">筛选 Skill</span>
           <input
-            className="chat-panel-search"
+            className="skill-search__input"
             placeholder="按名称、描述或作用域筛选..."
             ref={searchInputRef}
             type="text"
@@ -198,19 +195,19 @@ function SkillDrawer({
         </label>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+      <div className="skill-list">
         {model.skillErrorMessage ? (
-          <StateNotice tone="danger">{model.skillErrorMessage}</StateNotice>
+          <SkillEmpty tone="danger">{model.skillErrorMessage}</SkillEmpty>
         ) : null}
-        {model.skillsLoading ? <StateNotice>读取中…</StateNotice> : null}
+        {model.skillsLoading ? <SkillEmpty>读取中…</SkillEmpty> : null}
         {!model.skillErrorMessage && !model.skillsLoading && model.skillOptions.length === 0 ? (
-          <StateNotice>暂无可用 Skill</StateNotice>
+          <SkillEmpty>暂无可用 Skill</SkillEmpty>
         ) : null}
         {!model.skillErrorMessage && !model.skillsLoading && model.skillOptions.length > 0 && filteredSkillOptions.length === 0 ? (
-          <StateNotice>无匹配结果</StateNotice>
+          <SkillEmpty>无匹配结果</SkillEmpty>
         ) : null}
         {!model.skillErrorMessage && !model.skillsLoading && filteredSkillOptions.length > 0 ? (
-          <ul className="space-y-2">
+          <ul className="flex flex-col">
             {filteredSkillOptions.map((option) => (
               <SkillOptionCard
                 disabled={disabled}
@@ -237,25 +234,21 @@ function CurrentModeCard({
   onClose: () => void;
 }>) {
   return (
-    <div className="chat-skill-current-mode">
+    <div className="skill-current-mode">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="m-0 text-[11px] font-semibold tracking-[0.1em] text-text-tertiary uppercase">当前模式</p>
-          <p className="mt-1.5 text-[14px] font-bold leading-5 text-text-primary">
+          <p className="skill-current-mode__eyebrow">当前模式</p>
+          <p className="skill-current-mode__name">
             {model.skillState.headline}
           </p>
           {model.skillState.detail ? (
-            <p className="mt-1 text-[13px] leading-5 text-text-secondary">
+            <p className="skill-current-mode__desc">
               {model.skillState.detail}
             </p>
           ) : null}
         </div>
         <button
-          className={`inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[13px] font-semibold transition-all ${
-            isPlainChatMode(model)
-              ? "border-accent-primary-muted bg-accent-soft text-accent-primary"
-              : "bg-chat-panel border-line-soft text-text-secondary hover:text-text-primary"
-          }`}
+          className={`skill-action-btn ${isPlainChatMode(model) ? "skill-action-btn--active" : "skill-action-btn--default"}`}
           disabled={disabled}
           type="button"
           onClick={() => {
@@ -266,10 +259,10 @@ function CurrentModeCard({
           普通对话
         </button>
       </div>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="skill-current-mode__actions">
         {model.skillState.nextTurnSkillId ? (
           <button
-            className={DRAWER_ACTION_BUTTON_CLASS}
+            className="skill-action-btn skill-action-btn--default"
             disabled={disabled}
             type="button"
             onClick={() => {
@@ -282,7 +275,7 @@ function CurrentModeCard({
         ) : null}
         {model.skillState.conversationSkillId ? (
           <button
-            className={DRAWER_ACTION_BUTTON_CLASS}
+            className="skill-action-btn skill-action-btn--default"
             disabled={disabled}
             type="button"
             onClick={() => {
@@ -315,62 +308,50 @@ function SkillOptionCard({
 
   return (
     <li>
-      <div className={`chat-skill-option ${hasActiveMode ? "chat-skill-option--active" : ""}`}>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[14px] font-bold leading-5 text-text-primary">
-              {option.label}
-            </span>
-            <span className="inline-flex items-center rounded-full bg-elevated px-2 py-0.5 text-[11px] leading-4 text-text-secondary">
-              {option.scopeLabel}
-            </span>
-            {nextSelected ? (
-              <span className="inline-flex items-center rounded-full bg-accent-soft px-2 py-0.5 text-[11px] leading-4 text-accent-primary">
-                本次
-              </span>
-            ) : null}
-            {conversationSelected ? (
-              <span className="inline-flex items-center rounded-full bg-accent-warning-soft px-2 py-0.5 text-[11px] leading-4 text-accent-warning">
-                会话
-              </span>
-            ) : null}
-          </div>
-          {option.description ? (
-            <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-text-secondary">
-              {option.description}
-            </p>
+      <div className={`skill-option ${hasActiveMode ? "skill-option--active" : ""}`}>
+        <div className="skill-option__header">
+          <span className="skill-option__name">{option.label}</span>
+          <span className="skill-option__scope">{option.scopeLabel}</span>
+          {nextSelected ? (
+            <span className="skill-option__badge skill-option__badge--next">本次</span>
           ) : null}
-          <div className="mt-3 flex justify-end gap-2">
-            <button
-              className={resolveModeButtonClassName(nextSelected)}
-              disabled={disabled}
-              type="button"
-              onClick={() => {
-                model.useSkillOnce(option.value);
-                onClose();
-              }}
-            >
-              {nextSelected ? "本次中" : "本次"}
-            </button>
-            <button
-              className={resolveModeButtonClassName(conversationSelected)}
-              disabled={disabled}
-              type="button"
-              onClick={() => {
-                model.useSkillForConversation(option.value);
-                onClose();
-              }}
-            >
-              {conversationSelected ? "会话中" : "会话"}
-            </button>
-          </div>
+          {conversationSelected ? (
+            <span className="skill-option__badge skill-option__badge--conversation">会话</span>
+          ) : null}
+        </div>
+        {option.description ? (
+          <p className="skill-option__desc">{option.description}</p>
+        ) : null}
+        <div className="skill-option__actions">
+          <button
+            className={`skill-action-btn ${nextSelected ? "skill-action-btn--active" : "skill-action-btn--default"}`}
+            disabled={disabled}
+            type="button"
+            onClick={() => {
+              model.useSkillOnce(option.value);
+              onClose();
+            }}
+          >
+            {nextSelected ? "本次中" : "本次"}
+          </button>
+          <button
+            className={`skill-action-btn ${conversationSelected ? "skill-action-btn--active" : "skill-action-btn--default"}`}
+            disabled={disabled}
+            type="button"
+            onClick={() => {
+              model.useSkillForConversation(option.value);
+              onClose();
+            }}
+          >
+            {conversationSelected ? "会话中" : "会话"}
+          </button>
         </div>
       </div>
     </li>
   );
 }
 
-function StateNotice({
+function SkillEmpty({
   children,
   tone = "muted",
 }: Readonly<{
@@ -379,10 +360,8 @@ function StateNotice({
 }>) {
   return (
     <div
-      className={`rounded-xl px-4 py-3 text-[13px] leading-5 ${
-        tone === "danger"
-          ? "bg-accent-danger-soft text-accent-danger"
-          : "bg-elevated text-text-secondary"
+      className={`skill-empty ${
+        tone === "danger" ? "text-accent-danger" : ""
       }`}
     >
       {children}
@@ -436,19 +415,8 @@ function buildResultSummary(visibleCount: number, totalCount: number, query: str
   return `筛到 ${visibleCount} / ${totalCount} 个 Skill`;
 }
 
-const DRAWER_ACTION_BUTTON_CLASS =
-  "inline-flex h-8 items-center rounded-full bg-chat-panel border border-line-soft px-3 text-[13px] text-text-secondary transition-all hover:border-line-medium hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40";
-
 function isPlainChatMode(model: StudioChatSkillModel) {
   return model.skillState.conversationSkillId === null && model.skillState.nextTurnSkillId === null;
-}
-
-function resolveModeButtonClassName(active: boolean) {
-  return `inline-flex h-8 items-center justify-center rounded-full px-3 text-[13px] font-semibold transition-all ${
-    active
-      ? "bg-accent-soft text-accent-primary border border-accent-primary-muted"
-      : "bg-chat-panel text-text-secondary border border-line-soft hover:text-text-primary hover:border-line-medium"
-  }`;
 }
 
 function resolveTriggerLabel(headline: string) {

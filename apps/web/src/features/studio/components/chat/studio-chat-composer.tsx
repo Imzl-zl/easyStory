@@ -1,23 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
-import { Input, Message, Radio } from "@arco-design/web-react";
+import { Input, Message } from "@arco-design/web-react";
 
-import { AppSelect } from "@/components/ui/app-select";
 import { renderFloatingPanel, useFloatingPanelStyle } from "@/components/ui/floating-panel-support";
 import type {
   DocumentTreeNode,
   StudioChatLayoutMode,
 } from "@/features/studio/components/page/studio-page-support";
 import { getErrorMessage } from "@/lib/api/client";
-import {
-  normalizeAssistantThinkingBudgetInput,
-  resolveAssistantReasoningControl,
-} from "@/features/shared/assistant/assistant-reasoning-support";
 
 import { STUDIO_ATTACHMENT_ACCEPT, type StudioChatAttachmentMeta } from "@/features/studio/components/chat/studio-chat-attachment-support";
+import { StudioChatModelPicker } from "@/features/studio/components/chat/studio-chat-model-picker";
 import { submitStudioComposerMessage } from "@/features/studio/components/chat/studio-chat-composer-support";
 import { StudioChatContextSelectorContent } from "@/features/studio/components/chat/studio-chat-context-selector";
 import type { StudioChatSettings, StudioProviderOption } from "@/features/studio/components/chat/studio-chat-support";
@@ -60,9 +56,6 @@ type StudioChatComposerProps = {
   isWriteToCurrentDocumentEnabled: boolean;
 };
 
-const MODEL_PICKER_PROVIDER_LIST_CLASS =
-  "mt-2 grid gap-1 rounded-2xl bg-glass shadow-glass-heavy p-1 max-h-56 overflow-y-auto";
-
 export function StudioChatComposer({
   attachments,
   availableContexts,
@@ -99,7 +92,6 @@ export function StudioChatComposer({
   const compactLayout = layoutMode !== "default";
   const iconLayout = layoutMode === "icon";
   const [showModelPicker, setShowModelPicker] = useState(false);
-  const [showProviderList, setShowProviderList] = useState(false);
   const [showContextSelector, setShowContextSelector] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modelPickerRef = useRef<HTMLDivElement>(null);
@@ -119,22 +111,6 @@ export function StudioChatComposer({
     side: "top",
   });
 
-  const currentProviderOption = useMemo(
-    () =>
-      providerOptions.find((option) => option.value === settings.provider)
-      ?? providerOptions[0]
-      ?? null,
-    [providerOptions, settings.provider],
-  );
-  const reasoningControl = useMemo(
-    () =>
-      resolveAssistantReasoningControl({
-        apiDialect: selectedCredentialApiDialect,
-        modelName: settings.modelName || currentProviderOption?.defaultModel,
-      }),
-    [currentProviderOption?.defaultModel, selectedCredentialApiDialect, settings.modelName],
-  );
-
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target;
@@ -147,7 +123,6 @@ export function StudioChatComposer({
         modelButtonRef.current &&
         !modelButtonRef.current.contains(target as Node)
       ) {
-        setShowProviderList(false);
         setShowModelPicker(false);
       }
       if (
@@ -166,24 +141,13 @@ export function StudioChatComposer({
 
   const handleToggleContextSelector = useCallback(() => {
     setShowModelPicker(false);
-    setShowProviderList(false);
     setShowContextSelector((visible) => !visible);
   }, []);
 
   const handleToggleModelPicker = useCallback(() => {
     setShowContextSelector(false);
-    setShowProviderList(false);
     setShowModelPicker((visible) => !visible);
   }, []);
-
-  const handleToggleProviderList = useCallback(() => {
-    setShowProviderList((visible) => !visible);
-  }, []);
-
-  const handleSelectProvider = useCallback((provider: string) => {
-    setShowProviderList(false);
-    onProviderChange(provider);
-  }, [onProviderChange]);
 
   const handleUnexpectedSendError = useCallback((error: unknown) => {
     console.error("Studio chat composer send failed unexpectedly.", error);
@@ -290,178 +254,28 @@ export function StudioChatComposer({
                 <SparkIcon />
               </ToolbarChipButton>
 
-              {showModelPicker ? renderFloatingPanel(
-                <div style={{ position: 'fixed', inset: 0, zIndex: 100 }}>
-                  <div
-                    className="chat-panel-overlay"
-                    style={{ position: 'absolute', inset: 0, zIndex: 1 }}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      setShowProviderList(false);
-                      setShowModelPicker(false);
-                    }}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setShowProviderList(false); setShowModelPicker(false); } }}
-                  />
-                  <div
-                    className="chat-model-panel overflow-y-auto"
-                    ref={modelPickerRef}
-                    style={{ ...modelPickerStyle, zIndex: 2, position: 'absolute' }}
-                  >
-                    <div className="chat-panel-header">
-                      <div>
-                        <h3 className="chat-panel-header__title">切换模型</h3>
-                        <p className="chat-panel-header__subtitle">
-                          {selectedCredentialLabel ?? "先选可用渠道，再决定模型名"}
-                        </p>
-                      </div>
-                      <button
-                        className="chat-panel-header__close"
-                        type="button"
-                        onClick={() => {
-                          setShowProviderList(false);
-                          setShowModelPicker(false);
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <div className="chat-model-form">
-                      {/* 渠道选择 */}
-                      <div className="chat-model-form__group">
-                        <label className="chat-model-form__label">渠道</label>
-                        <div className="relative">
-                          <button
-                            aria-expanded={showProviderList}
-                            className="chat-model-form__select flex items-center justify-between text-left"
-                            type="button"
-                            onClick={handleToggleProviderList}
-                          >
-                            <span className="min-w-0 flex-1 truncate font-semibold text-[14px]">
-                              {currentProviderOption?.label ?? (isCredentialLoading ? "读取中..." : "选择渠道")}
-                            </span>
-                            <span className={`shrink-0 text-[11px] text-text-tertiary transition-transform duration-200 ${showProviderList ? "rotate-180" : ""}`}>▾</span>
-                          </button>
-                          {showProviderList ? (
-                            <div className="mt-2 grid gap-1 rounded-xl bg-surface border border-line-soft p-2 max-h-64 overflow-y-auto shadow-lg">
-                              {providerOptions.length > 0 ? (
-                                providerOptions.map((option) => {
-                                  const selected = option.value === settings.provider;
-                                  return (
-                                    <button
-                                      className={`flex w-full flex-col items-start gap-1 rounded-lg px-3 py-2.5 text-left transition-colors ${selected ? "bg-accent-soft text-accent-primary" : "text-text-primary hover:bg-surface-hover"}`}
-                                      key={option.value}
-                                      type="button"
-                                      onMouseDown={(event) => {
-                                        event.preventDefault();
-                                        handleSelectProvider(option.value);
-                                      }}
-                                    >
-                                      <span className="text-[14px] font-semibold leading-relaxed">{option.label}</span>
-                                      {option.description ? (
-                                        <span className="text-[12px] leading-relaxed text-text-tertiary">{option.description}</span>
-                                      ) : null}
-                                    </button>
-                                  );
-                                })
-                              ) : (
-                                <p className="px-3 py-3 text-[14px] text-text-tertiary">
-                                  {isCredentialLoading ? "正在读取渠道..." : "当前没有可用渠道"}
-                                </p>
-                              )}
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {/* 模型输入 */}
-                      <div className="chat-model-form__group">
-                        <label className="chat-model-form__label">模型</label>
-                        <input
-                          className="chat-model-form__input"
-                          autoComplete="off"
-                          placeholder="留空则跟随当前渠道默认模型"
-                          spellCheck={false}
-                          value={settings.modelName}
-                          onChange={(e) => onModelNameChange(e.target.value)}
-                        />
-                      </div>
-
-                      {/* 推理控制 */}
-                      <div className="chat-model-form__section">
-                        <p className="m-0 text-[14px] font-bold text-text-primary">{reasoningControl.title}</p>
-                        {reasoningControl.description ? (
-                          <p className="mt-1 text-[13px] leading-5 text-text-secondary">{reasoningControl.description}</p>
-                        ) : null}
-                        {reasoningControl.kind === "gemini_budget" ? (
-                          <div className="mt-3 space-y-3">
-                            <div className="flex flex-wrap gap-2">
-                              <ReasoningChipButton
-                                active={settings.thinkingBudget === ""}
-                                label="跟随默认"
-                                onClick={() => onThinkingBudgetChange("")}
-                              />
-                              {reasoningControl.allowDisable ? (
-                                <ReasoningChipButton
-                                  active={settings.thinkingBudget === "0"}
-                                  label="关闭思考"
-                                  onClick={() => onThinkingBudgetChange("0")}
-                                />
-                              ) : null}
-                              {reasoningControl.allowDynamic ? (
-                                <ReasoningChipButton
-                                  active={settings.thinkingBudget === "-1"}
-                                  label="动态思考"
-                                  onClick={() => onThinkingBudgetChange("-1")}
-                                />
-                              ) : null}
-                            </div>
-                            <input
-                              className="chat-model-form__input"
-                              autoComplete="off"
-                              inputMode="numeric"
-                              placeholder={reasoningControl.placeholder}
-                              spellCheck={false}
-                              value={settings.thinkingBudget}
-                              onChange={(e) => onThinkingBudgetChange(normalizeAssistantThinkingBudgetInput(e.target.value))}
-                            />
-                          </div>
-                        ) : reasoningControl.kind === "none" ? null : (
-                          <div className="mt-3">
-                            <AppSelect
-                              ariaLabel={reasoningControl.title}
-                              className="min-w-0"
-                              options={reasoningControl.options}
-                              value={reasoningControl.kind === "openai" ? settings.reasoningEffort : settings.thinkingLevel}
-                              onChange={(value) =>
-                                reasoningControl.kind === "openai"
-                                  ? onReasoningEffortChange(value)
-                                  : onThinkingLevelChange(value)}
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 回复显示方式 */}
-                      <div className="chat-model-form__section mt-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <p className="m-0 text-[14px] font-bold text-text-primary">回复显示方式</p>
-                          <Radio.Group
-                            aria-label="回复显示方式"
-                            mode="fill"
-                            size="small"
-                            type="button"
-                            value={settings.streamOutput ? "stream" : "buffered"}
-                            onChange={(value) => onStreamOutputChange(value === "stream")}
-                          >
-                            <Radio value="stream">流式</Radio>
-                            <Radio value="buffered">非流式</Radio>
-                          </Radio.Group>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>,
+              {showModelPicker ? (
+                <StudioChatModelPicker
+                  isCredentialLoading={isCredentialLoading}
+                  modelName={settings.modelName}
+                  onClose={() => setShowModelPicker(false)}
+                  onModelNameChange={onModelNameChange}
+                  onProviderChange={onProviderChange}
+                  onReasoningEffortChange={onReasoningEffortChange}
+                  onStreamOutputChange={onStreamOutputChange}
+                  onThinkingBudgetChange={onThinkingBudgetChange}
+                  onThinkingLevelChange={onThinkingLevelChange}
+                  panelRef={modelPickerRef}
+                  panelStyle={modelPickerStyle}
+                  providerOptions={providerOptions}
+                  reasoningEffort={settings.reasoningEffort}
+                  selectedCredentialApiDialect={selectedCredentialApiDialect}
+                  selectedCredentialLabel={selectedCredentialLabel}
+                  selectedProvider={settings.provider}
+                  streamOutput={settings.streamOutput}
+                  thinkingBudget={settings.thinkingBudget}
+                  thinkingLevel={settings.thinkingLevel}
+                />
               ) : null}
             </div>
 
@@ -509,27 +323,6 @@ export function StudioChatComposer({
         />
       </div>
     </div>
-  );
-}
-
-function ReasoningChipButton({
-  active,
-  label,
-  onClick,
-}: Readonly<{
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}>) {
-  return (
-    <button
-      className="ink-toolbar-chip rounded-pill"
-      data-active={active ? "true" : undefined}
-      type="button"
-      onClick={onClick}
-    >
-      {label}
-    </button>
   );
 }
 

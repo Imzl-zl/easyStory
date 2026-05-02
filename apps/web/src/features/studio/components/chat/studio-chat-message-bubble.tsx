@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { matchAssistantMarkdownDocument } from "@/features/shared/assistant/assistant-markdown-document-support";
+import { SparkleIcon } from "@/features/studio/components/page/studio-page-icons";
 
 import { formatStudioChatAttachmentSize } from "@/features/studio/components/chat/studio-chat-attachment-support";
 import {
@@ -16,12 +17,9 @@ type StudioChatMessageBubbleProps = {
   onAppendToDocument: (markdown: string) => void;
   onCopyMarkdown: (markdown: string) => void;
   onCreateNewDocument: (markdown: string) => void;
+  username?: string;
 };
 
-const MESSAGE_BUBBLE_BASE_CLASS =
-  "relative mb-3.5 w-full min-w-0 max-w-[calc(100%-2rem)] overflow-hidden rounded-2xl px-4 py-3.5 text-sm leading-relaxed animate-[fadeIn_0.3s_ease_forwards]";
-const ASSISTANT_MESSAGE_CLASS = "mr-8 bg-accent-soft";
-const USER_MESSAGE_CLASS = "ml-8 bg-glass";
 const MESSAGE_CONTENT_CLASS = "min-w-0 max-w-full overflow-hidden text-text-primary text-sm leading-relaxed";
 const MARKDOWN_CONTENT_CLASS =
   "min-w-0 max-w-full overflow-hidden break-words [overflow-wrap:anywhere] text-sm leading-relaxed [&_a]:break-all [&_a]:text-accent-primary [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-accent-primary [&_blockquote]:py-0.5 [&_blockquote]:pl-3 [&_blockquote]:text-text-secondary [&_blockquote]:break-words [&_blockquote]:[overflow-wrap:anywhere] [&_code]:break-words [&_code]:rounded-sm [&_code]:bg-surface-hover [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.88em] [&_code]:text-accent-danger [&_h1]:my-3 [&_h1]:mb-1.5 [&_h2]:my-3 [&_h2]:mb-1.5 [&_h3]:my-3 [&_h3]:mb-1.5 [&_img]:h-auto [&_img]:max-w-full [&_li]:break-words [&_li]:[overflow-wrap:anywhere] [&_p]:my-2 [&_p]:break-words [&_p]:[overflow-wrap:anywhere] [&_pre]:my-3 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre_code]:break-normal [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-inherit";
@@ -33,6 +31,7 @@ export function StudioChatMessageBubble({
   onAppendToDocument,
   onCopyMarkdown,
   onCreateNewDocument,
+  username,
 }: Readonly<StudioChatMessageBubbleProps>) {
   const [showActions, setShowActions] = useState(false);
   const isAssistant = message.role === "assistant";
@@ -41,64 +40,100 @@ export function StudioChatMessageBubble({
     ? matchAssistantMarkdownDocument(actionState.documentMatchSource)
     : null;
   const actionContent = documentMatch?.body ?? actionState.actionContent;
+  const senderLabel = isAssistant ? "助手" : (username || "你");
+  const userInitial = resolveUsernameInitial(username);
 
   return (
     <article
-      className={`${MESSAGE_BUBBLE_BASE_CLASS} ${isAssistant ? ASSISTANT_MESSAGE_CLASS : USER_MESSAGE_CLASS} ${message.status === "error" ? "ring-1 ring-inset ring-accent-danger/10" : ""}`}
+      className={`chat-message-row ${isAssistant ? "chat-message-row--assistant" : "chat-message-row--user"}`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      <p className="m-0 mb-1.5 text-[0.66rem] font-semibold tracking-widest uppercase text-text-tertiary">{isAssistant ? "助手" : "你"}</p>
-      {isAssistant && message.toolProgress?.length ? (
-        <div className="mb-2.5 flex flex-col gap-1.5">
-          {message.toolProgress.map((item) => (
-            <ToolProgressCard
-              key={item.toolCallId}
-              detail={item.detail}
-              label={item.label}
-              statusLabel={item.statusLabel}
-              tone={item.tone}
-            />
-          ))}
-        </div>
-      ) : null}
-      <div className={MESSAGE_CONTENT_CLASS}>
-        {isAssistant ? (
-          <MarkdownContent
-            content={message.content}
-            documentMatch={documentMatch}
-            onCopyMarkdown={onCopyMarkdown}
-          />
-        ) : <p className="m-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>}
+      <div
+        className={`chat-message__avatar ${isAssistant ? "chat-message__avatar--assistant" : "chat-message__avatar--user"}`}
+        aria-hidden
+      >
+        {isAssistant ? <SparkleIcon /> : userInitial}
       </div>
-      {message.attachments?.length ? (
-        <div className="flex flex-wrap gap-1.5 mt-3">
-          {message.attachments.map((attachment) => (
-            <span className={ATTACHMENT_PILL_CLASS} key={attachment.id}>
-              {attachment.name} · {formatStudioChatAttachmentSize(attachment.size)}
-            </span>
-          ))}
-        </div>
-      ) : null}
-      {isAssistant && actionState.showCopyAction && showActions ? (
-        <div className="flex flex-wrap gap-1.5 mt-3">
-          <button className="ink-button-secondary text-xs h-7 px-2.5" type="button" onClick={() => onCopyMarkdown(actionContent)}>
-            {actionState.copyLabel}
-          </button>
-          {actionState.showDocumentActions ? (
-            <button className="ink-button-secondary text-xs h-7 px-2.5" type="button" onClick={() => onAppendToDocument(actionContent)}>
-              追加到文档
-            </button>
+
+      <div className="chat-message__body">
+        <p className="chat-message__sender">{senderLabel}</p>
+
+        <div className={`chat-bubble ${isAssistant ? "chat-bubble--assistant" : "chat-bubble--user"} ${message.status === "error" ? "chat-bubble--error" : ""}`}>
+          {isAssistant && message.toolProgress?.length ? (
+            <div className="mb-2.5 flex flex-col gap-1.5">
+              {message.toolProgress.map((item) => (
+                <ToolProgressCard
+                  key={item.toolCallId}
+                  detail={item.detail}
+                  label={item.label}
+                  statusLabel={item.statusLabel}
+                  tone={item.tone}
+                />
+              ))}
+            </div>
           ) : null}
-          {actionState.showDocumentActions ? (
-            <button className="ink-button-secondary text-xs h-7 px-2.5" type="button" onClick={() => onCreateNewDocument(actionContent)}>
-              新建文档
-            </button>
+
+          <div className={MESSAGE_CONTENT_CLASS}>
+            {isAssistant ? (
+              <MarkdownContent
+                content={message.content}
+                documentMatch={documentMatch}
+                onCopyMarkdown={onCopyMarkdown}
+              />
+            ) : (
+              <p className="m-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>
+            )}
+          </div>
+
+          {message.attachments?.length ? (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {message.attachments.map((attachment) => (
+                <span className={ATTACHMENT_PILL_CLASS} key={attachment.id}>
+                  {attachment.name} · {formatStudioChatAttachmentSize(attachment.size)}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {isAssistant && actionState.showCopyAction && showActions ? (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              <button
+                className="ink-button-secondary text-xs h-7 px-2.5"
+                type="button"
+                onClick={() => onCopyMarkdown(actionContent)}
+              >
+                {actionState.copyLabel}
+              </button>
+              {actionState.showDocumentActions ? (
+                <button
+                  className="ink-button-secondary text-xs h-7 px-2.5"
+                  type="button"
+                  onClick={() => onAppendToDocument(actionContent)}
+                >
+                  追加到文档
+                </button>
+              ) : null}
+              {actionState.showDocumentActions ? (
+                <button
+                  className="ink-button-secondary text-xs h-7 px-2.5"
+                  type="button"
+                  onClick={() => onCreateNewDocument(actionContent)}
+                >
+                  新建文档
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </div>
-      ) : null}
+      </div>
     </article>
   );
+}
+
+function resolveUsernameInitial(username?: string) {
+  const value = username?.trim();
+  return value ? Array.from(value)[0] ?? "客" : "客";
 }
 
 function ToolProgressCard({
@@ -179,8 +214,26 @@ function MarkdownHtmlContent({ content }: { content: string }) {
   );
 }
 
+function escapeHTML(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function sanitizeURL(raw: string) {
+  const trimmed = raw.trim();
+  if (/^(https?:)?\/\//i.test(trimmed) || trimmed.startsWith("/") || trimmed.startsWith("#")) {
+    return trimmed;
+  }
+  return "";
+}
+
 function renderStudioMarkdown(text: string) {
-  let html = text
+  let html = escapeHTML(text);
+
+  html = html
     .replace(/^### (.*$)/gim, "<h3>$1</h3>")
     .replace(/^## (.*$)/gim, "<h2>$1</h2>")
     .replace(/^# (.*$)/gim, "<h1>$1</h1>")
@@ -188,14 +241,20 @@ function renderStudioMarkdown(text: string) {
     .replace(/\*\*(.*)\*\*/gim, "<strong>$1</strong>")
     .replace(/\*(.*)\*/gim, "<em>$1</em>")
     .replace(/`([^`]+)`/gim, "<code>$1</code>")
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/gim, '<img alt="$1" src="$2" />')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/gim, (_m, alt, src) => {
+      const safe = sanitizeURL(src);
+      return safe ? `<img alt="${alt}" src="${safe}" />` : `<img alt="${alt}" />`;
+    })
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, (_m, label, href) => {
+      const safe = sanitizeURL(href);
+      return safe ? `<a href="${safe}" target="_blank" rel="noopener">${label}</a>` : label;
+    })
     .replace(/^\- (.*$)/gim, "<li>$1</li>")
     .replace(/^\d+\. (.*$)/gim, "<li>$1</li>")
     .replace(/\n/gim, "<br>");
 
   html = html.replace(/```(\w*)\n([\s\S]*?)```/gim, (_, lang, code) =>
-    `<pre class="my-3 max-w-full overflow-x-auto rounded-2xl bg-surface-hover px-3.5 py-3 text-text-primary font-mono text-xs leading-relaxed" data-lang="${lang}"><code>${code.trim()}</code></pre>`);
+    `<pre class="my-3 max-w-full overflow-x-auto rounded-2xl bg-surface-hover px-3.5 py-3 text-text-primary font-mono text-xs leading-relaxed" data-lang="${escapeHTML(lang)}"><code>${code.trim()}</code></pre>`);
 
   return html;
 }

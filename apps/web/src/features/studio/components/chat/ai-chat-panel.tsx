@@ -68,6 +68,7 @@ type AiChatPanelProps = {
   writeIntentNotice: string | null;
   writeTargetDisabledReason: string | null;
   isWriteToCurrentDocumentEnabled: boolean;
+  username?: string;
 };
 
 export function AiChatPanel({
@@ -114,6 +115,7 @@ export function AiChatPanel({
   writeIntentNotice,
   writeTargetDisabledReason,
   isWriteToCurrentDocumentEnabled,
+  username,
 }: Readonly<AiChatPanelProps>) {
   const transcriptRef = useRef<HTMLDivElement>(null);
   const [activeHeaderPanel, setActiveHeaderPanel] = useState<"history" | "skill" | null>(null);
@@ -185,6 +187,7 @@ export function AiChatPanel({
             onAppendToDocument={onAppendToDocument}
             onCopyMarkdown={onCopyMarkdown}
             onCreateNewDocument={onCreateNewDocument}
+            username={username}
           />
         ))}
         {isResponding ? (

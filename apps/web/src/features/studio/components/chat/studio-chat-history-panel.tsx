@@ -89,57 +89,61 @@ export function StudioChatHistoryPanel({
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onOpenChange(false); }}
         />
         <div
-          className="chat-history-panel"
+          className="history-panel"
           ref={popupRef}
           style={panelStyle}
         >
-          <div className="chat-panel-header">
+          <div className="history-panel-header">
             <div>
-              <h3 className="chat-panel-header__title">历史对话</h3>
-              <p className="chat-panel-header__subtitle">{conversations.length} 条对话记录</p>
+              <h3 className="history-panel-header__title">历史对话</h3>
+              <p className="history-panel-header__subtitle">{conversations.length} 条对话记录</p>
             </div>
             <button
-              className="chat-panel-header__close"
+              className="history-panel-header__close"
               type="button"
               onClick={() => onOpenChange(false)}
             >
-              ×
+              <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+              </svg>
             </button>
           </div>
-          <ul className="chat-panel-list max-h-[320px]">
+          <ul className="history-list">
             {conversations.map((conversation) => {
               const isActive = conversation.id === activeConversationId;
               return (
                 <li key={conversation.id}>
-                  <div
-                    className={`chat-panel-item ${isActive ? "chat-panel-item--active" : ""}`}
-                  >
-                    <button
-                      className="min-w-0 flex-1 rounded-xl px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/15 disabled:cursor-not-allowed"
-                      disabled={disabled}
-                      type="button"
+                  <div className={`history-item ${isActive ? "history-item--active" : ""}`}>
+                    <div
+                      className="history-item__content"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => {
                         onSelectConversation(conversation.id);
                         onOpenChange(false);
                       }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          onSelectConversation(conversation.id);
+                          onOpenChange(false);
+                        }
+                      }}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <span className="chat-panel-item__title">
+                      <div className="history-item__title-wrap">
+                        <span className="history-item__title">
                           {conversation.title}
                         </span>
                         {isActive ? (
-                          <span className="inline-flex shrink-0 items-center rounded-full bg-elevated px-2 py-0.5 text-[11px] leading-4 text-accent-primary">
-                            当前
-                          </span>
+                          <span className="history-item__badge">当前</span>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-[12px] leading-4 text-text-tertiary">
+                      <span className="history-item__meta">
                         {formatConversationUpdatedAt(conversation.updatedAt)}
-                      </p>
-                    </button>
+                      </span>
+                    </div>
                     <button
                       aria-label={`删除对话：${conversation.title}`}
-                      className="ink-toolbar-icon text-accent-danger shrink-0"
+                      className="history-item__delete"
                       disabled={disabled}
                       type="button"
                       onClick={(event) => {
