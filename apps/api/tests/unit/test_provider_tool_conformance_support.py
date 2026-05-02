@@ -132,15 +132,14 @@ def test_build_conformance_probe_request_uses_safe_tool_alias() -> None:
     assert prepared.tool_name_aliases == {PROBE_TOOL_NAME: "probe_echo_payload"}
 
 
-def test_build_conformance_probe_request_does_not_force_tool_choice_for_chat_reasoning_profile() -> None:
+def test_build_conformance_probe_request_does_not_force_tool_choice_for_openai_chat() -> None:
     request = build_conformance_probe_request(
         LLMConnection(
             api_dialect="openai_chat_completions",
             api_key="test-key",
             base_url="https://gateway.example.com/v1/chat/completions",
-            interop_profile="chat_compat_reasoning_content",
         ),
-        model_name="kimi-coding",
+        model_name="deepseek-v4-flash",
         probe_kind="tool_call_probe",
     )
     prepared = prepare_generation_request(request)

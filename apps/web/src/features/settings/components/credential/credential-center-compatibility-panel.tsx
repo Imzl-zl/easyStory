@@ -44,7 +44,7 @@ export function CredentialCompatibilityPanel({
         {showInteropProfileField ? (
           <CredentialSelectField
             className={fieldClassName}
-            label="协议兼容 Profile"
+            label="协议兼容配置"
             options={interopProfileOptions}
             value={formState.interopProfile}
             onChange={(value) =>
@@ -93,7 +93,7 @@ export function CredentialCompatibilityPanel({
             }
           />
           <p className="mt-2 text-xs text-text-secondary">
-            这里适合填写站点来源、租户标识这类补充信息。不要在这里填写 Token、Secret 或鉴权头。
+            这里适合填写 Accept、HTTP-Referer、X-Title、租户标识这类非鉴权请求头。不要在这里填写 Token、Secret 或鉴权头。
           </p>
         </label>
       </div>

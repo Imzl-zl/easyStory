@@ -51,6 +51,34 @@ def test_build_litellm_call_spec_uses_openai_prefix_and_api_base_for_openai_comp
     assert spec.call_kwargs["custom_llm_provider"] == "openai"
 
 
+def test_build_litellm_call_spec_passes_user_agent_and_extra_headers() -> None:
+    request = LLMGenerateRequest(
+        connection=LLMConnection(
+            provider="openai",
+            api_dialect="openai_chat_completions",
+            api_key="test-key",
+            base_url="https://proxy.example.com/v1",
+            extra_headers={"Accept": "application/json"},
+            user_agent_override="python-httpx/0.28.1",
+        ),
+        model_name="deepseek-v4-flash",
+        prompt="hi",
+        system_prompt=None,
+        response_format="text",
+        temperature=0.0,
+        max_tokens=32,
+        top_p=1.0,
+    )
+
+    spec = build_litellm_call_spec(request)
+
+    assert spec.call_kwargs["extra_headers"] == {
+        "Accept": "application/json",
+        "User-Agent": "python-httpx/0.28.1",
+    }
+    assert "Authorization" not in spec.call_kwargs["extra_headers"]
+
+
 def test_build_litellm_call_spec_keeps_openai_model_for_official_openai() -> None:
     request = build_text_probe_request(
         LLMConnection(
@@ -76,6 +104,22 @@ def test_resolve_backend_selection_uses_native_for_full_endpoint_base_url() -> N
             base_url="https://proxy.example.com/v1/chat/completions",
         ),
         model_name="gpt-4.1-mini",
+    )
+
+    selection = resolve_backend_selection(request)
+
+    assert selection.backend_key == "native_http"
+
+
+def test_resolve_backend_selection_uses_native_for_custom_openai_chat_gateway() -> None:
+    request = build_text_probe_request(
+        LLMConnection(
+            provider="openai",
+            api_dialect="openai_chat_completions",
+            api_key="test-key",
+            base_url="https://proxy.example.com/v1",
+        ),
+        model_name="deepseek-v4-flash",
     )
 
     selection = resolve_backend_selection(request)

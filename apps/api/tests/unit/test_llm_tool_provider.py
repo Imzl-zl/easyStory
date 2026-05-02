@@ -89,6 +89,76 @@ def test_execute_builds_openai_chat_request_with_default_model_fallback() -> Non
     assert result["content"] == "生成结果"
 
 
+def test_execute_uses_native_http_for_custom_openai_chat_gateway() -> None:
+    captured = {}
+
+    async def request_sender(request):
+        captured["request"] = request
+        return HttpJsonResponse(
+            status_code=200,
+            json_body={
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "call_123",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "project_read_documents",
+                                        "arguments": '{"paths":["设定/人物.md"]}',
+                                    },
+                                }
+                            ],
+                        },
+                        "finish_reason": "tool_calls",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 12,
+                    "completion_tokens": 34,
+                    "total_tokens": 46,
+                },
+            },
+            text="",
+        )
+
+    provider = LLMToolProvider(request_sender=request_sender)
+    result = asyncio.run(
+        provider.execute(
+            "llm.generate",
+            {
+                "prompt": "读一下人物设定",
+                "model": {"provider": "openai", "name": "deepseek-v4-flash"},
+                "credential": {
+                    "api_key": "test-key",
+                    "api_dialect": "openai_chat_completions",
+                    "base_url": "https://newapi.example.com/v1",
+                },
+                "tools": [
+                    {
+                        "name": "project.read_documents",
+                        "description": "读取文稿。",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"paths": {"type": "array", "items": {"type": "string"}}},
+                            "required": ["paths"],
+                        },
+                    }
+                ],
+            },
+        )
+    )
+
+    request = captured["request"]
+    assert request.url == "https://newapi.example.com/v1/chat/completions"
+    assert request.json_body["model"] == "deepseek-v4-flash"
+    assert request.json_body["tools"][0]["function"]["name"] == "project_read_documents"
+    assert "tool_choice" not in request.json_body
+    assert result["tool_calls"][0]["tool_name"] == "project.read_documents"
+
+
 def test_execute_rejects_empty_tool_response_when_tools_enabled() -> None:
     async def request_sender(_request):
         return HttpJsonResponse(
@@ -1830,6 +1900,8 @@ def test_execute_stream_preserves_openai_responses_output_order_for_multiple_mis
 
 
 def test_execute_stream_recovers_openai_chat_tool_calls_from_delta_events(monkeypatch) -> None:
+    captured = {}
+
     class FakeResponse:
         status_code = 200
 
@@ -1870,6 +1942,8 @@ def test_execute_stream_recovers_openai_chat_tool_calls_from_delta_events(monkey
             return False
 
         def stream(self, *args, **kwargs):
+            captured["args"] = args
+            captured["kwargs"] = kwargs
             return FakeResponse()
 
     from app.shared.runtime.llm.interop import provider_interop_stream_support as stream_support
@@ -1888,6 +1962,7 @@ def test_execute_stream_recovers_openai_chat_tool_calls_from_delta_events(monkey
                     "credential": {
                         "api_key": "test-key",
                         "api_dialect": "openai_chat_completions",
+                        "base_url": "https://newapi.example.com/v1",
                     },
                     "tools": [
                         {
@@ -1906,6 +1981,9 @@ def test_execute_stream_recovers_openai_chat_tool_calls_from_delta_events(monkey
 
     events = asyncio.run(collect_events())
 
+    assert captured["args"] == ("POST", "https://newapi.example.com/v1/chat/completions")
+    assert captured["kwargs"]["json"]["model"] == "gpt-5.4"
+    assert "tool_choice" not in captured["kwargs"]["json"]
     assert len(events) == 1
     response = events[0].response
     assert response is not None

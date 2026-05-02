@@ -24,6 +24,7 @@ export function CredentialTokenFields({
       <FieldInput
         autoComplete="off"
         className={className}
+        description="用于输入预算和上下文压缩；留空时不按连接窗口做预算限制。"
         inputMode="numeric"
         label="上下文窗口"
         name="contextWindowTokens"
@@ -39,7 +40,7 @@ export function CredentialTokenFields({
       <FieldInput
         autoComplete="off"
         className={className}
-        description="留空则按上游默认值处理。"
+        description="作为运行时 max_tokens / max output 默认值；单次请求可由模型设置覆盖。"
         inputMode="numeric"
         label="默认单次回复上限"
         name="defaultMaxOutputTokens"

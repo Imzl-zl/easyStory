@@ -318,10 +318,7 @@ def _build_generate_request(
 
 
 def _should_force_tool_call_probe(connection: LLMConnection) -> bool:
-    if (
-        connection.api_dialect == "openai_chat_completions"
-        and connection.interop_profile == "chat_compat_reasoning_content"
-    ):
+    if connection.api_dialect == "openai_chat_completions":
         return False
     return True
 

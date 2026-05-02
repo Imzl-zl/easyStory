@@ -23,12 +23,12 @@ export const USER_AGENT_PRESET_OPTIONS: Array<{
   label: string;
   description: string;
 }> = [
-  { value: "", label: "不伪装", description: "不覆盖 User-Agent，继续使用下面的应用名/版本/运行环境。" },
-  { value: "codex-cli", label: "Codex CLI", description: "填入一条常见的 Codex CLI User-Agent 模板，可继续手改。" },
-  { value: "claude-code", label: "Claude Code", description: "填入一条常见的 Claude Code User-Agent 模板，可继续手改。" },
-  { value: "gemini-cli", label: "Gemini CLI", description: "填入一条常见的 Gemini CLI User-Agent 模板，可继续手改。" },
-  { value: "chrome-browser", label: "Chrome 浏览器", description: "填入一条常见的 Chrome 浏览器 User-Agent 模板，可继续手改。" },
-  { value: "custom", label: "自定义覆盖", description: "自己填写完整 User-Agent，运行时优先使用它。" },
+  { value: "", label: "不覆盖", description: "不覆盖 User-Agent，继续使用下面的应用名/版本/运行环境。" },
+  { value: "codex-cli", label: "Codex CLI", description: "填入常见的 Codex CLI User-Agent 模板，可继续手改。" },
+  { value: "claude-code", label: "Claude Code", description: "填入常见的 Claude Code User-Agent 模板，可继续手改。" },
+  { value: "gemini-cli", label: "Gemini CLI", description: "填入常见的 Gemini CLI User-Agent 模板，可继续手改。" },
+  { value: "chrome-browser", label: "Chrome 浏览器", description: "填入常见的 Chrome 浏览器 User-Agent 模板，可继续手改。" },
+  { value: "custom", label: "自定义 User-Agent", description: "填写完整 User-Agent，运行时优先发送它。" },
 ];
 
 export function normalizeCredentialUserAgentOverride(value: string): string | null {

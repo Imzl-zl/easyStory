@@ -83,7 +83,7 @@
 - 新实现优先补服务和测试，再接路由；保持 API 只做装配，不直接写业务规则。
 - 所有业务模块公开面已收敛为 async-only：统一 `Service + create_*_service` 命名，不保留 `Async*` 镜像类或 `create_async_*` 第二导出面。内部若只剩 async 一套实现，把 `*_async` 名称改回业务语义名。
 - LLM 供应商兼容层当前最佳实践入口：`api_dialect` 只决定协议格式与解析；鉴权方式由 `auth_strategy` / `api_key_header_name` 显式 override，不再硬绑在 dialect 上。
-- LLM southbound transport 当前默认走 `apps/api/app/shared/runtime/llm/litellm_backend.py`；`custom_header` 鉴权、完整 endpoint `base_url`、自定义 Gemini 网关、自定义 OpenAI Responses 网关、`openai_responses + stop`，以及 Gemini 原生 `thinking_level` / 非零 `thinking_budget` 显式走 `native_http_backend.py`。这是按连接 / 请求语义做 backend 选择，不是失败后的静默降级；不要再把 provider HTTP 细节写回 `LLMToolProvider` 或 verifier 业务层。
+- LLM southbound transport 当前默认走 `apps/api/app/shared/runtime/llm/litellm_backend.py`；`custom_header` 鉴权、完整 endpoint `base_url`、自定义 Gemini 网关、自定义 OpenAI Chat/Responses 网关、`openai_responses + stop`，以及 Gemini 原生 `thinking_level` / 非零 `thinking_budget` 显式走 `native_http_backend.py`。这是按连接 / 请求语义做 backend 选择，不是失败后的静默降级；不要再把 provider HTTP 细节写回 `LLMToolProvider` 或 verifier 业务层。
 - Credential Center 当前正式支持的高级连接字段：`interop_profile`、`auth_strategy`、`api_key_header_name`、`extra_headers`、`user_agent_override`、`client_name`、`client_version`、`runtime_kind`；这些字段同时作用于保存、验证和运行时请求，其中 `interop_profile` 用于显式表达协议兼容 override，不单独下沉到 assistant 业务层。
 - Credential Center 设置页当前主入口已显式区分 `验证流式链路`、`验证非流链路`、`验证流式工具`、`验证非流工具`；后端统一入口仍是 `POST /api/v1/credentials/{id}/verify?probe_kind=...&transport_mode=...`，底层仍保留不带 `transport_mode` 的 `text_probe`。
 - `model_credentials` 当前的工具能力真值已按传输模式拆开：`stream_tool_verified_probe_kind + stream_tool_last_verified_at` 只代表流式工具链，`buffered_tool_verified_probe_kind + buffered_tool_last_verified_at` 只代表非流工具链；`last_verified_at` 只代表基础连接验证时间，不再承载工具能力语义。

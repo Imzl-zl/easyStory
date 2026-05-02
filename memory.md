@@ -3,9 +3,9 @@
 
 ## 当前基线
 
-- 后端检查：`2026-04-25` 已确认 `cd apps/api && ./.venv/bin/ruff check app tests` 通过；runtime flow hardening 相关定向后端回归已通过。全量 `pytest -q` 仍受 60 秒硬超时限制，当前未在本轮内跑完整轮
-- 前端检查：`2026-04-19` 已确认 `pnpm --dir apps/web lint` 与 `pnpm --dir apps/web test:unit` 通过（`342 passed`）
-- 最后更新：2026-04-25
+- 后端检查：`2026-05-02` 已确认 `cd apps/api && ./.venv/bin/ruff check app tests` 通过；模型连接配置审查相关后端定向回归 `112 passed`。全量 `pytest -q` 仍受 60 秒硬超时限制，当前未在本轮内跑完整轮
+- 前端检查：`2026-05-02` 已确认 Credential Center 定向组件测试 `43 passed`；本轮全量 `pnpm --dir apps/web test:unit` 仍有 6 个与凭证改动无关的既有断言不匹配
+- 最后更新：2026-05-02
 ## 已完成能力
 
 - 凭证与模型连接闭环：安全存储、endpoint policy、`api_dialect` 路由、`interop_profile` / auth strategy override、公网 http 显式测试开关、本地 provider interop probe、旧库 schema reconcile，以及连接级 `context_window_tokens / default_max_output_tokens`
@@ -14,6 +14,7 @@
 - verification / tool conformance probe 预算当前已显式抬高：连接验证 `max_output_tokens` 从 32 提到 256，tool conformance probe 从 128 提到 256，tool probe 超时从 5 秒提到 30 秒；修复目标是减少 reasoning 模型把默认思考预算或首 token 延迟误判成“渠道不兼容”
 - assistant / provider interop 流式口径已收口：assistant turn 后端默认 `stream=true`，前端非流 JSON 调用显式传 `stream=false`；credential verifier 与 provider interop probe 默认走流式；incubator / studio 聊天已移除“流式失败自动退回非流”；模型工具调用现已在 shared runtime 引入 canonical dotted name -> external safe alias 边界，以及共享 `tool_schema_compiler / tool_call_codec / tool_continuation_codec / stream_event_normalizer`，避免 OpenAI-compatible tool name / schema / tool call parse / continuation / stream parse 漂移再次打断 assistant tool loop
 - Credential Center 高级兼容设置与能力真值闭环：凭证现正式支持 `interop_profile / auth_strategy / api_key_header_name / extra_headers`，工具能力真值已按传输模式拆成 `stream_tool_* / buffered_tool_*`，且保存、验证、assistant runtime 与前端配置入口已对齐；其中 `extra_headers` 已收口为仅允许非敏感元数据头，`interop_profile` 已按 `api_dialect` 做显式约束
+- 2026-05-02 模型连接配置审查已完成：自定义 OpenAI Chat/Responses 网关显式走 `native_http`，保留原始模型名与 Chat/Responses 请求语义；LiteLLM 路径已验证 `extra_headers` 与 `User-Agent` 会真实传入调用；OpenAI Chat 工具 conformance probe 不再强制 `tool_choice`，避免 NewAPI/DeepSeek 类网关拒绝验证请求
 - Credential Center 显式验证语义与 assistant 门控已收口：产品面现已区分 `验证连接(text_probe)`、`验证流式工具(tool_continuation_probe + stream)`、`验证非流工具(tool_continuation_probe + buffered)`；共享 verifier 已复用 conformance probe 主链，assistant 在 visible `project.*` 工具存在时会按本轮 `stream` 模式显式要求对应的工具能力真值，避免再出现“流式验证通过但非流 tool loop 实际不可用”的单一 verify 假象
 - 2026-04-08 review remediation 已完成：`tool_definition_probe` 现仅接受精确 success token；`tool_continuation_probe` follow-up 改为校验只存在于 tool result 中的动态 echoed 值，不再把期望答案写进 prompt；同模式下的工具能力写回已改为数据库当前值参与的原子 promote，避免并发低等级验证覆盖高等级 capability 真值
 - 2026-04-09 继续收口了工具能力真值与传输模式语义：若显式工具验证失败，只会清掉对应模式里同级或更高的工具能力真值；shared runtime 与 verifier 现已明确区分流式 / 非流工具链，并把“工具验证通过”改成带模式的能力结论。任何成功/失败验证现在都会清空 legacy `verified_probe_kind`，避免启动 reconcile 再从旧字段回灌流式能力；`openai_responses` 非流解析也只在 `output_text` 非空时才允许 `output=[]`，空字符串不再被静默放过。最新本地实测：`Gemini` 的流式和非流工具链都可用，而两条 OpenAI-compatible 连接在非流工具路径上仍会显式暴露上游空响应 / `output=[]`。
@@ -104,8 +105,9 @@
 - async 语义审查不要误把基础设施命名（AsyncSessionFactory 等）当待清理对象
 - shared/runtime 改为惰性导出，避免 settings -> runtime -> llm tool provider 循环导入
 
-## 最近活跃窗口（2026-04-06 ~ 2026-04-25）
+## 最近活跃窗口（2026-04-06 ~ 2026-05-02）
 
 - 2026-04-06：assistant 原生 tool-calling runtime `v1A`、stale-running-turn 恢复、SSE 错误元数据、Incubator continuity 与共享 stream client 终止语义集中收口。
 - 2026-04-07 ~ 2026-04-09：assistant runtime context governance、模型工具兼容层与凭证能力真值主线收口，`tool_*_codec`、stream normalizer、conformance probes、分模式 `stream_tool_* / buffered_tool_*` 已打通。
 - 2026-04-25：完成 runtime flow hardening；MCP SDK 适配、MCP endpoint policy、workflow graph loop recursion budget 均已补定向测试并通过，full pytest 仍因 60 秒硬超时未完成。
+- 2026-05-02：完成模型连接配置审查与修复；Credential Center 文案改为标准协议名，custom OpenAI Chat gateway 改走 native HTTP，目标后端/前端验证通过。

@@ -137,7 +137,7 @@ export function CredentialCenterForm({
         <div className="space-y-2">
           <SectionLabel>客户端标识</SectionLabel>
           <p className="text-[10px]" style={{ color: "var(--text-tertiary)" }}>
-            某些中转站会按客户端标识分流，需要伪装时在此设置
+            设置运行时发送的 User-Agent；某些中转站会按客户端标识分流
           </p>
           <CredentialClientIdentityFields formState={formState} setFormState={setFormState} />
         </div>
