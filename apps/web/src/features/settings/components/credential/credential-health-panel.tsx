@@ -4,6 +4,10 @@ import { useMemo } from "react";
 
 import type { PendingCredentialAction } from "@/features/settings/components/credential/credential-center-action-support";
 import {
+  isPendingCredentialAction,
+  resolveCredentialActionButtonLabel,
+} from "@/features/settings/components/credential/credential-center-action-support";
+import {
   buildCredentialTransportCapabilityItem,
   formatAuditTime,
   formatCredentialTokenSummary,
@@ -62,6 +66,7 @@ export function CredentialHealthPanel({
   const streamCap = buildCredentialTransportCapabilityItem(credential, "stream");
   const bufferedCap = buildCredentialTransportCapabilityItem(credential, "buffered");
   const overallStatus = getOverallStatus(credential);
+  const activeValidationLabel = resolveActiveValidationLabel(pendingAction, credential.id);
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -119,18 +124,31 @@ export function CredentialHealthPanel({
           <LinkageRow
             title="流式链路"
             capability={streamCap}
+            credentialId={credential.id}
+            connectionActionType="verify_stream_connection"
+            toolsActionType="verify_stream_tools"
             onVerifyConnection={() => onVerify("verify_stream_connection", credential.id)}
             onVerifyTools={() => onVerify("verify_stream_tools", credential.id)}
+            pendingAction={pendingAction}
             isPending={isPending}
           />
           <LinkageRow
             title="非流链路"
             capability={bufferedCap}
+            credentialId={credential.id}
+            connectionActionType="verify_buffered_connection"
+            toolsActionType="verify_buffered_tools"
             onVerifyConnection={() => onVerify("verify_buffered_connection", credential.id)}
             onVerifyTools={() => onVerify("verify_buffered_tools", credential.id)}
+            pendingAction={pendingAction}
             isPending={isPending}
           />
         </div>
+        {activeValidationLabel ? (
+          <p className="mt-4 text-[11px]" style={{ color: "var(--accent-primary)" }} aria-live="polite">
+            {activeValidationLabel}
+          </p>
+        ) : null}
       </div>
 
       {/* Last Verified */}
@@ -146,21 +164,31 @@ export function CredentialHealthPanel({
 function LinkageRow({
   title,
   capability,
+  credentialId,
+  connectionActionType,
+  toolsActionType,
   onVerifyConnection,
   onVerifyTools,
+  pendingAction,
   isPending,
 }: {
   title: string;
   capability: { title: string; summary: string; detail: string; tone: string; lastVerifiedAt?: string | null };
+  credentialId: string;
+  connectionActionType: PendingCredentialAction["type"];
+  toolsActionType: PendingCredentialAction["type"];
   onVerifyConnection: () => void;
   onVerifyTools: () => void;
+  pendingAction: PendingCredentialAction | null;
   isPending: boolean;
 }) {
   const isOk = capability.tone === "completed";
   const isWarning = capability.tone === "ready" || capability.tone === "warning";
+  const isConnectionPending = isPendingCredentialAction(pendingAction, connectionActionType, credentialId);
+  const isToolsPending = isPendingCredentialAction(pendingAction, toolsActionType, credentialId);
 
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex items-center justify-between gap-4" aria-busy={isConnectionPending || isToolsPending}>
       <div className="flex items-center gap-3 min-w-0">
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
@@ -204,7 +232,10 @@ function LinkageRow({
           onClick={onVerifyConnection}
           disabled={isPending}
         >
-          验证连接
+          <ButtonContent
+            isPending={isConnectionPending}
+            label={isConnectionPending ? resolveCredentialActionButtonLabel(connectionActionType, true) : "验证连接"}
+          />
         </button>
         <button
           className="h-6 px-2 rounded text-[10px] font-medium"
@@ -212,11 +243,56 @@ function LinkageRow({
           onClick={onVerifyTools}
           disabled={isPending}
         >
-          验证工具
+          <ButtonContent
+            isPending={isToolsPending}
+            label={isToolsPending ? resolveCredentialActionButtonLabel(toolsActionType, true) : "验证工具"}
+          />
         </button>
       </div>
     </div>
   );
+}
+
+function ButtonContent({
+  isPending,
+  label,
+}: {
+  isPending: boolean;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {isPending ? (
+        <span
+          className="h-2.5 w-2.5 animate-spin rounded-full"
+          style={{ border: "1px solid var(--line-medium)", borderTopColor: "var(--accent-primary)" }}
+        />
+      ) : null}
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function resolveActiveValidationLabel(
+  pendingAction: PendingCredentialAction | null,
+  credentialId: string,
+): string | null {
+  if (pendingAction?.credentialId !== credentialId) {
+    return null;
+  }
+  if (pendingAction.type === "verify_stream_connection") {
+    return "正在验证流式链路...";
+  }
+  if (pendingAction.type === "verify_buffered_connection") {
+    return "正在验证非流链路...";
+  }
+  if (pendingAction.type === "verify_stream_tools") {
+    return "正在验证流式工具...";
+  }
+  if (pendingAction.type === "verify_buffered_tools") {
+    return "正在验证非流工具...";
+  }
+  return null;
 }
 
 function InfoItem({ label, value }: { label: string; value: string }) {

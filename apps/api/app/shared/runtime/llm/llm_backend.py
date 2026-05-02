@@ -59,6 +59,16 @@ def resolve_backend_selection(request: LLMGenerateRequest) -> ResolvedLLMBackend
             backend_key="native_http",
             reason="已保存的完整 endpoint base_url 需要保留现有直连语义，避免 LiteLLM 再拼接路径",
         )
+    if _uses_custom_gemini_base_url(request):
+        return ResolvedLLMBackendSelection(
+            backend_key="native_http",
+            reason="Gemini 自定义网关需要保留 generateContent 原生路径语义",
+        )
+    if _uses_custom_openai_responses_base_url(request):
+        return ResolvedLLMBackendSelection(
+            backend_key="native_http",
+            reason="OpenAI Responses 自定义网关需要保留 Responses 原生流式工具语义",
+        )
     if request.connection.api_dialect == "openai_responses" and request.stop:
         return ResolvedLLMBackendSelection(
             backend_key="native_http",
@@ -81,6 +91,26 @@ def _requires_native_thinking_budget(request: LLMGenerateRequest) -> bool:
     if request.connection.api_dialect != "gemini_generate_content":
         return True
     return request.thinking_budget != 0
+
+
+def _uses_custom_gemini_base_url(request: LLMGenerateRequest) -> bool:
+    if request.connection.api_dialect != "gemini_generate_content":
+        return False
+    base_url = request.connection.base_url
+    if base_url is None:
+        return False
+    hostname = (urlsplit(base_url).hostname or "").lower()
+    return hostname != "generativelanguage.googleapis.com"
+
+
+def _uses_custom_openai_responses_base_url(request: LLMGenerateRequest) -> bool:
+    if request.connection.api_dialect != "openai_responses":
+        return False
+    base_url = request.connection.base_url
+    if base_url is None:
+        return False
+    hostname = (urlsplit(base_url).hostname or "").lower()
+    return hostname != "api.openai.com"
 
 
 def _uses_full_endpoint_base_url(request: LLMGenerateRequest) -> bool:

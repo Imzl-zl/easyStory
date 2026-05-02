@@ -133,10 +133,10 @@ test("normalizeCredentialActionErrorMessage rewrites tool call probe failure int
   );
 });
 
-test("normalizeCredentialActionErrorMessage rewrites tool continuation equality failure into user-facing Chinese", () => {
+test("normalizeCredentialActionErrorMessage rewrites tool continuation dynamic echo failure into user-facing Chinese", () => {
   assert.equal(
     normalizeCredentialActionErrorMessage(
-      "无法验证 bwen 凭证: 非流工具调用验证失败：Tool continuation probe final content must equal '工具续接成功：probe-result-123。'",
+      "无法验证 bwen 凭证: 非流工具调用验证失败：Tool continuation probe final content must mention 'probe-result-123'",
       "verify_buffered_tools",
     ),
     "连接“bwen”非流工具调用验证失败：模型没有完成工具结果续接。请检查上游的 tool continuation 兼容性。",

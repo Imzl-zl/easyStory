@@ -12,7 +12,6 @@ from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     conformance_probe_kind_satisfies,
     normalize_conformance_probe_kind,
     promote_conformance_probe_kind,
-    render_tool_continuation_probe_success_text,
     resolve_conformance_probe_kind_rank,
     validate_tool_call_probe_response,
     validate_tool_continuation_probe_response,
@@ -83,8 +82,8 @@ def test_build_text_probe_request_uses_default_verification_prompt() -> None:
         model_name="gpt-5.4",
     )
 
-    assert request.prompt == "今天天气怎么样？"
-    assert request.system_prompt == "请像日常聊天一样，用一句简短中文直接回答用户问题，不要使用 Markdown。"
+    assert request.prompt == "你好"
+    assert request.system_prompt == "请像日常聊天一样，用十个汉字以内的中文回答，不要使用 Markdown。"
     assert request.thinking_budget is None
 
 
@@ -370,8 +369,8 @@ def test_validate_tool_call_probe_response_rejects_wrong_arguments() -> None:
         )
 
 
-def test_validate_tool_continuation_probe_response_requires_exact_success_text() -> None:
-    with pytest.raises(ConfigurationError, match="must equal"):
+def test_validate_tool_continuation_probe_response_requires_dynamic_echo() -> None:
+    with pytest.raises(ConfigurationError, match="must mention"):
         validate_tool_continuation_probe_response(
             NormalizedLLMResponse(
                 content="工具续接成功，但没有带回工具结果。",
@@ -384,7 +383,17 @@ def test_validate_tool_continuation_probe_response_requires_exact_success_text()
         )
     validate_tool_continuation_probe_response(
         NormalizedLLMResponse(
-            content=f"  {render_tool_continuation_probe_success_text('probe-result-789')}  ",
+            content="  工具续接成功：probe-result-789  ",
+            finish_reason=None,
+            input_tokens=None,
+            output_tokens=None,
+            total_tokens=None,
+        ),
+        expected_echo="probe-result-789",
+    )
+    validate_tool_continuation_probe_response(
+        NormalizedLLMResponse(
+            content="工具续接成功：<echoed>probe-result-789</echoed>",
             finish_reason=None,
             input_tokens=None,
             output_tokens=None,

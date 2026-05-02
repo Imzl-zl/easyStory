@@ -16,7 +16,6 @@ from app.shared.runtime.llm.llm_backend import LLMBackendStreamEvent
 from app.shared.runtime.llm.llm_protocol_types import (
     LLMGenerateRequest,
     NormalizedLLMResponse,
-    PreparedLLMHttpRequest,
     VERIFY_SYSTEM_PROMPT,
     VERIFY_USER_PROMPT,
 )
@@ -415,14 +414,13 @@ def test_verify_tool_probe_requires_transport_mode() -> None:
 
 
 def test_verify_text_probe_accepts_explicit_stream_transport_mode() -> None:
-    captured: dict[str, object] = {}
+    backend = RecordingBackend(
+        stream_sequences=[
+            [LLMBackendStreamEvent(terminal_response=_ok_response("今天天气真好。"))],
+        ],
+    )
 
-    async def stream_request_sender(request, *, api_dialect):
-        captured["request"] = request
-        captured["api_dialect"] = api_dialect
-        return _ok_response("今天天气真好。")
-
-    verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
+    verifier = AsyncHttpCredentialVerifier(backend=backend)
     result = asyncio.run(
         verifier.verify(
             provider="claude",
@@ -434,10 +432,8 @@ def test_verify_text_probe_accepts_explicit_stream_transport_mode() -> None:
         )
     )
 
-    request = captured["request"]
-    assert request.headers["Accept"] == "text/event-stream"
-    assert request.json_body["stream"] is True
-    assert captured["api_dialect"] == "anthropic_messages"
+    assert len(backend.stream_requests) == 1
+    assert backend.generate_requests == []
     assert result.message == "流式连接验证成功"
     assert result.transport_mode == "stream"
 
@@ -516,11 +512,11 @@ def test_verify_credential_maps_upstream_authentication_error_subclass() -> None
 
 
 def test_verify_credential_surfaces_connection_error() -> None:
-    async def stream_request_sender(_request, *, api_dialect):
-        assert api_dialect == "openai_chat_completions"
-        raise httpx.ConnectError("connect failed")
+    backend = RecordingBackend(
+        stream_sequences=[httpx.ConnectError("connect failed")],
+    )
 
-    verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
+    verifier = AsyncHttpCredentialVerifier(backend=backend)
 
     with pytest.raises(BusinessRuleError, match="无法连接到 openai"):
         asyncio.run(
@@ -587,14 +583,13 @@ def test_verify_credential_rejects_public_http_base_url_by_default(monkeypatch) 
 def test_verify_credential_allows_private_base_url_when_enabled(monkeypatch) -> None:
     monkeypatch.setenv(ALLOW_PRIVATE_MODEL_ENDPOINTS_ENV, "true")
     clear_settings_cache()
-    captured: dict[str, object] = {}
+    backend = RecordingBackend(
+        stream_sequences=[
+            [LLMBackendStreamEvent(terminal_response=_ok_response("今天天气真好。"))],
+        ],
+    )
 
-    async def stream_request_sender(request, *, api_dialect):
-        captured["request"] = request
-        captured["api_dialect"] = api_dialect
-        return _ok_response("今天天气真好。")
-
-    verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
+    verifier = AsyncHttpCredentialVerifier(backend=backend)
     asyncio.run(
         verifier.verify(
             provider="openai",
@@ -605,24 +600,20 @@ def test_verify_credential_allows_private_base_url_when_enabled(monkeypatch) -> 
         )
     )
 
-    request = captured["request"]
-    assert isinstance(request, PreparedLLMHttpRequest)
-    assert request.url == "http://127.0.0.1:11434/v1/chat/completions"
-    assert request.json_body["stream"] is True
-    assert captured["api_dialect"] == "openai_chat_completions"
+    assert len(backend.stream_requests) == 1
+    assert backend.stream_requests[0].connection.base_url == "http://127.0.0.1:11434/v1"
 
 
 def test_verify_credential_allows_public_http_base_url_when_enabled(monkeypatch) -> None:
     monkeypatch.setenv(ALLOW_INSECURE_PUBLIC_MODEL_ENDPOINTS_ENV, "true")
     clear_settings_cache()
-    captured: dict[str, object] = {}
+    backend = RecordingBackend(
+        stream_sequences=[
+            [LLMBackendStreamEvent(terminal_response=_ok_response("今天天气真好。"))],
+        ],
+    )
 
-    async def stream_request_sender(request, *, api_dialect):
-        captured["request"] = request
-        captured["api_dialect"] = api_dialect
-        return _ok_response("今天天气真好。")
-
-    verifier = AsyncHttpCredentialVerifier(stream_request_sender=stream_request_sender)
+    verifier = AsyncHttpCredentialVerifier(backend=backend)
     asyncio.run(
         verifier.verify(
             provider="openai",
@@ -633,11 +624,8 @@ def test_verify_credential_allows_public_http_base_url_when_enabled(monkeypatch)
         )
     )
 
-    request = captured["request"]
-    assert isinstance(request, PreparedLLMHttpRequest)
-    assert request.url == "http://49.234.21.84:3000/v1/chat/completions"
-    assert request.json_body["stream"] is True
-    assert captured["api_dialect"] == "openai_chat_completions"
+    assert len(backend.stream_requests) == 1
+    assert backend.stream_requests[0].connection.base_url == "http://49.234.21.84:3000/v1"
 
 
 def _tool_call_response(

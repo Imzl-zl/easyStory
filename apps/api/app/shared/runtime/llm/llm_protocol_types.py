@@ -51,8 +51,8 @@ DEFAULT_BASE_URLS: dict[LlmApiDialect, str] = {
 }
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 60
-VERIFY_USER_PROMPT = "今天天气怎么样？"
-VERIFY_SYSTEM_PROMPT = "请像日常聊天一样，用一句简短中文直接回答用户问题，不要使用 Markdown。"
+VERIFY_USER_PROMPT = "你好"
+VERIFY_SYSTEM_PROMPT = "请像日常聊天一样，用十个汉字以内的中文回答，不要使用 Markdown。"
 # Verification requests should not use tiny output budgets. Reasoning-capable
 # models may spend part of the allowance before producing visible output, which
 # turns credential checks into false negatives.

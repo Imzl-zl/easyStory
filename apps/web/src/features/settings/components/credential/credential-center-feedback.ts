@@ -12,7 +12,6 @@ const VERIFY_SUBJECT_PATTERN = /^无法验证\s+(.+?)\s+凭证:\s*/;
 const TOOL_CALL_PROBE_ZERO_CALLS_MARKER = "Tool call probe expected exactly one tool call, got 0";
 const TOOL_CALL_PROBE_RESPONSE_ID_MARKER = "requires provider_response_id";
 const TOOL_CONTINUATION_EMPTY_MARKER = "Tool continuation probe returned empty final content";
-const TOOL_CONTINUATION_EQUAL_MARKER = "Tool continuation probe final content must equal";
 const TOOL_CONTINUATION_FOLLOWUP_MARKER = "Tool continuation probe final content must mention";
 
 export function resolveCredentialActionFeedback(
@@ -132,7 +131,6 @@ function normalizeToolVerificationErrorMessage(
   if (
     message.includes(TOOL_CONTINUATION_EMPTY_MARKER)
     || message.includes(TOOL_CONTINUATION_FOLLOWUP_MARKER)
-    || message.includes(TOOL_CONTINUATION_EQUAL_MARKER)
   ) {
     return `${subject}${toolLabel}调用验证失败：模型没有完成工具结果续接。请检查上游的 tool continuation 兼容性。`;
   }

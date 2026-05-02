@@ -68,6 +68,6 @@ verifier / probe 侧目标：
 
 ## 6. 风险点
 
-- LiteLLM 对任意 `custom_header` 鉴权、完整 endpoint `base_url`、`openai_responses + stop` 与部分 provider-native thinking 语义未必天然等价。
+- LiteLLM 对任意 `custom_header` 鉴权、完整 endpoint `base_url`、自定义 Gemini 网关、自定义 OpenAI Responses 网关、`openai_responses + stop` 与部分 provider-native thinking 语义未必天然等价。
 - 现有单测大量绑定 request JSON shape，需要按新 backend 分层重写。
 - 真实渠道失败不能视为本轮代码回归，需和上游 provider 状态区分。

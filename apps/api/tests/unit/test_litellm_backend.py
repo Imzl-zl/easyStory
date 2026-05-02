@@ -136,6 +136,28 @@ def test_build_litellm_call_spec_uses_openai_prefix_for_openai_responses_gateway
     assert spec.call_kwargs["custom_llm_provider"] == "openai"
 
 
+def test_resolve_backend_selection_uses_native_for_custom_openai_responses_gateway() -> None:
+    request = LLMGenerateRequest(
+        connection=LLMConnection(
+            provider="openai",
+            api_dialect="openai_responses",
+            api_key="test-key",
+            base_url="https://proxy.example.com/v1",
+        ),
+        model_name="gpt-5.4",
+        prompt="hi",
+        system_prompt=None,
+        response_format="text",
+        temperature=0.0,
+        max_tokens=32,
+        top_p=1.0,
+    )
+
+    selection = resolve_backend_selection(request)
+
+    assert selection.backend_key == "native_http"
+
+
 def test_resolve_backend_selection_uses_native_for_openai_responses_stop() -> None:
     request = LLMGenerateRequest(
         connection=LLMConnection(
@@ -179,6 +201,29 @@ def test_resolve_backend_selection_keeps_gemini_zero_budget_on_litellm() -> None
     selection = resolve_backend_selection(request)
 
     assert selection.backend_key == "litellm"
+
+
+def test_resolve_backend_selection_uses_native_for_custom_gemini_gateway() -> None:
+    request = LLMGenerateRequest(
+        connection=LLMConnection(
+            provider="gemini",
+            api_dialect="gemini_generate_content",
+            api_key="test-key",
+            base_url="https://proxy.example.com",
+        ),
+        model_name="gemini-2.5-flash",
+        prompt="hi",
+        system_prompt=None,
+        response_format="text",
+        temperature=0.0,
+        max_tokens=32,
+        top_p=1.0,
+        thinking_budget=0,
+    )
+
+    selection = resolve_backend_selection(request)
+
+    assert selection.backend_key == "native_http"
 
 
 def test_build_litellm_call_spec_appends_gemini_models_path_for_root_gateway() -> None:

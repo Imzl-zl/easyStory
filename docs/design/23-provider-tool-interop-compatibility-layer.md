@@ -135,7 +135,7 @@ assistant 侧与工具域的正式入口在：
 - 当前 `portable_subset` 会收口 required-only `anyOf`，`gemini_compatible` 会在此基础上继续移除 Gemini 不支持的 schema key
 - shared runtime 已新增 `tool_continuation_codec.py`，runtime replay projection、tool result payload encoding 与 OpenAI Responses continuation input 已从 request builder 中抽离
 - shared runtime 已为 Gemini 流式补齐终态 tool-call synthesize，避免早期 `functionCall` 在 terminal 装配时丢失或重复
-- shared runtime 当前已新增 `llm_backend.py + litellm_backend.py + native_http_backend.py`：默认 southbound provider transport 走 LiteLLM；`custom_header` 鉴权、完整 endpoint `base_url`、`Responses + stop`，以及 Gemini 原生 `thinking_level` / 非零 `thinking_budget` 走显式 `native_http` backend，不做 silent fallback
+- shared runtime 当前已新增 `llm_backend.py + litellm_backend.py + native_http_backend.py`：默认 southbound provider transport 走 LiteLLM；`custom_header` 鉴权、完整 endpoint `base_url`、自定义 Gemini 网关、自定义 OpenAI Responses 网关、`Responses + stop`，以及 Gemini 原生 `thinking_level` / 非零 `thinking_budget` 走显式 `native_http` backend，不做 silent fallback。这些是按连接 / 请求语义选择的标准 backend，不是失败后的静默降级
 
 ## 4. 设计目标
 

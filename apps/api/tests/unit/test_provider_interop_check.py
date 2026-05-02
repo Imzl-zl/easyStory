@@ -56,7 +56,7 @@ def test_render_staged_request_uses_llm_generate_request_for_litellm_backend() -
     assert payload["request"]["kind"] == "llm_generate_request"
     assert payload["request"]["litellm_preview"]["call_kind"] == "completion"
     assert payload["request"]["litellm_preview"]["call_kwargs"]["model"] == "gpt-5.4"
-    assert payload["request"]["prompt"] == "今天天气怎么样？"
+    assert payload["request"]["prompt"] == "你好"
 
 
 def test_render_staged_request_uses_prepared_http_request_for_native_backend() -> None:

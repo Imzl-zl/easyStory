@@ -241,11 +241,10 @@ def validate_tool_continuation_probe_response(
     content = response.content.strip()
     if not content:
         raise ConfigurationError("Tool continuation probe returned empty final content")
-    expected_content = render_tool_continuation_probe_success_text(expected_echo)
-    if content != expected_content:
+    if expected_echo not in content:
         raise ConfigurationError(
-            "Tool continuation probe final content must equal "
-            f"'{expected_content}'"
+            "Tool continuation probe final content must mention "
+            f"'{expected_echo}'"
         )
 
 
@@ -272,12 +271,6 @@ def serialize_probe_response(response: NormalizedLLMResponse) -> dict[str, Any]:
 
 def build_tool_continuation_probe_result_echo() -> str:
     return f"probe-result-{uuid4().hex[:12]}"
-
-
-def render_tool_continuation_probe_success_text(expected_echo: str) -> str:
-    return f"工具续接成功：{expected_echo}"
-
-
 
 
 def use_buffered_text_probe_by_default(api_dialect: str) -> bool:

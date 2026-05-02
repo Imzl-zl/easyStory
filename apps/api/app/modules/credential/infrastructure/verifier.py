@@ -8,7 +8,6 @@ from typing import Literal, Protocol
 import httpx
 
 from app.shared.runtime.errors import BusinessRuleError, ConfigurationError
-from app.shared.runtime.llm.interop.provider_interop_stream_support import build_stream_probe_request
 from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
     ConformanceProbeKind,
     build_conformance_probe_request,
@@ -24,12 +23,10 @@ from app.shared.runtime.llm.interop.provider_tool_conformance_support import (
 )
 from app.shared.runtime.llm.llm_backend import AsyncLLMGenerateBackend, resolve_backend_selection
 from app.shared.runtime.llm.litellm_backend import LiteLLMBackend
-from app.shared.runtime.llm.llm_protocol_requests import prepare_generation_request
 from app.shared.runtime.llm.llm_protocol_types import (
     LLMConnection,
     LLMGenerateRequest,
     NormalizedLLMResponse,
-    PreparedLLMHttpRequest,
     resolve_model_name,
 )
 from app.shared.runtime.llm.native_http_backend import NativeHttpLLMBackend
@@ -76,25 +73,14 @@ class AsyncCredentialVerifier(Protocol):
     ) -> CredentialVerificationResult: ...
 
 
-class AsyncCredentialStreamRequestSender(Protocol):
-    async def __call__(
-        self,
-        request: PreparedLLMHttpRequest,
-        *,
-        api_dialect: str,
-    ) -> NormalizedLLMResponse: ...
-
-
 class AsyncHttpCredentialVerifier:
     def __init__(
         self,
         *,
-        stream_request_sender: AsyncCredentialStreamRequestSender | None = None,
         backend: AsyncLLMGenerateBackend | None = None,
         litellm_backend: AsyncLLMGenerateBackend | None = None,
         native_backend: AsyncLLMGenerateBackend | None = None,
     ) -> None:
-        self.stream_request_sender = stream_request_sender
         self.default_backend = backend
         self.litellm_backend = litellm_backend or backend or LiteLLMBackend()
         self.native_backend = native_backend or NativeHttpLLMBackend()
@@ -278,11 +264,6 @@ class AsyncHttpCredentialVerifier:
         self,
         request: LLMGenerateRequest,
     ) -> NormalizedLLMResponse:
-        if self.stream_request_sender is not None:
-            return await _execute_stream_request_with_sender(
-                self.stream_request_sender,
-                request,
-            )
         terminal_response: NormalizedLLMResponse | None = None
         async for event in self._resolve_backend(request).generate_stream(request):
             if event.terminal_response is not None:
@@ -312,20 +293,6 @@ class AsyncHttpCredentialVerifier:
         upstream_error = normalize_text_probe_error_message(actual_reply)
         if upstream_error is not None:
             raise BusinessRuleError(f"无法验证 {provider} 凭证: {upstream_error}")
-
-
-async def _execute_stream_request_with_sender(
-    sender: AsyncCredentialStreamRequestSender,
-    request: LLMGenerateRequest,
-) -> NormalizedLLMResponse:
-    prepared_request = build_stream_probe_request(
-        prepare_generation_request(request),
-        api_dialect=request.connection.api_dialect,
-    )
-    return await sender(
-        prepared_request,
-        api_dialect=request.connection.api_dialect,
-    )
 
 
 def _raise_stream_http_error(
