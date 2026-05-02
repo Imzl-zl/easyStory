@@ -19,7 +19,7 @@ test("lobby settings tab resolves to supported values", () => {
   assert.equal(resolveLobbySettingsTab("assistant-hooks"), "hooks");
   assert.equal(resolveLobbySettingsTab("assistant-mcp"), "mcp");
   assert.equal(resolveLobbySettingsTab("assistant-skills"), "skills");
-  assert.equal(resolveLobbySettingsTab("other"), "assistant");
+  assert.equal(resolveLobbySettingsTab("other"), "credentials");
   assert.equal(isValidLobbySettingsTab("agents"), true);
   assert.equal(isValidLobbySettingsTab("credentials"), true);
   assert.equal(isValidLobbySettingsTab("hooks"), true);

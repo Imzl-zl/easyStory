@@ -26,7 +26,7 @@ export function resolveLobbySettingsTab(value: string | null): LobbySettingsTab 
   if (value && value in LOBBY_SETTINGS_TAB_ALIASES) {
     return LOBBY_SETTINGS_TAB_ALIASES[value as keyof typeof LOBBY_SETTINGS_TAB_ALIASES];
   }
-  return "assistant";
+  return "credentials";
 }
 
 export function isValidLobbySettingsTab(value: string | null): boolean {

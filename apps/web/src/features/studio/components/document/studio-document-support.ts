@@ -212,6 +212,9 @@ export async function syncStudioDocumentQueries(
     buildStudioDocumentQueryKey(projectId, document.path),
     document,
   );
+  queryClient.invalidateQueries({
+    queryKey: buildStudioDocumentCatalogQueryKey(projectId),
+  }).catch(() => {});
   if (isStudioFileSavedDocument(document)) {
     await syncStudioDocumentCatalogEntry(queryClient, projectId, document);
     return;
